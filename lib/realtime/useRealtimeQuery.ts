@@ -15,7 +15,7 @@ import type {
 
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
-export { lastSeqOf, mergeBySeq, type SeqRow } from "./mergeBySeq";
+export { lastSeqOf, mergeBySeq } from "./mergeBySeq";
 
 /**
  * The single way to subscribe to Realtime (docs/FRONTEND.md "State management").

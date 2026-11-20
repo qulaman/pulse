@@ -6,7 +6,7 @@ import { humanAqtobe } from "@/lib/ai/time";
 import type { StatusScreen as Screen, Segment } from "@/lib/tasks/overview";
 import { deadlineToneOf, TONE_VAR } from "@/lib/tasks/tone";
 
-import { Icon } from "../desk/icons";
+import { Icon } from "../icons";
 
 /**
  * The status screen at the head of «Задачи» and «Мои дела» (D-83): what the moment is

@@ -61,6 +61,18 @@ export interface ParseInput {
   kinds?: readonly ParserKind[];
 }
 
+/** The parser switches of company.settings, or the model the lab tries instead (`run`, D-138). */
+type ParserSwitches = { model: string; escalate: boolean; escalation_model: string; kinds?: readonly ParserKind[] };
+
+/** A company's parser switches as parse options: the model, the escalation, the kinds. */
+export function parseOptionsOf(
+  settings: { parser: ParserSwitches },
+  run?: Omit<ParserSwitches, "kinds">,
+): Required<Pick<ParseInput, "model" | "escalate" | "escalationModel">> & Pick<ParseInput, "kinds"> {
+  const model = run ?? settings.parser;
+  return { model: model.model, escalate: model.escalate, escalationModel: model.escalation_model, kinds: settings.parser.kinds };
+}
+
 const MAX_TOKENS = 4096;
 const DEEPSEEK_TIMEOUT_MS: Record<string, number> = { "deepseek-chat": 25_000, "deepseek-reasoner": 55_000 };
 const ESCALATION_TRANSCRIPT_CHARS = 400;

@@ -4,12 +4,13 @@ import { Check, ChevronDown, Copy, Phone, Siren } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
 import { Kbd } from "@/components/desk/ui/Kbd";
+import { keysTaken } from "@/components/desk/ui/layers";
 import { afterAlarm, agoLine, alarmOf, clock, guardPhone } from "@/lib/desk/signals";
 import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
 import { useErrandActions } from "@/lib/errands/mutations";
 import { useErrands, useSecretaryActions, useSecretarySetup, type Errand } from "@/lib/errands/queries";
 import { shortName } from "@/lib/people/names";
-import { useNow } from "@/lib/pulse/queries";
+import { useNow } from "@/lib/useNow";
 import { useVisits } from "@/lib/visits/queries";
 
 /** A stray Enter typed just as the alarm comes up must not answer it. */
@@ -100,9 +101,8 @@ function AlarmField({ alarm, meId, main, busy, onAct, onFold }: { alarm: Errand;
     const armedAt = Date.now() + ARMED_AFTER_MS;
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || isTypingTarget(event.target)) return;
-      if (document.body.hasAttribute("data-sheet-open") || document.body.hasAttribute("data-dialog-open")) return;
-      // a menu or a popover of the top bar is open: its own Enter and Esc come first
-      if (document.querySelector("body > .desk-pop")) return;
+      // a dialog, a sheet, a menu or a popover is open: its own Enter and Esc come first
+      if (keysTaken()) return;
       if (!isPlainKey(event)) return;
       if (event.key === "Enter" || event.code === "NumpadEnter") {
         // a button of its own under the caret («Свернуть», «Копировать», the top bar's) answers itself

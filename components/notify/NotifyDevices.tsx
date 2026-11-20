@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
+import { SwitchPill } from "@/components/people/SwitchPill";
 import { usePushTest } from "@/components/push/usePushTest";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
@@ -137,13 +138,9 @@ export function NotifyDevices() {
               aria-checked={device.enabled}
               aria-label={device.enabled ? "Не присылать сюда" : "Присылать сюда"}
               onClick={() => toggle.mutate(device)}
-              className="relative h-7 w-12 shrink-0 rounded-full transition-colors duration-[120ms]"
-              style={{ background: device.enabled ? "var(--accent)" : "var(--border)" }}
+              className="shrink-0 rounded-full"
             >
-              <span
-                className="absolute top-1 h-5 w-5 rounded-full bg-bg transition-transform duration-[120ms]"
-                style={{ transform: device.enabled ? "translateX(24px)" : "translateX(4px)", left: 0 }}
-              />
+              <SwitchPill on={device.enabled} />
             </button>
             <button
               type="button"

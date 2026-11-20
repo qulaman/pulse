@@ -3,11 +3,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { Icon } from "@/components/tasks/desk/icons";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
 import { HapticSwitch } from "@/components/ui/HapticSwitch";
 import { taskMeta } from "@/lib/daily-report/format";
 import type { DailyReportTask } from "@/lib/daily-report/types";
+import { Icon } from "@/components/tasks/icons";
 
 /**
  * The tasks of a day in a report — handed over or accepted that day, written in by themselves

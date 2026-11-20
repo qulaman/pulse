@@ -4,10 +4,10 @@ import { pointsWord, takenLabel } from "@/lib/shop/format";
 import type { ShopItem } from "@/lib/shop/queries";
 
 /**
- * Плитка награды: значок на золотом ореоле, название, ценник-ярлык и одна строка жизни —
- * сколько раз награду уносили. Состояние склада (скрыта / закончилась / осталось N) висит
- * поверх ореола ярлыком, чтобы не спорить с ценой. Тап открывает редактор; других органов
- * управления на плитке нет — руководителю хватает одного жеста.
+ * A reward's tile: the icon on a gold halo, the title, a price tag and one line of its life — how
+ * many times the reward was carried off. The stock state (hidden / ran out / N left) hangs over the
+ * halo as a tag, so it does not argue with the price. A tap opens the editor; the tile has no other
+ * controls — one gesture is enough for the person in charge.
  */
 export function RewardTile({
   item,
@@ -75,7 +75,7 @@ export function RewardTile({
   );
 }
 
-/** Пустая плитка «добавить» — та же сетка, пунктир вместо карточки. */
+/** The empty «добавить» tile — the same grid, a dashed outline instead of a card. */
 export function AddRewardTile({ onClick }: { onClick: () => void }) {
   return (
     <button

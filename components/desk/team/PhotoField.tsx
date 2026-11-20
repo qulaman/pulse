@@ -2,12 +2,12 @@
 
 import { useRef, useState } from "react";
 
+import { Face } from "@/components/desk/ui/Face";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import { squarePhoto } from "@/lib/people/avatar";
 import type { PhotoDraft } from "@/lib/people/card-queries";
 
-import { TileFace } from "./TeamGrid";
 
 /**
  * The card's photo in a form: the circle as it will be on the tile, «Загрузить» or «Заменить», «Убрать». The
@@ -49,7 +49,7 @@ export function PhotoField({
 
   return (
     <div className="person-photo flex items-center gap-3" data-testid="person-photo">
-      <TileFace person={{ id, full_name: name.trim() || "?", avatar_url: shown }} size={48} />
+      <Face person={{ id, full_name: name.trim() || "?", avatar_url: shown }} size={48} />
       <input ref={input} type="file" accept="image/*" className="sr-only" tabIndex={-1} aria-label="Файл с фото" onChange={(event) => void pick(event.target.files?.[0])} data-testid="person-photo-file" />
       <Button size="sm" variant="secondary" loading={busy} onClick={() => input.current?.click()} data-testid="person-photo-pick">
         {shown ? "Заменить" : "Загрузить"}

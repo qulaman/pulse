@@ -30,18 +30,9 @@ import {
   SettingsSectionsBone,
   SkeletonGroup,
   StatBone,
-  TaskListBone,
 } from "./Skeleton";
 
 const MAIN = "mx-auto w-full max-w-lg flex-1 px-4 pb-36";
-
-/**
- * The screen head (D-113) as the page draws it. A line that loads keeps its room with a
- * no-break space: a plain " " collapses to nothing and the head grew by a line on arrival.
- */
-function Title({ text, sub }: { text: string; sub?: string }) {
-  return <PageHead title={text} sub={sub} />;
-}
 
 /** The date above the title, still grey: the phone's «now» draws it (D-113). */
 const DATE_BONE = (
@@ -51,21 +42,6 @@ const DATE_BONE = (
 );
 
 /* ---- director ---------------------------------------------------------------- */
-
-/** The inbox part of Пульс (below the verdict card, which renders itself while loading). */
-export function PulseInboxBone() {
-  return (
-    <SkeletonGroup grow className="mt-6">
-      <div className="flex items-center gap-2">
-        <Bone round w={10} h={10} />
-        <Bone h={24} w={120} />
-      </div>
-      <div className="mt-3">
-        <TaskListBone count={2} variant="director" />
-      </div>
-    </SkeletonGroup>
-  );
-}
 
 /**
  * Пульс and Лента (D-60) before their data: the page's own three bands with the face in the
@@ -299,7 +275,7 @@ export function PersonSkeleton() {
 export function SettingsSkeleton() {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
-      <Title text="Настройки" />
+      <PageHead title="Настройки" />
       <SettingsTiles tab="company" />
       <div className="mt-5">
         <SettingsSectionsBone count={3} />
@@ -315,7 +291,7 @@ export function SettingsSkeleton() {
 export function AdminSkeleton() {
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-36">
-      <Title text="Данные" />
+      <PageHead title="Данные" />
       <TableChips active={ADMIN_TABLES[0].table} />
       <div className="mt-4">
         <DataTable spec={ADMIN_TABLES[0]} />
@@ -449,7 +425,6 @@ export function BoardSkeleton() {
   );
 }
 
-/** «Мои дела»: the same page as the director's, without the people strip. */
 /**
  * «Мои дела» stops at its head (D-122): under it the employee's screen is shaped by the orders
  * themselves (D-173) — one line while orders wait, a red row for a late one, the full screen
@@ -479,7 +454,7 @@ export function EtherListBone() {
 export function EtherSkeleton() {
   return (
     <main className={MAIN}>
-      <Title text="Эфир" />
+      <PageHead title="Эфир" />
       <EtherListBone />
     </main>
   );
@@ -582,7 +557,7 @@ export function RatingListBone({ withAward = true }: { withAward?: boolean }) {
 export function RatingSkeleton() {
   return (
     <main className={MAIN}>
-      <Title text="Рейтинг" />
+      <PageHead title="Рейтинг" />
       <ShopRow />
       <div className="mt-4">
         <PeriodChips value="week" />

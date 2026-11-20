@@ -7,8 +7,8 @@ type OrderStatus = Database["public"]["Enums"]["order_status"];
 export type ShopTone = "warn" | "accent" | "ok" | "muted";
 
 /**
- * Что значит статус заказа для человека. Сотруднику и завхозу показывается одно и то же
- * слово — «подтверждён» у обоих означает, что очки уже списаны, а вещь ещё не на руках.
+ * What an order's status means to a person. The employee and the storekeeper are shown the same
+ * word — «подтверждён» means to both that the points are taken and the thing is not in hand yet.
  */
 export const ORDER_STATUS: Record<OrderStatus, { text: string; tone: ShopTone }> = {
   pending: { text: "Ждёт подтверждения", tone: "warn" },
@@ -17,7 +17,7 @@ export const ORDER_STATUS: Record<OrderStatus, { text: string; tone: ShopTone }>
   cancelled: { text: "Отменён", tone: "muted" },
 };
 
-/** Склонение: 1 очко, 2 очка, 5 очков. */
+/** Declension: 1 очко, 2 очка, 5 очков. */
 export function pointsWord(n: number): string {
   const abs = Math.abs(n) % 100;
   const tail = abs % 10;
@@ -27,24 +27,24 @@ export function pointsWord(n: number): string {
   return "очков";
 }
 
-/** Сколько ещё копить до товара; 0 — уже хватает. */
+/** How much more to save for the item; 0 — enough already. */
 export function shortfall(price: number, balance: number): number {
   return Math.max(0, price - balance);
 }
 
-/** Насколько полоска накопления закрашена, 0…100. */
+/** How full the saving bar is, 0…100. */
 export function progressPct(price: number, balance: number): number {
   if (price <= 0) return 100;
   const pct = (balance / price) * 100;
   return Math.max(0, Math.min(100, Math.round(pct)));
 }
 
-/** Заказ ещё можно отменить самому: до подтверждения завхозом (D-37). */
+/** The order can still be cancelled by its author: until the storekeeper confirms it (D-37). */
 export function cancellableByOwner(status: OrderStatus): boolean {
   return status === "pending";
 }
 
-/** Заказ ещё в работе у завхоза — он висит в очереди выдачи. */
+/** The order is still the storekeeper's work — it waits in the hand-out queue. */
 /** The orders that wait for the one looking at them: open, and not their own. */
 export function ordersWaiting<T extends { status: OrderStatus; user_id: string }>(orders: readonly T[], meId: string | undefined): T[] {
   return orders.filter((order) => isOpenOrder(order.status) && order.user_id !== meId);
@@ -55,8 +55,8 @@ export function isOpenOrder(status: OrderStatus): boolean {
 }
 
 /**
- * Сколько заказ уже ждёт — словами, как сказал бы человек: «только что», «12 минут»,
- * «3 часа», «2 дня». Директору важно не время заказа, а то, сколько он висит.
+ * How long the order has waited — in words, as a person would say it: «только что», «12 минут»,
+ * «3 часа», «2 дня». The director cares not when it was ordered but how long it hangs.
  */
 export function waitingRu(created: Date, now: Date = new Date()): string {
   const minutes = Math.floor((now.getTime() - created.getTime()) / 60_000);
@@ -68,7 +68,7 @@ export function waitingRu(created: Date, now: Date = new Date()): string {
   return `${days} ${pluralRu(days, ["день", "дня", "дней"])}`;
 }
 
-/** Ближайшая по цене награда, на которую этому балансу ещё не хватает. */
+/** The nearest reward by price that this balance cannot afford yet. */
 export function nearestGoal(
   balance: number,
   items: { title: string; price: number; is_active: boolean }[],
@@ -80,7 +80,7 @@ export function nearestGoal(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Жизнь магазина: что берут, что выдали                                       */
+/* The shop's life: what is taken, what was handed out                            */
 /* -------------------------------------------------------------------------- */
 
 export type OrderFact = {
@@ -90,7 +90,7 @@ export type OrderFact = {
   delivered_at: string | null;
 };
 
-/** Сколько раз награду уносили: считается любой заказ, кроме отменённого. */
+/** How many times a reward was taken: every order counts but a cancelled one. */
 export function takenCounts(orders: OrderFact[]): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const order of orders) {
@@ -100,7 +100,7 @@ export function takenCounts(orders: OrderFact[]): Record<string, number> {
   return counts;
 }
 
-/** Сколько наград выдано за последние `days` дней — цифра героя экрана. */
+/** How many rewards were handed out over the last `days` days — the screen's hero figure. */
 export function deliveredInPeriod(orders: OrderFact[], now: Date = new Date(), days = 30): number {
   const from = now.getTime() - days * 86_400_000;
   return orders.filter(
@@ -108,7 +108,7 @@ export function deliveredInPeriod(orders: OrderFact[], now: Date = new Date(), d
   ).length;
 }
 
-/** Последние выдачи, свежие первыми — лента «кому что досталось». */
+/** The latest hand-outs, the fresh ones first — the «кому что досталось» feed. */
 export function recentDeliveries<T extends OrderFact>(orders: T[], limit = 3): T[] {
   return orders
     .filter((order) => order.status === "delivered" && order.delivered_at !== null)
@@ -116,7 +116,7 @@ export function recentDeliveries<T extends OrderFact>(orders: T[], limit = 3): T
     .slice(0, limit);
 }
 
-/** «взяли 3 раза» / «пока не брали» — подпись под ценой на плитке. */
+/** «взяли 3 раза» / «пока не брали» — the caption under the price on a tile. */
 export function takenLabel(count: number): string {
   if (count === 0) return "пока не брали";
   return `взяли ${count} ${pluralRu(count, ["раз", "раза", "раз"])}`;

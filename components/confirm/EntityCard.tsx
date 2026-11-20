@@ -9,9 +9,10 @@ import { WhenSheet } from "@/components/confirm/WhenSheet";
 import { EventRepeatSheet, firstLine, repeatLine, RepeatSheet } from "@/components/recurrence/RepeatSheet";
 import type { PostprocessedEntity } from "@/lib/ai/postprocess";
 import type { Entity } from "@/lib/ai/schema";
+import { describeParticipants, hasAssignee, mainField } from "@/lib/confirm/entities";
 import { shortNames } from "@/lib/people/aliases";
 import { EVENT_REPEAT_LABEL } from "@/lib/recurrence/schedule";
-import { describeParticipants, type EntityPatch } from "@/lib/store/ingest";
+import type { EntityPatch } from "@/lib/store/ingest";
 
 const ICON_STROKE = {
   fill: "none",
@@ -45,33 +46,6 @@ function KindIcon({ kind }: { kind: Entity["kind"] }) {
       <svg width="20" height="20" viewBox="0 0 24 24" {...ICON_STROKE}>{icon.path}</svg>
     </span>
   );
-}
-
-/** Every kind keeps its main text under its own name — one editor, one field map. */
-function mainField(
-  entity: PostprocessedEntity,
-): { key: "title" | "text" | "question" | "reason"; value: string } {
-  switch (entity.kind) {
-    case "task":
-    case "recurrence":
-    case "delegation":
-    case "event":
-      return { key: "title", value: entity.title };
-    case "announcement":
-    case "reminder":
-    case "note":
-      return { key: "text", value: entity.text };
-    case "query":
-      return { key: "question", value: entity.question };
-    case "points":
-      return { key: "reason", value: entity.reason ?? "" };
-  }
-}
-
-function hasAssignee(
-  entity: PostprocessedEntity,
-): entity is PostprocessedEntity & { assignee_id: string | null } {
-  return entity.kind === "task" || entity.kind === "delegation" || entity.kind === "recurrence" || entity.kind === "points";
 }
 
 /** D-16: what the chip says is exactly how sure the matcher is. */
@@ -269,7 +243,7 @@ export function EntityCard({
                     {deadline.sourceText ? ` · „${deadline.sourceText}“` : ""}
                   </Chip>
                 ) : entity.kind === "task" && entity.priority === "high" ? (
-                  // «срочно» без времени: один чип вместо двух спорящих, и он же ставит срок
+                  // «срочно» without a time: one chip instead of two arguing ones, and it is the one that sets the deadline
                   <Chip tone="warn" onClick={onOpenDeadline}>
                     срочно · задать срок
                   </Chip>

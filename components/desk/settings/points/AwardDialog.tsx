@@ -3,11 +3,12 @@
 import { Megaphone, X } from "lucide-react";
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 
-import { Switch } from "@/components/desk/settings/form";
-import { TileFace } from "@/components/desk/team/TeamGrid";
 import { Dialog } from "@/components/desk/ui/Dialog";
+import { Face } from "@/components/desk/ui/Face";
 import { Kbd } from "@/components/desk/ui/Kbd";
+import { Switch } from "@/components/desk/ui/Switch";
 import { Button } from "@/components/ui/Button";
+import { personFits } from "@/lib/people/search";
 import { useAwardPoints } from "@/lib/points/queries";
 
 const PRESETS = [5, 10, 20, 50];
@@ -17,8 +18,6 @@ const REASONS = ["за скорость", "за качество", "за ини�
 export type AwardFor = { userId?: string };
 
 export type AwardPerson = { id: string; name: string; sub?: string | null; avatar?: string | null };
-
-const fold = (text: string) => text.toLowerCase().replace(/ё/g, "е").trim();
 
 function Label({ children, htmlFor }: { children: string; htmlFor?: string }) {
   return (
@@ -38,10 +37,7 @@ function PersonPicker({ people, value, onChange, autoFocus, next }: { people: Aw
   const [at, setAt] = useState(0);
   const [open, setOpen] = useState(false);
   const chosen = people.find((p) => p.id === value) ?? null;
-  const found = useMemo(() => {
-    const q = fold(text);
-    return q ? people.filter((p) => fold(`${p.name} ${p.sub ?? ""}`).split(/\s+/).some((word) => word.startsWith(q)) || fold(p.name).includes(q)) : people;
-  }, [people, text]);
+  const found = useMemo(() => people.filter((p) => personFits({ full_name: p.name, position: p.sub }, text)), [people, text]);
 
   const take = (person: AwardPerson) => {
     onChange(person.id);
@@ -76,7 +72,7 @@ function PersonPicker({ people, value, onChange, autoFocus, next }: { people: Aw
   return (
     <div className="relative">
       <div className="field award-who flex h-9 items-center gap-2">
-        {chosen ? <TileFace person={{ id: chosen.id, full_name: chosen.name, avatar_url: chosen.avatar ?? null }} size={22} /> : null}
+        {chosen ? <Face person={{ id: chosen.id, full_name: chosen.name, avatar_url: chosen.avatar ?? null }} size={22} /> : null}
         <input
           id="award-who"
           aria-label="Кому"
@@ -127,7 +123,7 @@ function PersonPicker({ people, value, onChange, autoFocus, next }: { people: Aw
                 className={`award-option flex h-9 w-full items-center gap-2.5 px-3 text-left text-[14px] leading-5 ${index === at ? "bg-surface-2" : ""}`}
                 data-active={index === at ? "" : undefined}
               >
-                <TileFace person={{ id: person.id, full_name: person.name, avatar_url: person.avatar ?? null }} size={24} />
+                <Face person={{ id: person.id, full_name: person.name, avatar_url: person.avatar ?? null }} size={24} />
                 <span className="min-w-0 flex-1 truncate">{person.name}</span>
                 {person.sub ? <span className="truncate text-[12px] text-muted">{person.sub}</span> : null}
               </button>
@@ -232,7 +228,7 @@ function AwardForm({ initialUser, people, onDone }: { initialUser?: string; peop
 
       {amount > 0 ? (
         <div className="award-public flex items-center gap-3 text-[14px] leading-5" data-testid="award-public">
-          <Megaphone size={16} strokeWidth={2} aria-hidden className="award-public-icon shrink-0 text-muted" />
+          <Megaphone size={16} strokeWidth={2} aria-hidden className="shrink-0 text-muted" />
           <label htmlFor="award-public-switch" className="min-w-0 flex-1 cursor-pointer">
             Сказать в Эфире <span className="text-muted">· команда увидит похвалу, без пуша</span>
           </label>

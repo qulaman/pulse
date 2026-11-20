@@ -184,7 +184,7 @@ export function MonthGrid({ days, byDay, today, now, meId, onOpen, openId, month
           </span>
         ))}
       </div>
-      <div className="cal-month-body grid min-h-0 flex-1 grid-cols-7" style={{ gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` }}>
+      <div className="grid min-h-0 flex-1 grid-cols-7" style={{ gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))` }}>
         {days.map((ymd, index) => {
           const parts = parseYmd(ymd)!;
           const outside = parts.year !== month.year || parts.month !== month.month;

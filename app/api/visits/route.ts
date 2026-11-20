@@ -2,7 +2,7 @@ import { after } from "next/server";
 import { z } from "zod";
 
 import { userSupabase, withAuth } from "@/lib/api/handler";
-import { apiError, apiOk } from "@/lib/api/respond";
+import { apiOk, NO_ACCESS, rpcFailure } from "@/lib/api/respond";
 import { kickDeliveries } from "@/lib/push/send";
 
 const BodySchema = z
@@ -33,9 +33,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       ...(body.kind === "message" ? { p_kind: "message" } : {}),
     });
     if (error) {
-      if (error.message.includes("forbidden")) return apiError(403, "forbidden", "Нет доступа");
-      if (error.message.includes("empty_message")) return apiError(400, "empty_message", "Напиши, что показать директору");
-      throw new Error(`announce_visit failed: ${error.message}`);
+      return rpcFailure(error, { forbidden: NO_ACCESS, empty_message: [400, "Напиши, что показать директору"] }, "announce_visit");
     }
     after(() => kickDeliveries());
     return apiOk({ visit: data });

@@ -16,7 +16,7 @@ import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { TEXT } from "@/lib/tasks/status-text";
 import { flyAway, flyInto } from "@/lib/ui/flyAway";
 
-import type { EmployeeAction } from "./EmployeeTaskCard";
+import type { EmployeeAction } from "./EmployeeKeys";
 
 type SheetState = { name: "ask" | "cant" | "report" | "pass"; taskId: string; words?: string } | null;
 

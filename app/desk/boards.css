@@ -1,16 +1,16 @@
-/* «Доски» of the desk (D-177): the gallery, a board in preparation and «Ведущий». Owned by the boards builder.
-   Both looks: the journal lays the screens out in print, «Графит» (D-171) gives them depth below. The sheet of
-   a board is the wall's — dark in both themes and both looks, as the room will see it. Motion is news only:
+/* «Доски» of the desk (D-177): the gallery, a board in preparation and «Ведущий». The base block lays
+   the screens out, «Графит» (D-171) gives them depth below. The sheet of a board is the wall's — dark
+   in both themes, as the room will see it. Motion is news only:
    a tile rises once when it comes, nothing loops; all of it off under reduced motion. */
 
 html[data-surface="desk"][data-journal] {
   /* ---- the wall's sheet: text only, laid out in container units ------------------------------ */
   .board-sheet {
-    --sheet-bg: #0b0f14;
-    --sheet-ink: #eef3f8;
-    --sheet-ink-2: #93a2b4;
-    --sheet-pen: #2ed3b7;
-    --sheet-ok: #34c759;
+    --sheet-bg: var(--phone-bg);
+    --sheet-ink: var(--phone-text);
+    --sheet-ink-2: var(--phone-text-muted);
+    --sheet-pen: var(--phone-accent);
+    --sheet-ok: var(--phone-ok);
     container-type: inline-size;
     position: relative;
     aspect-ratio: 16 / 9;
@@ -247,7 +247,6 @@ html[data-surface="desk"][data-journal] {
     grid-template-columns: minmax(0, min(46%, 560px)) minmax(0, 1fr);
     gap: 24px;
     padding: 16px;
-    border: 1px solid var(--rule);
   }
   .boards-live-chip {
     display: inline-flex;
@@ -372,10 +371,6 @@ html[data-surface="desk"][data-journal] {
     position: sticky;
     top: 16px;
   }
-  .board-wall-card {
-    padding: 12px;
-    border: 1px solid var(--rule);
-  }
   .board-keys > span {
     flex-shrink: 0;
   }
@@ -432,7 +427,6 @@ html[data-surface="desk"][data-journal] {
   }
   .board-faces {
     padding: 12px;
-    border: 1px solid var(--rule);
   }
   .board-face {
     display: inline-flex;
@@ -447,10 +441,6 @@ html[data-surface="desk"][data-journal] {
     transition:
       background-color 120ms linear,
       border-color 120ms linear;
-
-    &:hover:not(:disabled) {
-      background: var(--surface-2);
-    }
     &:disabled {
       opacity: 0.5;
     }
@@ -468,7 +458,6 @@ html[data-surface="desk"][data-journal] {
   /* «Раздать поручения»: a «Кому» column over the lines */
   .board-handout {
     padding: 12px;
-    border: 1px solid var(--rule);
   }
   .board-handout-head {
     padding: 2px 4px 10px;
@@ -512,12 +501,7 @@ html[data-surface="desk"][data-journal] {
     height: 34px;
     padding: 0 8px;
     border: 1px solid var(--rule);
-    border-radius: 8px;
-    background: var(--surface);
-
-    &:focus-within {
-      border-color: var(--accent);
-    }
+    border-radius: 8px
   }
   .board-who-field {
     min-width: 0;
@@ -566,10 +550,7 @@ html[data-surface="desk"][data-journal] {
     display: flex;
     flex-direction: column;
     padding: 4px;
-    border: 1px solid var(--rule);
     border-radius: 10px;
-    background: var(--surface);
-    box-shadow: var(--shadow-raised);
   }
   .board-who-option {
     display: flex;

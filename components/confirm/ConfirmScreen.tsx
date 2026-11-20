@@ -15,7 +15,8 @@ import { PageHead } from "@/components/ui/PageHead";
 import { Sheet } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
 import { usePointsEnabled } from "@/lib/points/queries";
-import { isSendable, useIngestStore } from "@/lib/store/ingest";
+import { isSendable } from "@/lib/confirm/entities";
+import { useIngestStore } from "@/lib/store/ingest";
 
 export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
   const entities = useIngestStore((state) => state.entities);

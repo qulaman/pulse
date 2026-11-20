@@ -18,7 +18,7 @@ import { applyWords, deliverCreate, fetchWords } from "./replay";
  * verbatim. No parser and no «запиши мысль» preamble: on this screen everything said is
  * a note, so nothing has to be decided and nothing can be misfiled as a task.
  *
- * Order of safety (принцип 5): the recording is kept on the phone (IndexedDB, D-95),
+ * Order of safety (principle 5): the recording is kept on the phone (IndexedDB, D-95),
  * then goes to Storage, then the note row is born with the recording and no words, then
  * STT writes the words onto that row on the server (the transcribe route takes
  * `note_id`). No network, a closed tab, a failed STT or a lost response — the thought
@@ -254,7 +254,7 @@ export function useDictation(
     await deliver();
   }
 
-  // leaving the screen mid-sentence saves what was said instead of dropping it (принцип 5)
+  // leaving the screen mid-sentence saves what was said instead of dropping it (principle 5)
   const finishRef = useRef(finish);
   useEffect(() => {
     finishRef.current = finish;

@@ -6,7 +6,8 @@ import { joinRu } from "@/components/confirm/format";
 import { useRoster } from "@/lib/people/roster";
 import { toast } from "@/components/ui/Toast";
 import { usePointsEnabled } from "@/lib/points/queries";
-import { isCountable, isSendable, useIngestStore } from "@/lib/store/ingest";
+import { isCountable, isSendable, namesById } from "@/lib/confirm/entities";
+import { useIngestStore } from "@/lib/store/ingest";
 
 /**
  * Throwing the batch: who it went to, what the toast says, and the question a mixed phrase
@@ -23,16 +24,7 @@ export function useSendBatch(onDone?: () => void) {
   const pointsEnabled = usePointsEnabled().data === true;
   const roster = useRoster();
 
-  const nameOf = useMemo(() => {
-    const byId = new Map<string, string>();
-    for (const user of roster.data ?? []) byId.set(user.id, user.full_name);
-    for (const entity of entities) {
-      for (const candidate of entity.assignee?.candidates ?? []) {
-        if (!byId.has(candidate.user_id)) byId.set(candidate.user_id, candidate.full_name);
-      }
-    }
-    return (id: string) => byId.get(id);
-  }, [roster.data, entities]);
+  const nameOf = useMemo(() => namesById(roster.data, entities), [roster.data, entities]);
 
   const countable = entities.filter((entity) => isCountable(entity, pointsEnabled)).length;
   const sendable = entities.filter((entity) => isSendable(entity, pointsEnabled)).length;

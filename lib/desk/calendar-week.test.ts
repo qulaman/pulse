@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { earliest, minutesAt, movedTo, ahead, slotOf } from "@/components/desk/calendar/slots";
+import { isoWeekday } from "@/lib/desk/busy";
 import {
   bandOf,
   bandsOf,
@@ -8,7 +9,6 @@ import {
   columnsOf,
   dayShares,
   hourPxFor,
-  isoWeekday,
   layoutDay,
   SHARE,
   spanOf,

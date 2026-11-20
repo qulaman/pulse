@@ -1,3 +1,4 @@
+import { foldRu } from "@/lib/people/search";
 import type { SettingsTab } from "@/lib/settings-tabs";
 
 /**
@@ -25,13 +26,13 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { id: "brand-logo", tab: "company", place: "Компания", title: "Логотип", words: "лого картинка файл бренд" },
   { id: "brand-accent", tab: "company", place: "Компания", title: "Акцентный цвет", words: "цвет бренд акцент контраст" },
   { id: "window-hours", tab: "company", place: "Компания", title: "Тихие часы — когда доставлять уведомления", words: "пуш ночь утро уведомления доставка окно" },
-  // Программа
+  // «Программа»
   { id: "secretary-buttons", tab: "app", place: "Программа", title: "Кнопки секретаря", words: "кофе чай охрана врач заявки зайди" },
   { id: "secretary-phone", tab: "app", place: "Программа", title: "Телефон охраны", words: "тревога позвонить" },
   { id: "secretary-repeat", tab: "app", place: "Программа", title: "Повтор пуша секретарю", words: "напомнить заявка минут" },
   { id: "mascot-seasons", tab: "app", place: "Программа", title: "Праздничные наряды маскота", words: "новый год наурыз колпак лицо" },
   { id: "mascot-telegraph", tab: "app", place: "Программа", title: "Лицо сотрудника переживает за дела", words: "маскот волнуется зовёт" },
-  // Сотрудники
+  // «Сотрудники»
   { id: "points-enabled", tab: "team", place: "Сотрудники", title: "Очки включены", words: "баллы рейтинг магазин" },
   { id: "rating-mode", tab: "team", place: "Сотрудники", title: "Кто видит рейтинг целиком", words: "топ-5 топ рейтинг" },
   { id: "points-quick", tab: "team", place: "Сотрудники", title: "Очки за быстрое «Принял»", words: "быстро минут принял" },
@@ -65,7 +66,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { id: "page-shop", href: "/desk/settings/points?view=shop", place: "Очки и магазин", title: "Магазин наград", words: "товар награда выдать заказ мерч", director: true },
 ];
 
-const fold = (text: string) => text.toLowerCase().replace(/ё/g, "е").replace(/[«»"]/g, "");
+const fold = (text: string) => foldRu(text).replace(/[«»"]/g, "");
 
 /** The entries a query finds — every word of it somewhere in the title, the place or the words; titles first. */
 export function searchSettings(query: string, options: { director: boolean; devTools: boolean }): SettingEntry[] {

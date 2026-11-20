@@ -25,8 +25,8 @@ function Chevron() {
 }
 
 /**
- * Появление блоков лесенкой: единственное движение на экране, только transform+opacity,
- * 40 мс между блоками. Под `prefers-reduced-motion` блоки просто стоят на месте.
+ * The blocks come in as a staircase: the only motion on the screen, transform and opacity only,
+ * 40 ms apart. Under `prefers-reduced-motion` the blocks simply stand in place.
  */
 function Reveal({ index, children }: { index: number; children: ReactNode }) {
   const reduced = useReducedMotion();
@@ -43,10 +43,10 @@ function Reveal({ index, children }: { index: number; children: ReactNode }) {
 }
 
 /**
- * Магазин глазами директора — пульт, а не витрина (D-71 §12–14). Экран отвечает по
- * порядку: чем магазин жил месяц (герой), что ждёт выдачи сегодня, что вообще можно
- * получить и сколько раз это уже брали, кому что досталось, и как идут очки у людей.
- * Кнопок «Обменять» тут нет: директор очков не копит, а поощряет людей на Рейтинге.
+ * The shop as the director sees it — a console, not a shop window (D-71 §12–14). The screen answers
+ * in order: what the shop lived on this month (the hero), what waits to be handed out today, what can
+ * be had at all and how many times it was taken, who got what, and how people's points are going.
+ * No «Обменять» here: the director does not save points, he rewards people on «Рейтинг».
  */
 export function AdminShop({ me }: { me: Me | undefined }) {
   const items = useAllShopItems(true);

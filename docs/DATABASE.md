@@ -284,7 +284,7 @@ create policy things_select on things for select using (
 
 ### 7.8. Служебные
 
-Клиент их не зовёт: помощники RLS (`auth_session_live`, `subordinates`, `team_role`); чтение настроек (`points_rule`, `daily_report_workday`, `voice_retention_days`, `notify_prefs_of`); доставка (`next_delivery_slot`, `delivery_category`, `push_when` — слова срока как `lib/ai/time.ts`); очки (`task_sent_at`, `task_streak_of`); стена (`tv_emit`, `tv_touch`, `tv_task_story`); календарь (`event_release`, `set_event_participants`); заявки (`errand_recipients`); функции триггеров.
+Клиент их не зовёт: помощники RLS (`auth_session_live`, `subordinates`, `team_role`); чтение настроек (`points_rule`, `daily_report_workday`, `voice_retention_days`, `notify_prefs_of`); доставка (`next_delivery_slot`, `delivery_category`, `push_when` — слова срока как `lib/ai/time.ts`); очки (`task_sent_at`, `task_streak_of`); стена (`tv_emit`, `tv_touch`, `tv_task_story`); календарь (`event_release`); заявки (`errand_recipients`); функции триггеров.
 
 ## 8. Триггеры
 

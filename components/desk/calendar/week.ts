@@ -2,7 +2,8 @@ import { isoWeekday } from "@/lib/desk/busy";
 import { hhmm, ymdOfEvent } from "@/lib/calendar/agenda";
 import { endOf } from "@/lib/calendar/overview";
 import type { CalendarEvent } from "@/lib/calendar/queries";
-import type { Ymd } from "@/lib/datetime/calendar";
+import { ymdOf, type Ymd } from "@/lib/datetime/calendar";
+import { wallOf } from "@/lib/desk/when";
 
 /**
  * The week of the desk's calendar as hours (D-154, D-180): a column a day, the working hours
@@ -30,17 +31,12 @@ export const SHARE = { focus: 2.2, work: 1, off: 0.55 } as const;
 /** Two meetings starting within this many minutes stand side by side, not one over the other. */
 export const TOGETHER_MIN = 30;
 
-const OFFSET_MS = 5 * 60 * 60 * 1000;
 const DAY_MIN = 24 * 60;
 
 /** Minutes past the wall clock's midnight, and the day they belong to. */
-export function wallOf(at: string | number): { ymd: Ymd; minutes: number } {
-  const wall = new Date((typeof at === "string" ? new Date(at).getTime() : at) + OFFSET_MS);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return {
-    ymd: `${wall.getUTCFullYear()}-${pad(wall.getUTCMonth() + 1)}-${pad(wall.getUTCDate())}`,
-    minutes: wall.getUTCHours() * 60 + wall.getUTCMinutes(),
-  };
+export function dayMinuteOf(at: string | number): { ymd: Ymd; minutes: number } {
+  const wall = wallOf(new Date(at));
+  return { ymd: ymdOf(wall.y, wall.m, wall.d), minutes: wall.h * 60 + wall.min };
 }
 
 /**
@@ -48,8 +44,8 @@ export function wallOf(at: string | number): { ymd: Ymd; minutes: number } {
  * (`overnight`). A meeting without an end lasts an hour, everywhere (`endOf`, D-180).
  */
 export function spanOf(event: CalendarEvent): { start: number; end: number; overnight: boolean } {
-  const start = wallOf(event.starts_at);
-  const end = wallOf(endOf(event));
+  const start = dayMinuteOf(event.starts_at);
+  const end = dayMinuteOf(endOf(event));
   const overnight = end.ymd !== start.ymd;
   return { start: start.minutes, end: Math.max(overnight ? DAY_MIN : end.minutes, start.minutes), overnight };
 }
@@ -87,9 +83,6 @@ export function hourPxFor(available: number): number {
 export function yOf(minutes: number, from: number, hourPx: number = HOUR_PX): number {
   return ((minutes - from * 60) * hourPx) / 60;
 }
-
-// one Monday-to-Sunday rule for the widths here and «Окна директора» (lib/desk/busy.ts)
-export { isoWeekday };
 
 /** Each day's share of the width: the focused day widest, a working day one, a day off narrow. */
 export function dayShares(days: readonly Ymd[], focusDay: Ymd | null, workdays: readonly number[]): number[] {

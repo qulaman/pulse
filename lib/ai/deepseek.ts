@@ -11,8 +11,6 @@ import type { TokenUsage } from "./pricing";
  * at the caller is the only enforcement.
  */
 
-export const DEEPSEEK_MODELS = ["deepseek-chat", "deepseek-reasoner"] as const;
-
 export function isDeepSeekModel(model: string): boolean {
   return model.startsWith("deepseek-");
 }

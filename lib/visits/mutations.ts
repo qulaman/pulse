@@ -3,16 +3,17 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
+import { postJson } from "@/lib/api/client";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 import { visitKeys, type Visit, type VisitAnswer, type VisitKind } from "./queries";
 
 /**
- * «К вам посетитель» (D-96) и «Сообщение на экран» (D-116) — три действия: секретарь
- * объявляет или пишет, директор отвечает, карточку убирают. Оффлайн-очереди нет ни у одного
- * намеренно: человек стоит у стола сейчас, и «к вам посетитель», доехавшее через полчаса,
- * хуже честного «нет связи» (то же правило, что у пульта, D-76 §3); сообщение на экран —
- * о том, что происходит сейчас, тоже. Поэтому `networkMode: "always"` перебивает глобальный
+ * «К вам посетитель» (D-96) and «Сообщение на экран» (D-116) — three moves: the secretary
+ * announces or writes, the director answers, the card is put away. None has an offline queue,
+ * on purpose: the person stands at the desk now, and a «к вам посетитель» that arrives half an hour later
+ * is worse than an honest «нет связи» (the same rule as the remote's, D-76 §3); a message on the screen
+ * is about what happens now, too. So `networkMode: "always"` overrides the global
  * `offlineFirst`.
  */
 
@@ -26,23 +27,11 @@ async function withTimeout<T>(call: Promise<T>, message: string): Promise<T> {
 }
 
 async function post(url: string, body: unknown, message: string): Promise<void> {
-  const res = await withTimeout(
-    fetch(url, {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    }),
-    message,
-  );
-  if (!res.ok) {
-    const payload = (await res.json().catch(() => null)) as { error?: { message_ru?: string } } | null;
-    throw new Error(payload?.error?.message_ru ?? message);
-  }
+  await withTimeout(postJson(url, body, { outbox: false, offline: message, fallback: message }), message);
 }
 
 /**
- * Секретарь: «Посетитель» или «Сообщение». Ключ идемпотентности чеканится в момент тапа
+ * The secretary: «Посетитель» or «Сообщение». The idempotency key is minted at the tap
  * (принцип 7).
  */
 export function useAnnounceVisit(kind: VisitKind = "visitor") {
@@ -66,7 +55,7 @@ function patchVisit(queryClient: ReturnType<typeof useQueryClient>, id: string, 
   return snapshot;
 }
 
-/** Директор: «Пусть заходит» / «Подождёт» / «Не приму», сообщению — «Понятно»; на Пульсе и на пульте. */
+/** The director: «Пусть заходит» / «Подождёт» / «Не приму», to a message — «Понятно»; on Пульс and on the remote. */
 export function useAnswerVisit() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -88,7 +77,7 @@ export function useAnswerVisit() {
   });
 }
 
-/** Убрать карточку: «Отменить», «Готово», «Понятно». Повтор безвреден. */
+/** Putting a card away: «Отменить», «Готово», «Понятно». A repeat is harmless. */
 export function useCloseVisit() {
   const queryClient = useQueryClient();
   return useMutation({

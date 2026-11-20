@@ -1,7 +1,7 @@
 import { aqtobeDay, humanAqtobe } from "@/lib/ai/time";
 import { shortName } from "@/lib/people/names";
 
-import { REASON_ORDER, reasonOf, type DeskReason } from "./desk";
+import { REASON_ORDER, reasonOf, type DeskReason } from "./reasons";
 import { compareTasks, groupTasks, mostUrgent, nearestDeadline, type Bucket, type Groupable } from "./grouping";
 import { awaitsMyMove } from "./my-move";
 import { isOverdue, pluralRu, SHORT_STATUS, type TaskStatus } from "./status-text";
@@ -118,7 +118,7 @@ export function yoursSections<T extends Groupable>(items: readonly { task: T; re
 const BUCKET_TONE: Partial<Record<Bucket, Tone>> = { overdue: "danger", urgent: "warn", today: "accent" };
 
 /**
- * «В работе»: the deadline piles — просрочено → срочно → сегодня → … → без срока. The
+ * «В работе»: the deadline piles — «просрочено» → «срочно» → «сегодня» → … → «без срока». The
  * employee's handed-in work stands at the foot under its own words; the director's
  * «отправлю позже» is not with anyone yet, so it closes the list.
  */
@@ -456,13 +456,33 @@ export function stepsOf(
     case "in_progress":
       // the station still ahead is named by its stage as a process — «Сдача», like «Доработка» and
       // «Проверка» — not «Сдана», which on the current ring read as handed in already
-      return [handed, step("work", "В работе", task.accepted_at, "done"), step("handed_in", "Сдача", null, late("current")), step("closed", "Закрыта", null, "todo")];
+      return [
+        handed,
+        step("work", "В работе", task.accepted_at, "done"),
+        step("handed_in", "Сдача", null, late("current")),
+        step("closed", "Закрыта", null, "todo"),
+      ];
     case "rework":
-      return [handed, step("work", "В работе", task.accepted_at, "done"), step("handed_in", "Доработка", null, late("warn")), step("closed", "Закрыта", null, "todo")];
+      return [
+        handed,
+        step("work", "В работе", task.accepted_at, "done"),
+        step("handed_in", "Доработка", null, late("warn")),
+        step("closed", "Закрыта", null, "todo"),
+      ];
     case "pending_review":
-      return [handed, step("work", "В работе", task.accepted_at, "done"), step("handed_in", "Сдана", task.completed_at, "done"), step("closed", "Проверка", null, "current")];
+      return [
+        handed,
+        step("work", "В работе", task.accepted_at, "done"),
+        step("handed_in", "Сдана", task.completed_at, "done"),
+        step("closed", "Проверка", null, "current"),
+      ];
     case "done":
-      return [handed, step("work", "В работе", task.accepted_at, "done"), step("handed_in", "Сдана", task.completed_at, "done"), step("closed", "Закрыта", closedAtOf(task), "done")];
+      return [
+        handed,
+        step("work", "В работе", task.accepted_at, "done"),
+        step("handed_in", "Сдана", task.completed_at, "done"),
+        step("closed", "Закрыта", closedAtOf(task), "done"),
+      ];
     case "declined":
       return [handed, step("work", "Отказ", closedAtOf(task), "bad"), step("handed_in", "Сдана", null, "todo"), step("closed", "Закрыта", null, "todo")];
     case "revoked":

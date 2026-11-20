@@ -12,7 +12,7 @@ import { useMe } from "@/lib/tasks/queries";
 
 import { usePeriodMarks } from "./marks";
 
-export type { AwayKind, Tabel, TabelCell, TabelDay, TabelPerson, TabelState, TabelTotals } from "@/lib/daily-report/tabel";
+export type { Tabel, TabelDay, TabelPerson } from "@/lib/daily-report/tabel";
 
 /**
  * The period as a табель (D-183): the period RPC's people × the reports of each day (marks.ts) ×

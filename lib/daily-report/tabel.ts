@@ -12,11 +12,11 @@
  */
 import { isWorkday, reportDayState, type ReportDayState, type ReportPerson, type ReportRules } from "@/lib/people/stats";
 import { isTeamMember } from "@/lib/people/queries";
-import { MONTHS_RU, parseYmd, ymdHmToAqtobeIso, type Ymd } from "@/lib/datetime/calendar";
+import { addDays, MONTHS_RU, parseYmd, ymdHmToAqtobeIso, type Ymd } from "@/lib/datetime/calendar";
 
 import { kzHolidayName } from "./holidays";
 
-import { addDaysYmd, isoWeekday, rangeText, spanText } from "./format";
+import { isoWeekday, rangeText, spanText } from "./format";
 import type { DailyReportStatus, TeamPeriodRow } from "./types";
 
 /** What the табель needs of a day's report — the raw read of `daily_reports` (marks.ts). */
@@ -104,7 +104,7 @@ export type Tabel = {
 
 /** The person came after this day was over (`created_at` ≥ the next midnight in Aqtobe). */
 function joinedAfter(person: Pick<ReportPerson, "created_at">, day: Ymd): boolean {
-  const end = ymdHmToAqtobeIso(addDaysYmd(day, 1), "00:00");
+  const end = ymdHmToAqtobeIso(addDays(day, 1), "00:00");
   return end !== null && new Date(person.created_at).getTime() >= new Date(end).getTime();
 }
 
@@ -160,7 +160,7 @@ export function daysOf(from: Ymd, to: Ymd): Ymd[] {
   const days: Ymd[] = [];
   if (!parseYmd(from) || !parseYmd(to)) return days;
   // the database answers for 92 days at most; a few more never hurt, a broken range never loops
-  for (let day = from; day <= to && days.length < 400; day = addDaysYmd(day, 1)) days.push(day);
+  for (let day = from; day <= to && days.length < 400; day = addDays(day, 1)) days.push(day);
   return days;
 }
 
@@ -333,13 +333,11 @@ export function cellWords(cell: TabelCell, day: TabelDay, rules: ReportRules, pe
   }
 }
 
-const pad = (n: number) => String(n).padStart(2, "0");
-
 /** The period is one whole calendar month. */
 export function isCalendarMonth(from: Ymd, to: Ymd): boolean {
   const a = parseYmd(from);
   const b = parseYmd(to);
-  return Boolean(a && b && a.day === 1 && a.year === b.year && a.month === b.month && addDaysYmd(to, 1).endsWith("-01"));
+  return Boolean(a && b && a.day === 1 && a.year === b.year && a.month === b.month && addDays(to, 1).endsWith("-01"));
 }
 
 /** «ноябрь 2026» for a calendar month, «3–9 нояб. 2026» otherwise, «29 дек. 2026 – 4 янв. 2027» over a new year. */
@@ -350,10 +348,4 @@ export function tabelPeriodWords(from: Ymd, to: Ymd): string {
   if (isCalendarMonth(from, to)) return `${MONTHS_RU[a.month - 1]} ${a.year}`;
   if (a.year === b.year) return `${rangeText(from, to)} ${a.year}`;
   return `${rangeText(from, from)} ${a.year} – ${rangeText(to, to)} ${b.year}`;
-}
-
-/** «12.11» — a day in a narrow place. */
-export function dayMonthText(day: Ymd): string {
-  const parts = parseYmd(day);
-  return parts ? `${pad(parts.day)}.${pad(parts.month)}` : day;
 }

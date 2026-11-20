@@ -16,6 +16,9 @@ import type { TaskStatus } from "./status-text";
 /** Work still in the employee's hands — the only states where a request for time makes sense. */
 export const WORKING: readonly TaskStatus[] = ["sent", "accepted", "in_progress", "rework"];
 
+/** On the director's board: still working, or waiting for him (a report to check, a refusal to settle). Closed ones leave it. */
+export const ON_BOARD: readonly TaskStatus[] = [...WORKING, "pending_review", "declined"];
+
 export function isWorking(status: TaskStatus): boolean {
   return WORKING.includes(status);
 }

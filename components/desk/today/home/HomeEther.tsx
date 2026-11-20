@@ -14,7 +14,7 @@ import { loadStateOf, worstLoad } from "@/lib/desk/tasks";
 import { useEther, useEtherEvents, useHeldAnnouncements, type Announcement, type EtherEvent } from "@/lib/ether/queries";
 import { shortName } from "@/lib/people/names";
 import { isTeamMember, usePeople, type Person } from "@/lib/people/queries";
-import { useNow } from "@/lib/pulse/queries";
+import { useNow } from "@/lib/useNow";
 
 import { AllClear, Face, Mark, Meter, Pill, rise, Titled } from "./look";
 import { Aside, BlockLink, BlockNote, HeadMove, RowsBone } from "./parts";
@@ -41,7 +41,7 @@ export function HomeEther({ onAnnounce }: { onAnnounce: () => void }) {
   // only the director reads the outbox (RLS): what still waits for the window
   const held = useHeldAnnouncements(role === "director");
   const people = usePeople();
-  const now = useNow(60_000);
+  const now = useNow();
   const team = useMemo(() => (people.data ?? []).filter(isTeamMember), [people.data]);
   const lines = useMemo(() => etherLinesOf(feed.data ?? [], news.data ?? [], held.data, now, SHOWN), [feed.data, news.data, held.data, now]);
   // the announcements decide the block; good news without them is still the feed

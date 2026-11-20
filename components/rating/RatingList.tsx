@@ -12,8 +12,8 @@ import { PointsSheet } from "@/components/rating/PointsSheet";
 import { Button } from "@/components/ui/Button";
 import { RatingListBone } from "@/components/ui/PageSkeletons";
 import { RollingNumber } from "@/components/ui/RollingNumber";
-import { shortName } from "@/lib/people/names";
-import { initialsOf, usePeople } from "@/lib/people/queries";
+import { shortName, initialsOf } from "@/lib/people/names";
+import { usePeople } from "@/lib/people/queries";
 import { useAwardPoints, useRating, type RatingPeriod, type RatingRow } from "@/lib/points/queries";
 
 const RING = ["var(--gold)", "#B8C2CC", "#C98A5B"];

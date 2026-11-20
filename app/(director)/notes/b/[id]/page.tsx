@@ -1,56 +1,47 @@
 "use client";
 
-import { onlineManager, useIsMutating, useQueryClient } from "@tanstack/react-query";
+import { useIsMutating, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
 import { BoardOnWall } from "@/components/mindboard/BoardOnWall";
 import { BoardPicker } from "@/components/mindboard/BoardPicker";
 import { BoardPresenter } from "@/components/mindboard/BoardPresenter";
 import { BoardScreen, type AimKey, type BoardActions, type BoardLines, type Person } from "@/components/mindboard/BoardScreen";
-import { carryOver, ejectReceipt } from "@/components/mindboard/carry";
+import { carryOver } from "@/components/mindboard/carry";
 import { EXTEND_MINUTES, WallSheet } from "@/components/mindboard/WallSheet";
 import { AssignSheet } from "@/components/notes/AssignSheet";
 import { PeoplePicker } from "@/components/people/PeoplePicker";
-import { useMinute } from "@/components/tasks/list/TaskList";
 import { BoardSkeleton } from "@/components/ui/PageSkeletons";
 import { toast } from "@/components/ui/Toast";
 import { haptic } from "@/lib/haptics";
 import { afterPlace, chainEnd } from "@/lib/mindboard/branch";
-import { boardOnWall, defaultTitle, splitBoards, summariesOf } from "@/lib/mindboard/list";
-import { useCreateBoard, useDeleteBoard, useFinishBoard, useMovePoint, usePinBoard, useRenameBoard, useRestoreBoard } from "@/lib/mindboard/mutations";
-import { useBoards, type MindBoard } from "@/lib/mindboard/queries";
+import { boardOnWall } from "@/lib/mindboard/list";
+import { useBoardMoves } from "@/lib/mindboard/moves";
 import type { SplitPoint } from "@/lib/mindboard/split";
 import { nextPlaceIn } from "@/lib/mindboard/tree";
+import { useBoardRows, useBoardWrites } from "@/lib/mindboard/useBoard";
 import { wallBoardOf } from "@/lib/mindboard/wall";
 import { useAssignNotes } from "@/lib/notes/assign";
 import { useDictation, type Receipt } from "@/lib/notes/dictation";
-import { firstLine, phoneRow } from "@/lib/notes/list";
-import { useCreateNote, useDeleteNote, useUpdateNote } from "@/lib/notes/mutations";
-import { useNotes, type Note } from "@/lib/notes/queries";
-import { usePendingNotes, useReplayHearing } from "@/lib/notes/replay";
-import { useDeliveryWindow } from "@/lib/points/queries";
-import { useMe, useSentTasks } from "@/lib/tasks/queries";
+import { firstLine } from "@/lib/notes/list";
+import type { Note } from "@/lib/notes/queries";
+import { useSentTasks } from "@/lib/tasks/queries";
 import { pluralRu } from "@/lib/tasks/status-text";
 import { firstNameOf } from "@/lib/text/normalize";
 import { stageOf } from "@/lib/tv/board";
-import { useTvBoardControl, useTvControl, useTvWeekBoard } from "@/lib/tv/mutations";
-import { tvKeys, useTvState, type TvState } from "@/lib/tv/queries";
-import { afterBoard, boardExtendTo, boardPointOf, boardViewOf, weekBoardLive } from "@/lib/tv/state";
-import { isWithinDeliveryWindow, WINDOW_OPEN_HOUR } from "@/lib/voice/quietHours";
+import { tvKeys, type TvState } from "@/lib/tv/queries";
+import { boardExtendTo, boardPointOf, boardViewOf, weekBoardLive } from "@/lib/tv/state";
+import { useFlash } from "@/lib/useFlash";
+import { useNow } from "@/lib/useNow";
+import { useQuietHours } from "@/lib/voice/quietHours";
 
 /** A receipt stays on the screen long enough to be read over the shoulder of a point. */
 const RECEIPT_MS = 4_000;
-/** An edit younger than this is simply on its way; older, with the network up, it is stuck. */
-const STUCK_MS = 20_000;
 /** A line just given its place reaches the cache within this; past it, the cache is the truth. */
 const IN_FLIGHT_MS = 3_000;
-
-const subscribeOnline = (onChange: () => void) => onlineManager.subscribe(onChange);
-const isOnline = () => onlineManager.isOnline();
-const noop = () => () => {};
 
 const TIME = new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Aqtobe" });
 
@@ -71,104 +62,31 @@ function aimOf(key: AimKey): { parent: string | null; after: string | null } {
  * its lines from the one notes cache with what still waits on the phone laid over them
  * (D-95), the wall row and the wall as it will draw this board, the screen's one dictaphone,
  * and every write as one mutation. A line is a note underneath: it waits on the phone without
- * network and lands once, its voice is kept before any AI (принцип 5).
+ * network and lands once, its voice is kept before any AI (principle 5).
  */
 export default function BoardPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const me = useMe();
-  const notes = useNotes(me.data?.userId);
-  const boards = useBoards(me.data?.userId);
-  const pending = usePendingNotes(me.data?.userId);
-  const heard = useReplayHearing();
-  const tv = useTvState();
-  const control = useTvControl();
-  const boardControl = useTvBoardControl();
-  const weekBoard = useTvWeekBoard();
-  const create = useCreateNote(me.data);
-  const update = useUpdateNote(me.data);
-  const remove = useDeleteNote(me.data);
-  const rename = useRenameBoard(me.data);
-  const deleteBoard = useDeleteBoard(me.data);
-  const restoreBoard = useRestoreBoard(me.data);
-  const pin = usePinBoard(me.data);
-  const finish = useFinishBoard(me.data);
-  const createBoard = useCreateBoard(me.data);
-  const movePoint = useMovePoint(me.data);
+  // the board and its lines with what still waits on the phone laid over them (D-95)
+  const data = useBoardRows(id);
+  const { me, heard, tv, board, rows, phone, owed, late, online } = data;
+  const writes = useBoardWrites(me.data);
+  const { create, update, remove, rename, deleteBoard, restoreBoard, pin, finish, control, boardControl, weekBoard } = writes;
   const assignMany = useAssignNotes(me.data);
-  const deliveryWindow = useDeliveryWindow().data;
+  const hours = useQuietHours();
   const writing = useIsMutating({ mutationKey: ["notes"] }) > 0;
-  const online = useSyncExternalStore(subscribeOnline, isOnline, () => true);
-  const hydrated = useSyncExternalStore(noop, () => true, () => false);
-  const now = useMinute();
+  const now = useNow();
+  const openBoard = (boardId: string) => router.push(`/notes/b/${boardId}`);
+  const moves = useBoardMoves(data, writes, openBoard, now);
 
-  const [receipt, setReceipt] = useState<Receipt | null>(null);
-  // «stuck» is judged on a finer clock while something waits on the phone: after 20 s, not
-  // «whenever the minute turns»
-  const [tick, setTick] = useState(() => Date.now());
-  const owedCount = pending.creates.length + pending.edits.length;
-  useEffect(() => {
-    if (owedCount === 0) return;
-    const timer = setInterval(() => setTick(Date.now()), 5_000);
-    return () => clearInterval(timer);
-  }, [owedCount]);
+  const [receipt, show] = useFlash<Receipt>(RECEIPT_MS);
   // «Поручить»: the people sheet over the board, the task leaves from here (D-108)
   const [assigning, setAssigning] = useState<Note | null>(null);
   // «Раздать поручения» (D-140): the point whose person is being picked, and what to do with the pick
   const [picking, setPicking] = useState<{ row: Note; then: (person: Person) => void } | null>(null);
-  // «На другую доску» (D-140)
-  const [moving, setMoving] = useState<Note | null>(null);
   // «Как на стене» (D-140)
   const [wallOpen, setWallOpen] = useState(false);
-
-  // the board from the server, or — made without network — from the phone
-  const board: MindBoard | null = useMemo(() => {
-    const found = boards.data?.find((row) => row.id === id);
-    if (found) return found;
-    const kept = pending.boards.find((entry) => entry.id === id);
-    if (!kept) return null;
-    return {
-      id: kept.id,
-      company_id: kept.companyId,
-      user_id: kept.userId,
-      title: kept.title,
-      deleted_at: null,
-      pinned_at: null,
-      finished_at: null,
-      client_request_id: kept.crid,
-      created_at: kept.createdAt,
-      updated_at: kept.createdAt,
-    };
-  }, [boards.data, pending.boards, id]);
-
-  // the lines as the director should see them: the cache, edits still on the phone laid over
-  // their rows, and lines that exist only on the phone so far (D-95)
-  const { rows, phone, owed, late } = useMemo(() => {
-    const byId = new Map<string, Note>();
-    for (const note of notes.data ?? []) if (note.board_id === id && note.deleted_at === null) byId.set(note.id, note);
-    for (const edit of pending.edits) {
-      const row = byId.get(edit.id);
-      if (row) byId.set(edit.id, { ...row, ...edit.fields });
-    }
-    const phoneOnly = new Set<string>();
-    const creates = pending.creates.filter((entry) => entry.boardId === id);
-    for (const entry of creates) {
-      if (byId.has(entry.id)) continue;
-      phoneOnly.add(entry.id);
-      byId.set(entry.id, phoneRow(entry));
-    }
-    const stuck = (at: number) => !online || tick - at > STUCK_MS;
-    return {
-      rows: [...byId.values()].filter((note) => note.deleted_at === null),
-      phone: phoneOnly,
-      owed: new Set(creates.map((entry) => entry.id)),
-      late: new Set([
-        ...creates.filter((entry) => stuck(Date.parse(entry.createdAt))).map((entry) => entry.id),
-        ...pending.edits.filter((edit) => stuck(edit.at)).map((edit) => edit.id),
-      ]),
-    };
-  }, [notes.data, pending, id, online, tick]);
 
   // the one microphone of the screen (D-121): whose words it takes is decided when it opens —
   // the status screen says points, «+ подпункт» of an open point says its sub-points, «Пункт
@@ -221,12 +139,6 @@ export default function BoardPage() {
     [nextPlace, placeAfter],
   );
 
-  const receiptTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const show = useCallback((next: Receipt) => {
-    if (receiptTimer.current) clearTimeout(receiptTimer.current);
-    setReceipt(next);
-    receiptTimer.current = setTimeout(() => setReceipt(null), RECEIPT_MS);
-  }, []);
   // the dictaphone's receipt: a board says «пункт» / «подпункт», not «сохранено слово в слово»
   const flash = useCallback(
     (next: Receipt) => {
@@ -237,12 +149,6 @@ export default function BoardPage() {
       show({ ...next, line: row ? (target.parent ? `Подпункт к «${quote(row.text)}»` : `Пункт после «${quote(row.text)}»`) : "Новый пункт на доске" });
     },
     [show],
-  );
-  useEffect(
-    () => () => {
-      if (receiptTimer.current) clearTimeout(receiptTimer.current);
-    },
-    [],
   );
 
   // the place is taken once per capture: parentId() is asked first, nextPosition() right after
@@ -262,10 +168,7 @@ export default function BoardPage() {
   const sent = useSentTasks(handed ? me.data?.userId : undefined);
   const taskById = useMemo(() => new Map((sent.data ?? []).map((task) => [task.id, task])), [sent.data]);
 
-  const others = useMemo(() => splitBoards(boards.data ?? [], now).live.filter((other) => other.id !== id), [boards.data, now, id]);
-  const summaries = useMemo(() => summariesOf(notes.data ?? []), [notes.data]);
-
-  if (me.isLoading || notes.isLoading || boards.isLoading || !me.data) return <BoardSkeleton />;
+  if (data.loading || !me.data) return <BoardSkeleton />;
 
   if (!board || board.deleted_at) {
     return (
@@ -294,7 +197,7 @@ export default function BoardPage() {
   });
 
   // tasks handed out after hours wait for the morning (D-38) — unless «сразу»
-  const quiet = hydrated && !isWithinDeliveryWindow(new Date(), deliveryWindow) ? `утром в ${deliveryWindow?.from ?? `0${WINDOW_OPEN_HOUR}:00`}` : null;
+  const quiet = hours.quiet ? `утром в ${hours.opensAt}` : null;
 
   const lines: BoardLines = {
     rows,
@@ -304,11 +207,6 @@ export default function BoardPage() {
     online,
     hearing: new Set([...dictation.busy, ...heard]),
   };
-
-  const openBoard = (boardId: string) => router.push(`/notes/b/${boardId}`);
-  const eject = () =>
-    // the wall goes to the face — or to the round, while a week board waits in it (D-144)
-    control.mutate(afterBoard(tv.data ?? null, new Date()), { onSuccess: () => ejectReceipt(queryClient, me.data, board, notes.data ?? [], openBoard) });
 
   const writeOne = (text: string, parent: string | null, position: number) =>
     create.mutate({ id: crypto.randomUUID(), text, client_request_id: crypto.randomUUID(), board_id: board.id, position, parent_id: parent });
@@ -407,30 +305,13 @@ export default function BoardPage() {
       toast(on ? "Доска завершена — она в «Завершённых»" : "Доска снова в работе");
     },
     copyOpen: () => void carryOver(queryClient, me.data, board, openBoard),
-    move: setMoving,
+    move: moves.move,
     openWall: () => setWallOpen(true),
     pickPerson: (row, then) => setPicking({ row, then }),
     assignMany: async (picks, forceNow) => {
       const result = await assignMany.mutateAsync(picks.map(({ row, person, key }) => ({ note: row, person, forceNow, client_request_id: key })));
       return result.failed.map((input) => input.note.id);
     },
-  };
-
-  // «На другую доску» (D-140): to the bottom of the chosen board; a new board is made first
-  const moveTo = (target: { id: string; fresh: boolean }) => {
-    const row = moving;
-    setMoving(null);
-    if (!row) return;
-    const position = target.fresh ? 1 : nextPlaceIn((notes.data ?? []).filter((note) => note.board_id === target.id && note.deleted_at === null), null);
-    movePoint.mutate(
-      { note: row, to: { boardId: target.id, position } },
-      {
-        onSuccess: () =>
-          toast(`Пункт на доске «${target.fresh ? defaultTitle(new Date()) : (boards.data?.find((other) => other.id === target.id)?.title ?? "")}»`, {
-            action: { label: "Открыть", onClick: () => openBoard(target.id) },
-          }),
-      },
-    );
   };
 
   return (
@@ -446,7 +327,7 @@ export default function BoardPage() {
       writing={writing}
       actions={actions}
       quiet={quiet}
-      wallButton={<BoardOnWall boardId={board.id} now={now} onHold={() => setWallOpen(true)} onEjected={() => ejectReceipt(queryClient, me.data, board, notes.data ?? [], openBoard)} />}
+      wallButton={<BoardOnWall boardId={board.id} now={now} onHold={() => setWallOpen(true)} onEjected={moves.ejected} />}
       presenter={(points) => <BoardPresenter variant="board" boardId={board.id} points={points} now={now} />}
       sheets={
         <>
@@ -462,24 +343,7 @@ export default function BoardPage() {
               setPicking(null);
             }}
           />
-          <BoardPicker
-            open={moving !== null}
-            onClose={() => setMoving(null)}
-            subject={moving ? firstLine(moving.text) : null}
-            boards={others}
-            summaries={summaries}
-            onPick={(other) => moveTo({ id: other.id, fresh: false })}
-            onNew={() => {
-              // a move needs the network; a board made «for later» would wait with nothing on it
-              if (!navigator.onLine) {
-                setMoving(null);
-                toast("Нет связи — пункт остался на этой доске");
-                return;
-              }
-              const fresh = crypto.randomUUID();
-              createBoard.mutate({ id: fresh, title: defaultTitle(new Date()), client_request_id: crypto.randomUUID() }, { onSuccess: () => moveTo({ id: fresh, fresh: true }) });
-            }}
-          />
+          <BoardPicker {...moves.picker} />
           <WallSheet
             open={wallOpen}
             onClose={() => setWallOpen(false)}
@@ -515,7 +379,7 @@ export default function BoardPage() {
             }
             onEject={() => {
               setWallOpen(false);
-              eject();
+              moves.eject();
             }}
           />
         </>

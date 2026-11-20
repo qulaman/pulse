@@ -5,6 +5,8 @@
  * wall clock is plain arithmetic. Pure: the confirm editor renders, this one reads and writes time.
  */
 
+import { foldRu } from "@/lib/people/search";
+
 const OFFSET_MS = 5 * 60 * 60 * 1000;
 const DAY_MS = 86_400_000;
 
@@ -134,7 +136,7 @@ const FILLER = /^(в|во|до|к|ко|на|часов|часа|час|ч|чис
  * passed; a weekday is the next one (today, while its hour is still ahead).
  */
 export function parseWhen(text: string, now: Date = new Date()): string | null | undefined {
-  const source = text.toLowerCase().replace(/ё/g, "е").trim();
+  const source = foldRu(text).trim();
   if (!source) return undefined;
   if (/^(без срока|без|нет|никогда|-|—)$/u.test(source)) return null;
 

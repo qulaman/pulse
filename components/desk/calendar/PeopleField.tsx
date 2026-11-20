@@ -4,7 +4,8 @@ import { useId, useLayoutEffect, useMemo, useRef, useState, type RefObject } fro
 
 import { shortName } from "@/lib/people/names";
 import { usePeople, type Person } from "@/lib/people/queries";
-import { foldRu, searchPeople, useRoster } from "@/lib/people/roster";
+import { useRoster } from "@/lib/people/roster";
+import { foldRu, searchPeople } from "@/lib/people/search";
 
 /** Matches shown under the field at once; the rest — by typing more. */
 const SHOWN = 6;
@@ -190,7 +191,7 @@ function noteOf(profile: Pick<Person, "availability" | "is_active"> | undefined)
 
 function PersonChip({ label, name, note = null, onRemove }: { label: string; name?: string; note?: string | null; onRemove: () => void }) {
   return (
-    <span className="cal-chip-person inline-flex h-6 max-w-full items-center gap-0.5 text-[14px] font-medium leading-5" data-name={name}>
+    <span className="inline-flex h-6 max-w-full items-center gap-0.5 text-[14px] font-medium leading-5" data-name={name}>
       <span className="truncate">{label}</span>
       {note ? <span className="cal-away ml-1 shrink-0 text-[12px] font-normal leading-4">{note}</span> : null}
       <button

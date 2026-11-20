@@ -1,26 +1,18 @@
-import { redirect } from "next/navigation";
-
 import { SettingsTabs } from "@/components/settings/SettingsTabs";
 import { PageHead } from "@/components/ui/PageHead";
-import { AuthError, getSessionProfile } from "@/lib/auth";
+import { profileOrLogin } from "@/lib/auth-layout";
 import { parseSettingsTab } from "@/lib/settings-tabs";
 
 /**
- * Настройки: everything that makes this instance this company, split into four tabs —
- * Компания, Программа, Сотрудники, ИИ-модель (D-85). `?tab=` opens one directly, so a
+ * «Настройки»: everything that makes this instance this company, split into four tabs —
+ * «Компания», «Программа», «Сотрудники», «ИИ-модель» (D-85). `?tab=` opens one directly, so a
  * link from the rating («включить очки») or the secretary screen lands on the right tab.
  * The director and the secretary (D-104); the layout lets nobody else in.
  */
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string | string[] }> }) {
   const { tab } = await searchParams;
   // the layout renders in parallel and redirects on its own; this only needs the role
-  const role = await getSessionProfile().then(
-    (p) => p.role,
-    (error: unknown) => {
-      if (error instanceof AuthError) redirect("/login");
-      throw error;
-    },
-  );
+  const { role } = await profileOrLogin();
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
       <PageHead title="Настройки" />

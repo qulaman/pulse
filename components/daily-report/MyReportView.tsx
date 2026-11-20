@@ -3,20 +3,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
-import { Icon } from "@/components/tasks/desk/icons";
+
 import { Button } from "@/components/ui/Button";
 import { PageHead } from "@/components/ui/PageHead";
-import {
-  dayState,
-  dayTitle,
-  durationText,
-  formProblem,
-  hmOf,
-  isoAt,
-  pointsHint,
-  SUMMARY_MAX,
-  timeOf,
-} from "@/lib/daily-report/format";
+import { dayState, dayTitle, durationText, formProblem, isoAt, pointsHint, SUMMARY_MAX, timeOf, isoToHm } from "@/lib/daily-report/format";
 import { readDraft, writeDraft, type Draft } from "@/lib/daily-report/draft";
 import type { DailyReport, MyDailyReportDay, SubmitDailyReportInput } from "@/lib/daily-report/types";
 import type { Hm } from "@/lib/datetime/calendar";
@@ -27,6 +17,7 @@ import { PointsPop, type Pop } from "./PointsPop";
 import { ReportHistory } from "./ReportHistory";
 import { HistoryBone } from "./Skeletons";
 import { TimePair } from "./TimePair";
+import { Icon } from "@/components/tasks/icons";
 
 const FIELD =
   "w-full field px-3 py-3 text-[16px] leading-[22px] text-text placeholder:text-muted outline-none focus:border-accent";
@@ -107,8 +98,8 @@ function ReportForm({
     if (draft) return { ...draft, restored: true };
     return {
       date: day.date,
-      arrived: hmOf(saved?.arrived_at ?? day.suggest.arrived_at),
-      left: hmOf(saved?.left_at ?? day.suggest.left_at),
+      arrived: isoToHm(saved?.arrived_at ?? day.suggest.arrived_at),
+      left: isoToHm(saved?.left_at ?? day.suggest.left_at),
       summary: saved?.summary ?? "",
       restored: false,
     };
@@ -129,7 +120,7 @@ function ReportForm({
   const problem = formProblem(arrivedIso, leftIso, summary);
   const wordsMissing = !summary.trim();
   const dirty =
-    !saved || (saved.summary ?? "").trim() !== summary.trim() || hmOf(saved.arrived_at) !== arrived || hmOf(saved.left_at) !== left;
+    !saved || (saved.summary ?? "").trim() !== summary.trim() || isoToHm(saved.arrived_at) !== arrived || isoToHm(saved.left_at) !== left;
 
   // the words survive a reload until the server has them
   useEffect(() => {

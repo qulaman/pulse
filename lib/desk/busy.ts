@@ -1,4 +1,4 @@
-import { aqtobeIsoToYmdHm, daysBetween, humanYmd, todayYmd, ymdHmToAqtobeIso, type Ymd } from "@/lib/datetime/calendar";
+import { addDays, aqtobeIsoToYmdHm, daysBetween, humanYmd, todayYmd, weekdayOf, ymdHmToAqtobeIso, type Ymd } from "@/lib/datetime/calendar";
 import { sceneOf } from "@/lib/errands/scene";
 import type { SecretaryAction } from "@/lib/settings";
 
@@ -207,12 +207,6 @@ export const MIN_WINDOW = 15;
 /** `director_busy` answers at most this many days at once (`20261104121000_director_busy.sql:26`). */
 export const BUSY_MAX_DAYS = 31;
 
-function shiftYmd(ymd: Ymd, days: number): Ymd {
-  const [year, month, day] = ymd.split("-").map(Number);
-  const moved = new Date(Date.UTC(year, month - 1, day + days));
-  return `${moved.getUTCFullYear()}-${String(moved.getUTCMonth() + 1).padStart(2, "0")}-${String(moved.getUTCDate()).padStart(2, "0")}`;
-}
-
 /**
  * The reads of `[from, to)` — `to` not included — for an RPC that takes at most `max` days: a
  * month on screen (42 days) is two calls.
@@ -221,7 +215,7 @@ export function busyChunks(from: Ymd, to: Ymd, max = BUSY_MAX_DAYS): [Ymd, Ymd][
   const out: [Ymd, Ymd][] = [];
   let at = from;
   while (daysBetween(at, to) > 0) {
-    const next = daysBetween(at, to) > max ? shiftYmd(at, max) : to;
+    const next = daysBetween(at, to) > max ? addDays(at, max) : to;
     out.push([at, next]);
     at = next;
   }
@@ -231,7 +225,7 @@ export function busyChunks(from: Ymd, to: Ymd, max = BUSY_MAX_DAYS): [Ymd, Ymd][
 /** The days of `[from, to)`. */
 export function daysFromTo(from: Ymd, to: Ymd): Ymd[] {
   const out: Ymd[] = [];
-  for (let at = from; daysBetween(at, to) > 0; at = shiftYmd(at, 1)) out.push(at);
+  for (let at = from; daysBetween(at, to) > 0; at = addDays(at, 1)) out.push(at);
   return out;
 }
 
@@ -306,8 +300,7 @@ export type WindowDay = "past" | "today" | "work" | "off";
 
 /** 1 = Monday … 7 = Sunday, as `settings.workdays` counts. */
 export function isoWeekday(ymd: Ymd): number {
-  const [year, month, day] = ymd.split("-").map(Number);
-  return ((new Date(Date.UTC(year, month - 1, day)).getUTCDay() + 6) % 7) + 1;
+  return weekdayOf(ymd) + 1;
 }
 
 export function windowDayOf(ymd: Ymd, today: Ymd, workdays: readonly number[]): WindowDay {

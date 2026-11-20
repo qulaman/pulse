@@ -29,7 +29,7 @@ export const shopKeys = {
 const ORDER_SELECT =
   "*, item:shop_items(title, icon), user:profiles!orders_user_id_fkey(full_name)";
 
-/** Витрина: активные товары, дешёвое — первым. */
+/** The shop window: active items, the cheap ones first. */
 export function useShopItems() {
   return useRealtimeQuery<ShopItem[]>({
     queryKey: shopKeys.items,
@@ -48,7 +48,7 @@ export function useShopItems() {
   });
 }
 
-/** Весь ассортимент, включая скрытые — витрина глазами директора. */
+/** The whole range, hidden items too — the shop window as the director sees it. */
 export function useAllShopItems(enabled: boolean) {
   return useRealtimeQuery<ShopItem[]>({
     queryKey: shopKeys.allItems,
@@ -68,8 +68,8 @@ export function useAllShopItems(enabled: boolean) {
 }
 
 /**
- * Заказы под RLS: сотрудник видит свои, директор и завхоз — все компании. Один и тот же
- * запрос обслуживает обе секции страницы — второго источника правды о заказе нет.
+ * Orders under RLS: an employee sees their own, the director and the storekeeper — the whole company's. One
+ * query serves both sections of the page — there is no second source of truth about an order.
  */
 export function useOrders(enabled = true) {
   return useRealtimeQuery<Order[]>({
@@ -83,15 +83,15 @@ export function useOrders(enabled = true) {
         .order("created_at", { ascending: false })
         .limit(100);
       if (error) throw new Error(error.message);
-      return (data ?? []) as unknown as Order[];
+      return data ?? [];
     },
     channel: { table: "orders" },
   });
 }
 
 /**
- * Баланс = SUM(point_transactions) целиком (принцип 4): в магазине цена сверяется с точным
- * числом, иначе кнопка соврёт. Один источник на всё приложение — lib/points (D-126).
+ * Balance = SUM(point_transactions) as a whole (principle 4): the shop checks a price against the exact
+ * number, or the button would lie. One source for the whole app — lib/points (D-126).
  */
 export { useBalance } from "@/lib/points/queries";
 
@@ -134,7 +134,7 @@ function useShopMutation<TInput>(
   });
 }
 
-/** Заказ: холд очков и резерв товара одной транзакцией (RPC, идемпотентно). */
+/** An order: the points hold and the item reserve in one transaction (RPC, idempotent). */
 export function useCreateOrder() {
   return useShopMutation<ShopItem>(
     async (item, requestId) => {
@@ -151,7 +151,7 @@ export function useCreateOrder() {
   );
 }
 
-/** Отмена: очки возвращаются ровно на сумму холда (D-10). */
+/** A cancel: exactly the held points come back (D-10). */
 export function useCancelOrder() {
   return useShopMutation<Order>(
     async (order, requestId) => {
@@ -168,7 +168,7 @@ export function useCancelOrder() {
   );
 }
 
-/** Завхоз ведёт заказ: подтвердил → выдал. Новых транзакций выдача не пишет. */
+/** The storekeeper runs an order: confirmed → handed out. Handing out writes no new transactions. */
 export function useSetOrderStatus() {
   return useShopMutation<{ order: Order; status: Extract<OrderStatus, "approved" | "delivered"> }>(
     async ({ order, status }, requestId) => {
@@ -187,24 +187,24 @@ export function useSetOrderStatus() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Админка директора: ассортимент и очки компании                              */
+/* The director's admin: the range and the company's points                       */
 /* -------------------------------------------------------------------------- */
 
 export type ItemDraft = {
-  /** Известен заранее: повтор сохранения — тот же upsert, а не второй товар (принцип 7). */
+  /** Known in advance: a repeated save is the same upsert, not a second item (principle 7). */
   id: string;
   title: string;
   description: string | null;
   icon: string | null;
   price: number;
-  /** null — без ограничения. */
+  /** null — no limit. */
   stock: number | null;
   is_active: boolean;
 };
 
 /**
- * Сохранение награды — upsert по заранее выданному id: экран не знает разницы между
- * «создать» и «изменить», а доехавший дважды запрос не родит второй товар.
+ * Saving a reward is an upsert by an id handed out in advance: the screen knows no difference between
+ * «создать» and «изменить», and a request that arrived twice does not make a second item.
  */
 export function useSaveShopItem(companyId: string | undefined) {
   const queryClient = useQueryClient();
@@ -235,7 +235,7 @@ export function useSaveShopItem(companyId: string | undefined) {
   });
 }
 
-/** Удаление возможно, только пока награду никто не заказывал: иначе её прячут. */
+/** A reward can be deleted only while nobody has ordered it: otherwise it is hidden. */
 export function useDeleteShopItem() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -250,7 +250,7 @@ export function useDeleteShopItem() {
     },
     onError: (error) => {
       const raw = error instanceof Error ? error.message : "";
-      // on delete restrict: заказы ссылаются на товар — история заказов важнее удаления
+      // on delete restrict: orders point at the item — the history of orders matters more than the delete
       toast(
         raw.includes("violates foreign key") || raw.includes("23503")
           ? "Награду уже заказывали — её можно только скрыть"
@@ -270,7 +270,7 @@ export type LedgerRow = {
   user: { full_name: string } | null;
 };
 
-/** Очки компании одной лентой — директорское право по RLS, сотруднику придут только свои. */
+/** The company's points as one feed — the director's right by RLS, an employee gets only their own. */
 export function useCompanyLedger(enabled: boolean, limit = 200) {
   const query = useQuery({
     queryKey: [...shopKeys.ledger, limit],
@@ -285,7 +285,7 @@ export function useCompanyLedger(enabled: boolean, limit = 200) {
         .order("created_at", { ascending: false })
         .limit(limit);
       if (error) throw new Error(error.message);
-      return (data ?? []) as unknown as LedgerRow[];
+      return data ?? [];
     },
   });
   useRealtimeInvalidate({ table: "point_transactions" }, shopKeys.ledger, enabled);
@@ -293,21 +293,21 @@ export function useCompanyLedger(enabled: boolean, limit = 200) {
 }
 
 export type ShopSummary = {
-  /** Столько очков сейчас на руках у людей (сумма всех транзакций компании). */
+  /** The points people hold right now (the sum of all the company's transactions). */
   onHands: number;
-  /** Столько унесено в магазин и не вернулось (холды минус возвраты). */
+  /** The points taken to the shop and not back (holds minus returns). */
   spent: number;
-  /** Начислено за последние 30 дней — что компания раздала, без магазинных возвратов. */
+  /** Awarded over the last 30 days — what the company gave, without shop returns. */
   earned30: number;
-  /** Балансы по людям, богатые первыми — «кто копит» на пульте директора. */
+  /** Balances by person, the richest first — «кто копит» on the director's panel. */
   balances: { userId: string; points: number }[];
 };
 
 /**
- * Все цифры пульта из одной строки на человека (`point_balances`, D-126): сколько на руках,
- * сколько унесено в магазин, сколько роздано за месяц и у кого сколько. База суммирует
- * транзакции сама — второго источника правды об очках нет (принцип 4), а телефон больше
- * не тянет всю ленту, которую PostgREST всё равно обрезал бы на max_rows.
+ * Every figure of the panel from one row per person (`point_balances`, D-126): how much is held,
+ * how much went to the shop, how much was given this month and who has how much. The base sums
+ * the transactions itself — there is no second source of truth about points (principle 4), and the phone
+ * no longer pulls the whole feed, which PostgREST would cut at max_rows anyway.
  */
 export function useShopSummary(enabled: boolean) {
   const query = useQuery({

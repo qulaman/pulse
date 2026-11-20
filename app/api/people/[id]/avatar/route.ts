@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { userSupabase, withAuth, type HandlerContext } from "@/lib/api/handler";
+import { PERSON_ID, userSupabase, withAuth, type HandlerContext } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
 import { canEditPerson } from "@/lib/people/access";
 import { AVATAR_BUCKET, avatarPathFits, avatarPathOf } from "@/lib/people/avatar";
@@ -13,12 +13,10 @@ const PutSchema = z.strictObject({
 
 /** The card when the caller may change it (D-104); a card of another company is simply not found. */
 async function loadCard<T>({ profile, params }: HandlerContext<T>): Promise<{ id: string; avatar_url: string | null } | Response> {
-  const id = z.guid().safeParse(params.id); // guid: seed ids are not RFC-4122
-  if (!id.success) return apiError(404, "not_found", "Сотрудник не найден");
   const { data, error } = await createServiceSupabase()
     .from("profiles")
     .select("id, role, avatar_url")
-    .eq("id", id.data)
+    .eq("id", params.id)
     .eq("company_id", profile.companyId)
     .maybeSingle();
   if (error) throw new Error(`profile read failed: ${error.message}`);
@@ -69,16 +67,22 @@ export const PUT = withAuth<z.infer<typeof PutSchema>>(
     return apiOk({ avatar_url: url });
   },
   PutSchema,
+  { id: PERSON_ID },
 );
 
 /** Takes the photo off the card and removes the file. Idempotent: no photo — nothing to do. */
-export const DELETE = withAuth(["director", "secretary"], async (ctx) => {
-  const card = await loadCard(ctx);
-  if (card instanceof Response) return card;
-  if (card.avatar_url) {
-    const refused = await writeUrl(ctx, card.id, null);
-    if (refused) return refused;
-    await dropFile(card.avatar_url, null, ctx.profile.companyId);
-  }
-  return apiOk({ avatar_url: null });
-});
+export const DELETE = withAuth(
+  ["director", "secretary"],
+  async (ctx) => {
+    const card = await loadCard(ctx);
+    if (card instanceof Response) return card;
+    if (card.avatar_url) {
+      const refused = await writeUrl(ctx, card.id, null);
+      if (refused) return refused;
+      await dropFile(card.avatar_url, null, ctx.profile.companyId);
+    }
+    return apiOk({ avatar_url: null });
+  },
+  undefined,
+  { id: PERSON_ID },
+);

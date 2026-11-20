@@ -12,21 +12,15 @@
  */
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { chromium, type BrowserContext, type Page } from "playwright";
+import { chromium } from "playwright";
 
-const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
+import { PHONE, signIn } from "./lib/login";
+import { APP_URL, finish, record } from "./lib/smoke";
+
 const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui", "offline");
-const EMAIL = process.env.EMAIL ?? "test@demo.local";
-const PASSWORD = process.env.PASS ?? "1";
+const ACCOUNT = { email: process.env.EMAIL ?? "test@demo.local", password: process.env.PASS ?? "1" };
 
 mkdirSync(SHOTS, { recursive: true });
-
-type Check = { name: string; ok: boolean; detail: string };
-const checks: Check[] = [];
-const record = (name: string, ok: boolean, detail = "") => {
-  checks.push({ name, ok, detail });
-  console.log(`${ok ? "ok  " : "FAIL"}  ${name}${detail ? `  ${detail}` : ""}`);
-};
 
 /** Strings, not functions: tsx would inject helpers the page does not have. */
 const KEPT_QUERIES = `new Promise((resolve) => {
@@ -48,26 +42,16 @@ const KEPT_CACHES = `(async () => {
 /** Skeleton groups still on the screen: the data has not arrived. */
 const BONES = `document.querySelectorAll('main [aria-busy="true"]').length`;
 
-async function signIn(context: BrowserContext): Promise<Page> {
-  const page = await context.newPage();
-  await page.goto(`${APP_URL}/login`, { waitUntil: "networkidle" });
-  await page.getByLabel("Почта").fill(EMAIL);
-  await page.getByLabel("Пароль").fill(PASSWORD);
-  await page.getByRole("button", { name: "Войти" }).click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 30_000 });
-  await page.waitForLoadState("networkidle");
-  return page;
-}
-
 async function main() {
   const browser = await chromium.launch({ channel: "chrome", headless: true });
-  const context = await browser.newContext({ viewport: { width: 375, height: 667 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: "ru-RU" });
+  const context = await browser.newContext(PHONE);
   // any page error — a hydration mismatch (#418) above all: the kept data must come back
   // only after the page hydrated
   const errors = new Set<string>();
   let offline = false;
   context.on("page", (p) => p.on("pageerror", (error) => errors.add(`${new URL(p.url()).pathname}${offline ? " (без сети)" : ""}: ${error.message.slice(0, 120)}`)));
-  const page = await signIn(context);
+  const page = await context.newPage();
+  await signIn(page, APP_URL, ACCOUNT);
 
   // ---- the worker takes over, the screens and their data are kept ----------------------------
   await page.waitForFunction("navigator.serviceWorker && navigator.serviceWorker.controller !== null", undefined, { timeout: 20_000 }).catch(() => {});
@@ -139,9 +123,7 @@ async function main() {
   record("без ошибок страницы", errors.size === 0, [...errors].join(" | "));
 
   await browser.close();
-  const failed = checks.filter((c) => !c.ok);
-  console.log(`\n${checks.length - failed.length}/${checks.length} offline checks passed`);
-  process.exit(failed.length ? 1 : 0);
+  finish();
 }
 
 void main().catch((error) => {

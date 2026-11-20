@@ -6,7 +6,6 @@ import { MyReportView } from "@/components/daily-report/MyReportView";
 import type { Pop } from "@/components/daily-report/PointsPop";
 import { ReportSkeleton } from "@/components/daily-report/Skeletons";
 import { LoadFailed } from "@/components/daily-report/TeamDayPanel";
-import { useMinute } from "@/components/tasks/list/TaskList";
 import { PageHead } from "@/components/ui/PageHead";
 import {
   useMyDailyReport,
@@ -15,6 +14,7 @@ import {
   useSubmitDailyReport,
 } from "@/lib/daily-report/queries";
 import { isNetworkError } from "@/lib/net";
+import { useNow } from "@/lib/useNow";
 
 /**
  * «Отчёт за день» (D-152): the data and the submit; the screen itself is `MyReportView`, which
@@ -25,7 +25,7 @@ export default function ReportPage() {
   const history = useMyDailyReportHistory();
   const submit = useSubmitDailyReport();
   useRefreshAfterReplay();
-  const now = useMinute();
+  const now = useNow();
   const [pop, setPop] = useState<Pop | null>(null);
 
   if (day.isPending) return <ReportSkeleton />;

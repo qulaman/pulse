@@ -23,19 +23,14 @@
  * never failed, and the screens' writes are answered in the browser (scripts/lib/login.ts).
  * Screenshots land in SHOTS_DIR (default ./.smoke-ui/stages).
  */
-import { createClient } from "@supabase/supabase-js";
 import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium, type Browser, type BrowserContext, type Page, type Route } from "playwright";
 
 import { PHONE as IPHONE, readOnly, signIn as enter } from "./lib/login";
+import { apiSession, APP_URL } from "./lib/smoke";
 
-process.loadEnvFile(".env.local");
-
-const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui", "stages");
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const ROLE = process.env.ROLE ?? "all";
 const ONLY = process.env.ROUTES?.split(",").filter(Boolean) ?? null;
 const SCENARIOS = (process.env.SCENARIOS ?? "nav,cold").split(",");
@@ -83,9 +78,7 @@ const ACCOUNTS: Account[] = [
 
 /** Real ids for the dynamic screens, read under the account's own RLS. */
 async function idsFor(account: Account): Promise<Ids> {
-  const supabase = createClient(SUPABASE_URL, ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data } = await supabase.auth.signInWithPassword({ email: account.email, password: account.password });
-  const me = data.user?.id ?? "";
+  const { supabase, userId: me } = await apiSession(account.email, account.password);
   const mine = account.role === "director" ? "author_id" : "assignee_id";
   const task = await supabase.from("tasks").select("id").eq(mine, me).neq("status", "scheduled").order("created_at", { ascending: false }).limit(1).maybeSingle();
   const person = await supabase.from("profiles").select("id").neq("id", me).eq("is_active", true).in("role", ["employee", "manager"]).limit(1).maybeSingle();

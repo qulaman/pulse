@@ -2,7 +2,7 @@ import { after } from "next/server";
 import { z } from "zod";
 
 import { userSupabase, withAuth } from "@/lib/api/handler";
-import { apiError, apiOk } from "@/lib/api/respond";
+import { apiError, apiOk, NO_ACCESS, rpcFailure, rpcResult } from "@/lib/api/respond";
 import { editDiff } from "@/lib/ai/edit-diff";
 import { EntitySchema, type Entity } from "@/lib/ai/schema";
 import { kickDeliveries } from "@/lib/push/send";
@@ -79,22 +79,19 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     });
 
     if (error) {
-      if (error.message.includes("assignee_required")) {
-        return apiError(400, "assignee_required", "Не понял, кому задача — выбери исполнителя");
-      }
-      if (error.message.includes("assignee_inactive")) {
-        return apiError(400, "assignee_inactive", "Этот сотрудник больше не работает — выбери другого");
-      }
-      if (error.message.includes("event_time_required")) {
-        return apiError(400, "event_time_required", "Не понял, когда мероприятие — выбери время");
-      }
-      if (error.message.includes("forbidden")) {
-        return apiError(403, "forbidden", "Нет доступа");
-      }
-      throw new Error(`confirm_voice_batch failed: ${error.message}`);
+      return rpcFailure(
+        error,
+        {
+          assignee_required: [400, "Не понял, кому задача — выбери исполнителя"],
+          assignee_inactive: [400, "Этот сотрудник больше не работает — выбери другого"],
+          event_time_required: [400, "Не понял, когда мероприятие — выбери время"],
+          forbidden: NO_ACCESS,
+        },
+        "confirm_voice_batch",
+      );
     }
 
-    const { duplicate = false, ...result } = (data ?? {}) as Record<string, unknown>;
+    const { result, duplicate } = rpcResult(data);
     // «отправить сейчас» is the whole batch (D-129): the outbox holds an announcement for the
     // window like every word to the team, so its pushes are released here, after the batch
     const announcementIds = Array.isArray(result.announcement_ids) ? (result.announcement_ids as string[]) : [];

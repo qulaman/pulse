@@ -6,8 +6,10 @@ import { Mascot } from "@/components/brand/Mascot";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { haptic } from "@/lib/haptics";
-import { initialsOf, searchPeople, useRoster, type RosterEntry } from "@/lib/people/roster";
+import { useRoster, type RosterEntry } from "@/lib/people/roster";
+import { searchPeople } from "@/lib/people/search";
 import { pluralRu } from "@/lib/tasks/status-text";
+import { initialsOf } from "@/lib/people/names";
 
 /**
  * The one way to choose people in the app (D-108): «Поручить» on a note or a board's point,

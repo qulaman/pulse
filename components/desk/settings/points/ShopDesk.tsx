@@ -4,9 +4,9 @@ import { EyeOff, Pencil, Plus } from "lucide-react";
 import { useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { ItemDialog } from "@/components/desk/settings/points/ItemDialog";
-import { TileFace } from "@/components/desk/team/TeamGrid";
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
+import { Face, useAvatars } from "@/components/desk/ui/Face";
 import { useContextMenu } from "@/components/desk/ui/Menu";
 import { Num } from "@/components/desk/ui/Num";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
@@ -16,7 +16,6 @@ import { Bone } from "@/components/ui/Skeleton";
 import { humanAqtobe } from "@/lib/ai/time";
 import { formatNum } from "@/lib/desk/format";
 import { shortName, useNamesKey } from "@/lib/people/names";
-import { usePeople } from "@/lib/people/queries";
 import { isOpenOrder, ORDER_STATUS, pointsWord, recentDeliveries, takenCounts, takenLabel, waitingRu } from "@/lib/shop/format";
 import { useAllShopItems, useCancelOrder, useOrders, useSaveShopItem, useSetOrderStatus, type Order, type ShopItem } from "@/lib/shop/queries";
 import { useMe } from "@/lib/tasks/queries";
@@ -56,7 +55,7 @@ function Who({ id, name, avatar }: { id: string; name: string; avatar: string | 
   useNamesKey();
   return (
     <span className="flex min-w-0 items-center gap-2.5">
-      <TileFace person={{ id, full_name: name, avatar_url: avatar }} size={26} />
+      <Face person={{ id, full_name: name, avatar_url: avatar }} size={26} />
       <span className="truncate" title={name}>
         {shortName(name)}
       </span>
@@ -140,7 +139,6 @@ export function ShopDesk() {
   const me = useMe().data;
   const items = useAllShopItems(true);
   const orders = useOrders();
-  const people = usePeople();
   const setStatus = useSetOrderStatus();
   const cancel = useCancelOrder();
   const [editing, setEditing] = useState<ShopItem | "new" | null>(null);
@@ -153,7 +151,7 @@ export function ShopDesk() {
   const toggleShown = (item: ShopItem) =>
     saveItem.mutate({ id: item.id, title: item.title, description: item.description, icon: item.icon, price: item.price, stock: item.stock, is_active: !item.is_active });
 
-  const avatars = useMemo(() => new Map((people.data ?? []).map((p) => [p.id, p.avatar_url])), [people.data]);
+  const avatars = useAvatars();
   const all = useMemo(() => orders.data ?? [], [orders.data]);
   // the director's own orders are not his to hand out (as on the phone)
   const waiting = useMemo(() => all.filter((order) => isOpenOrder(order.status) && order.user_id !== me?.userId), [all, me?.userId]);

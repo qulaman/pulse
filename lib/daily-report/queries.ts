@@ -5,10 +5,12 @@ import { useCallback, useEffect, useMemo } from "react";
 
 import { toast } from "@/components/ui/Toast";
 import type { Ymd } from "@/lib/datetime/calendar";
-import { isNetworkError, NetworkError } from "@/lib/net";
-import { dequeue, enqueue, outboxSize, subscribeOutbox } from "@/lib/outbox";
+import { ApiError, postJson } from "@/lib/api/client";
+import { isNetworkError } from "@/lib/net";
+import { outboxSize, subscribeOutbox } from "@/lib/outbox";
 import { useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
 import { createBrowserSupabase } from "@/lib/supabase/client";
+import { rpcJson } from "@/lib/supabase/rpc";
 
 import { readDraft } from "./draft";
 import { askFromOf, ASK_FROM_DEFAULT, reportDue, type ReportDue } from "./due";
@@ -62,25 +64,21 @@ export class DailyReportFailure extends Error {
   }
 }
 
-type RpcName = (typeof DAILY_REPORT_RPC)[keyof Omit<typeof DAILY_REPORT_RPC, "submit">];
-
 /** One read RPC of the module; its jsonb comes back in the contract's shape (lib/daily-report/types.ts). */
-async function read<T>(name: RpcName, args: Record<string, unknown> = {}): Promise<T> {
-  const supabase = createBrowserSupabase();
-  // the generated Args differ per function; the contract types the answer, the database checks the args
-  const { data, error } = await supabase.rpc(name as "my_daily_report", args as never);
+async function read<T>(call: Parameters<typeof rpcJson>[0]): Promise<T> {
+  const { data, error } = await rpcJson<T>(call);
   if (error) {
     const code = errorCodeOf(error.message);
     throw new DailyReportFailure(code, code ? DAILY_REPORT_ERROR_TEXT[code] : error.message);
   }
-  return data as unknown as T;
+  return data;
 }
 
 /** The employee's today: the form's prefill, the live tasks of the day, the report if any. */
 export function useMyDailyReport() {
   return useQuery({
     queryKey: dailyReportKeys.myDay(),
-    queryFn: () => read<MyDailyReportDay>(DAILY_REPORT_RPC.my),
+    queryFn: () => read<MyDailyReportDay>(createBrowserSupabase().rpc(DAILY_REPORT_RPC.my)),
   });
 }
 
@@ -89,7 +87,10 @@ export function useMyDailyReportHistory(enabled = true) {
   return useQuery({
     queryKey: dailyReportKeys.history(),
     enabled,
-    queryFn: async () => (await read<DailyReportHistoryItem[] | null>(DAILY_REPORT_RPC.history, { p_limit: HISTORY_LIMIT })) ?? [],
+    queryFn: async () => {
+      const call = createBrowserSupabase().rpc(DAILY_REPORT_RPC.history, { p_limit: HISTORY_LIMIT });
+      return (await read<DailyReportHistoryItem[] | null>(call)) ?? [];
+    },
   });
 }
 
@@ -99,27 +100,16 @@ export function useMyDailyReportHistory(enabled = true) {
  * OutboxReplay sends it after a closed app. A refusal comes back with the module's code.
  */
 async function postSubmit(input: SubmitDailyReportInput): Promise<SubmitDailyReportResult> {
-  let res: Response;
+  let body: SubmitDailyReportResult | null;
   try {
-    res = await fetch(SUBMIT_PATH, {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(input),
-    });
-  } catch {
-    enqueue({ id: input.client_request_id, path: SUBMIT_PATH, payload: input });
-    throw new NetworkError(WAITING);
+    body = (await postJson(SUBMIT_PATH, input, { offline: WAITING, fallback: SUBMIT_FAILED })) as SubmitDailyReportResult | null;
+  } catch (error) {
+    if (!(error instanceof ApiError)) throw error;
+    // a dead session went to /login: the words stay in the draft (./draft)
+    const code = errorCodeOf(error.code);
+    throw new DailyReportFailure(code, code ? DAILY_REPORT_ERROR_TEXT[code] : error.message);
   }
-  dequeue(input.client_request_id);
-  const body = (await res.json().catch(() => null)) as
-    | (SubmitDailyReportResult & { error?: { code?: string; message_ru?: string } })
-    | null;
-  if (res.status === 401) throw new DailyReportFailure(null, "Сессия истекла. Войдите заново — текст отчёта остался на экране");
-  if (!res.ok || !body?.report) {
-    const code = errorCodeOf(body?.error?.code);
-    throw new DailyReportFailure(code, code ? DAILY_REPORT_ERROR_TEXT[code] : (body?.error?.message_ru ?? SUBMIT_FAILED));
-  }
+  if (!body?.report) throw new DailyReportFailure(null, SUBMIT_FAILED);
   return body;
 }
 
@@ -296,7 +286,7 @@ export function useSubmitWaiting(): boolean {
 export function useTeamDailyReportDay(date: Ymd, companyId: string | undefined, enabled = true) {
   return useRealtimeQuery<TeamDay>({
     queryKey: dailyReportKeys.teamDay(date),
-    queryFn: () => read<TeamDay>(DAILY_REPORT_RPC.teamDay, { p_date: date }),
+    queryFn: () => read<TeamDay>(createBrowserSupabase().rpc(DAILY_REPORT_RPC.teamDay, { p_date: date })),
     channel: { table: "daily_reports", filter: companyId ? `company_id=eq.${companyId}` : undefined },
     // a report changes the day it belongs to and every period around it
     onEvent: (_payload, queryClient) => {
@@ -313,6 +303,6 @@ export function useTeamDailyReportPeriod(from: Ymd, to: Ymd, enabled = true) {
     queryKey: dailyReportKeys.teamPeriod(from, to),
     enabled: enabled && Boolean(from && to) && from <= to,
     placeholderData: keepPreviousData,
-    queryFn: () => read<TeamPeriod>(DAILY_REPORT_RPC.teamPeriod, { p_from: from, p_to: to }),
+    queryFn: () => read<TeamPeriod>(createBrowserSupabase().rpc(DAILY_REPORT_RPC.teamPeriod, { p_from: from, p_to: to })),
   });
 }

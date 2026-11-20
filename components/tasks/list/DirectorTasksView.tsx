@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
 import { RecurrenceSection } from "@/components/recurrence/RecurrenceSection";
-import { Icon } from "@/components/tasks/desk/icons";
+import { Icon } from "@/components/tasks/icons";
 import { Button } from "@/components/ui/Button";
 import { HeadButton } from "@/components/ui/HeadButton";
 import { PageHead } from "@/components/ui/PageHead";
@@ -14,7 +14,7 @@ import { usePointsEnabled } from "@/lib/points/queries";
 import { isReactable, showsReactionBar } from "@/lib/points/reactions";
 import type { BoardTask } from "@/lib/pulse/board";
 import type { Rule } from "@/lib/recurrence/queries";
-import type { DeskReason } from "@/lib/tasks/desk";
+import type { DeskReason } from "@/lib/tasks/reasons";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import {
   closedSections,
@@ -38,8 +38,8 @@ import { StatusScreen } from "./StatusScreen";
 import { TabColumnBox, Tabs } from "./Tabs";
 import { TaskColumn, useAccordion, useRevealOpen } from "./TaskList";
 import { useDirectorControls } from "./useDirectorControls";
+import { dateLineRu } from "@/lib/ai/time";
 
-const DATE_LINE = new Intl.DateTimeFormat("ru-RU", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Aqtobe" });
 
 /**
  * «Задачи» директора (D-83): a status screen on top — whose move it is, how the open work
@@ -181,7 +181,7 @@ export function DirectorTasksView({
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
       <PageHead
-        eyebrow={DATE_LINE.format(now)}
+        eyebrow={dateLineRu(now)}
         title="Задачи"
         tone={screen.tone}
         actions={

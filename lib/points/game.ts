@@ -85,7 +85,8 @@ export function useReactToTask() {
       const supabase = createBrowserSupabase();
       const { data, error } = await supabase.rpc("react_to_task", {
         p_task: input.taskId,
-        p_code: input.code,
+        // null takes the reaction back; the generated types cannot say a SQL argument may be null
+        p_code: input.code as string,
         client_request_id: crypto.randomUUID(),
       });
       if (error) throw new Error(error.message);
@@ -181,7 +182,7 @@ export function useOpenDisputes(enabled: boolean) {
         .order("created_at", { ascending: true })
         .limit(50);
       if (error) throw new Error(error.message);
-      return (data ?? []) as unknown as OpenDispute[];
+      return data ?? [];
     },
   });
   useRealtimeInvalidate({ table: "point_disputes" }, disputeKeys.open, enabled);

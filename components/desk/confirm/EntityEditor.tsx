@@ -3,7 +3,7 @@
 import { X } from "lucide-react";
 import { useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
-import { hasAssignee, KIND_ICON, KIND_LABEL, chosenId, mainField } from "@/components/desk/confirm/kinds";
+import { KIND_ICON, KIND_LABEL } from "@/components/desk/confirm/kinds";
 import { PeopleField, PersonField, type PickPerson } from "@/components/desk/confirm/PersonField";
 import { EventRepeatField, RecurrenceFields } from "@/components/desk/confirm/RepeatFields";
 import { WhenField } from "@/components/desk/confirm/WhenField";
@@ -13,7 +13,8 @@ import { Select } from "@/components/desk/ui/Toolbar";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import type { PostprocessedEntity } from "@/lib/ai/postprocess";
 import { shortName } from "@/lib/people/names";
-import { describeParticipants, type EntityPatch } from "@/lib/store/ingest";
+import { chosenId, describeParticipants, hasAssignee, mainField } from "@/lib/confirm/entities";
+import type { EntityPatch } from "@/lib/store/ingest";
 
 /** One line of the editor: the field's name on the left, its control on the right. */
 function Field({ label, children, align = "center" }: { label: string; children: ReactNode; align?: "center" | "start" }) {

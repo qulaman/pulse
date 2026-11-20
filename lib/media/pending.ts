@@ -9,6 +9,7 @@
  * Every call degrades to «nothing kept» where IndexedDB is missing (private mode, an old
  * WebView) — the caller then keeps the in-memory path it had before.
  */
+import { idbStore } from "@/lib/offline/idb";
 
 export type PendingMediaKind = "voice" | "photo" | "report";
 
@@ -44,67 +45,18 @@ function fromStored(entry: StoredMedia): PendingMedia {
   return { ...rest, blob: new Blob([bytes], { type: entry.mime }) };
 }
 
-const DB_NAME = "pulse-media";
-const DB_VERSION = 1;
 const ITEMS = "items";
+/** The phones' database — its name, version and store never change (lib/offline/idb.ts). */
+const db = idbStore("pulse-media", 1, [ITEMS]);
 
-let opening: Promise<IDBDatabase | null> | null = null;
-
-function database(): Promise<IDBDatabase | null> {
-  if (typeof indexedDB === "undefined") return Promise.resolve(null);
-  opening ??= new Promise((resolve) => {
-    try {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
-      request.onupgradeneeded = () => {
-        const db = request.result;
-        if (!db.objectStoreNames.contains(ITEMS)) db.createObjectStore(ITEMS, { keyPath: "id" });
-      };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => resolve(null);
-      request.onblocked = () => resolve(null);
-    } catch {
-      resolve(null);
-    }
-  });
-  return opening;
+function run<T>(mode: IDBTransactionMode, make: (target: IDBObjectStore) => IDBRequest<T>): Promise<{ ok: boolean; value?: T }> {
+  return db.run(ITEMS, mode, make);
 }
 
-async function run<T>(mode: IDBTransactionMode, make: (target: IDBObjectStore) => IDBRequest<T>): Promise<{ ok: boolean; value?: T }> {
-  const db = await database();
-  if (!db) return { ok: false };
-  return new Promise((resolve) => {
-    try {
-      const tx = db.transaction(ITEMS, mode);
-      const request = make(tx.objectStore(ITEMS));
-      tx.oncomplete = () => resolve({ ok: true, value: request.result });
-      tx.onerror = () => resolve({ ok: false });
-      tx.onabort = () => resolve({ ok: false });
-    } catch {
-      resolve({ ok: false });
-    }
-  });
-}
+/** Reads and writes in one line: a patch is read-modify-write. */
+const { queued, changed } = db;
 
-/** Reads and writes in one line: a patch is read-modify-write (as lib/voice/kept.ts). */
-let line: Promise<unknown> = Promise.resolve();
-function queued<T>(step: () => Promise<T>): Promise<T> {
-  const next = line.then(step, step);
-  line = next.catch(() => undefined);
-  return next;
-}
-
-const listeners = new Set<() => void>();
-
-export function subscribeMedia(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-}
-
-function changed() {
-  for (const listener of listeners) listener();
-}
+export const subscribeMedia: (listener: () => void) => () => void = db.subscribe;
 
 /** Keep a file on the phone. False — nothing was kept (no IndexedDB here). */
 export async function keepMedia(item: PendingMedia): Promise<boolean> {
@@ -153,21 +105,17 @@ export function listMedia(userId: string): Promise<PendingMedia[]> {
 export function countMedia(): Promise<number> {
   return queued(async () => {
     const { value } = await run<StoredMedia[]>("readonly", (store) => store.getAll());
-    return (value ?? []).filter((item) => !claimed.has(item.id)).length;
+    return (value ?? []).filter((item) => !db.isClaimed(item.id)).length;
   });
 }
 
 /** One sender per file inside this tab: the composer's own send and the replay never both upload it. */
-const claimed = new Set<string>();
-
 export function claimMedia(id: string): boolean {
-  if (claimed.has(id)) return false;
-  claimed.add(id);
-  return true;
+  return db.claim(id);
 }
 
 export function releaseMedia(id: string): void {
-  claimed.delete(id);
+  db.release(id);
 }
 
 /** Views redraw (the send line, the composer's strip) — after a round of the replay. */
@@ -190,7 +138,7 @@ export function onMediaHandedOver(listener: () => void): () => void {
 
 /** The composer could not send it now: the replay takes it from here. */
 export function handOverMedia(id: string): void {
-  claimed.delete(id);
+  db.release(id);
   changed();
   for (const listener of waitingListeners) listener();
 }

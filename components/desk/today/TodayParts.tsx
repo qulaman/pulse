@@ -52,6 +52,7 @@ import type { Visit, VisitAnswer } from "@/lib/visits/queries";
 import { waitedSince } from "@/lib/visits/text";
 
 import { AllClear, Face, Live, Mark, Meter, Pill, rise, Titled, type Ink } from "./home/look";
+import { Aside, BlockLink, DAY_ROW } from "./home/parts";
 
 /* -------------------------------------------------------------------------- */
 /* The left column: the director's work                                         */
@@ -63,15 +64,6 @@ export function WorkList({ children, testId }: { children: ReactNode; testId?: s
     <div className="desk-list" data-testid={testId}>
       {children}
     </div>
-  );
-}
-
-/** A way from a block's head to the screen that holds all of it. */
-export function BlockLink({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <Link href={href} prefetch className="text-[13px] leading-4 text-muted transition-colors hover:text-text">
-      {children}
-    </Link>
   );
 }
 
@@ -160,7 +152,7 @@ const MOVES = "flex-row-reverse";
 const OVER_ROW = "desk-row-over pointer-events-none absolute inset-y-0 right-8 hidden items-center pl-3 group-hover/row:pointer-events-auto group-hover/row:flex";
 
 /**
- * «Ждут вашего решения» (D-154): приёмка, просьбы о сроке, вопросы, отказы — the queue's own order,
+ * «Ждут вашего решения» (D-154): hand-ins, requests for time, questions, refusals — the queue's own order,
  * each with who, what, what exactly waits and the reason's two moves at hand. A click opens the
  * task in the panel. The late ones have a list of their own below. Under the tasks — disputes and
  * orders, which have no stack of their own. «Ничего не ждёт» is said only when all of it has
@@ -269,7 +261,7 @@ export function Decisions({
                   <MoveRow className={`self-center ${MOVES}`} moves={movesOf(item)} onPress={(move, target) => onMove(move, item, target)} showKeys={cursorId === item.task.id} />
                 )}
                 <span className="flex self-center">
-                  <MoreButton items={() => menuOf(item)} />
+                  <MoreButton items={() => menuOf(item)} taskId={item.task.id} />
                 </span>
               </div>
             </WorkRow>
@@ -413,7 +405,7 @@ export function Overdue({
                   <When overdue>{late}</When>
                 </span>
                 {nudge ? <MoveButton move={nudge} onPress={(move, target) => onMove(move, item, target)} showKey={cursorId === item.task.id} /> : <span />}
-                <MoreButton items={() => menuOf(item)} />
+                <MoreButton items={() => menuOf(item)} taskId={item.task.id} />
               </div>
             </WorkRow>
           );
@@ -438,18 +430,8 @@ export function reportWord(row: TeamDayRow | undefined, now: Date): string | nul
 /* The right column: the day around the director                               */
 /* -------------------------------------------------------------------------- */
 
-/** A line of the right column: the time or the figure in the margin, the words on one vertical. */
-const DAY_ROW = "grid grid-cols-[84px_minmax(0,1fr)] items-baseline gap-x-3 py-[7px] text-[13px] leading-5";
-/** The same line when it starts with an icon or a face (D-169): centred, an icon has no baseline. */
+/** A line of the right column (`DAY_ROW`) when it starts with an icon or a face (D-169): centred, an icon has no baseline. */
 const DAY_ROW_MARKED = "grid grid-cols-[84px_minmax(0,1fr)] items-center gap-x-3 py-[7px] text-[13px] leading-5";
-
-function Aside({ children, testId }: { children: ReactNode; testId: string }) {
-  return (
-    <section className="flex flex-col gap-1" data-testid={testId}>
-      {children}
-    </section>
-  );
-}
 
 /** How many of today's deadlines stand in «Встречи и сроки» before «ещё N в задачах». */
 const DUE_SHOWN = 4;

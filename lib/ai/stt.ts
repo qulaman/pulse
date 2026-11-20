@@ -186,7 +186,7 @@ async function attempt(
 
 /**
  * Fixed policy (architect's decision, do not change): primary → fallback → pause → one primary
- * retry. Permanent 4xx short-circuits. Никакие секреты в сообщения ошибок не попадают.
+ * retry. Permanent 4xx short-circuits. No secret ever gets into an error message.
  */
 export async function transcribe(
   audio: Buffer,

@@ -2,7 +2,7 @@ import type { Ymd } from "@/lib/datetime/calendar";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { isOverdue, type TaskStatus } from "@/lib/tasks/status-text";
 
-import { DAY_FROM, DAY_TO, wallOf, type Band } from "./week";
+import { DAY_FROM, DAY_TO, dayMinuteOf, type Band } from "./week";
 
 /**
  * «Сроки задач» — the director's open orders laid over the calendar (D-154): the planning is
@@ -43,7 +43,7 @@ export function deadlineMarks(tasks: readonly TaskWithPeople[], days: readonly Y
   const groups = new Map<string, TaskWithPeople[]>();
   for (const task of tasks) {
     if (!task.deadline || CLOSED.has(task.status)) continue;
-    if (!shown.has(wallOf(task.deadline).ymd)) continue;
+    if (!shown.has(dayMinuteOf(task.deadline).ymd)) continue;
     const key = task.group_id ? `${task.group_id}|${task.deadline}` : task.id;
     const list = groups.get(key);
     if (list) list.push(task);
@@ -53,7 +53,7 @@ export function deadlineMarks(tasks: readonly TaskWithPeople[], days: readonly Y
   const byDay = new Map<Ymd, DeadlineMark[]>();
   for (const list of groups.values()) {
     const first = list[0];
-    const { ymd, minutes } = wallOf(first.deadline as string);
+    const { ymd, minutes } = dayMinuteOf(first.deadline as string);
     const mark: DeadlineMark = {
       id: first.id,
       ymd,

@@ -4,15 +4,15 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSPr
 import { createPortal } from "react-dom";
 
 import { EmptyState } from "@/components/desk/ui/EmptyState";
+import { Face } from "@/components/desk/ui/Face";
 import { SegmentTabs } from "@/components/desk/ui/Toolbar";
 import { Button } from "@/components/ui/Button";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
-import { isoWeekday, rangeText } from "@/lib/daily-report/format";
+import { rangeText } from "@/lib/daily-report/format";
 import { cellSymbol, cellWords, holidayWords, missedByDay, tabelPeriodWords, tabelTotals } from "@/lib/daily-report/tabel";
 import type { TeamPeriodRow } from "@/lib/daily-report/types";
-import { parseYmd, WEEKDAYS_SHORT_RU, type Ymd } from "@/lib/datetime/calendar";
+import { parseYmd, weekdayOf, WEEKDAYS_SHORT_RU, type Ymd } from "@/lib/datetime/calendar";
 
-import { TileFace } from "../team/TeamGrid";
 import type { Tabel, TabelDay, TabelPerson } from "./tabel-data";
 
 export type TabelShow = "all" | "gaps";
@@ -69,7 +69,7 @@ function measures(width: number, days: number, excused: boolean) {
 /* ---- words ---- */
 
 const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
-const weekday = (day: Ymd) => WEEKDAYS_SHORT_RU[isoWeekday(day) - 1];
+const weekday = (day: Ymd) => WEEKDAYS_SHORT_RU[weekdayOf(day)];
 /** «ср, 12 нояб.» */
 const dayLabel = (day: Ymd) => `${weekday(day)}, ${rangeText(day, day)}`;
 const percent = (rate: number) => `${Math.round(rate * 100)} %`;
@@ -172,7 +172,7 @@ const Row = memo(function Row({ person, days, mode, excused, selected, open, onS
             onOpen(id);
           }}
         >
-          <TileFace person={{ id, full_name: person.row.full_name, avatar_url: person.row.avatar_url }} size={mode === "dense" ? 18 : 20} />
+          <Face person={{ id, full_name: person.row.full_name, avatar_url: person.row.avatar_url }} size={mode === "dense" ? 18 : 20} />
           <span className="rep-tabel-name-text">{person.row.full_name}</span>
         </button>
       </span>
@@ -181,7 +181,7 @@ const Row = memo(function Row({ person, days, mode, excused, selected, open, onS
           <span className="rep-tabel-mark">{mode === "marks" ? cellSymbol(cell) : null}</span>
         </span>
       ))}
-      <span aria-hidden className="rep-tabel-gap" />
+      <span aria-hidden />
       <span role="cell" className="rep-tabel-end">
         <Totals row={person.row} excused={excused} />
       </span>
@@ -265,7 +265,7 @@ function useSheetTip(tabel: Tabel | undefined, shown: readonly TabelPerson[]) {
       ? createPortal(
           <span
             role="tooltip"
-            className="rep-tabel-tip pointer-events-none fixed z-[80] whitespace-nowrap rounded-[8px] border border-border bg-surface-2 px-2 py-1 text-[12px] leading-4 text-text"
+            className="pointer-events-none fixed z-[80] whitespace-nowrap rounded-[8px] border border-border bg-surface-2 px-2 py-1 text-[12px] leading-4 text-text"
             style={{ left: tip.x, top: tip.below ? tip.y + 6 : tip.y - 6, transform: `translate(-50%, ${tip.below ? "0" : "-100%"})`, boxShadow: "var(--shadow-raised)" }}
           >
             {tip.text}
@@ -514,18 +514,18 @@ export function TabelView({ tabel, stale, failed, onRetry, match, show, onShow, 
               <div role="rowgroup" className="rep-tabel-head">
                 {m.mode === "dense" ? (
                   <div className="rep-tabel-row rep-tabel-months" aria-hidden>
-                    <span className="rep-tabel-name rep-tabel-corner" />
+                    <span className="rep-tabel-name" />
                     <MonthLabels days={tabel.days} />
-                    <span className="rep-tabel-gap" />
+                    <span />
                     <span className="rep-tabel-end" />
                   </div>
                 ) : null}
                 <div role="row" className="rep-tabel-row rep-tabel-heads">
-                  <span role="columnheader" className="rep-tabel-name rep-tabel-corner">
+                  <span role="columnheader" className="rep-tabel-name">
                     Сотрудник
                   </span>
                   <DayHeads days={tabel.days} mode={m.mode} onDay={onDay} />
-                  <span aria-hidden className="rep-tabel-gap" />
+                  <span aria-hidden />
                   <span role="columnheader" className="rep-tabel-end">
                     <span className="rep-tabel-totals" data-as="head">
                       <span data-col="submitted">Сдал</span>
@@ -565,11 +565,11 @@ export function TabelView({ tabel, stale, failed, onRetry, match, show, onShow, 
 
               <div role="rowgroup" className="rep-tabel-foot" data-testid="desk-tabel-foot">
                 <div role="row" className="rep-tabel-row">
-                  <span role="rowheader" className="rep-tabel-name rep-tabel-corner">
+                  <span role="rowheader" className="rep-tabel-name">
                     Не сдали
                   </span>
                   <Foot days={tabel.days} missed={missed} mode={m.mode} />
-                  <span aria-hidden className="rep-tabel-gap" />
+                  <span aria-hidden />
                   <span role="cell" className="rep-tabel-end">
                     <Totals row={{ submitted: foot.submitted, missed: foot.missed, excused: foot.excused, submit_rate: foot.rate }} excused={excused} as="foot" />
                   </span>

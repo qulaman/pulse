@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
-import { ParseError, parseTranscript, providerOf } from "@/lib/ai/parse";
+import { ParseError, parseOptionsOf, parseTranscript, providerOf } from "@/lib/ai/parse";
 import { pinAssignee } from "@/lib/ai/pin";
 import { postprocess, type PostprocessedEntity } from "@/lib/ai/postprocess";
 import { matchErrand } from "@/lib/errands/matcher";
@@ -87,8 +87,8 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     const settings = parseCompanySettings(rawSettings);
     const rules = activeParserRules(settings.parser_rules);
 
-    // «Кофе» до модели (D-79): короткая фраза без имени из ростера, совпавшая с кнопкой
-    // каталога, — это заявка, а не поручение. Ни токена, ни экрана подтверждения.
+    // «Кофе» before the model (D-79): a short phrase with no roster name that matched a catalogue
+    // button is an errand, not an order. No tokens, no confirm screen.
     const errand = matchErrand(body.transcript, settings.secretary.actions, roster, secretaryOnDuty);
     if (errand) {
       return apiOk({ entities: [], errand, model: "matcher", escalated: false, latency_ms: 0 });
@@ -101,12 +101,9 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
         source: body.source,
         now: new Date(),
         roster,
-        model: settings.parser.model,
-        escalate: settings.parser.escalate,
-        escalationModel: settings.parser.escalation_model,
+        ...parseOptionsOf(settings),
         conventions: settings.conventions,
         rules: rules.text,
-        kinds: settings.parser.kinds,
       });
     } catch (error) {
       const code = error instanceof ParseError ? error.code : "parse_failed";

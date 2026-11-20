@@ -1,8 +1,8 @@
 import { after } from "next/server";
 import { z } from "zod";
 
-import { userSupabase, withAuth } from "@/lib/api/handler";
-import { apiError, apiOk } from "@/lib/api/respond";
+import { TASK_ID, userSupabase, withAuth } from "@/lib/api/handler";
+import { apiOk, NO_ACCESS, NO_TASK, rpcFailure, rpcResult } from "@/lib/api/respond";
 import { kickDeliveries } from "@/lib/push/send";
 
 const BodySchema = z.strictObject({
@@ -17,10 +17,6 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
   ["director"],
   async ({ req, body, params }) => {
     const taskId = params.id;
-    if (!z.guid().safeParse(taskId).success) {
-      return apiError(404, "task_not_found", "Задача не найдена");
-    }
-
     const supabase = await userSupabase(req);
     const { data, error } = await supabase.rpc("nudge_task", {
       task_id: taskId,
@@ -28,17 +24,17 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     });
 
     if (error) {
-      if (error.message.includes("task_not_found")) return apiError(404, "task_not_found", "Задача не найдена");
-      if (error.message.includes("forbidden")) return apiError(403, "forbidden", "Нет доступа");
-      if (error.message.includes("invalid_transition")) {
-        return apiError(409, "invalid_transition", "Задача уже не в работе — напоминать не о чем");
-      }
-      throw new Error(`nudge_task failed: ${error.message}`);
+      return rpcFailure(
+        error,
+        { task_not_found: NO_TASK, forbidden: NO_ACCESS, invalid_transition: [409, "Задача уже не в работе — напоминать не о чем"] },
+        "nudge_task",
+      );
     }
 
-    const { duplicate = false, ...result } = (data ?? {}) as Record<string, unknown>;
-    if (!result.too_soon) after(() => kickDeliveries());
-    return apiOk({ result, duplicate });
+    const answer = rpcResult(data);
+    if (!answer.result.too_soon) after(() => kickDeliveries());
+    return apiOk(answer);
   },
   BodySchema,
+  { id: TASK_ID },
 );

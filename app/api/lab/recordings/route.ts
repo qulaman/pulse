@@ -1,4 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 import { userSupabase, withAuth } from "@/lib/api/handler";
@@ -8,9 +7,7 @@ const BodySchema = z.object({ crids: z.array(z.uuid()).max(500) });
 
 /**
  * The recordings behind the lab's rows and whether each is kept «в корпус» (D-155 §3). A read,
- * not a mutation: POST only because the ids do not fit a URL. Asked on the server, not from the
- * browser: before migration 20261103121000 `voice_kept` is missing, and a browser request would
- * log a 404 on every lab visit — here it is just `recordings: null` (no «В корпус» chips).
+ * not a mutation: POST only because the ids do not fit a URL.
  */
 export const POST = withAuth<z.infer<typeof BodySchema>>(
   ["director"],
@@ -32,13 +29,9 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     }
     if (pathOf.size === 0) return apiOk({ recordings: [] });
 
-    // voice_kept comes with migration 20261103121000 — not in the generated types yet
-    const kept = await (supabase as unknown as SupabaseClient)
-      .from("voice_kept")
-      .select("path")
-      .in("path", [...pathOf.values()]);
-    if (kept.error) return apiOk({ recordings: null });
-    const keptPaths = new Set((kept.data as { path: string }[]).map((row) => row.path));
+    const kept = await supabase.from("voice_kept").select("path").in("path", [...pathOf.values()]);
+    if (kept.error) throw new Error(`voice_kept read failed: ${kept.error.message}`);
+    const keptPaths = new Set(kept.data.map((row) => row.path));
 
     return apiOk({
       recordings: [...pathOf].map(([crid, path]) => ({ crid, path, kept: keptPaths.has(path) })),

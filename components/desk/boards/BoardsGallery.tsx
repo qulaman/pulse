@@ -6,10 +6,10 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProper
 
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { Kbd } from "@/components/desk/ui/Kbd";
+import { keysTaken } from "@/components/desk/ui/layers";
 import { DeskPage } from "@/components/desk/ui/PageTitle";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SearchField, SegmentTabs } from "@/components/desk/ui/Toolbar";
-import { deskLayerUp } from "@/components/desk/voice/control";
 import { PurgeDialog, type Purge } from "@/components/desk/notes/PurgeDialog";
 import { useMinute } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
@@ -184,7 +184,7 @@ export function BoardsGallery() {
         search.current?.select();
         return true;
       }
-      if (!isPlainKey(event) || event.shiftKey || isTypingTarget(event.target) || deskLayerUp()) return false;
+      if (!isPlainKey(event) || event.shiftKey || isTypingTarget(event.target) || keysTaken()) return false;
       if (event.code === "KeyN") {
         newBoard();
         return true;

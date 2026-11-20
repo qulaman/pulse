@@ -21,3 +21,13 @@ export function dropLayer(id: number) {
 export function isTopLayer(id: number): boolean {
   return stack[stack.length - 1] === id;
 }
+
+/**
+ * Something of the desk holds the keys right now: a dialog, a sheet, a popover or a menu.
+ * Screen and panel shortcuts ask this first — the one place the rule lives.
+ */
+export function keysTaken(): boolean {
+  if (typeof document === "undefined") return true;
+  const body = document.body;
+  return body.hasAttribute("data-dialog-open") || body.hasAttribute("data-sheet-open") || document.querySelector(".desk-pop") !== null;
+}

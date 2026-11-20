@@ -20,17 +20,14 @@ import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { tvKeys, type TvState } from "@/lib/tv/queries";
 import type { BoardView } from "@/lib/tv/state";
 
-import { BOARD_CASES, BOARD_ID, buildBoard, COMPANY, DIRECTOR, wallRow, type BoardCase } from "./fixtures";
+import { CAST } from "../fixtures/people";
+import { BOARD_CASES, BOARD_ID, buildBoard, COMPANY, DIRECTOR, noteRow, wallRow, type BoardCase } from "./fixtures";
 
 const RECEIPT_MS = 4_000;
 /** What the sandbox's «STT» hears, in turn. */
 const HEARD = ["Позвонить поставщику бетона", "Подготовить отчёт к пятнице", "Собрать цифры по регионам", "Проверить договор аренды"];
 /** Whom «Раздать поручения» picks here, in turn: the people sheet needs a login. */
-const PEOPLE = [
-  { id: "p-marat", full_name: "Марат Оспанов" },
-  { id: "p-aigul", full_name: "Айгуль Сапарова" },
-  { id: "p-erlan", full_name: "Ерлан Байжанов" },
-];
+const PEOPLE = [CAST.marat, CAST.aigul, CAST.erlan];
 
 /**
  * The dictaphone of the screen without a microphone or a network: the same contract as
@@ -218,30 +215,11 @@ export function BoardSandbox({ which }: { which: BoardCase }) {
   const add = useCallback((text: string, parentId: string | null, voice: boolean, place: number | null = null) => {
     const at = new Date().toISOString();
     const id = crypto.randomUUID();
-    const row: Note = {
-      id,
-      company_id: COMPANY,
-      user_id: DIRECTOR,
-      text,
-      raw_transcript: null,
+    const row = noteRow(id, text, at, {
       audio_path: voice ? `${COMPANY}/${DIRECTOR}/${id}.m4a` : null,
-      inbox_item_id: null,
-      pinned: false,
-      board_id: BOARD_ID,
       position: place ?? nextPlaceIn(rowsRef.current.filter((note) => note.deleted_at === null), parentId),
       parent_id: parentId,
-      done_at: null,
-      converted_task_id: null,
-      converted_announcement_id: null,
-      converted_at: null,
-      deleted_at: null,
-      remind_at: null,
-      reminded_at: null,
-      sketch: null,
-      client_request_id: id,
-      created_at: at,
-      updated_at: at,
-    };
+    });
     setRows((list) => [...list, row]);
     // the next line said here goes after this one, before the state has caught up
     rowsRef.current = [...rowsRef.current, row];
@@ -353,7 +331,7 @@ export function BoardSandbox({ which }: { which: BoardCase }) {
         // a handed line of the sandbox went to Марат and is in work: «→ Марат · в работе», his work on the wall (D-144)
         taskOf={(row) =>
           row.converted_task_id
-            ? ({ id: row.converted_task_id, status: "accepted", deadline: null, assignee_id: "u-marat", assignee: { full_name: "Марат Сейткали" } } as unknown as TaskWithPeople)
+            ? ({ id: row.converted_task_id, status: "accepted", deadline: null, assignee_id: CAST.marat.id, assignee: { full_name: CAST.marat.full_name } } as unknown as TaskWithPeople)
             : undefined
         }
         dictation={dictation}

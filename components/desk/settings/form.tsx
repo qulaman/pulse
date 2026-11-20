@@ -8,7 +8,6 @@ import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { Select } from "@/components/desk/ui/Toolbar";
 import { Button } from "@/components/ui/Button";
-import { shortName, useNamesKey } from "@/lib/people/names";
 
 /**
  * The desk's settings form (D-154 wave 3, D-158, D-174). A group is a card — its title and a line
@@ -16,21 +15,8 @@ import { shortName, useNamesKey } from "@/lib/people/names";
  * and why on the left and holds its control on the right (or under the words: a list, a table).
  * A changed row carries a line of the accent on its left edge until it is saved. Controls are
  * sized for a mouse (36 px) and answer the keys a desktop expects: ↑/↓ step a number or a time,
- * ←/→ move a choice, Space flips a switch. Under «Журнал» (journal.css) the same markup is a
- * ruled form: a label over a rule of print, no card (app/desk/settings.css draws both).
+ * ←/→ move a choice, Space flips a switch. Drawn by app/desk/settings.css.
  */
-
-/** A person in a ruled list: one line, the name and after it the position in the second voice. */
-export function PersonLine({ name, sub }: { name: string; sub?: string | null }) {
-  // re-reads the company's names, so «Ерлан» becomes «Ерлан Б.» once the roster has come
-  useNamesKey();
-  return (
-    <span className="block truncate text-[14px] leading-5" title={name}>
-      {shortName(name)}
-      {sub ? <span className="text-[12px] text-muted"> · {sub}</span> : null}
-    </span>
-  );
-}
 
 /**
  * A row's anchor in the page: the settings search lands here (`set-<id>`). A control in a row has an
@@ -127,36 +113,6 @@ export function SettingRow({
         </div>
       )}
     </div>
-  );
-}
-
-/** On / off: a pill that slides under «Графит», the desk's small ruled box under «Журнал»; Space or Enter flips it, the label's click too. */
-export function Switch({
-  id,
-  checked,
-  onChange,
-  label,
-  disabled = false,
-}: {
-  id?: string;
-  checked: boolean;
-  onChange: (value: boolean) => void;
-  label: string;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      id={id}
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className="set-switch relative shrink-0 transition-colors duration-[120ms] disabled:opacity-40"
-    >
-      <span aria-hidden className="absolute transition-transform duration-[120ms]" />
-    </button>
   );
 }
 
@@ -437,9 +393,7 @@ export function SelectInput<V extends string>({
 
 /**
  * The one bar of a tab with edits (D-154 wave 3): what is unsaved, «Отменить» and «Сохранить» with
- * its key — under «Графит» a floating bar that rises at the foot of the window, under «Журнал» the
- * form's closing rule; stuck to the bottom of the window either way. Gone when there is nothing to
- * save.
+ * its key — a floating bar that rises at the foot of the window. Gone when there is nothing to save.
  */
 export function SaveBar({ changes, saving, onSave, onReset, blocked }: { changes: string[]; saving: boolean; onSave: () => void; onReset: () => void; blocked?: string | null }) {
   if (changes.length === 0) return null;

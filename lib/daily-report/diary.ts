@@ -5,7 +5,7 @@
  * Days are Asia/Aqtobe calendar days; the hours are «по времени сдачи», lunch included — never a
  * payroll number, so they stay grey and are never summed into one.
  */
-import { addMonths, MONTHS_RU, monthMatrix, parseYmd, ymdOf, type Month, type Ymd } from "@/lib/datetime/calendar";
+import { addMonths, MONTHS_RU, monthMatrix, parseYmd, ymdAt, ymdOf, type Month, type Ymd } from "@/lib/datetime/calendar";
 import { isWorkday, type ReportPerson, type ReportRules } from "@/lib/people/stats";
 import { pluralRu } from "@/lib/tasks/status-text";
 
@@ -242,7 +242,7 @@ export function stampOf(report: Pick<DailyReport, "report_date" | "submitted_at"
   if (!report.submitted_at) return null;
   const at = new Date(report.submitted_at);
   if (Number.isNaN(at.getTime())) return null;
-  const day = new Date(at.getTime() + 5 * 3_600_000).toISOString().slice(0, 10);
+  const day = ymdAt(at);
   const late = day > report.report_date;
   const text = late ? `сдан ${SHORT_DATE.format(at)} в ${timeOf(report.submitted_at)}` : `сдан ${timeOf(report.submitted_at)}`;
   const changed = new Date(report.updated_at).getTime() - at.getTime() > EDIT_GAP_MS;

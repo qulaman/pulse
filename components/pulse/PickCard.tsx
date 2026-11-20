@@ -5,10 +5,11 @@ import { useEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { haptic } from "@/lib/haptics";
-import { initialsOf } from "@/lib/people/queries";
+
 import { useComposeStore } from "@/lib/store/compose";
 import { useIngestStore } from "@/lib/store/ingest";
 import { elapsedSince } from "@/lib/voice/stages";
+import { initialsOf } from "@/lib/people/names";
 
 /** Somebody picked on the waiting screen: who, how to address them, and where their circle is. */
 export type Picked = {

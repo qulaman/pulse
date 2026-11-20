@@ -2,8 +2,8 @@
 
 import { Mascot } from "@/components/brand/Mascot";
 import { RollingNumber } from "@/components/ui/RollingNumber";
-import { shortName } from "@/lib/people/names";
-import { initialsOf } from "@/lib/people/queries";
+import { shortName, initialsOf } from "@/lib/people/names";
+
 import type { RatingRow } from "@/lib/points/queries";
 
 const RING = ["var(--gold)", "#B8C2CC", "#C98A5B"];

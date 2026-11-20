@@ -3,15 +3,14 @@
 import { Quote, Undo2 } from "lucide-react";
 import { useState } from "react";
 
-import { TileFace } from "@/components/desk/team/TeamGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
+import { Face, useAvatars } from "@/components/desk/ui/Face";
 import { Num } from "@/components/desk/ui/Num";
 import { When } from "@/components/desk/ui/When";
 import { Button } from "@/components/ui/Button";
 import { humanAqtobe } from "@/lib/ai/time";
 import { formatNum, pointsTone } from "@/lib/desk/format";
 import { shortName, useNamesKey } from "@/lib/people/names";
-import { usePeople } from "@/lib/people/queries";
 import { useOpenDisputes, useResolveDispute, type OpenDispute } from "@/lib/points/game";
 
 /**
@@ -30,7 +29,7 @@ function DisputeCard({ item, avatar, index }: { item: OpenDispute; avatar: strin
     <li className="pts-dispute desk-fields flex flex-col gap-1 py-2.5" data-testid="dispute-card" style={{ animationDelay: `${Math.min(index, 8) * 50}ms` }}>
       <div className="flex items-center justify-between gap-3">
         <span className="flex min-w-0 items-center gap-2.5">
-          <TileFace person={{ id: item.user_id, full_name: name, avatar_url: avatar }} size={32} />
+          <Face person={{ id: item.user_id, full_name: name, avatar_url: avatar }} size={32} />
           <span className="flex min-w-0 flex-col">
             <span className="truncate text-[14px] font-medium leading-5">{shortName(name)}</span>
             <span className="text-[12px] leading-4 text-muted">
@@ -82,9 +81,8 @@ function DisputeCard({ item, avatar, index }: { item: OpenDispute; avatar: strin
  */
 export function DisputesList() {
   const disputes = useOpenDisputes(true);
-  const people = usePeople();
+  const avatars = useAvatars();
   const items = disputes.data ?? [];
-  const avatars = new Map((people.data ?? []).map((p) => [p.id, p.avatar_url]));
 
   if (items.length === 0) {
     return disputes.isPending ? (

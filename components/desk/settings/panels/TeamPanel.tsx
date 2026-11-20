@@ -4,8 +4,9 @@ import { CalendarPlus, Plus, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
-import { GroupLink, GroupNote, NumberInput, Segmented, SettingRow, SettingsGroup, Switch, TimeInput } from "@/components/desk/settings/form";
+import { GroupLink, GroupNote, NumberInput, Segmented, SettingRow, SettingsGroup, TimeInput } from "@/components/desk/settings/form";
 import { Popover } from "@/components/desk/ui/Popover";
+import { Switch } from "@/components/desk/ui/Switch";
 import { useDraft } from "@/components/settings/draft";
 import { Button } from "@/components/ui/Button";
 import { Calendar } from "@/components/ui/datetime/Calendar";
@@ -210,7 +211,7 @@ export function TeamPanel({ director }: { director: boolean }) {
 
       <SettingsGroup id="points-reactions" title="Реакция директора на задачу" about="Реакция платит свою цену; 0 — реакция без очков. Сменил реакцию — разница доплачивается или списывается.">
         <SettingRow id="points-reactions-prices" label="Цена реакций" stack muted={off} changed={!same(rules.reactions, saved.reactions)}>
-          <div className="set-prices desk-cells grid grid-cols-2 gap-x-8">
+          <div className="desk-cells grid grid-cols-2 gap-x-8">
             {REACTION_CODES.map((code) => (
               <ReactionPrice key={code} code={code} value={rules.reactions[code]} onChange={(value) => setRules({ reactions: { ...rules.reactions, [code]: value } })} />
             ))}

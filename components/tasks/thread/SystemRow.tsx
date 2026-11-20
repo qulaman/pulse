@@ -1,7 +1,7 @@
 import { humanAqtobe } from "@/lib/ai/time";
 import type { TaskMessage } from "@/lib/tasks/queries";
 import { STATUS_LABEL, type TaskStatus } from "@/lib/tasks/status-text";
-import { messageFlags } from "@/components/tasks/TaskThread";
+import { messageFlags } from "@/lib/tasks/thread";
 
 /**
  * A status change or an edit of the order, in the same feed as the words: one thin

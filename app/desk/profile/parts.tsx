@@ -1,7 +1,9 @@
 "use client";
 
 import { motion } from "motion/react";
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
+
+import { useSectionSpy } from "@/components/desk/ui/useSectionSpy";
 
 /**
  * A card of the account page (D-174), the way settings read on Vercel: a title and what it is for,
@@ -76,40 +78,6 @@ export function StateBadge({ tone, children }: { tone: "ok" | "danger" | "muted"
 
 export type ProfileSection = { id: string; label: string };
 
-/** The section that sits under the top of the window now — the nearest heading above its middle. */
-function useSpy(ids: readonly string[]): string | null {
-  const [current, setCurrent] = useState<string | null>(ids[0] ?? null);
-  const key = ids.join("|");
-  useEffect(() => {
-    const list = key.split("|").filter(Boolean);
-    const scroller = document.getElementById("desk-main");
-    if (!scroller || list.length === 0) return;
-    let frame = 0;
-    const read = () => {
-      frame = 0;
-      const top = scroller.getBoundingClientRect().top + 120;
-      let found = list[0];
-      for (const id of list) {
-        const node = document.getElementById(id);
-        if (node && node.getBoundingClientRect().top <= top) found = id;
-      }
-      // at the very bottom the last section is the one being read, however short
-      if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4) found = list[list.length - 1];
-      setCurrent(found);
-    };
-    const onScroll = () => {
-      if (!frame) frame = requestAnimationFrame(read);
-    };
-    read();
-    scroller.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      scroller.removeEventListener("scroll", onScroll);
-      if (frame) cancelAnimationFrame(frame);
-    };
-  }, [key]);
-  return current;
-}
-
 const GLIDE = { type: "spring", stiffness: 520, damping: 42, mass: 0.8 } as const;
 
 /**
@@ -117,7 +85,7 @@ const GLIDE = { type: "spring", stiffness: 520, damping: 42, mass: 0.8 } as cons
  * the section being read as the page scrolls.
  */
 export function ProfileNav({ sections }: { sections: ProfileSection[] }) {
-  const current = useSpy(sections.map((section) => section.id));
+  const current = useSectionSpy(sections.map((section) => section.id), 120);
   return (
     <nav className="profile-nav" aria-label="Оглавление профиля">
       {sections.map((section) => {

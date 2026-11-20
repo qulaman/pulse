@@ -1,15 +1,12 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 
 import { PeoplePicker } from "@/components/people/PeoplePicker";
 import { useAssignNote } from "@/lib/notes/assign";
 import { firstLine } from "@/lib/notes/list";
 import type { Note } from "@/lib/notes/queries";
-import { useDeliveryWindow } from "@/lib/points/queries";
-import { isWithinDeliveryWindow, WINDOW_OPEN_HOUR } from "@/lib/voice/quietHours";
-
-const noop = () => () => {};
+import { useQuietHours } from "@/lib/voice/quietHours";
 
 /**
  * «Кому поручить?» over a note or a board's point (D-108): the people sheet, and a tap on a
@@ -19,11 +16,7 @@ const noop = () => () => {};
  */
 export function AssignSheet({ note, onClose, me }: { note: Note | null; onClose: () => void; me: { userId: string } | undefined }) {
   const assign = useAssignNote(me);
-  const window = useDeliveryWindow().data;
-  // read after hydration: the server renders «within the window» so both passes match
-  const hydrated = useSyncExternalStore(noop, () => true, () => false);
-  const quiet = hydrated && !isWithinDeliveryWindow(new Date(), window);
-  const opensAt = window?.from ?? `0${WINDOW_OPEN_HOUR}:00`;
+  const { quiet, opensAt } = useQuietHours();
   const [now, setNow] = useState(false);
 
   const close = () => {

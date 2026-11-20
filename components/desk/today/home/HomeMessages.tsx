@@ -10,9 +10,9 @@ import { toast } from "@/components/ui/Toast";
 import { MESSAGE_KIND_WORD, messagesOf, plainWords, shortWhen, type HomeMessage, type MessageKind } from "@/lib/desk/home";
 import { loadStateOf } from "@/lib/desk/tasks";
 import { shortName } from "@/lib/people/names";
-import { useNow } from "@/lib/pulse/queries";
 import { useMarkRead } from "@/lib/tasks/mutations";
 import { usePulseBoard, type Me } from "@/lib/tasks/queries";
+import { useNow } from "@/lib/useNow";
 
 import { AllClear, Face, rise, Titled } from "./look";
 import { Aside, BlockNote, DAY_ROW, HeadMove, RowsBone } from "./parts";
@@ -39,7 +39,7 @@ const KIND_INK: Record<MessageKind, string> = {
  */
 export function HomeMessages({ me, onOpenTask }: { me: Me; onOpenTask: (id: string) => void }) {
   const board = usePulseBoard(me);
-  const now = useNow(60_000);
+  const now = useNow();
   const markRead = useMarkRead(me);
   const openId = useSearchParams().get("id");
   const [all, setAll] = useState(false);

@@ -10,10 +10,7 @@ import { SettingsPatchSchema } from "@/lib/settings";
 /** The console's own session cookie: an operator's sign-in never touches a company session. */
 export const OPS_COOKIE = "pulse-ops-auth";
 
-/** How fresh a TOTP must be for a dangerous action; the base enforces it (ops_ticket). */
-export const FRESH_SECONDS = 300;
-
-/** Every writing action. The base decides which of them need a fresh TOTP (ops_ticket). */
+/** Every writing action. The base decides which of them need a fresh TOTP (ops_ticket, 300 s). */
 export const OPS_ACTIONS = [
   "create_company",
   "update_company",
@@ -305,16 +302,3 @@ export const ExportFinishBodySchema = z.strictObject({
 });
 export type ExportFinishBody = z.infer<typeof ExportFinishBodySchema>;
 export type ExportFinishAnswer = { ok: true };
-
-/** The failure codes a screen must react to; every other one is shown by its `message_ru`. */
-export type OpsErrorCode =
-  | "unauthorized"
-  | "fresh_required"
-  | "validation_error"
-  | "slug_taken"
-  | "email_exists"
-  | "confirm_mismatch"
-  | "export_required"
-  | "not_found"
-  | "not_director"
-  | "internal";

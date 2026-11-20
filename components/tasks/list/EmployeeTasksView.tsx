@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
-import { Icon } from "@/components/tasks/desk/icons";
+import { Icon } from "@/components/tasks/icons";
 import { Button } from "@/components/ui/Button";
 import { PageHead } from "@/components/ui/PageHead";
 import { ASK_FROM_DEFAULT } from "@/lib/daily-report/due";
@@ -18,13 +18,14 @@ import { closedSections, employeeScreen, employeeTabOf, workingSections, type Em
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { isOverdue, TEXT } from "@/lib/tasks/status-text";
 
-import { EmployeeTaskCard, type EmployeeAction } from "./EmployeeTaskCard";
+import type { EmployeeAction } from "./EmployeeKeys";
+import { EmployeeTaskCard } from "./EmployeeTaskCard";
 import { StatusScreen } from "./StatusScreen";
 import { TabColumnBox, Tabs } from "./Tabs";
 import { TaskColumn, useAccordion, useRevealOpen } from "./TaskList";
 import { useEmployeeControls } from "./useEmployeeControls";
+import { dateLineRu } from "@/lib/ai/time";
 
-const DATE_LINE = new Intl.DateTimeFormat("ru-RU", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Aqtobe" });
 
 const LATE_MARK = "есть просроченные";
 
@@ -151,7 +152,7 @@ export function EmployeeTasksView({
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-24">
-      <PageHead eyebrow={DATE_LINE.format(now)} title="Мои дела" tone={screen.tone} />
+      <PageHead eyebrow={dateLineRu(now)} title="Мои дела" tone={screen.tone} />
 
       <div className="mt-3">
         <StatusScreen screen={screen} now={now} onNearest={showNearest} />

@@ -13,10 +13,10 @@ import type { Me } from "@/lib/tasks/queries";
 const LOADING_LINE = " ";
 
 /**
- * Витрина глазами того, кто копит очки: баланс, награды и свои заказы. Баланс здесь —
- * точная сумма транзакций (принцип 4), поэтому кнопка «Обменять» не может соврать.
- * Завхоз видит то же плюс очередь выдачи: он и сотрудник, и тот, кто выдаёт. Очередь у него —
- * первой, под заголовком: выдача — его работа, витрина — его очки (D-146).
+ * The shop window for whoever saves points: the balance, the rewards and one's own orders. The
+ * balance here is the exact sum of the transactions (principle 4), so «Обменять» cannot lie. The
+ * storekeeper sees the same plus the hand-out queue: they are both an employee and the one who hands
+ * out. Their queue comes first, under the title: handing out is their job, the window is their points (D-146).
  */
 export function ShopFront({ me, pointsEnabled }: { me: Me | undefined; pointsEnabled: boolean }) {
   const items = useShopItems();

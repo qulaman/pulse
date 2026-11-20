@@ -59,7 +59,7 @@ function row(status: TaskStatus, extra: Partial<BoardTask> = {}): BoardTask {
 }
 
 const word = (id: string, seq: number, sender = BOSS) => ({ id, content: "Как дела?", type: "text", sender_id: sender, seq, created_at: NOW.toISOString() });
-const SOON = "2026-09-11T05:10:00Z"; // через 40 минут
+const SOON = "2026-09-11T05:10:00Z"; // in 40 minutes
 const LATER = "2026-09-11T09:00:00Z";
 
 describe("employeeLoad — что лицо держит в покое (D-110)", () => {
@@ -135,7 +135,7 @@ describe("employeeLoad — отчёт за день зовёт с ask_from (D-16
 });
 
 describe("tasksBallCount — одно число «Дел» (D-173)", () => {
-  const PAST = "2026-09-11T03:00:00Z"; // полтора часа назад
+  const PAST = "2026-09-11T03:00:00Z"; // an hour and a half ago
 
   it("считает новые, доработки и просроченные в работе — как значок вкладки", () => {
     const day = [

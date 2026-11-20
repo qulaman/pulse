@@ -1,65 +1,62 @@
 "use client";
 
-import { onlineManager, useQueryClient } from "@tanstack/react-query";
-import { Brush, ChevronLeft, MonitorUp, Presentation, Send } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { ChevronLeft, Presentation, Send } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import { MoreMenu } from "@/components/desk/ui/IconButton";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { Kbd } from "@/components/desk/ui/Kbd";
-import type { MenuItem } from "@/components/desk/ui/Menu";
 import { DeskPage } from "@/components/desk/ui/PageTitle";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SegmentTabs } from "@/components/desk/ui/Toolbar";
+import { keysTaken } from "@/components/desk/ui/layers";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { useDeskVoiceClaim } from "@/components/desk/voice/claim";
-import { deskLayerUp } from "@/components/desk/voice/control";
 import { DictationMic, useDeskDictationKeys } from "@/components/desk/voice/DictationMic";
 import { BoardPicker } from "@/components/mindboard/BoardPicker";
 import { VIEW_LABEL } from "@/components/mindboard/BoardPresenter";
-import { carryOver, ejectReceipt, openWords } from "@/components/mindboard/carry";
+import { carryOver } from "@/components/mindboard/carry";
 import { WallPreview } from "@/components/mindboard/WallPreview";
 import { EXTEND_MINUTES, WallSheet } from "@/components/mindboard/WallSheet";
 import { AssignSheet } from "@/components/notes/AssignSheet";
 import { NoteIcon } from "@/components/notes/icons";
-import { useMinute } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
-import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
 import { isTypingTarget } from "@/lib/desk/keys";
 import { numbersOf } from "@/lib/mindboard/branch";
-import { BOARD_TRASH_DAYS, boardOnWall, boardSummary, boardText, cleanTitle, defaultTitle, openPoints, splitBoards, summariesOf } from "@/lib/mindboard/list";
-import { useCreateBoard, useDeleteBoard, useFinishBoard, useMovePoint, usePinBoard, usePointToThought, useRenameBoard, useRestoreBoard } from "@/lib/mindboard/mutations";
-import { useBoards, type MindBoard } from "@/lib/mindboard/queries";
+import { BOARD_TRASH_DAYS, boardOnWall, boardSummary, openPoints } from "@/lib/mindboard/list";
+import { copyBoardText, saveSketch, untickAll, useBoardMoves } from "@/lib/mindboard/moves";
+import { usePointToThought } from "@/lib/mindboard/mutations";
 import { sketchFrom, type Sketch } from "@/lib/mindboard/sketch";
 import type { SplitPoint } from "@/lib/mindboard/split";
 import { branchesOf, nextPlaceIn } from "@/lib/mindboard/tree";
+import { useBoardRows, useBoardWrites } from "@/lib/mindboard/useBoard";
 import { wallBoardOf, wallNote } from "@/lib/mindboard/wall";
 import { useDictation, type Receipt } from "@/lib/notes/dictation";
-import { firstLine, phoneRow } from "@/lib/notes/list";
-import { useCreateNote, useDeleteNote, useUpdateNote } from "@/lib/notes/mutations";
-import { noteKeys, useNotes, type Note } from "@/lib/notes/queries";
-import { usePendingNotes, useReplayHearing } from "@/lib/notes/replay";
-import { useMe, useSentTasks } from "@/lib/tasks/queries";
+import { draftRow, firstLine } from "@/lib/notes/list";
+import type { NoteFields } from "@/lib/notes/pending";
+import { noteKeys, type Note } from "@/lib/notes/queries";
+import { useSentTasks } from "@/lib/tasks/queries";
 import { pluralRu } from "@/lib/tasks/status-text";
 import { firstNameOf } from "@/lib/text/normalize";
 import { stageOf } from "@/lib/tv/board";
 import { tvTime } from "@/lib/tv/clock";
 import { presenterPoints } from "@/lib/tv/presenter";
-import { useTvBoardControl, useTvControl, useTvWeekBoard } from "@/lib/tv/mutations";
-import { tvKeys, useTvState, type TvState } from "@/lib/tv/queries";
-import { afterBoard, BOARD_VIEWS, boardExtendTo, boardPointOf, boardViewOf, weekBoardLive, type BoardView } from "@/lib/tv/state";
+import { tvKeys, type TvState } from "@/lib/tv/queries";
+import { BOARD_VIEWS, boardExtendTo, boardPointOf, boardViewOf, weekBoardLive, type BoardView } from "@/lib/tv/state";
+import { useNow } from "@/lib/useNow";
 
+import { boardMenu, boardStateLine, type BoardCounts } from "./boardMenu";
+import { BoardBones, BoardKeys, TitleField } from "./BoardParts";
 import { darkPaper, DeskSketch } from "./DeskSketch";
 import { HandOut } from "./HandOut";
 import { MeetingStage } from "./MeetingStage";
 import { Outline, type OutlineActions } from "./Outline";
 import { ThoughtsPicker } from "./ThoughtsPicker";
 
-const subscribeOnline = (onChange: () => void) => onlineManager.subscribe(onChange);
-const isOnline = () => onlineManager.isOnline();
 const EMPTY: Note[] = [];
 
 /** The board's three forms (D-177): preparing it, handing its points out, leading the meeting by it. */
@@ -68,8 +65,6 @@ type Mode = "prep" | "handout" | "lead";
 /** What the board's dictaphone says it does — one microphone on the screen (D-81). */
 const VOICE_LABEL = "Сказать пункт — слово в слово";
 
-const pointsWord = (n: number) => `${n} ${pluralRu(n, ["пункт", "пункта", "пунктов"])}`;
-
 /**
  * A board of «Доски» (D-102, D-121, D-140, D-177) on the whole work area, in three forms.
  *
@@ -77,7 +72,7 @@ const pointsWord = (n: number) => `${n} ${pluralRu(n, ["пункт", "пункт
  * its buttons), the state said once, «На стену» (the one white button) or — while it is up —
  * «Вести совещание», and «⋯» with the rest. Left, the outline typed line after line (`Outline`)
  * with the board's dictaphone on the line of a new point: one recording, one point, kept before
- * any AI (`useDictation`, принцип 5; «V» while the board holds the desk's voice). Right, «Как
+ * any AI (`useDictation`, principle 5; «V» while the board holds the desk's voice). Right, «Как
  * увидит кабинет» — the real wall drawing (`WallPreview`), «Список · Карта» — and «Добавить из
  * мыслей…» behind a button (the room may see this screen).
  *
@@ -95,34 +90,20 @@ export function DeskBoard() {
   const router = useRouter();
   const params = useSearchParams();
   const queryClient = useQueryClient();
-  const me = useMe();
-  const notes = useNotes(me.data?.userId);
-  const boards = useBoards(me.data?.userId);
-  const pending = usePendingNotes(me.data?.userId);
-  const heard = useReplayHearing();
-  const tv = useTvState();
-  const control = useTvControl();
-  const boardControl = useTvBoardControl();
-  const weekBoard = useTvWeekBoard();
-  const create = useCreateNote(me.data);
-  const update = useUpdateNote(me.data);
-  const remove = useDeleteNote(me.data);
-  const rename = useRenameBoard(me.data);
-  const deleteBoard = useDeleteBoard(me.data);
-  const restoreBoard = useRestoreBoard(me.data);
-  const pin = usePinBoard(me.data);
-  const finish = useFinishBoard(me.data);
-  const createBoard = useCreateBoard(me.data);
-  const movePoint = useMovePoint(me.data);
-  const toThought = usePointToThought(me.data);
-  const online = useSyncExternalStore(subscribeOnline, isOnline, () => true);
-  const now = useMinute();
-
   // lines typed here, shown from the keystroke until the cache has them (its write is async)
   const [typed, setTyped] = useState<Note[]>([]);
+  // the board and its lines with what still waits on this computer laid over them (D-95), and lines just typed
+  const data = useBoardRows(id, typed);
+  const { me, notes, heard, tv, board, rows, phone, online } = data;
+  const writes = useBoardWrites(me.data);
+  const { create, update, remove, rename, deleteBoard, restoreBoard, pin, finish, movePoint, control, boardControl, weekBoard } = writes;
+  const toThought = usePointToThought(me.data);
+  const now = useNow();
+  const openBoard = (boardId: string) => router.push(`/desk/boards/${boardId}`);
+  const moves = useBoardMoves(data, writes, openBoard, now);
+
   const [renaming, setRenaming] = useState(false);
   const [assigning, setAssigning] = useState<Note | null>(null);
-  const [moving, setMoving] = useState<Note | null>(null);
   const [sketching, setSketching] = useState<{ row: Note | null } | null>(null);
   const [wallOpen, setWallOpen] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -130,35 +111,7 @@ export function DeskBoard() {
   // «Список · Карта» of the preview while the board is not up: the wall's own choice once it is
   const [previewView, setPreviewView] = useState<BoardView | null>(null);
 
-  // the board from the server, or — made without network — from this computer
-  const board: MindBoard | null = useMemo(() => {
-    const found = boards.data?.find((row) => row.id === id);
-    if (found) return found;
-    const kept = pending.boards.find((entry) => entry.id === id);
-    if (!kept) return null;
-    return { id: kept.id, company_id: kept.companyId, user_id: kept.userId, title: kept.title, deleted_at: null, pinned_at: null, finished_at: null, client_request_id: kept.crid, created_at: kept.createdAt, updated_at: kept.createdAt };
-  }, [boards.data, pending.boards, id]);
-
-  // the lines as the director should see them: the cache, edits still waiting here over their rows,
-  // lines that exist only here so far (D-95), and lines just typed
-  const { rows, phone } = useMemo(() => {
-    const byId = new Map<string, Note>();
-    for (const note of notes.data ?? []) if (note.board_id === id) byId.set(note.id, note);
-    for (const edit of pending.edits) {
-      const row = byId.get(edit.id);
-      if (row) byId.set(edit.id, { ...row, ...edit.fields });
-    }
-    const waiting = new Set<string>();
-    for (const entry of pending.creates.filter((create) => create.boardId === id)) {
-      if (byId.has(entry.id)) continue;
-      waiting.add(entry.id);
-      byId.set(entry.id, phoneRow(entry));
-    }
-    for (const row of typed) if (!byId.has(row.id)) byId.set(row.id, row);
-    return { rows: [...byId.values()].filter((note) => note.deleted_at === null), phone: waiting };
-  }, [notes.data, pending, id, typed]);
-
-  // the board's dictaphone: one recording — the next point at the bottom (принцип 5: kept before any AI)
+  // the board's dictaphone: one recording — the next point at the bottom (principle 5: kept before any AI)
   const isMine = useDeskVoiceClaim(VOICE_LABEL);
   const rowsNow = useRef(rows);
   useEffect(() => {
@@ -182,8 +135,6 @@ export function DeskBoard() {
   const taskById = useMemo(() => new Map((sent.data ?? []).map((task) => [task.id, task])), [sent.data]);
   const branches = useMemo(() => branchesOf(rows), [rows]);
   const numbers = useMemo(() => numbersOf(branches), [branches]);
-  const others = useMemo(() => splitBoards(boards.data ?? [], now).live.filter((other) => other.id !== id), [boards.data, now, id]);
-  const summaries = useMemo(() => summariesOf(notes.data ?? []), [notes.data]);
   const steps = useMemo(() => presenterPoints(rows.filter((row) => !phone.has(row.id)), id), [rows, phone, id]);
 
   const titleRef = useRef<() => void>(() => {});
@@ -194,11 +145,11 @@ export function DeskBoard() {
   // F2 — rename, as on any desktop — but not over a line being typed; Esc leaves «Ведущий» and the hand-out
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || document.body.hasAttribute("data-dialog-open") || document.body.hasAttribute("data-sheet-open")) return;
+      if (event.defaultPrevented || keysTaken()) return;
       if (event.code === "F2" && !isTypingTarget(event.target)) {
         event.preventDefault();
         titleRef.current();
-      } else if (event.key === "Escape" && !deskLayerUp()) {
+      } else if (event.key === "Escape") {
         // a line being typed keeps its Esc; an empty «Кому» of the hand-out lets it go
         const target = event.target as HTMLElement | null;
         if (isTypingTarget(event.target) && !target?.hasAttribute?.("data-handout")) return;
@@ -244,21 +195,7 @@ export function DeskBoard() {
     wasLeading.current = leading;
   }, [leading, mode]);
 
-  if (me.isLoading || notes.isLoading || boards.isLoading || !me.data) {
-    return (
-      <DeskPage width="full">
-        <SkeletonGroup className="board-page" grow>
-          <Bone w={64} h={14} />
-          <Bone className="mt-3" w="40%" h={34} />
-          <Bone className="mt-2" w="24%" h={16} />
-          <div className="board-body mt-5">
-            <span className="block h-[360px] rounded-[14px] bg-surface-2" />
-            <span className="block aspect-video rounded-[14px] bg-surface-2" />
-          </div>
-        </SkeletonGroup>
-      </DeskPage>
-    );
-  }
+  if (data.loading || !me.data) return <BoardBones />;
 
   if (!board || board.deleted_at) {
     return (
@@ -287,8 +224,7 @@ export function DeskBoard() {
   const open = openPoints(rows.filter((row) => !phone.has(row.id)));
   const ticks = rows.filter((row) => row.done_at !== null && !phone.has(row.id));
   const toHand = rows.filter((row) => row.text.trim() && row.converted_task_id === null && !phone.has(row.id)).length;
-  const handedCount = rows.filter((row) => row.converted_task_id !== null).length;
-  const openBoard = (boardId: string) => router.push(`/desk/boards/${boardId}`);
+  const counts: BoardCounts = { summary, toHand, open: open.length, ticks: ticks.length, handed: rows.filter((row) => row.converted_task_id !== null).length };
   const wallView = onWall ? boardViewOf(tv.data ?? null) : (previewView ?? boardViewOf(tv.data ?? null));
   const taskOf = (row: Note) => (row.converted_task_id ? taskById.get(row.converted_task_id) : undefined);
   const preview = wallBoardOf(board, rows.filter((row) => !phone.has(row.id)), { view: wallView, focus: spot }, (row) => {
@@ -299,42 +235,13 @@ export function DeskBoard() {
 
   /** A line written here: on screen at once, a note on the server (and kept here till it lands). */
   const write = (row: { id: string; text: string; parent_id: string | null; position: number; sketch?: Sketch | null }) => {
-    const at = new Date().toISOString();
     // the lines the cache has by now are no longer kept here
     const cached = new Set((notes.data ?? []).map((note) => note.id));
-    setTyped((list) => [
-      ...list.filter((line) => !cached.has(line.id)),
-      {
-        id: row.id,
-        company_id: meData.companyId,
-        user_id: meData.userId,
-        text: row.text,
-        raw_transcript: null,
-        audio_path: null,
-        inbox_item_id: null,
-        pinned: false,
-        board_id: board.id,
-        position: row.position,
-        parent_id: row.parent_id,
-        done_at: null,
-        converted_task_id: null,
-        converted_announcement_id: null,
-        converted_at: null,
-        deleted_at: null,
-        remind_at: null,
-        reminded_at: null,
-        sketch: row.sketch ?? null,
-        client_request_id: null,
-        created_at: at,
-        updated_at: at,
-      },
-    ]);
+    const line = draftRow({ ...row, sketch: row.sketch ?? null, company_id: meData.companyId, user_id: meData.userId, board_id: board.id, created_at: new Date().toISOString() });
+    setTyped((list) => [...list.filter((kept) => !cached.has(kept.id)), line]);
     create.mutate({ id: row.id, text: row.text, client_request_id: crypto.randomUUID(), board_id: board.id, position: row.position, parent_id: row.parent_id, ...(row.sketch ? { sketch: row.sketch } : {}) });
   };
 
-  const eject = () =>
-    // the wall goes to the face — or to the round, while a week board waits in it (D-144)
-    control.mutate(afterBoard(tv.data ?? null, new Date()), { onSuccess: () => ejectReceipt(queryClient, meData, board, notes.data ?? [], openBoard) });
   const putUp = () => control.mutate({ board: board.id }, { onSuccess: (row) => toast(row.board_until ? `Доска на стене до ${tvTime(new Date(row.board_until))}` : "Доска на стене") });
   const extend = () =>
     boardControl.mutate(
@@ -386,7 +293,7 @@ export function DeskBoard() {
       });
     },
     assign: setAssigning,
-    move: setMoving,
+    move: moves.move,
     spotlight: (pointId) => boardControl.mutate(pointId ? { point: pointId } : { clearPoint: true }),
     sketch: openSketch,
     toThought: backToThoughts,
@@ -411,20 +318,8 @@ export function DeskBoard() {
     },
   };
 
-  const copyText = async () => {
-    try {
-      await navigator.clipboard.writeText(boardText(board.title, rows));
-      toast("Скопировал доску текстом");
-    } catch {
-      toast("Не получилось скопировать");
-    }
-  };
-  const untickAll = () => {
-    for (const row of ticks) update.mutate({ id: row.id, done_at: null });
-    toast(`Снял ${ticks.length} ${pluralRu(ticks.length, ["отметку", "отметки", "отметок"])}`, {
-      action: { label: "Вернуть", onClick: () => ticks.forEach((row) => update.mutate({ id: row.id, done_at: row.done_at })) },
-    });
-  };
+  /** One line's change written as it is (no line typed here is touched). */
+  const writeLine = (row: Note, fields: NoteFields) => update.mutate({ id: row.id, ...fields });
   // «В корзину» here does what it does under the gallery's «⋯»: at once, the toast brings it back
   const binIt = () => {
     const boardId = board.id;
@@ -433,80 +328,26 @@ export function DeskBoard() {
     router.push("/desk/boards");
   };
 
-  const menuItems: MenuItem[] = [
-    { key: "rename", label: "Переименовать", hint: "F2", icon: <NoteIcon name="pencil" size={14} />, onSelect: () => setRenaming(true) },
-    {
-      key: "pin",
-      label: board.pinned_at ? "Открепить" : "Закрепить сверху",
-      icon: <NoteIcon name="pin" size={14} />,
-      onSelect: () => {
-        pin.mutate({ id: board.id, on: !board.pinned_at });
-        toast(board.pinned_at ? "Открепил" : "Закрепил первой в «Досках»");
-      },
-    },
-    ...(toHand > 0 ? [{ key: "handout", label: "Раздать поручения", icon: <NoteIcon name="task" size={14} />, onSelect: () => setMode("handout") }] : []),
-    { key: "sketch", label: "Рисунок — новым пунктом…", icon: <Brush aria-hidden size={14} strokeWidth={2} />, onSelect: () => openSketch(null) },
-    ...(open.length > 0 ? [{ key: "copy", label: `Новая доска из открытых · ${openWords(open.length)}`, icon: <NoteIcon name="stack" size={14} />, onSelect: () => void carryOver(queryClient, meData, board, openBoard) }] : []),
-    ...(ticks.length > 0 ? [{ key: "untick", label: `Снять все отметки · ${ticks.length}`, icon: <NoteIcon name="retry" size={14} />, onSelect: untickAll }] : []),
-    ...(summary.total > 0 ? [{ key: "text", label: "Скопировать текстом", icon: <NoteIcon name="copy" size={14} />, onSelect: () => void copyText() }] : []),
-    "separator",
-    ...(onWall
-      ? [
-          { key: "extend", label: `Ещё ${EXTEND_MINUTES} минут на стене`, icon: <NoteIcon name="wall" size={14} />, onSelect: extend },
-          { key: "look", label: "Вид и время на стене…", icon: <MonitorUp aria-hidden size={14} strokeWidth={2} />, onSelect: () => setWallOpen(true) },
-          { key: "eject", label: "Убрать со стены", icon: <NoteIcon name="x" size={14} />, onSelect: eject },
-        ]
-      : [{ key: "look", label: "Вид, время, доска недели…", icon: <MonitorUp aria-hidden size={14} strokeWidth={2} />, onSelect: () => setWallOpen(true) }]),
-    "separator",
-    {
-      key: "finish",
-      label: board.finished_at ? "Вернуть в работу" : "Завершить доску",
-      icon: <NoteIcon name={board.finished_at ? "restore" : "flag"} size={14} />,
-      onSelect: () => {
-        finish.mutate({ id: board.id, on: !board.finished_at });
-        toast(board.finished_at ? "Доска снова в работе" : "Доска завершена — она в «Завершённых»");
-      },
-    },
-    { key: "delete", label: "В корзину", danger: true, icon: <NoteIcon name="trash" size={14} />, onSelect: binIt },
-  ];
-
-  // the state of the board said once: the wall first while it is up
-  const stateLine = [
-    onWall && until ? `на стене до ${tvTime(until)}` : "",
-    summary.total > 0 ? pointsWord(summary.total) : "Пока пусто",
-    summary.subs > 0 ? `${summary.subs} ${pluralRu(summary.subs, ["подпункт", "подпункта", "подпунктов"])}` : "",
-    summary.done > 0 ? `${summary.done} ${pluralRu(summary.done, ["отмечен", "отмечено", "отмечено"])}` : "",
-    handedCount > 0 ? `${handedCount} ${pluralRu(handedCount, ["поручен", "поручено", "поручено"])}` : "",
-    board.finished_at ? "завершена" : board.pinned_at ? "закреплена" : "",
-    !online ? "нет связи — строки ждут на этом компьютере" : "",
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const menuItems = boardMenu(board, onWall, counts, {
+    rename: () => setRenaming(true),
+    pin: (on) => pin.mutate({ id: board.id, on }),
+    handout: () => setMode("handout"),
+    sketch: () => openSketch(null),
+    carry: () => void carryOver(queryClient, meData, board, openBoard),
+    untick: () => untickAll(rows, phone, writeLine),
+    copy: () => void copyBoardText(board.title, rows),
+    extend,
+    look: () => setWallOpen(true),
+    eject: moves.eject,
+    finish: (on) => finish.mutate({ id: board.id, on }),
+    bin: binIt,
+  });
 
   // a drawing goes back on its point, or comes as a new point (D-141)
-  const saveSketch = (sketch: Sketch | null, caption: string) => {
+  const saveIt = (sketch: Sketch | null, caption: string) => {
     const row = sketching?.row ?? null;
     setSketching(null);
-    if (!row) {
-      if (sketch || caption) write({ id: crypto.randomUUID(), text: caption, parent_id: null, position: nextPlaceIn(rows, null), sketch });
-      return;
-    }
-    const [first = "", ...rest] = row.text.trim().split("\n");
-    const text = caption === first.trim() ? null : [caption, ...rest].join("\n").trim();
-    update.mutate({ id: row.id, sketch, ...(text === null ? {} : { text }) });
-    toast(sketch ? "Рисунок сохранён" : "Рисунок стёрт — пункт остался");
-  };
-
-  // «На другую доску» (D-140): to the bottom of the chosen board; a new board is made first
-  const moveTo = (target: { id: string; fresh: boolean }) => {
-    const row = moving;
-    setMoving(null);
-    if (!row) return;
-    const position = target.fresh ? 1 : nextPlaceIn((notes.data ?? []).filter((note) => note.board_id === target.id && note.deleted_at === null), null);
-    movePoint.mutate(
-      { note: row, to: { boardId: target.id, position } },
-      { onSuccess: () => toast(`Пункт на доске «${target.fresh ? defaultTitle(new Date()) : (boards.data?.find((other) => other.id === target.id)?.title ?? "")}»`, { action: { label: "Открыть", onClick: () => openBoard(target.id) } }) },
-    );
+    saveSketch(row, sketch, caption, { edit: writeLine, add: (drawn, words) => write({ id: crypto.randomUUID(), text: words, parent_id: null, position: nextPlaceIn(rows, null), sketch: drawn }) });
   };
 
   // «Добавить из мыслей…»: the thought at the bottom of this board, «Отменить» sends it back with its reminder and pin
@@ -569,7 +410,7 @@ export function DeskBoard() {
             {leading ? null : (
               <p className="mt-1 truncate text-[14px] leading-5 text-muted" data-testid="board-state">
                 {onWall ? <span aria-hidden className="board-live-dot" /> : null}
-                {stateLine}
+                {boardStateLine(board, counts, { until, online })}
               </p>
             )}
             {/* how far the board has come: the ticked points of all */}
@@ -590,7 +431,7 @@ export function DeskBoard() {
               <Button size="sm" variant="secondary" onClick={extend} disabled={boardControl.isPending}>
                 +{EXTEND_MINUTES} мин
               </Button>
-              <Button size="sm" variant="ghost" onClick={eject} disabled={control.isPending}>
+              <Button size="sm" variant="ghost" onClick={moves.eject} disabled={control.isPending}>
                 Убрать со стены
               </Button>
               <Button size="sm" variant="ghost" onClick={leave} data-testid="board-lead-exit">
@@ -627,25 +468,7 @@ export function DeskBoard() {
           <div className="board-body">
             <div className="min-w-0">
               {mode === "handout" ? <HandOut rows={rows.filter((row) => !phone.has(row.id))} numbers={numbers} me={meData} taskOf={taskOf} onClose={() => setMode("prep")} /> : outline(false)}
-              {mode === "handout" ? null : (
-                <p className="board-keys mt-2 flex items-center gap-x-3 overflow-hidden whitespace-nowrap text-[12px] leading-4 text-muted">
-                  <span className="inline-flex items-center gap-1">
-                    <Kbd>Enter</Kbd> строка
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <Kbd>Tab</Kbd> подпункт
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <Kbd>V</Kbd> голосом
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <Kbd>Ctrl Enter</Kbd> отметить
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <Kbd>?</Kbd> все клавиши
-                  </span>
-                </p>
-              )}
+              {mode === "handout" ? null : <BoardKeys />}
             </div>
             <aside className="board-aside flex min-w-0 flex-col gap-3">
               <section className="board-wall-card" data-testid="board-wall-card">
@@ -682,23 +505,7 @@ export function DeskBoard() {
 
       <AssignSheet note={assigning} onClose={() => setAssigning(null)} me={meData} />
       <ThoughtsPicker open={picking} onClose={() => setPicking(false)} notes={notes.data ?? EMPTY} now={now} onAdd={addThought} />
-      <BoardPicker
-        open={moving !== null}
-        onClose={() => setMoving(null)}
-        subject={moving ? firstLine(moving.text) : null}
-        boards={others}
-        summaries={summaries}
-        onPick={(other) => moveTo({ id: other.id, fresh: false })}
-        onNew={() => {
-          if (!navigator.onLine) {
-            setMoving(null);
-            toast("Нет связи — пункт остался на этой доске");
-            return;
-          }
-          const fresh = crypto.randomUUID();
-          createBoard.mutate({ id: fresh, title: defaultTitle(new Date()), client_request_id: crypto.randomUUID() }, { onSuccess: () => moveTo({ id: fresh, fresh: true }) });
-        }}
-      />
+      <BoardPicker {...moves.picker} />
       <WallSheet
         open={wallOpen}
         onClose={() => setWallOpen(false)}
@@ -719,7 +526,7 @@ export function DeskBoard() {
         onExtend={extend}
         onEject={() => {
           setWallOpen(false);
-          eject();
+          moves.eject();
         }}
       />
       {sketching ? (
@@ -728,49 +535,9 @@ export function DeskBoard() {
           caption={sketching.row?.text.trim().split("\n")[0].trim() ?? ""}
           editing={sketching.row !== null}
           onClose={() => setSketching(null)}
-          onSave={saveSketch}
+          onSave={saveIt}
         />
       ) : null}
     </DeskPage>
-  );
-}
-
-/** The title in place: Enter or leaving keeps it, Esc gives the old one back, an empty field keeps the old. */
-function TitleField({ title, onDone, onCancel }: { title: string; onDone: (title: string) => void; onCancel: () => void }) {
-  const [draft, setDraft] = useState(title);
-  const field = useRef<HTMLInputElement>(null);
-  // Enter, Esc and the blur that follows them answer once
-  const answered = useRef(false);
-  const finish = (next: string | null) => {
-    if (answered.current) return;
-    answered.current = true;
-    if (next === null) onCancel();
-    else onDone(next);
-  };
-  useEffect(() => {
-    field.current?.focus();
-    field.current?.select();
-  }, []);
-  return (
-    <input
-      ref={field}
-      value={draft}
-      maxLength={120}
-      onChange={(event) => setDraft(event.target.value)}
-      onBlur={() => finish(cleanTitle(draft, title))}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          finish(cleanTitle(draft, title));
-        } else if (event.key === "Escape") {
-          event.preventDefault();
-          event.stopPropagation();
-          finish(null);
-        }
-      }}
-      aria-label="Название доски"
-      data-testid="desk-board-title-input"
-      className="board-title w-full bg-transparent shadow-[inset_0_-2px_0_var(--accent)] outline-none"
-    />
   );
 }

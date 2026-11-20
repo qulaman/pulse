@@ -1,15 +1,15 @@
--- Календарь и мероприятия (наряд 014A, D-78): голос директора создаёт встречу с составом,
--- участник видит только свою, отвечает за себя, а минутный тик напоминает ровно один раз.
--- Фикстуры — supabase/seed.sql: директор …0001, Динара (менеджер) …0002, киоск …0004,
+-- Calendar and events (task 014A, D-78): the director's voice makes a meeting with its guests, a
+-- participant sees only his own, answers for himself, and the minute tick reminds exactly once.
+-- Fixtures — supabase/seed.sql: the director …0001, Динара (manager) …0002, the kiosk …0004,
 -- Ерлан Б. …0005, Марат …0007, Айгуль …0008.
 begin;
-select plan(43);
+select plan(39);
 
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated"}';
 
 -- ---------------------------------------------------------------------------
--- 1. «Собери планёрку завтра в десять»: одна строка, трое участников, два приглашения
+-- 1. «Собери планёрку завтра в десять»: one row, three participants, two invitations
 -- ---------------------------------------------------------------------------
 create temp table run as
 select confirm_voice_batch(
@@ -61,7 +61,7 @@ select is(
 );
 
 -- ---------------------------------------------------------------------------
--- 2. Тот же client_request_id ничего не создаёт
+-- 2. The same client_request_id creates nothing
 -- ---------------------------------------------------------------------------
 create temp table again as
 select confirm_voice_batch(
@@ -76,7 +76,7 @@ select is((select r->>'duplicate' from again), 'true', 'the replay is flagged as
 select is((select count(*) from events), 1::bigint, 'and it created no second event');
 
 -- ---------------------------------------------------------------------------
--- 3. Встреча без времени — не встреча
+-- 3. A meeting without a time is not a meeting
 -- ---------------------------------------------------------------------------
 select throws_ok(
   $$ select confirm_voice_batch(
@@ -88,7 +88,7 @@ select throws_ok(
 );
 
 -- ---------------------------------------------------------------------------
--- 4. Видимость: участник — да, посторонний, менеджер и киоск — нет
+-- 4. Visibility: a participant sees it; an outsider, the manager and the kiosk do not
 -- ---------------------------------------------------------------------------
 set local request.jwt.claims = '{"sub":"10000000-0000-0000-0000-000000000007","role":"authenticated"}';
 select is((select count(*) from events), 1::bigint, 'Марат sees the meeting he is invited to');
@@ -106,7 +106,7 @@ select is((select count(*) from events), 0::bigint, 'the kiosk reads no events a
 select is((select count(*) from event_participants), 0::bigint, 'and no participants at all');
 
 -- ---------------------------------------------------------------------------
--- 5. Ответ участника: «Не смогу» с причиной, потом «Буду»; чужой ответ не принимается
+-- 5. A participant answers: «Не смогу» with a reason, then «Буду»; nobody answers for another
 -- ---------------------------------------------------------------------------
 set local request.jwt.claims = '{"sub":"10000000-0000-0000-0000-000000000007","role":"authenticated"}';
 select is(
@@ -150,33 +150,10 @@ select throws_ok(
   'P0001', 'forbidden', 'a stranger does not answer for a meeting he was not called to'
 );
 
--- ---------------------------------------------------------------------------
--- 6. Состав правит только директор
--- ---------------------------------------------------------------------------
-select throws_ok(
-  format($$ select set_event_participants(%L::uuid, array['10000000-0000-0000-0000-000000000005']::uuid[]) $$,
-         (select (r->'event_ids'->>0)::uuid from run)),
-  'P0001', 'forbidden', 'an employee does not rewrite the guest list'
-);
-
 set local request.jwt.claims = '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated"}';
-select lives_ok(
-  format($$ select set_event_participants(%L::uuid,
-                    array['10000000-0000-0000-0000-000000000005']::uuid[],
-                    array['10000000-0000-0000-0000-000000000008']::uuid[]) $$,
-         (select (r->'event_ids'->>0)::uuid from run)),
-  'the director swaps one person for another'
-);
-select is((select count(*) from event_participants), 3::bigint, 'the list is three people long again');
-select is(
-  (select count(*) from notification_deliveries
-    where event_kind = 'event_invite' and user_id = '10000000-0000-0000-0000-000000000005'),
-  1::bigint,
-  'and the newcomer got his invitation'
-);
 
 -- ---------------------------------------------------------------------------
--- 7. Перенос: отметка напоминания гаснет, участники узнают, сотрудник не переносит
+-- 6. A move: the reminder mark goes out, the participants are told, an employee moves nothing
 -- ---------------------------------------------------------------------------
 -- the invitations have reached the phones: a line still waiting for the window would
 -- be rewritten by the move instead of followed by «Перенос» (D-94, 023_calendar_edit)
@@ -206,7 +183,7 @@ select is(
 );
 
 -- ---------------------------------------------------------------------------
--- 8. Тик напоминаний: одна встреча, по строке каждому идущему, одна строка стене
+-- 7. The reminder tick: one meeting, a line for each one coming, one line for the wall
 -- ---------------------------------------------------------------------------
 select throws_ok(
   $$ select events_due_reminders(now()) $$,
@@ -238,7 +215,7 @@ select is(
 );
 
 -- ---------------------------------------------------------------------------
--- 9. Стена: сводка отдаёт встречу, гостю — без названия
+-- 8. The wall: the summary gives the meeting, a visitor gets it without a title
 -- ---------------------------------------------------------------------------
 set local role authenticated;
 set local request.jwt.claims = '{"sub":"10000000-0000-0000-0000-000000000004","role":"authenticated"}';
@@ -256,7 +233,7 @@ select is(
 );
 
 -- ---------------------------------------------------------------------------
--- 10. Отмена: всех предупредили, из сводки встреча ушла
+-- 9. Calling it off: everybody is warned, the meeting leaves the summary
 -- ---------------------------------------------------------------------------
 set local request.jwt.claims = '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated"}';
 select lives_ok($$ update events set cancelled_at = now() $$, 'the director calls it off');

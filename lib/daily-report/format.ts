@@ -3,7 +3,7 @@
  * person and of a past day. Pure — the screens draw from these, the tests
  * pin them. Every clock here is the Aqtobe wall clock (lib/datetime/calendar.ts).
  */
-import { aqtobeIsoToYmdHm, humanYmd, parseYmd, ymdHmToAqtobeIso, ymdOf, type Hm, type Ymd } from "@/lib/datetime/calendar";
+import { addDays, aqtobeIsoToYmdHm, humanYmd, parseYmd, weekdayOf, ymdHmToAqtobeIso, type Hm, type Ymd } from "@/lib/datetime/calendar";
 import { pluralRu } from "@/lib/tasks/status-text";
 
 import type {
@@ -38,7 +38,7 @@ export function timeOf(iso: string | null | undefined): string {
 }
 
 /** The «HH:MM» of an instant, for a time field. */
-export function hmOf(iso: string | null | undefined): Hm | null {
+export function isoToHm(iso: string | null | undefined): Hm | null {
   return aqtobeIsoToYmdHm(iso ?? null)?.hm ?? null;
 }
 
@@ -94,19 +94,12 @@ export function dayName(ymd: Ymd, now: Date = new Date()): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-/** A day plus or minus some days, on the wall clock. */
-export function addDaysYmd(ymd: Ymd, days: number): Ymd {
-  const parts = parseYmd(ymd);
-  if (!parts) return ymd;
-  const date = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + days));
-  return ymdOf(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
-}
+/** @deprecated use `addDays` from lib/datetime/calendar.ts */
+export const addDaysYmd = addDays;
 
 /** ISO weekday of a day: 1 — Monday … 7 — Sunday. */
 export function isoWeekday(ymd: Ymd): number {
-  const parts = parseYmd(ymd);
-  if (!parts) return 0;
-  return ((new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay() + 6) % 7) + 1;
+  return parseYmd(ymd) ? weekdayOf(ymd) + 1 : 0;
 }
 
 const SHORT_MONTHS = ["янв.", "февр.", "мар.", "апр.", "мая", "июн.", "июл.", "авг.", "сент.", "окт.", "нояб.", "дек."] as const;
@@ -128,7 +121,7 @@ export const PERIOD_MAX_DAYS = 92;
 
 /** «Неделя» — the last 7 days with today, «Месяц» — the last 30. */
 export function periodOf(kind: Exclude<PeriodKind, "custom">, today: Ymd): { from: Ymd; to: Ymd } {
-  return { from: addDaysYmd(today, kind === "week" ? -6 : -29), to: today };
+  return { from: addDays(today, kind === "week" ? -6 : -29), to: today };
 }
 
 /** «задача / задачи / задач» with the number. */

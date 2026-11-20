@@ -4,133 +4,39 @@ import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-q
 
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
+import { GENERIC_ERROR, postJson, type ApiErrorBody } from "@/lib/api/client";
 import { isNetworkError, NetworkError } from "@/lib/net";
-import { dequeue, enqueue, release } from "@/lib/outbox";
 import { shortName } from "@/lib/people/names";
-import type { BoardTask } from "@/lib/pulse/board";
 import { kickPush } from "@/lib/push/client";
 import { createBrowserSupabase } from "@/lib/supabase/client";
-import type { Json } from "@/lib/supabase/types";
 import { voiceApi, VoiceApiError } from "@/lib/voice/api";
+import { markBoardRead } from "./board-queries";
 import { forgetHold, holdForUndo, Undone } from "./grace";
-import {
-  markBoardRead,
-  taskKeys,
-  type Me,
-  type TaskMessage,
-  type TaskRow,
-  type TaskWithPeople,
-} from "./queries";
 import { heldKeys } from "./held";
 import { NUDGE_EVERY_MS } from "./lifecycle";
+import { taskKeys, type Me, type TaskWithPeople } from "./query-core";
 import { receiptKeys } from "./receipts";
 import type { TaskStatus } from "./status-text";
-import { markFailed } from "./thread";
+import {
+  invalidateTasks,
+  optimistic,
+  patchBoard,
+  patchCached,
+  restoreTasks,
+  rollbackTask,
+  snapshotTasks,
+  type TaskSnapshot,
+} from "./task-cache";
+import { useSendMessage, type SendMessageInput } from "./thread-mutations";
 
-const GENERIC_ERROR = "Не получилось. Попробую ещё раз по тапу";
-
-type ApiErrorBody = { error?: { code?: string; message_ru?: string } };
-
-/** The answer's JSON body on success (null when there is none); a failure throws. */
-async function postJson(path: string, payload: unknown): Promise<unknown> {
-  // the idempotency key doubles as the outbox key: a replay after a reload is the same call
-  const key = (payload as { client_request_id?: string } | null)?.client_request_id ?? `${path}:${Date.now()}`;
-  let res: Response;
-  try {
-    res = await fetch(path, {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-  } catch {
-    // the mutation pauses and resumes when the network is back (QueryProvider, networkMode
-    // offlineFirst); the persisted copy survives a closed tab and replays on the next start.
-    // A tap fresh out of its «Отменить» window waited there unseen; now it really waits (D-139)
-    enqueue({ id: key, path, payload });
-    release(key);
-    throw new NetworkError("Нет связи. Отправлю, как появится");
-  }
-  dequeue(key);
-
-  if (res.ok) {
-    try {
-      return await res.json();
-    } catch {
-      return null;
-    }
-  }
-  if (res.status === 401 && typeof window !== "undefined") {
-    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- full reload on purpose: drop every client cache of the dead session
-    window.location.assign(`${window.location.origin}/login`);
-    throw new Error("Сессия истекла. Войди заново");
-  }
-
-  let body: ApiErrorBody | null = null;
-  try {
-    body = (await res.json()) as ApiErrorBody;
-  } catch {
-    body = null;
-  }
-  throw new Error(body?.error?.message_ru ?? GENERIC_ERROR);
+/** A failed call says the server's own words when there are any, else the general «не получилось». */
+function toastError(error: unknown) {
+  toast(error instanceof Error ? error.message : GENERIC_ERROR);
 }
 
 /* -------------------------------------------------------------------------- */
-/* Optimistic patching across every cached shape that holds tasks              */
+/* «Отменить» windows (D-139)                                                  */
 /* -------------------------------------------------------------------------- */
-
-type TaskPatch = Partial<TaskRow>;
-
-function patchOne<T extends TaskWithPeople>(task: T, taskId: string, patch: TaskPatch): T {
-  return task.id === taskId ? { ...task, ...patch } : task;
-}
-
-function patchCached(old: unknown, taskId: string, patch: TaskPatch): unknown {
-  if (Array.isArray(old)) {
-    return (old as TaskWithPeople[]).map((task) => patchOne(task, taskId, patch));
-  }
-  if (old && typeof old === "object") {
-    const record = old as Record<string, unknown>;
-    if (typeof record.id === "string") {
-      return patchOne(old as TaskWithPeople, taskId, patch);
-    }
-  }
-  return old;
-}
-
-/** Snapshot every `tasks`-prefixed cache so a failed call can be rolled back. */
-function snapshotTasks(queryClient: QueryClient) {
-  return queryClient.getQueriesData({ queryKey: taskKeys.root });
-}
-
-function restoreTasks(queryClient: QueryClient, snapshot: ReturnType<typeof snapshotTasks>) {
-  for (const [key, data] of snapshot) queryClient.setQueryData(key, data);
-}
-
-/** One row back to how a snapshot had it — in a list at its old place, or the task's own object. */
-export function restoreOne(before: unknown, now: unknown, taskId: string): unknown {
-  if (Array.isArray(before) && Array.isArray(now)) {
-    const index = (before as TaskWithPeople[]).findIndex((task) => task?.id === taskId);
-    if (index === -1) return now;
-    const row = before[index];
-    const at = (now as TaskWithPeople[]).findIndex((task) => task?.id === taskId);
-    const copy = [...now];
-    if (at >= 0) copy[at] = row;
-    else copy.splice(Math.min(index, copy.length), 0, row);
-    return copy;
-  }
-  if (before && typeof before === "object" && (before as { id?: unknown }).id === taskId) return before;
-  return now;
-}
-
-/**
- * A tap taken back or refused inside its window (D-139): only that task goes back. The whole
- * snapshot would also take back a neighbour's tap still in its own window and whatever the
- * socket brought meanwhile.
- */
-function rollbackTask(queryClient: QueryClient, snapshot: ReturnType<typeof snapshotTasks>, taskId: string) {
-  for (const [key, before] of snapshot) queryClient.setQueryData(key, (now: unknown) => restoreOne(before, now, taskId));
-}
 
 /**
  * The patches of the «Отменить» windows open right now (D-139), by call. The server has not
@@ -154,23 +60,22 @@ function keepOverlays(queryClient: QueryClient) {
   });
 }
 
-/** The board row carries what the task row does not — a request for time, a reminder (D-128). */
-function patchBoard(queryClient: QueryClient, taskId: string, patch: Partial<BoardTask>) {
-  queryClient.setQueryData<BoardTask[]>(taskKeys.board(), (old) =>
-    old ? old.map((row) => (row.id === taskId ? { ...row, ...patch } : row)) : old,
-  );
+/** The call is over, one way or another: its window's patch and mark are not needed any more. */
+function settleWindow(requestId: string) {
+  overlays.delete(requestId);
+  forgetHold(requestId);
 }
 
-/**
- * After a change to one task: the task and its thread read anew at once; the lists are only
- * marked stale. The Realtime echo of this very change patches or refetches the lists on screen,
- * and a list opened later reads anew — refetching them all here (the board, «Отправленные» with
- * 200 rows, «Мои дела», the loads) was eight requests per tap (D-126).
- */
-function invalidateTasks(queryClient: QueryClient, taskId: string) {
-  void queryClient.invalidateQueries({ queryKey: taskKeys.root, refetchType: "none" });
-  void queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
-  void queryClient.invalidateQueries({ queryKey: taskKeys.thread(taskId) });
+/** A tap that waits out «Отменить» (or a plain one) failed or was taken back: its task goes back. */
+function takeBack(
+  queryClient: QueryClient,
+  { taskId, requestId, undo }: { taskId: string; requestId: string; undo?: string },
+  snapshot: TaskSnapshot | undefined,
+) {
+  if (undo) overlays.delete(requestId);
+  if (!snapshot) return;
+  if (undo) rollbackTask(queryClient, snapshot, taskId);
+  else restoreTasks(queryClient, snapshot);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -216,33 +121,21 @@ export function useTransition() {
       await postJson(path, payload);
     },
     onMutate: async (input) => {
-      await queryClient.cancelQueries({ queryKey: taskKeys.root });
-      const snapshot = snapshotTasks(queryClient);
       const patch = (old: unknown) => patchCached(old, input.taskId, { status: input.toStatus });
-      queryClient.setQueriesData({ queryKey: taskKeys.root }, patch);
+      const snapshot = await optimistic(queryClient, patch);
       if (input.undo) overlays.set(input.requestId, patch);
       return { snapshot };
     },
     onError: (error, input, context) => {
-      if (input.undo) overlays.delete(input.requestId);
-      if (context) {
-        if (input.undo) rollbackTask(queryClient, context.snapshot, input.taskId);
-        else restoreTasks(queryClient, context.snapshot);
-      }
+      takeBack(queryClient, input, context?.snapshot);
       if (error instanceof Undone) return;
-      toast(error instanceof Error ? error.message : GENERIC_ERROR);
+      toastError(error);
     },
     onSettled: (_data, _error, input) => {
       settleWindow(input.requestId);
       invalidateTasks(queryClient, input.taskId);
     },
   });
-}
-
-/** The call is over, one way or another: its window's patch and mark are not needed any more. */
-function settleWindow(requestId: string) {
-  overlays.delete(requestId);
-  forgetHold(requestId);
 }
 
 export function useRevoke() {
@@ -256,21 +149,15 @@ export function useRevoke() {
       await postJson(path, payload);
     },
     onMutate: async ({ taskId, requestId, undo }) => {
-      await queryClient.cancelQueries({ queryKey: taskKeys.root });
-      const snapshot = snapshotTasks(queryClient);
       const patch = (old: unknown) => patchCached(old, taskId, { status: "revoked" });
-      queryClient.setQueriesData({ queryKey: taskKeys.root }, patch);
+      const snapshot = await optimistic(queryClient, patch);
       if (undo) overlays.set(requestId, patch);
       return { snapshot };
     },
-    onError: (error, { taskId, requestId, undo }, context) => {
-      if (undo) overlays.delete(requestId);
-      if (context) {
-        if (undo) rollbackTask(queryClient, context.snapshot, taskId);
-        else restoreTasks(queryClient, context.snapshot);
-      }
+    onError: (error, input, context) => {
+      takeBack(queryClient, input, context?.snapshot);
       if (error instanceof Undone) return;
-      toast(error instanceof Error ? error.message : GENERIC_ERROR);
+      toastError(error);
     },
     onSettled: (_data, _error, { taskId, requestId }) => {
       settleWindow(requestId);
@@ -294,12 +181,12 @@ function releaseCached(old: unknown, taskId: string, at: string): unknown {
   return Object.fromEntries(entries.map(([key, value]) => [key, holds(value) ? (value as TaskWithPeople[]).map(release) : value]));
 }
 
-/** The first name of the task's assignee, from whatever list holds the task — for the toast. */
-function assigneeOf(snapshot: ReturnType<typeof snapshotTasks>, taskId: string): string {
+/** The task's assignee as a screen names them (D-146), from whatever list holds the task — for the toast. */
+function assigneeOf(snapshot: TaskSnapshot, taskId: string): string {
   for (const [, data] of snapshot) {
     const list = Array.isArray(data) ? (data as TaskWithPeople[]) : data && typeof data === "object" ? [data as TaskWithPeople] : [];
     const task = list.find((item) => item?.id === taskId);
-    const name = task?.assignee?.full_name?.trim().split(/\s+/)[0];
+    const name = shortName(task?.assignee?.full_name);
     if (name) return name;
   }
   return "";
@@ -319,10 +206,8 @@ export function useSendNow() {
       });
     },
     onMutate: async ({ taskId }) => {
-      await queryClient.cancelQueries({ queryKey: taskKeys.root });
-      const snapshot = snapshotTasks(queryClient);
       const at = new Date().toISOString();
-      queryClient.setQueriesData({ queryKey: taskKeys.root }, (old: unknown) => releaseCached(old, taskId, at));
+      const snapshot = await optimistic(queryClient, (old: unknown) => releaseCached(old, taskId, at));
       // the receipt in words at the tap, as every move of the director has (useDirectorControls)
       const who = assigneeOf(snapshot, taskId);
       toast(who ? `Отправлено · ${who}` : "Отправлено");
@@ -330,7 +215,7 @@ export function useSendNow() {
     },
     onError: (error, _input, context) => {
       if (context) restoreTasks(queryClient, context.snapshot);
-      toast(error instanceof Error ? error.message : GENERIC_ERROR);
+      toastError(error);
     },
     onSettled: (_data, _error, { taskId }) => {
       invalidateTasks(queryClient, taskId);
@@ -358,16 +243,12 @@ export function useExtendDeadline() {
       });
     },
     onMutate: async (input) => {
-      await queryClient.cancelQueries({ queryKey: taskKeys.root });
-      const snapshot = snapshotTasks(queryClient);
-      queryClient.setQueriesData({ queryKey: taskKeys.root }, (old: unknown) =>
-        patchCached(old, input.taskId, { deadline: input.deadlineIso }),
-      );
+      const snapshot = await optimistic(queryClient, (old: unknown) => patchCached(old, input.taskId, { deadline: input.deadlineIso }));
       return { snapshot };
     },
     onError: (error, _input, context) => {
       if (context) restoreTasks(queryClient, context.snapshot);
-      toast(error instanceof Error ? error.message : GENERIC_ERROR);
+      toastError(error);
     },
     onSettled: (_data, _error, input) => invalidateTasks(queryClient, input.taskId),
   });
@@ -406,7 +287,7 @@ export function useReassign() {
       const open = input.onOpen;
       toast(`Передал: ${input.assigneeName}`, newId && open ? { action: { label: "Открыть", onClick: () => open(newId) }, lifetimeMs: 5_000 } : undefined);
     },
-    onError: (error) => toast(error instanceof Error ? error.message : GENERIC_ERROR),
+    onError: toastError,
     onSettled: (_data, _error, input) => invalidateTasks(queryClient, input.taskId),
   });
 }
@@ -437,13 +318,11 @@ export function useRequestDeadline(me: Me | undefined) {
       });
     },
     onMutate: async (input) => {
-      await queryClient.cancelQueries({ queryKey: taskKeys.root });
-      const snapshot = snapshotTasks(queryClient);
-      if (input.fromStatus === "sent") {
-        queryClient.setQueriesData({ queryKey: taskKeys.root }, (old: unknown) =>
-          patchCached(old, input.taskId, { status: "accepted" }),
-        );
-      }
+      // a new task is taken by the request
+      const snapshot = await optimistic(
+        queryClient,
+        input.fromStatus === "sent" ? (old: unknown) => patchCached(old, input.taskId, { status: "accepted" }) : undefined,
+      );
       patchBoard(queryClient, input.taskId, {
         time_request: {
           id: `pending:${input.requestId}`,
@@ -457,7 +336,7 @@ export function useRequestDeadline(me: Me | undefined) {
     },
     onError: (error, _input, context) => {
       if (context) restoreTasks(queryClient, context.snapshot);
-      toast(error instanceof Error ? error.message : GENERIC_ERROR);
+      toastError(error);
     },
     onSettled: (_data, _error, input) => invalidateTasks(queryClient, input.taskId),
   });
@@ -477,19 +356,16 @@ export function useAnswerDeadline() {
       });
     },
     onMutate: async (input) => {
-      await queryClient.cancelQueries({ queryKey: taskKeys.root });
-      const snapshot = snapshotTasks(queryClient);
-      if (input.approve && input.proposedIso) {
-        queryClient.setQueriesData({ queryKey: taskKeys.root }, (old: unknown) =>
-          patchCached(old, input.taskId, { deadline: input.proposedIso }),
-        );
-      }
+      const snapshot = await optimistic(
+        queryClient,
+        input.approve && input.proposedIso ? (old: unknown) => patchCached(old, input.taskId, { deadline: input.proposedIso }) : undefined,
+      );
       patchBoard(queryClient, input.taskId, { time_request: null });
       return { snapshot };
     },
     onError: (error, _input, context) => {
       if (context) restoreTasks(queryClient, context.snapshot);
-      toast(error instanceof Error ? error.message : GENERIC_ERROR);
+      toastError(error);
     },
     onSettled: (_data, _error, input) => invalidateTasks(queryClient, input.taskId),
   });
@@ -529,7 +405,7 @@ export function useNudge() {
             : "Напомнил",
       );
     },
-    onError: (error) => toast(error instanceof Error ? error.message : GENERIC_ERROR),
+    onError: toastError,
     onSettled: (_data, _error, input) => invalidateTasks(queryClient, input.taskId),
   });
 }
@@ -598,10 +474,8 @@ export function useDeleteTask() {
       await postJson(path, payload);
     },
     onMutate: async ({ taskId, requestId, undo }) => {
-      await queryClient.cancelQueries({ queryKey: taskKeys.root });
-      const snapshot = snapshotTasks(queryClient);
       const patch = (old: unknown) => dropCached(old, taskId);
-      queryClient.setQueriesData({ queryKey: taskKeys.root }, patch);
+      const snapshot = await optimistic(queryClient, patch);
       if (undo) overlays.set(requestId, patch);
       return { snapshot };
     },
@@ -609,14 +483,10 @@ export function useDeleteTask() {
     onSuccess: (_data, { undo }) => {
       if (!undo) toast("Удалил");
     },
-    onError: (error, { taskId, requestId, undo }, context) => {
-      if (undo) overlays.delete(requestId);
-      if (context) {
-        if (undo) rollbackTask(queryClient, context.snapshot, taskId);
-        else restoreTasks(queryClient, context.snapshot);
-      }
+    onError: (error, input, context) => {
+      takeBack(queryClient, input, context?.snapshot);
       if (error instanceof Undone) return;
-      toast(error instanceof Error ? error.message : GENERIC_ERROR);
+      toastError(error);
     },
     onSettled: (_data, error, { requestId }) => {
       settleWindow(requestId);
@@ -720,106 +590,16 @@ export function usePurgeClosed() {
       return body.deleted ?? 0;
     },
     onSuccess: (deleted) => toast(deleted > 0 ? `Удалил: ${deleted}` : "Закрытых задач не было"),
-    onError: (error) => toast(error instanceof Error ? error.message : GENERIC_ERROR),
+    onError: toastError,
     onSettled: () => void queryClient.invalidateQueries({ queryKey: taskKeys.root }),
   });
 }
 
 /* -------------------------------------------------------------------------- */
-/* Messages — straight into task_messages under RLS                            */
+/* Messages — lib/tasks/thread-mutations.ts                                    */
 /* -------------------------------------------------------------------------- */
 
-export type SendMessageInput = {
-  taskId: string;
-  companyId: string;
-  text: string;
-  /** `{ is_question: true }` for «Уточнить» (D-03). */
-  meta?: Record<string, unknown>;
-  /** Storage path of the attachment — `photos` for a photo, `voice` for a recording. */
-  filePath?: string | null;
-  /** Derived from `filePath` when omitted; a voice message says so itself. */
-  type?: "text" | "photo" | "voice";
-  /** A retry sends the very same row again — same id, so nothing is duplicated (принцип 7). */
-  id?: string;
-};
-
-function typeOf(input: Pick<SendMessageInput, "type" | "filePath">): "text" | "photo" | "voice" {
-  return input.type ?? (input.filePath ? "photo" : "text");
-}
-
-/**
- * The id is generated on the client and inserted explicitly, so the optimistic
- * row and the row that comes back are the same row — mergeBySeq dedupes them
- * instead of showing the message twice.
- */
-export function useSendMessage(me: Me | undefined) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (input: SendMessageInput & { id: string }) => {
-      if (!me) throw new Error(GENERIC_ERROR);
-      const supabase = createBrowserSupabase();
-      const row = {
-        id: input.id,
-        task_id: input.taskId,
-        company_id: input.companyId,
-        sender_id: me.userId,
-        type: typeOf(input),
-        content: input.text || null,
-        file_path: input.filePath ?? null,
-        meta: (input.meta ?? {}) as Json,
-      };
-      const { error } = await supabase.from("task_messages").insert(row);
-      if (error && isNetworkError(error)) {
-        // the row waits in the persisted outbox too — a closed tab must not lose the words
-        enqueue({ id: input.id, kind: "message", path: "task_messages", payload: row });
-        throw new NetworkError();
-      }
-      if (error) throw new Error(GENERIC_ERROR);
-      dequeue(input.id);
-      // the other side hears it now, not on the minute sweep (D-114)
-      kickPush();
-    },
-    onMutate: async (input) => {
-      const queryKey = taskKeys.thread(input.taskId);
-      await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<TaskMessage[]>(queryKey);
-
-      // a retry of a failed row replaces it in place; a new row goes to the end
-      const withoutRetry = (previous ?? []).filter((message) => message.id !== input.id);
-
-      if (me) {
-        const pending: TaskMessage = {
-          id: input.id,
-          task_id: input.taskId,
-          company_id: input.companyId,
-          sender_id: me.userId,
-          // Placeholder ordering only: pending rows are excluded from the cursor.
-          seq: (previous?.length ? previous[previous.length - 1].seq : 0) + 0.5,
-          type: typeOf(input),
-          content: input.text || null,
-          file_path: input.filePath ?? null,
-          meta: { ...(input.meta ?? {}), pending: true } as Json,
-          created_at: new Date().toISOString(),
-          sender: { full_name: me.fullName },
-        };
-        queryClient.setQueryData<TaskMessage[]>(queryKey, [...withoutRetry, pending]);
-      }
-
-      return { previous, queryKey };
-    },
-    onError: (error, input, context) => {
-      if (!context) return;
-      // No network: the row is in the persisted outbox and will arrive — it stays on
-      // screen with its clock, because taking the words away is the one thing that
-      // would make the person write them twice (принцип 5, DoD «оффлайн»).
-      if (error instanceof NetworkError || isNetworkError(error)) return;
-      queryClient.setQueryData<TaskMessage[]>(context.queryKey, (old) => markFailed(old, input.id));
-      toast(GENERIC_ERROR);
-    },
-    onSettled: (_data, _error, input) => invalidateTasks(queryClient, input.taskId),
-  });
-}
+export { useSendMessage, type SendMessageInput };
 
 /**
  * A handover kept on the phone — a report with a photo made without network (D-130): every

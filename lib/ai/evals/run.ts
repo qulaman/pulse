@@ -34,26 +34,22 @@ export interface CaseRun {
 }
 
 export async function runCase(c: EvalCase, corpus: Corpus, options: RunOptions = {}): Promise<CaseRun> {
+  // everything but `matching` is a parse option of the same name
+  const { matching, ...parse } = options;
   try {
     const outcome = await parseTranscript({
       transcript: c.transcript,
       source: c.source,
       now: new Date(c.frozen_now),
       roster: corpus.roster,
-      model: options.model,
-      escalate: options.escalate,
-      escalationModel: options.escalationModel,
-      conventions: options.conventions,
-      rules: options.rules,
-      kinds: options.kinds,
-      client: options.client,
+      ...parse,
     });
     // the model's own pick before postprocess: a full_name copied from the roster (D-56)
     const rosterNames = new Set(corpus.roster.map((u) => u.full_name));
     const rawNames = outcome.entities.flatMap((e) =>
       "assignee_name" in e && e.assignee_name !== null ? [e.assignee_name] : [],
     );
-    const predicted = postprocess(outcome.entities, corpus.roster, c.source, options.matching);
+    const predicted = postprocess(outcome.entities, corpus.roster, c.source, matching);
     const matched = predicted.filter((e) => e.assignee?.status === "matched");
     return {
       result: {

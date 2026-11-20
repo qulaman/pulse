@@ -17,28 +17,20 @@
  */
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { chromium, type BrowserContext, type Page, type Route } from "playwright";
+import { chromium, type BrowserContext, type Route } from "playwright";
 
 import { DRAFT_KEY } from "../lib/daily-report/draft";
 
-const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
+import { IPHONE_UA, signIn } from "./lib/login";
+import { APP_URL, finish, record } from "./lib/smoke";
+
 const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui", "feed");
 const EMPLOYEE = process.env.EMPLOYEE ?? "erlan.b@demo.local";
 const PASSWORD = process.env.PASSWORD ?? "demo1234";
-/** The phone the screen is made for; a desktop browser is sent to /desk by the proxy. */
-const IPHONE_UA =
-  "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 /** RPCs that only read; every other RPC writes and is answered here. */
 const READ_RPC = new Set(["fn_rating", "push_health", "my_daily_report", "my_daily_report_history"]);
 
 mkdirSync(SHOTS, { recursive: true });
-
-type Check = { name: string; ok: boolean; detail: string };
-const checks: Check[] = [];
-const record = (name: string, ok: boolean, detail = "") => {
-  checks.push({ name, ok, detail });
-  console.log(`${ok ? "ok  " : "FAIL"}  ${name}${detail ? `  ${detail}` : ""}`);
-};
 
 // ---- one working day, in the shapes the screen reads -----------------------------------------
 
@@ -264,16 +256,6 @@ async function guard(context: BrowserContext, blocked: string[], data: () => Ret
   });
 }
 
-async function signIn(page: Page) {
-  await page.goto(`${APP_URL}/login`, { waitUntil: "networkidle" });
-  const byMail = page.getByText("Войти по почте и паролю");
-  if (await byMail.count()) await byMail.click();
-  await page.getByLabel("Почта").fill(EMPLOYEE);
-  await page.getByLabel("Пароль").fill(PASSWORD);
-  await page.getByRole("button", { name: "Войти", exact: true }).click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 20_000 });
-}
-
 /**
  * 17:30 on a working day, by the screen's own clock: nothing new, only orders in work, the report
  * not in. The face calls for it, a tap opens «Дела» with the report on top, «Сдать» hands it in.
@@ -302,7 +284,8 @@ async function evening(context: BrowserContext, me: { userId: string; companyId:
   await face.waitFor({ timeout: 20_000 });
   await page.waitForTimeout(1200);
   await shot("06-evening-rest");
-  record("вечером несданный отчёт — лицо зовёт", (await page.locator('[data-testid="mascot-lever"] svg.mascot').first().getAttribute("data-state")) === "calling");
+  const faceCalls = (await page.locator('[data-testid="mascot-lever"] svg.mascot').first().getAttribute("data-state")) === "calling";
+  record("вечером несданный отчёт — лицо зовёт", faceCalls);
   await face.click();
   await page.waitForTimeout(1300);
   await shot("07-evening-tap");
@@ -314,7 +297,8 @@ async function evening(context: BrowserContext, me: { userId: string; companyId:
   const ball = await tasksBall.getAttribute("aria-label");
   const quiet = await tasksBall.getAttribute("data-quiet");
   record("вечером шарик «Дела» без числа, но не серый — зовёт к отчёту", ball === "Дела: 0" && quiet === "0", `${ball}, quiet ${quiet}`);
-  record("слова говорят, что отчёт не сдан", (await page.locator('[data-testid="assistant-line"]').allInnerTexts()).some((text) => text.includes("Отчёт за день ещё не сдан")));
+  const saysNotIn = (await page.locator('[data-testid="assistant-line"]').allInnerTexts()).some((text) => text.includes("Отчёт за день ещё не сдан"));
+  record("слова говорят, что отчёт не сдан", saysNotIn);
   const submit = card.getByRole("button", { name: "Сдать" }).first();
   record("в «Делах» первым — отчёт со «Сдать»", await submit.isVisible());
   const row = card.locator('[data-testid="report-due-row"], [data-testid^="report-due"]').first();
@@ -324,7 +308,8 @@ async function evening(context: BrowserContext, me: { userId: string; companyId:
   await page.waitForTimeout(1200);
   record("двойной тап по «Сдать» — одна отправка", blocked.filter((call) => call === "POST /api/daily-report").length === 1);
   const after = await row.boundingBox();
-  record("после «Сдать» строка отчёта не уезжает из-под пальца", Boolean(before && after && Math.abs(before.y - after.y) < 4), `${Math.round(before?.y ?? -1)} → ${Math.round(after?.y ?? -1)}`);
+  const rowStays = Boolean(before && after && Math.abs(before.y - after.y) < 4);
+  record("после «Сдать» строка отчёта не уезжает из-под пальца", rowStays, `${Math.round(before?.y ?? -1)} → ${Math.round(after?.y ?? -1)}`);
   await shot("08-evening-submitted");
   record("отчёт сдан одной кнопкой", (await card.innerText()).includes("Сдан в 17:3"));
   const sentWords = String(evening.today?.report.report?.summary ?? "");
@@ -363,7 +348,8 @@ async function eveningOrder(context: BrowserContext, me: { userId: string; compa
   const accept = order.getByRole("button", { name: "Принял" });
   const nav = await page.getByRole("navigation", { name: "Основная навигация" }).boundingBox();
   const [orderBox, rowBox, acceptBox] = [await order.boundingBox(), await row.boundingBox(), await accept.boundingBox()];
-  record("отчёт за день — под поручением, не над ним", Boolean(orderBox && rowBox && rowBox.y > orderBox.y), `поручение y${Math.round(orderBox?.y ?? -1)}, отчёт y${Math.round(rowBox?.y ?? -1)}`);
+  const reportBelow = Boolean(orderBox && rowBox && rowBox.y > orderBox.y);
+  record("отчёт за день — под поручением, не над ним", reportBelow, `поручение y${Math.round(orderBox?.y ?? -1)}, отчёт y${Math.round(rowBox?.y ?? -1)}`);
   record(
     "«Принял» на 360×780 — над таб-баром",
     Boolean(acceptBox && nav && acceptBox.y + acceptBox.height <= nav.y),
@@ -373,7 +359,9 @@ async function eveningOrder(context: BrowserContext, me: { userId: string; compa
   await page.waitForTimeout(1500);
   await shot("10-evening-order-accepted");
   const [firstBox, rowAfter] = [await card.locator("article").first().boundingBox(), await row.boundingBox()];
-  record("после «Принял» на последнем поручении отчёт не прыгает наверх", Boolean(firstBox && rowAfter && rowAfter.y > firstBox.y), `первая карточка y${Math.round(firstBox?.y ?? -1)}, отчёт y${Math.round(rowAfter?.y ?? -1)}`);
+  const reportStaysBelow = Boolean(firstBox && rowAfter && rowAfter.y > firstBox.y);
+  const where = `первая карточка y${Math.round(firstBox?.y ?? -1)}, отчёт y${Math.round(rowAfter?.y ?? -1)}`;
+  record("после «Принял» на последнем поручении отчёт не прыгает наверх", reportStaysBelow, where);
   record("вечер с поручением без ошибок страницы", errors.length === 0, errors.slice(0, 3).join(" | "));
   await page.close();
 }
@@ -408,7 +396,7 @@ async function main() {
   const mode = () => page.locator("main[data-board]").getAttribute("data-mode");
 
   try {
-    await signIn(page);
+    await signIn(page, APP_URL, { email: EMPLOYEE, password: PASSWORD });
     // who the screen belongs to, read from the screen's own session
     const me = await page.evaluate(async () => {
       const response = await fetch("/api/me");
@@ -433,7 +421,8 @@ async function main() {
     record("новые поручения ждут — «Дела» подняты без тапа", (await mode()) === "panel" && (await card.getAttribute("data-panel")) === "tasks");
     const tasksBall = page.locator('[data-testid="orbit-ball"][data-ball="tasks"]').first();
     // one number for «Дела» (D-173): new + rework + overdue — the tab's badge counts the same
-    record("шарик «Дела» — 3: новая, доработка, просроченная", (await tasksBall.getAttribute("aria-label")) === "Дела: 3", (await tasksBall.getAttribute("aria-label")) ?? "");
+    const ballLabel = await tasksBall.getAttribute("aria-label");
+    record("шарик «Дела» — 3: новая, доработка, просроченная", ballLabel === "Дела: 3", ballLabel ?? "");
     const box = await card.boundingBox();
     record("карточка занимает больше половины экрана", Boolean(box && box.height > 852 / 2), box ? `${Math.round(box.height)} px` : "");
     record("первая — новая задача", (await card.locator("article").first().innerText()).includes("Казхрома"));
@@ -492,7 +481,9 @@ async function main() {
     // the grip puts the card away to rest, not to the balls (D-173): the words and the way back are there
     await page.waitForTimeout(1600);
     const goAfterGrip = await page.locator('[data-testid="face-go"]').innerText().catch(() => "");
-    record("рывок за ручку убирает карточку — в покой, с «Открыть дела ›»", (await card.count()) === 0 && (await mode()) === "idle" && goAfterGrip.includes("Открыть дела"), `${await mode()}, карточек ${await card.count()}, кнопка «${goAfterGrip}»`);
+    const putAway = (await card.count()) === 0 && (await mode()) === "idle" && goAfterGrip.includes("Открыть дела");
+    const restState = `${await mode()}, карточек ${await card.count()}, кнопка «${goAfterGrip}»`;
+    record("рывок за ручку убирает карточку — в покой, с «Открыть дела ›»", putAway, restState);
     await shot("04-grip-rest");
 
     // at rest (D-173): the card put away stays down, the face says the greeting and the line that
@@ -501,7 +492,8 @@ async function main() {
     await shot("04b-rest");
     record("убранная карточка сама не поднимается", (await mode()) === "idle" && (await card.count()) === 0, (await mode()) ?? "");
     const restWords = await page.locator('[data-testid="assistant-line"]').allInnerTexts();
-    record("в покое лицо говорит: приветствие и главное", restWords.length >= 1 && restWords.length <= 2 && restWords[0].includes("на доработке"), restWords.join(" / "));
+    const greetsWithMain = restWords.length >= 1 && restWords.length <= 2 && restWords[0].includes("на доработке");
+    record("в покое лицо говорит: приветствие и главное", greetsWithMain, restWords.join(" / "));
     const go = page.locator('[data-testid="face-go"]');
     const goBox = await go.boundingBox();
     const faceBox = await face.boundingBox();
@@ -522,7 +514,8 @@ async function main() {
     if (prop) await page.touchscreen.tap(prop.x + prop.width / 2, prop.y + prop.height / 2);
     await page.waitForTimeout(1600);
     await shot("04c-prop-touch");
-    record("тап по карточке над лицом открыл «Дела», и они открыты", Boolean(prop) && (await mode()) === "panel" && (await card.getAttribute("data-panel")) === "tasks", prop ? (await mode()) ?? "" : "нет карточки над лицом");
+    const openedByProp = Boolean(prop) && (await mode()) === "panel" && (await card.getAttribute("data-panel")) === "tasks";
+    record("тап по карточке над лицом открыл «Дела», и они открыты", openedByProp, prop ? ((await mode()) ?? "") : "нет карточки над лицом");
     // and at the very top edge of the face's button, where the ball's row slides in under the finger
     await face.click();
     await page.waitForTimeout(900);
@@ -531,7 +524,8 @@ async function main() {
     const edge = await face.boundingBox();
     if (edge) await page.touchscreen.tap(edge.x + edge.width / 2 + 10, edge.y + 2);
     await page.waitForTimeout(1600);
-    record("тап по верхнему краю лица открыл «Дела», и они открыты", (await mode()) === "panel" && (await card.getAttribute("data-panel")) === "tasks", (await mode()) ?? "");
+    const openedByFace = (await mode()) === "panel" && (await card.getAttribute("data-panel")) === "tasks";
+    record("тап по верхнему краю лица открыл «Дела», и они открыты", openedByFace, (await mode()) ?? "");
 
     // the invitation is answered in its row: «Буду» in one tap, the row says so quietly
     const calendarBall = page.locator('[data-testid="orbit-ball"][data-ball="calendar"]').first();
@@ -539,11 +533,13 @@ async function main() {
     await calendarBall.click({ force: true });
     await page.waitForTimeout(1100);
     const going = page.locator('[data-testid="invite-going"]').first();
-    record("у приглашения «Буду / Не смогу» прямо в строке", (await going.isVisible()) && (await page.locator('[data-testid="invite-declined"]').first().isVisible()));
+    const bothAnswers = (await going.isVisible()) && (await page.locator('[data-testid="invite-declined"]').first().isVisible());
+    record("у приглашения «Буду / Не смогу» прямо в строке", bothAnswers);
     await going.click();
     await page.waitForTimeout(700);
     await shot("05-invite");
-    record("после «Буду» строка тихо говорит ответ", ((await page.locator('[data-testid="invite-said"]').first().innerText().catch(() => "")) ?? "").includes("Буду"));
+    const said = (await page.locator('[data-testid="invite-said"]').first().innerText().catch(() => "")) ?? "";
+    record("после «Буду» строка тихо говорит ответ", said.includes("Буду"));
     record("ответ ушёл одним вызовом (перехвачен)", blocked.filter((call) => call === "rpc respond_event").length === 1);
 
     // a new order raises the card again (D-173): it arrives, the screen reads the day anew
@@ -553,7 +549,8 @@ async function main() {
     await face.waitFor({ timeout: 20_000 });
     await page.waitForTimeout(2000);
     await shot("05b-new-order");
-    record("новое поручение снова поднимает «Дела»", (await mode()) === "panel" && (await card.getAttribute("data-panel")) === "tasks" && (await card.innerText()).includes("Забрать накладные"), (await mode()) ?? "");
+    const raisedAgain = (await mode()) === "panel" && (await card.getAttribute("data-panel")) === "tasks" && (await card.innerText()).includes("Забрать накладные");
+    record("новое поручение снова поднимает «Дела»", raisedAgain, (await mode()) ?? "");
 
     record("в базу ничего не ушло, кроме перехваченного", true, [...new Set(blocked)].join(", ") || "ничего не пытались писать");
     record("без ошибок страницы", errors.length === 0, errors.slice(0, 3).join(" | "));
@@ -578,9 +575,7 @@ async function main() {
     await browser.close();
   }
 
-  const failed = checks.filter((check) => !check.ok);
-  console.log(`\n${checks.length - failed.length}/${checks.length} проверок Ленты прошли`);
-  process.exit(failed.length ? 1 : 0);
+  finish();
 }
 
 void main();

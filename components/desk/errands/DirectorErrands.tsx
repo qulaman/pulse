@@ -15,7 +15,7 @@ import { useErrandLink } from "@/lib/errands/mutations";
 import { usePendingErrands } from "@/lib/errands/pending";
 import { isActive, useErrandHistory, useSecretaries, useSecretaryActions, type Errand } from "@/lib/errands/queries";
 import { medianDoneMinutes, outcomesOf, spanWords } from "@/lib/errands/stats";
-import { useNow } from "@/lib/pulse/queries";
+import { useNow } from "@/lib/useNow";
 import { useVisits } from "@/lib/visits/queries";
 import { awaitingDirector, unreadMessages } from "@/lib/visits/text";
 

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { initialsOf } from "@/lib/people/names";
+
 import { lookOf } from "./look";
-import { addressOf, initialsOf, SKIRT, sizeFor, tasksOf, teamField } from "./people";
+import { addressOf, SKIRT, sizeFor, tasksOf, teamField } from "./people";
 
 const NOW = new Date("2026-09-17T12:00:00Z").getTime();
 const AREA = { hx: 160, hy: 320 };

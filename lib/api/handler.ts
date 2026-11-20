@@ -5,6 +5,7 @@ import type { ZodType } from "zod";
 
 import { AuthError, authErrorMessageRu, getSessionProfile, requireRole, type Role, type SessionProfile } from "@/lib/auth";
 import { getPublicEnv } from "@/lib/env.public";
+import { isGuid } from "@/lib/ops/guard";
 import { createServerSupabase } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
 import { apiError } from "./respond";
@@ -23,20 +24,31 @@ type Handler<TBody> = (ctx: HandlerContext<TBody>) => Promise<Response>;
 
 const INTERNAL_MESSAGE = "Что-то пошло не так, попробуй ещё раз";
 
+/** What a route answers when the `[id]` of its address is not an id at all: a 404 with these words. */
+export type IdRefusal = { code: string; message: string };
+
+export const TASK_ID: IdRefusal = { code: "task_not_found", message: "Задача не найдена" };
+export const PERSON_ID: IdRefusal = { code: "not_found", message: "Сотрудник не найден" };
+
 /**
- * auth → zod → handler, with the error contract of docs/BACKEND.md §0.
+ * auth → `[id]` → zod → handler, with the error contract of docs/BACKEND.md §0.
  * `roles: 'any'` means "any active profile"; getSessionProfile already
- * rejects a disabled account with 403 `inactive`.
+ * rejects a disabled account with 403 `inactive`. `options.id` — the address carries an `[id]`:
+ * one that is not a guid is answered 404 before anything is read.
  */
 export function withAuth<TBody = unknown>(
   roles: Role[] | "any",
   fn: Handler<TBody>,
   schema?: ZodType<TBody>,
+  options: { id?: IdRefusal } = {},
 ): (req: Request, ctx?: RouteContext) => Promise<Response> {
   return async (req: Request, ctx?: RouteContext) => {
     try {
       const profile = await getSessionProfile(req);
       if (roles !== "any") requireRole(profile, ...roles);
+
+      const params = (ctx ? await ctx.params : undefined) ?? {};
+      if (options.id && !isGuid(params.id ?? "")) return apiError(404, options.id.code, options.id.message);
 
       let body = undefined as TBody;
       if (schema) {
@@ -53,7 +65,6 @@ export function withAuth<TBody = unknown>(
         body = parsed.data;
       }
 
-      const params = ctx ? await ctx.params : {};
       return await fn({ req, profile, body, params });
     } catch (error) {
       if (error instanceof AuthError) {

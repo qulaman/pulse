@@ -2,7 +2,7 @@ import { after } from "next/server";
 import { z } from "zod";
 
 import { userSupabase, withAuth } from "@/lib/api/handler";
-import { apiError, apiOk } from "@/lib/api/respond";
+import { apiError, apiOk, rpcFailure } from "@/lib/api/respond";
 import { kickDeliveries } from "@/lib/push/send";
 
 const BodySchema = z.strictObject({
@@ -25,13 +25,13 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     const { data, error } = await supabase.rpc("answer_visit", { p_id: visitId, p_answer: body.answer });
     if (error) {
       if (error.message.includes("forbidden")) return apiError(404, "visit_not_found", "Посетитель не найден");
+      // a second answer: the words depend on what was answered
       if (error.message.includes("bad_transition")) {
         return body.answer === "read"
           ? apiError(409, "already_answered", "Секретарь уже убрал это сообщение")
           : apiError(409, "already_answered", "Уже ответили — посетитель ушёл или вошёл");
       }
-      if (error.message.includes("bad_answer")) return apiError(400, "bad_answer", "Этот ответ сюда не подходит");
-      throw new Error(`answer_visit failed: ${error.message}`);
+      return rpcFailure(error, { bad_answer: [400, "Этот ответ сюда не подходит"] }, "answer_visit");
     }
     after(() => kickDeliveries());
     return apiOk({ visit: data });

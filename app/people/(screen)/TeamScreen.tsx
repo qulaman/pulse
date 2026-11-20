@@ -9,14 +9,7 @@ import { PageHead } from "@/components/ui/PageHead";
 import { useTeamLoads } from "@/lib/people/loads";
 import { usePeople } from "@/lib/people/queries";
 import { usePointsEnabled } from "@/lib/points/queries";
-
-function plural(n: number, forms: [string, string, string]): string {
-  const m10 = n % 10;
-  const m100 = n % 100;
-  if (m10 === 1 && m100 !== 11) return forms[0];
-  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return forms[1];
-  return forms[2];
-}
+import { pluralRu } from "@/lib/tasks/status-text";
 
 /**
  * «Команда»: the grid of who is loaded how right now (FRONTEND «Команда»), then the
@@ -37,8 +30,8 @@ export function TeamScreen() {
   const summary = ready
     ? [
         `${staff.length - away} на месте`,
-        away > 0 ? `${away} ${plural(away, ["отсутствует", "отсутствуют", "отсутствуют"])}` : null,
-        `${open} ${plural(open, ["задача", "задачи", "задач"])} в работе`,
+        away > 0 ? `${away} ${pluralRu(away, ["отсутствует", "отсутствуют", "отсутствуют"])}` : null,
+        `${open} ${pluralRu(open, ["задача", "задачи", "задач"])} в работе`,
         overdue > 0 ? `${overdue} просроч.` : null,
       ]
         .filter(Boolean)

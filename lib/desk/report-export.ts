@@ -41,7 +41,6 @@ export type ReportSheet = {
   /** Lines under the table: after an empty line in the file, under the table on paper (the legend). */
   notes?: string[];
 };
-export type Sheet = ReportSheet;
 
 const SEPARATOR = ";";
 const LINE_END = "\r\n";

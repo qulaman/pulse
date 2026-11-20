@@ -1,8 +1,7 @@
 /* ==========================================================================================
-   «Графит» — the desk's modern look (D-171), laid over «Журнал» (journal.css) and switched by
-   `data-graphite` on <html> (DESK_SHEET_SCRIPT, DeskShell; «Прежний вид» in the account menu
-   brings the journal back). The journal's rules stay underneath: this file gives back what the
-   journal took off — radii, depth, icons, faces, motion — and sets its own tokens.
+   «Графит» — the desk's look (D-171), drawn over the base layer of journal.css: `data-graphite` is
+   always on <html> on the desk (DESK_SHEET_SCRIPT, DeskShell). This file gives the radii, depth,
+   icons, faces and motion, and sets its own tokens.
    - Depth by steps of lightness: a dark window frame, the work area as a rounded panel with a
      hairline ring and a highlight on its top edge, what floats (the panel, menus, dialogs) on top
      with a soft shadow and frosted glass.
@@ -11,7 +10,7 @@
    - Everything answers the hand: a press sinks, a selection draws its rail, a panel slides in, a
      screen rises into place. Short (≤ 300 ms), never holding a click; still under «уменьшить
      движение».
-   `:root` (not `html`) on purpose: one step of specificity over every rule of the journal.
+   `:root` (not `html`) on purpose: one step of specificity over every rule of journal.css.
    ========================================================================================== */
 
 :root[data-surface="desk"][data-journal][data-graphite] {
@@ -49,6 +48,9 @@
     --shadow-card: 0 0 0 1px rgb(255 255 255 / 0.07), inset 0 1px 0 rgb(255 255 255 / 0.04);
     --btn-main: linear-gradient(180deg, #ffffff, #e3e4e8);
     --btn-main-ink: #0c0d10;
+    /* words and marks on a fill of the pen, of the red pencil */
+    --on-pen: #04130f;
+    --on-pencil: #1a0605;
     --btn-main-edge: inset 0 1px 0 #fff, 0 0 0 1px rgb(255 255 255 / 0.16), 0 1px 2px rgb(0 0 0 / 0.5);
     --btn-main-glow: 0 6px 22px -6px rgb(255 255 255 / 0.32);
     --surface-2: #1c1d22;
@@ -91,6 +93,8 @@
     --shadow-card: 0 0 0 1px rgb(15 17 22 / 0.07), 0 1px 2px -1px rgb(15 17 22 / 0.06), 0 2px 6px rgb(15 17 22 / 0.04);
     --btn-main: linear-gradient(180deg, #2b2e34, #16181b);
     --btn-main-ink: #ffffff;
+    --on-pen: #ffffff;
+    --on-pencil: #ffffff;
     --btn-main-edge: inset 0 1px 0 rgb(255 255 255 / 0.14), 0 0 0 1px #16181b, 0 1px 2px rgb(15 17 22 / 0.25);
     --btn-main-glow: 0 6px 18px -6px rgb(15 17 22 / 0.45);
     --surface-2: #f2f3f5;
@@ -110,8 +114,7 @@
     --danger: var(--pencil);
     --gold: var(--gold-ink);
     --shadow-raised: var(--shadow-pop);
-    /* the phone's face (D-179): Golos Text letters, Inter digits; «Журнал» keeps its Plex voices,
-       so each name is said again here rather than inherited */
+    /* the phone's face (D-179): Golos Text letters, Inter digits, under every name of a voice */
     --font-body: var(--font-digits), var(--font-golos), system-ui, sans-serif;
     --font-display: var(--font-digits), var(--font-golos), system-ui, sans-serif;
     --font-cond: var(--font-digits), var(--font-golos), system-ui, sans-serif;
@@ -204,15 +207,6 @@
   }
   .rounded-full {
     border-radius: 9999px;
-  }
-  .rounded-xl {
-    border-radius: 12px;
-  }
-  .rounded-lg {
-    border-radius: 8px;
-  }
-  .rounded-md {
-    border-radius: 6px;
   }
   .field {
     border-radius: 8px;
@@ -795,10 +789,6 @@
     }
   }
   [data-desk-tasks] {
-    [role="columnheader"]:nth-child(2),
-    [role="gridcell"]:nth-child(2) {
-      padding-left: 6px;
-    }
     [data-testid="desk-group-toggle"] svg {
       position: static;
     }
@@ -928,45 +918,6 @@
     }
   }
 
-  /* ---- a switch: a pill with a knob that slides, everywhere on the desk (D-174) ---- */
-  button[role="switch"]:has(> span[aria-hidden]:only-child) {
-    width: 36px;
-    height: 20px;
-    border-radius: 9999px;
-    background: var(--surface-2) !important;
-    box-shadow: inset 0 0 0 1px var(--rule) !important;
-    transition:
-      background-color 160ms linear,
-      box-shadow 160ms linear,
-      scale 220ms var(--ease-snap);
-
-    > span {
-      top: 2px;
-      left: 0 !important;
-      width: 16px;
-      height: 16px;
-      border-radius: 9999px;
-      background: var(--ink-2) !important;
-      box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
-      transform: translateX(2px) !important;
-      transition:
-        transform 220ms var(--ease-snap),
-        background-color 160ms linear;
-    }
-    &[aria-checked="true"] {
-      background: var(--pen) !important;
-      box-shadow: none !important;
-
-      > span {
-        background: #fff !important;
-        transform: translateX(18px) !important;
-      }
-    }
-    &:active:not(:disabled) {
-      scale: 0.94;
-      transition-duration: 70ms;
-    }
-  }
   /* the desk's own select in a form row: the journal's flush-left field is a field with a body here */
   .desk-form-row .desk-select-button {
     padding-left: 12px;
@@ -1095,7 +1046,7 @@
   }
 }
 
-/* ---- the desk's own select (D-174, components/desk/ui/Toolbar.tsx): both looks. The system's
+/* ---- the desk's own select (D-174, components/desk/ui/Toolbar.tsx). The system's
    select stays inside, unseen and untouchable, carrying the value, the label and the test id ---- */
 html[data-surface="desk"] {
   .desk-select-native {

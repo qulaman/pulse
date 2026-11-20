@@ -1,6 +1,6 @@
 "use client";
 
-import { hmOf, parseHm, type Hm } from "@/lib/datetime/calendar";
+import { hmFrom, parseHm, type Hm } from "@/lib/datetime/calendar";
 
 type Props = {
   value: Hm | null;
@@ -35,7 +35,7 @@ export function Clock({ value, onPick, step = 15 }: Props) {
               key={h}
               type="button"
               aria-pressed={chosen}
-              onClick={() => onPick(hmOf(h, minute))}
+              onClick={() => onPick(hmFrom(h, minute))}
               className={[
                 "nums flex h-9 items-center justify-center rounded-[10px] text-[14px] leading-5",
                 "transition-[background-color,color,transform] duration-[120ms] active:scale-[0.94]",
@@ -59,7 +59,7 @@ export function Clock({ value, onPick, step = 15 }: Props) {
               aria-pressed={chosen}
               aria-label={`${m} минут`}
               disabled={hour === null}
-              onClick={() => onPick(hmOf(hour ?? 0, m))}
+              onClick={() => onPick(hmFrom(hour ?? 0, m))}
               className={[
                 "nums flex h-9 flex-1 items-center justify-center rounded-[10px] text-[14px] leading-5",
                 "transition-[background-color,color,transform] duration-[120ms] active:scale-[0.94]",

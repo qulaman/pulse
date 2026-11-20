@@ -3,9 +3,9 @@
 import { Ban, CalendarClock, Check, CircleCheck, CircleX, Clock, Ellipsis, Hourglass, MessageCircleQuestion, Repeat, RotateCcw, Send, TriangleAlert, Undo2, X } from "lucide-react";
 import { useState, type CSSProperties, type ReactNode } from "react";
 
+import { useAvatars } from "@/components/desk/ui/Face";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { Menu } from "@/components/desk/ui/Menu";
-import { PersonCell } from "@/components/desk/ui/PersonCell";
 import { TONE_VAR, type Tone } from "@/components/desk/ui/tone";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { When } from "@/components/desk/ui/When";
@@ -25,11 +25,10 @@ import { closedAtOf, stepsOf, timeLeft, type Step } from "@/lib/tasks/overview";
 import type { DeliveryRow } from "@/lib/tasks/receipts";
 import type { Me, TaskWithPeople } from "@/lib/tasks/queries";
 import { deadlineLabel, TEXT } from "@/lib/tasks/status-text";
-import { useDeskLook } from "@/lib/desk/theme";
 
 import { deliveryLine, handInVerdict, keyOfAction, stageOf, type Line } from "@/lib/desk/tasks";
 import { focusComposer } from "./DeskThread";
-import { FaceName, useAvatars } from "./Face";
+import { FaceName } from "./Face";
 import { MiniButton } from "./RowMoves";
 import type { DeskTask } from "./useDeskTask";
 
@@ -46,7 +45,7 @@ export function ToneLine({ line, testId, className = "", children }: { line: Lin
 }
 
 /**
- * «Доставка» of a table row (принцип 8): the push receipt of a task not yet taken comes from the
+ * «Доставка» of a table row (principle 8): the push receipt of a task not yet taken comes from the
  * table's one query for all such rows (`useTaskReceipts`). Neutral words: a row carries two
  * colours at most — its stage ring and a missed deadline (D-158).
  */
@@ -118,7 +117,7 @@ function Field({ label, icon, children }: { label: string; icon?: ReactNode; chi
 }
 
 /**
- * «Доставка» (принцип 8): what waits for the morning with «отправить сейчас» (D-129), else the push
+ * «Доставка» (principle 8): what waits for the morning with «отправить сейчас» (D-129), else the push
  * receipt of a task not yet taken. Once it is taken the path under the fields says when.
  */
 function Receipt({ task, now, onSendNow }: { task: TaskWithPeople; now: Date; onSendNow: () => void }) {
@@ -153,9 +152,9 @@ function stepInk(step: Step): string {
 }
 
 /**
- * The four steps of a task (выдана → в работе → сдана → принята), each with its time. The journal
- * draws them as one quiet line of strokes; «Графит» as a stepper — a node a step, done ones ticked,
- * the one the task stands on ringed in its ink, the line between them drawing itself in.
+ * The four steps of a task (выдана → в работе → сдана → принята), each with its time, as a
+ * stepper — a node a step, done ones ticked, the one the task stands on ringed in its ink, the line
+ * between them drawing itself in.
  */
 function Path({ desk, now }: { desk: DeskTask; now: Date }) {
   const task = desk.task as TaskWithPeople;
@@ -193,7 +192,7 @@ function Path({ desk, now }: { desk: DeskTask; now: Date }) {
 /**
  * The head of a task at the desk (D-154 wave 3): who holds it — a click passes it on — and the
  * stage; the title; the fields a director changes with one click (the deadline: a popover with
- * the quick choices and a month); the receipt (принцип 8), the repeat, how much time is left or how
+ * the quick choices and a month); the receipt (principle 8), the repeat, how much time is left or how
  * the work came in, and the path in four steps. `large` — the stack of «Разобрать», whose headline
  * says the stage and the hand-in.
  */
@@ -214,14 +213,9 @@ export function TaskHead({ desk, now, large = false, scope }: { desk: DeskTask; 
   const from = (target: HTMLElement) => ({ at: target, scope: scope?.() ?? null });
   // the pen and the pencil are for what waits on the director; a stage on its way stays in print
   const stageInk = stage.tone === "danger" ? "var(--danger)" : desk.reason ? TONE_VAR[stage.tone] : "var(--text-muted)";
-  // «Графит» puts the person's face before the name, as the table does (D-174)
-  const graphite = useDeskLook() === "graphite";
+  // the person's face before the name, as the table has it (D-174)
   const avatars = useAvatars();
-  const who = graphite ? (
-    <FaceName id={task.assignee_id} name={task.assignee?.full_name} avatar={avatars.get(task.assignee_id)} size={26} gone={gone} full />
-  ) : (
-    <PersonCell name={task.assignee?.full_name} gone={gone} />
-  );
+  const who = <FaceName id={task.assignee_id} name={task.assignee?.full_name} avatar={avatars.get(task.assignee_id)} size={26} gone={gone} full />;
   return (
     <header className="tasks-head" data-large={large ? "" : undefined}>
       {/* the panel's «×» stands in the corner: the first line leaves it room */}
@@ -299,8 +293,7 @@ export function TaskHead({ desk, now, large = false, scope }: { desk: DeskTask; 
 /* -------------------------------------------------------------------------- */
 
 /**
- * One note of what waits on a task: in the journal a stroke of its ink in the margin, the words on
- * the sheet's vertical (D-158); in «Графит» a tinted card with the icon of what it is (D-174).
+ * One note of what waits on a task: a tinted card with the icon of what it is (D-174).
  */
 export function Callout({ tone, icon, children, testId }: { tone: Tone; icon?: ReactNode; children: ReactNode; testId?: string }) {
   return (
@@ -527,7 +520,7 @@ export function TaskKeys({ desk, me, now, pointsEnabled, scope }: { desk: DeskTa
           title="Все действия · ."
           data-testid="desk-task-more"
           data-desk-more={task.id}
-          // three moves fill the panel's line: «Графит» keeps the dots, the word would push «Ещё» onto a line of its own
+          // three moves fill the panel's line: the dots stay, the word would push «Ещё» onto a line of its own
           data-compact={desk.keys.length >= 3 ? "" : undefined}
           onClick={(event) => setMenuAt(menuAt ? null : event.currentTarget)}
           className={MORE_WORD}
@@ -547,11 +540,6 @@ export function TaskKeys({ desk, me, now, pointsEnabled, scope }: { desk: DeskTa
       ) : null}
     </div>
   );
-}
-
-/** «.» on a task: its «Ещё» opens as if clicked. */
-export function openMoreOf(taskId: string, root: Element | null) {
-  root?.querySelector<HTMLElement>(`[data-desk-more="${CSS.escape(taskId)}"]`)?.click();
 }
 
 /** The caret into the answer field of a task under `root` (O, «Ответить словами»). */

@@ -1,0 +1,243 @@
+/* The desk's surface (D-153) — /desk and the console /ops both wear data-surface="desk" on <html> —
+   part of app/globals.css by its @import, so it loads on every page like the rest of that sheet. */
+
+/* ---- the desk (D-153): the director's and the secretary's computer -------------------------
+   DeskShell puts data-surface="desk" on <html> while it is mounted. Only the desk's <main>
+   scrolls; nothing docks above a tab bar that is not there; the phone's bottom sheets are the
+   same Sheet.tsx drawn as centred dialogs — a fade and a 0.98 → 1 scale instead of the slide,
+   no keyboard to stand on. The phone path never carries the attribute, so none of this reaches it. */
+html[data-surface="desk"] {
+  --tabbar-space: 0px;
+  --dock-space: 0px;
+  scrollbar-gutter: auto;
+}
+html[data-surface="desk"] body {
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 20px;
+  background: var(--bg);
+}
+/* words on a computer are copied: names, phone numbers, a task's text (no caret still) */
+html[data-surface="desk"] #desk-main,
+html[data-surface="desk"] [data-testid="desk-panel"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+html[data-surface="desk"] [data-sheet-layer] {
+  display: grid;
+  place-items: center;
+  bottom: 0 !important;
+  padding: 24px;
+}
+/* `data-sheet` on the drawing canvas names its paper (portrait/landscape), not a sheet: it stays full screen */
+html[data-surface="desk"] [data-sheet]:not([data-testid="sketch-pad"]) {
+  /* a grid item shrinks to its content: the dialog keeps the sheet's own width */
+  width: min(560px, calc(100vw - 48px));
+  max-width: 560px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  max-height: min(86dvh, 900px) !important;
+  padding-top: 20px;
+  padding-bottom: 20px !important;
+  animation: desk-dialog-in 160ms var(--ease-out) both !important;
+}
+html[data-surface="desk"] [data-sheet]:not([data-testid="sketch-pad"])[data-closing] {
+  animation: desk-dialog-out 120ms var(--ease-in) both !important;
+}
+html[data-surface="desk"] [data-sheet-grip] {
+  display: none;
+}
+@keyframes desk-dialog-in {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes desk-dialog-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.98); }
+}
+/* the desk's table rows (components/desk/ui/DataGrid.tsx): a quiet hover, the chosen row ringed,
+   a row that changed by Realtime glows in the accent for a moment */
+html[data-surface="desk"] .desk-row {
+  transition: background-color 120ms var(--ease-out);
+}
+html[data-surface="desk"] .desk-row:hover {
+  background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+}
+html[data-surface="desk"] .desk-row[aria-selected="true"] {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+html[data-surface="desk"] .desk-row[data-glow] {
+  animation: desk-glow 1200ms var(--ease-out);
+}
+@keyframes desk-glow {
+  from { background-color: color-mix(in srgb, var(--accent) 12%, transparent); }
+  to { background-color: transparent; }
+}
+/* the order line at work: a thin bar running under it */
+html[data-surface="desk"] .desk-progress {
+  animation: desk-progress 1100ms var(--ease-in-out) infinite;
+}
+@keyframes desk-progress {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(300%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-surface="desk"] [data-sheet]:not([data-testid="sketch-pad"]),
+  html[data-surface="desk"] .desk-dialog {
+    animation-duration: 1ms !important;
+  }
+  html[data-surface="desk"] .desk-row[data-glow],
+  html[data-surface="desk"] .desk-progress {
+    animation: none;
+  }
+}
+
+/* ---- the desk's language, second pass (D-154) ------------------------------------------------
+   The light of a screen's state (components/desk/ui/Light.tsx): the phone's sky in a quiet
+   register — a 2 px line of the tone along the top, fading to the right, and one soft glow behind
+   the hero. A layer per tone; a change of state crossfades in 900 ms. */
+html[data-surface="desk"] .desk-light-layer {
+  opacity: 0;
+  transition: opacity 900ms var(--ease-out);
+  background:
+    linear-gradient(90deg, var(--light) 0%, transparent 78%) top left / 100% 2px no-repeat,
+    radial-gradient(620px 280px at 12% -60px, color-mix(in srgb, var(--light) 12%, transparent), transparent 72%);
+}
+html[data-surface="desk"] .desk-light-layer[data-on] {
+  opacity: 1;
+}
+/* a mouse needs no glow under the finger: the main button is a flat fill with its hairline of light */
+html[data-surface="desk"] .btn-primary {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22);
+}
+html[data-surface="desk"] .btn-primary:hover {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3), 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+/* the order line is the product's signature, not a search field */
+html[data-surface="desk"] .desk-command {
+  background: color-mix(in srgb, var(--surface-2) 92%, var(--accent));
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--border));
+}
+html[data-surface="desk"] .desk-command:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 75%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-surface="desk"] .desk-light-layer {
+    transition: none;
+  }
+}
+
+/* ---- the desk's frame, third pass (D-154 wave 3) ----------------------------------------------
+   The navigation folds to icons (`[`): the toasts move with its edge. The right-hand panel's
+   left edge is a handle — a hairline of the accent under the mouse, while dragged and when
+   focused; while it is dragged the whole window is the resize cursor and nothing gets selected. */
+html[data-surface="desk"][data-desk-nav="icons"] [data-testid="toasts-low"] {
+  left: 64px;
+}
+html[data-surface="desk"][data-desk-panel] [data-testid="toasts-low"] {
+  right: var(--desk-panel-w, 440px);
+}
+html[data-surface="desk"] .desk-panel-edge-line {
+  background: transparent;
+  transition: background-color 120ms var(--ease-out);
+}
+html[data-surface="desk"] .desk-panel-edge:hover .desk-panel-edge-line,
+html[data-surface="desk"] .desk-panel-edge:focus-visible .desk-panel-edge-line,
+html[data-surface="desk"] .desk-panel-edge[data-active] .desk-panel-edge-line {
+  width: 2px;
+  left: 2px;
+  background: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+html[data-surface="desk"][data-desk-resizing],
+html[data-surface="desk"][data-desk-resizing] * {
+  cursor: col-resize !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+/* the keyboard's focus on the desk: one visible ring of the accent, never under the mouse */
+html[data-surface="desk"] .desk-focus:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+/* a field of the confirm editor (components/desk/confirm): flat, a hairline, the accent when it has the caret */
+html[data-surface="desk"] .desk-input {
+  background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  transition: border-color 120ms var(--ease-out), background-color 120ms var(--ease-out);
+}
+html[data-surface="desk"] .desk-input:hover {
+  border-color: var(--border);
+}
+html[data-surface="desk"] .desk-input[data-tone="danger"] {
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+html[data-surface="desk"] .desk-input[data-tone="warn"] {
+  border-color: color-mix(in srgb, var(--warn) 55%, transparent);
+}
+html[data-surface="desk"] .desk-input:focus,
+html[data-surface="desk"] .desk-input:focus-within,
+html[data-surface="desk"] .desk-input[aria-expanded="true"] {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--border));
+  background: var(--surface-2);
+}
+/* the desk's one on/off (components/desk/ui/Switch.tsx), on the desk and in the console alike: a
+   pill whose knob slides on a spring and widens under the press, the accent when on */
+html[data-surface="desk"] .desk-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 36px;
+  height: 20px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--text) 16%, transparent);
+  box-shadow: inset 0 0 0 1px var(--border);
+  transition:
+    background-color 180ms linear,
+    box-shadow 180ms linear;
+}
+html[data-surface="desk"] .desk-switch[aria-checked="true"] {
+  background: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 60%, #000 10%);
+}
+html[data-surface="desk"] .desk-switch:active:not(:disabled) {
+  scale: 0.94;
+  transition-duration: 70ms;
+}
+html[data-surface="desk"] .desk-switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+html[data-surface="desk"] .desk-switch:disabled {
+  opacity: 0.4;
+}
+html[data-surface="desk"] .desk-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.35),
+    0 0 0 0.5px rgb(0 0 0 / 0.08);
+  transform: translateX(2px);
+  transition: transform 240ms cubic-bezier(0.3, 1.35, 0.5, 1);
+}
+html[data-surface="desk"] .desk-switch[aria-checked="true"] .desk-switch-knob {
+  transform: translateX(18px);
+}
+html[data-surface="desk"] .desk-switch:active:not(:disabled) .desk-switch-knob {
+  width: 19px;
+}
+html[data-surface="desk"] .desk-switch[aria-checked="true"]:active:not(:disabled) .desk-switch-knob {
+  transform: translateX(15px);
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-surface="desk"] .desk-switch-knob {
+    transition: none;
+  }
+}

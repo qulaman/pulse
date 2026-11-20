@@ -10,17 +10,7 @@ import { STT_PROVIDERS } from "@/lib/settings-plain";
 // Plain values and helpers without zod live in settings-plain.ts — the pages that only need a
 // label or a code helper import them there and stay free of zod (D-126). Re-exported here, so
 // server code keeps importing everything from one place.
-export {
-  PARSER_MODEL_LABEL,
-  PARSER_MODEL_SHORT,
-  PARSER_MODELS,
-  secretaryActionCode,
-  STT_PROVIDER_LABEL,
-  STT_PROVIDER_SHORT,
-  STT_PROVIDERS,
-  withSecretaryCodes,
-  type SttProviderKey,
-} from "@/lib/settings-plain";
+export { PARSER_MODELS, secretaryActionCode, withSecretaryCodes } from "@/lib/settings-plain";
 
 /**
  * company.settings — everything client-specific lives here, never in code (V-02).
@@ -314,8 +304,6 @@ export const VoiceRetentionSchema = z.object({
   closed_days: z.number().int().min(7).max(3650).default(90),
   orphan_days: z.number().int().min(7).max(3650).default(30),
 });
-
-export type VoiceRetention = z.infer<typeof VoiceRetentionSchema>;
 
 /** D-133 (И-46): which good news goes public on Эфир. */
 export const EtherEventsSchema = z.object({

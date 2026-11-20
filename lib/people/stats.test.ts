@@ -6,7 +6,6 @@ import {
   changeOf,
   givenAt,
   handSpans,
-  median,
   monotonePath,
   percent,
   placeText,
@@ -92,14 +91,6 @@ describe("givenAt and handSpans", () => {
       window,
     );
     expect(spans).toEqual([48 * HOUR, 2 * HOUR]);
-  });
-});
-
-describe("median", () => {
-  it("is the middle, or the mean of the two middles; nothing — null", () => {
-    expect(median([5, 1, 3])).toBe(3);
-    expect(median([4, 1, 3, 2])).toBe(2.5);
-    expect(median([])).toBeNull();
   });
 });
 

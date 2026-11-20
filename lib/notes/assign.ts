@@ -18,7 +18,7 @@ import { noteKeys, type Note } from "./queries";
  *
  * The same RPC as every batch — `confirm_voice_batch` through `/api/voice/confirm` — with
  * one task: the first line is the title, the rest the body (D-81), the recording of the
- * thought follows it (принцип 5), `note_id` marks what the note became (D-75 §5). Outside
+ * thought follows it (principle 5), `note_id` marks what the note became (D-75 §5). Outside
  * the delivery window the task waits for the morning like any other (D-38), unless the
  * director asked «сразу». Online only: a task handed out «later» is worse than an honest
  * «нет связи», and the note keeps its button.
@@ -26,7 +26,7 @@ import { noteKeys, type Note } from "./queries";
 
 /**
  * `client_request_id` is minted with the pick, not per attempt: a retry after a lost answer —
- * the hook's own or the next tap on «Поручить» — lands on the task already made (принцип 7).
+ * the hook's own or the next tap on «Поручить» — lands on the task already made (principle 7).
  */
 export type AssignInput = { note: Note; person: { id: string; full_name: string }; forceNow: boolean; client_request_id: string };
 

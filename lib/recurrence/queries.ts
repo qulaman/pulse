@@ -32,7 +32,7 @@ export function ruleOf(row: Pick<RuleRow, "every" | "interval_n" | "weekdays" | 
 }
 
 /** «18:00» of «18:00:00». */
-export function hmOf(time: string): string {
+export function sqlTimeToHm(time: string): string {
   return time.slice(0, 5);
 }
 

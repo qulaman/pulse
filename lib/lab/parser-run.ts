@@ -4,8 +4,7 @@ import { z } from "zod";
 
 import { ParseError, type ParseCall } from "@/lib/ai/parse";
 import { parseCost } from "@/lib/ai/pricing";
-import type { RunModel } from "@/lib/lab/parser";
-import { PARSER_MODELS, type CompanySettings } from "@/lib/settings";
+import { PARSER_MODELS } from "@/lib/settings";
 
 /** The sandbox and the corpus run of the lab's «Парсер» (D-138): shared server pieces. */
 
@@ -15,10 +14,6 @@ export const RunModelSchema = z.strictObject({
   escalate: z.boolean(),
   escalation_model: z.enum(PARSER_MODELS),
 });
-
-export function runModel(settings: CompanySettings, override: RunModel | undefined): RunModel {
-  return override ?? settings.parser;
-}
 
 /** Every paid call priced; one call without a price makes the total unknown, never a guess. */
 export function callsCost(calls: ParseCall[]): number | null {

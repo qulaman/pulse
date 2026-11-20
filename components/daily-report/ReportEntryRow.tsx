@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 
-import { Icon } from "@/components/tasks/desk/icons";
 import { HapticSwitch } from "@/components/ui/HapticSwitch";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { entryState } from "@/lib/daily-report/format";
 import { useMyDailyReport, useRefreshAfterReplay } from "@/lib/daily-report/queries";
 
 import { ReportDoneIcon, ReportIcon } from "./icons";
+import { Icon } from "@/components/tasks/icons";
 
 const TONE = {
   ok: { tile: "color-mix(in srgb, var(--ok) 15%, transparent)", fg: "var(--ok)" },
@@ -18,8 +18,8 @@ const TONE = {
 
 /**
  * «Отчёт за день» on «Дела» (D-152): one row with the day's state — «не сдан», «сдан в 18:04»,
- * «выходной» — a tap opens /report. Its box stands from the first paint (the skeleton draws the
- * same, `ReportEntryRowBone`); with reports off, or a database that does not answer, it is not there.
+ * «выходной» — a tap opens /report. With reports off, or a database that does not answer, it is not
+ * there.
  */
 export function ReportEntryRow() {
   const day = useMyDailyReport();

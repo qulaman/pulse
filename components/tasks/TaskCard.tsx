@@ -2,26 +2,28 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState } from "react";
 
 import { DeadlinePill, isUrgentNow, PersonChip, StatusEyebrow, TaskRail } from "@/components/tasks/TaskChrome";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import type { BoardTask } from "@/lib/pulse/board";
-import type { DeskAction } from "@/lib/tasks/desk";
-import { isWorking, passedWord, untilWords } from "@/lib/tasks/lifecycle";
+import type { DeskAction } from "@/lib/tasks/reasons";
+import { isWorking } from "@/lib/tasks/lifecycle";
 import type { QuickAnswer } from "@/lib/tasks/answers";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { BUTTON, deadlineLabel, reworkBannerText, STATUS_LABEL, TEXT } from "@/lib/tasks/status-text";
-import { toneOf, TONE_VAR, type Tone } from "@/lib/tasks/tone";
+import { toneOf } from "@/lib/tasks/tone";
 import { AudioOriginal } from "./AudioOriginal";
 import { DeliveryStatus } from "./DeliveryStatus";
-import { Icon, type IconName } from "./desk/icons";
-import { QuickAnswers, sendQuickAnswer } from "./desk/QuickAnswers";
+import { Icon, type IconName } from "./icons";
+import { QuickAnswers, sendQuickAnswer } from "./director/QuickAnswers";
 import { ACTION_ICON, ACTION_LABEL, allActionsFor, isPrimaryKey, LifecycleNotes, wideLabelOf } from "./list/DirectorTaskCard";
+import { EmployeeKeys } from "./list/EmployeeKeys";
 import { useDirectorControls } from "./list/useDirectorControls";
 import { useEmployeeControls } from "./list/useEmployeeControls";
+import { Note, RevokedNote, TimeRequestNote, TranscriptSpoiler } from "./TaskNotes";
 
 export type TaskCardVariant = "employee" | "director";
 
@@ -83,9 +85,6 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
   );
 
   const title = <h2 className="text-[19px] font-semibold leading-6 text-text">{task.title}</h2>;
-  const threeKeys = variant === "employee" && task.status === "sent";
-  // in work «Выполнено» leads on its own row, «Уточнить» and «Не могу» under it
-  const workKeys = variant === "employee" && isWorking(task.status) && task.status !== "sent";
 
   return (
     <article
@@ -139,27 +138,11 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
         </div>
       ) : null}
 
-      {task.source_transcript ? (
-        <details className="group relative mt-1">
-          {/* a whole row to press, not a 16 px line of words (D-173, 44 px targets) */}
-          <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-1.5 text-[13px] leading-4 text-muted [&::-webkit-details-marker]:hidden">
-            <Icon name="quote" size={14} />
-            {TEXT.transcriptSpoiler}
-            <span aria-hidden className="ml-auto transition-transform duration-[120ms] group-open:rotate-180">▾</span>
-          </summary>
-          <blockquote className="mt-2 border-l-2 pl-3 text-[14px] italic leading-[19px] text-muted" style={{ borderColor: "color-mix(in srgb, var(--accent) 45%, transparent)" }}>
-            «{task.source_transcript}»
-          </blockquote>
-        </details>
-      ) : null}
+      <TranscriptSpoiler task={task} className="relative" />
 
-      <StatusBanner task={task} declineReason={declineReason} />
+      <StatusNote task={task} declineReason={declineReason} />
 
-      {variant === "employee" && request ? (
-        <Banner tone="warn" icon={<Icon name="clock" size={15} />}>
-          Просите срок {untilWords(request.proposed, now)} · ждёт ответа директора
-        </Banner>
-      ) : null}
+      {variant === "employee" && request ? <TimeRequestNote proposed={request.proposed} now={now} className="relative" /> : null}
       {variant === "director" ? (
         <div className="relative">
           <LifecycleNotes task={task} request={request} suggestion={suggestion} partial={Boolean(task.partial)} nudgedAt={task.nudged_at ?? null} now={now} />
@@ -179,17 +162,17 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
         />
       ) : null}
 
-      <div className={`relative mt-4 gap-2 ${threeKeys ? "flex" : workKeys ? "grid grid-cols-2" : "flex flex-wrap"}`}>
-        {variant === "employee" ? (
-          <EmployeeButtons task={task} onPress={(action) => employee.press(action, task, card.current)} />
-        ) : (
+      {variant === "employee" ? (
+        <EmployeeKeys status={task.status} className="relative" onPress={(action) => employee.press(action, task, card.current)} />
+      ) : (
+        <div className="relative mt-4 flex flex-wrap gap-2">
           <DirectorButtons
             actions={allActionsFor(task, { request: Boolean(request), suggestion: Boolean(suggestion) })}
             label={(key) => wideLabelOf(key, request, suggestion, now) ?? (key === "reassign" ? BUTTON.reassign : ACTION_LABEL[key])}
             onPress={(key) => director.press(key, task)}
           />
-        )}
-      </div>
+        </div>
+      )}
 
       {variant === "employee" ? employee.sheets : director.sheets}
     </article>
@@ -213,109 +196,40 @@ function QuestionBanner({
 }) {
   return (
     <div className="mt-3">
-      <Banner tone="warn" icon={<Icon name="question" size={15} />}>
+      <Note tone="warn" icon={<Icon name="question" size={15} />} className="relative">
         {question}
-      </Banner>
+      </Note>
       <QuickAnswers question={question} deadline={deadline} now={now} onAnswer={onAnswer} onWords={onWords} />
     </div>
   );
 }
 
-function Banner({ tone, icon, children }: { tone: Tone; icon: ReactNode; children: ReactNode }) {
-  return (
-    <p
-      className="relative mt-3 flex items-start gap-2 rounded-[12px] border px-3 py-2 text-[14px] leading-[18px]"
-      style={{
-        color: TONE_VAR[tone],
-        borderColor: `color-mix(in srgb, ${TONE_VAR[tone]} 35%, transparent)`,
-        background: `color-mix(in srgb, ${TONE_VAR[tone]} 9%, transparent)`,
-      }}
-    >
-      <span className="mt-px">{icon}</span>
-      <span>{children}</span>
-    </p>
-  );
-}
-
-function StatusBanner({ task, declineReason }: { task: CardTask; declineReason?: string | null }) {
+/** The state said in words where the head does not say enough: a return, a refusal, a recall, «принята». */
+function StatusNote({ task, declineReason }: { task: CardTask; declineReason?: string | null }) {
   if (task.status === "rework") {
     // the director's own words with the return, when the board has them — not a pointer to
     // «комментарий внутри» behind a link nobody sees as one (D-173)
     return (
-      <Banner tone="warn" icon={<Icon name="rotate" size={15} />}>
+      <Note tone="warn" icon={<Icon name="rotate" size={15} />} className="relative">
         <span className="line-clamp-3">{task.rework_comment ? reworkBannerText(task.rework_comment) : TEXT.reworkBanner}</span>
-      </Banner>
+      </Note>
     );
   }
   if (task.status === "declined") {
     return (
-      <Banner tone="danger" icon={<Icon name="hand" size={15} />}>
+      <Note tone="danger" icon={<Icon name="hand" size={15} />} className="relative">
         Отказ{declineReason ? `: ${declineReason}` : ""}
-      </Banner>
+      </Note>
     );
   }
-  if (task.status === "revoked") {
-    return task.passed_to ? (
-      <Banner tone="muted" icon={<Icon name="swap" size={15} />}>
-        {passedWord(task.passed?.full_name)}
-      </Banner>
-    ) : (
-      <Banner tone="muted" icon={<Icon name="undo" size={15} />}>
-        {TEXT.revoked}
-      </Banner>
-    );
-  }
+  if (task.status === "revoked") return <RevokedNote task={task} className="relative" />;
   if (task.status === "done") {
     return (
-      <Banner tone="gold" icon={<Icon name="check" size={15} />}>
+      <Note tone="gold" icon={<Icon name="check" size={15} />} className="relative">
         {STATUS_LABEL.done}
-      </Banner>
+      </Note>
     );
   }
-  return null;
-}
-
-/**
- * Exactly the table of docs/FRONTEND.md «Состояние задачи → набор кнопок».
- * Three buttons at most — принцип 2, not to be widened.
- */
-function EmployeeButtons({ task, onPress }: { task: TaskWithPeople; onPress: (action: "accept" | "ask" | "decline" | "complete") => void }) {
-  if (task.status === "sent") {
-    // three keys in a row: each as wide as its words plus an equal share of what is left, the icon
-    // close to its word — in equal thirds on a 360 px phone «Уточнить» ran its icon into the edge
-    const key = "min-w-0 flex-auto !px-2 whitespace-nowrap [&>span]:gap-1";
-    return (
-      <>
-        <Button className={key} icon={<Icon name="check" />} onClick={() => onPress("accept")}>
-          {BUTTON.accept}
-        </Button>
-        <Button className={key} variant="secondary" icon={<Icon name="question" />} onClick={() => onPress("ask")}>
-          {BUTTON.ask}
-        </Button>
-        <Button className={key} variant="danger" icon={<Icon name="x" />} onClick={() => onPress("decline")}>
-          {BUTTON.cant}
-        </Button>
-      </>
-    );
-  }
-
-  // rework needs no second «Принял» — the tap sends accepted, then pending_review.
-  if (isWorking(task.status)) {
-    return (
-      <>
-        <Button block className="col-span-2 whitespace-nowrap" icon={<Icon name="check" />} onClick={() => onPress("complete")}>
-          {BUTTON.complete}
-        </Button>
-        <Button block className="!px-2 whitespace-nowrap" variant="secondary" icon={<Icon name="question" />} onClick={() => onPress("ask")}>
-          {BUTTON.ask}
-        </Button>
-        <Button block className="!px-2 whitespace-nowrap" variant="secondary" icon={<Icon name="clock" />} onClick={() => onPress("decline")}>
-          {BUTTON.cant}
-        </Button>
-      </>
-    );
-  }
-
   return null;
 }
 

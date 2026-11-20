@@ -1,25 +1,26 @@
 "use client";
 
-import { onlineManager, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { create } from "zustand";
 
 import { dismissToast, toast } from "@/components/ui/Toast";
 import { errandKeys } from "@/lib/errands/queries";
 import { atLine } from "@/lib/errands/scene";
+import { useReplayRounds } from "@/lib/offline/rounds";
 import type { SecretaryAction } from "@/lib/settings";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 /**
- * «Кофе» уходит сразу (D-101): случайную просьбу не даёт отправить удержание кнопки две
- * секунды. Уже ушедшую директор снимает «Отменить» в тосте или в строке живой заявки
- * (переход `cancelled`, очередь пушей снимается).
+ * «Кофе» goes at once (D-101): holding the button for two seconds keeps a request from going by
+ * accident. One already gone the director takes back with «Отменить» in the toast or in the row of the live
+ * errand (the `cancelled` move, the push queue is cleared).
  *
- * Без сети просьба не теряется (D-106): она лежит на телефоне (localStorage, по автору) и
- * уходит сама — когда сеть вернулась, когда приложение снова на экране, и тихим тиком, пока
- * что-то ждёт; ключ запроса выдан при нажатии, поэтому повтор той, что дошла, ничего не
- * меняет (принцип 7). Просьба, прождавшая связь дольше `STALE_MS`, не уходит: кофе через
- * сорок минут — уже не тот кофе; директору говорят, что она не ушла.
+ * Without network a request is not lost (D-106): it lies on the phone (localStorage, per author) and
+ * goes by itself — when the network is back, when the app is on screen again, and on a quiet beat while
+ * something waits; the request key is minted at the tap, so a repeat of one that did land changes
+ * nothing (principle 7). A request that waited for the network longer than `STALE_MS` does not go: coffee
+ * forty minutes later is not the same coffee; the director is told it did not go.
  */
 
 export type PendingErrand = {
@@ -29,7 +30,7 @@ export type PendingErrand = {
   label: string;
   icon: string;
   note: string | null;
-  /** Голосовой путь (D-79, фаза D): запись уже в Storage, её нельзя потерять (принцип 5). */
+  /** The voice path (D-79, phase D): the recording is in Storage already, it must not be lost (principle 5). */
   audioPath?: string | null;
   transcript?: string | null;
   inboxId?: string | null;
@@ -339,29 +340,16 @@ function adopt(userId: string): void {
  */
 export function useErrandReplay(userId: string | undefined): void {
   const queryClient = useQueryClient();
+  // before the first round: the kept requests are adopted, the landing refresh is set
   useEffect(() => {
     if (!userId) return;
     adopt(userId);
     onLanded = () => void queryClient.invalidateQueries({ queryKey: errandKeys.root });
-    const round = () => {
-      if (onlineManager.isOnline()) void flushErrands();
-    };
-    round();
-    const offOnline = onlineManager.subscribe((online) => {
-      if (online) round();
-    });
-    const onVisible = () => {
-      if (document.visibilityState === "visible") round();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    const beat = setInterval(round, RETRY_MS);
     return () => {
       onLanded = null;
-      offOnline();
-      document.removeEventListener("visibilitychange", onVisible);
-      clearInterval(beat);
     };
   }, [userId, queryClient]);
+  useReplayRounds(() => void flushErrands(), { on: userId, beatMs: RETRY_MS });
 }
 
 /**
@@ -378,7 +366,7 @@ export function askSecretary(
 ): string {
   const offline = typeof navigator !== "undefined" && navigator.onLine === false;
   const errand: PendingErrand = {
-    // голос приносит свой ключ запроса: повтор той же фразы не купит второй кофе
+    // a voice brings its own request key: a repeat of the same phrase does not buy a second coffee
     id: voice?.id ?? crypto.randomUUID(),
     code: action.code,
     label: action.label,

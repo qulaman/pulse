@@ -28,6 +28,7 @@ import {
   STT_PROVIDERS,
   withSecretaryCodes,
 } from "@/lib/settings-plain";
+import { pluralRu } from "@/lib/tasks/status-text";
 
 const FIELD =
   "min-h-[44px] w-full field px-3 text-[16px] leading-[22px] text-text outline-none focus:border-accent";
@@ -129,14 +130,6 @@ export function SectionActions({ pending, onSave, onReset }: { pending: boolean;
       </Button>
     </div>
   );
-}
-
-function plural(n: number, one: string, few: string, many: string): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return `${n} ${one}`;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${n} ${few}`;
-  return `${n} ${many}`;
 }
 
 export function SttSection() {
@@ -284,8 +277,8 @@ export function DictionarySection() {
       <span className="min-w-0 flex-1">
         <span className="block font-display text-[17px] font-semibold leading-[22px] tracking-[-0.01em]">Словарь</span>
         <span className="mt-0.5 block truncate text-[13px] leading-4 text-muted">
-          {people.data ? `${plural(names, "имя", "имени", "имён")} · ` : "имена · "}
-          {words ? plural(words, "слово", "слова", "слов") : "слов нет"}
+          {people.data ? `${names} ${pluralRu(names, ["имя", "имени", "имён"])} · ` : "имена · "}
+          {words ? `${words} ${pluralRu(words, ["слово", "слова", "слов"])}` : "слов нет"}
         </span>
       </span>
       <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden className="shrink-0 text-muted">
@@ -321,7 +314,7 @@ export function ConventionsSection() {
       icon={<ClockIcon />}
       title="Слова о сроках"
       dirty={dirty.conventions}
-      summary={plural(conventions.length, "правило", "правила", "правил")}
+      summary={`${conventions.length} ${pluralRu(conventions.length, ["правило", "правила", "правил"])}`}
       hint="Что значит «до обеда» или «к вечеру» именно у вас. Слова читает модель, время ставит система. Уверенность ниже 0.8 — срок придёт на проверку жёлтым."
     >
       <div className="flex flex-col gap-4">
@@ -388,7 +381,7 @@ export function SecretarySection() {
       dirty={dirty.secretary}
       summary={
         secretaries.length
-          ? `${secretaries.map((p) => p.full_name.split(" ")[0]).join(", ")} · ${plural(draft.secretary.actions.length, "кнопка", "кнопки", "кнопок")}`
+          ? `${secretaries.map((p) => p.full_name.split(" ")[0]).join(", ")} · ${draft.secretary.actions.length} ${pluralRu(draft.secretary.actions.length, ["кнопка", "кнопки", "кнопок"])}`
           : "роль никому не назначена"
       }
       hint="Кнопки, которыми ты зовёшь секретаря. Заявка — не задача: без срока, без приёмки, живёт минуты."
@@ -788,7 +781,7 @@ function HolidaysField({ days, onChange }: { days: readonly Ymd[]; onChange: (da
           })}
         </div>
       ) : null}
-      {past ? <p className="text-[13px] leading-4 text-muted">и ещё {plural(past, "прошедшая", "прошедшие", "прошедших")}</p> : null}
+      {past ? <p className="text-[13px] leading-4 text-muted">и ещё {past} {pluralRu(past, ["прошедшая", "прошедшие", "прошедших"])}</p> : null}
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <DateField value={picked} onChange={setPicked} min={today} label="Дата праздника" placeholder="Выбрать дату" />

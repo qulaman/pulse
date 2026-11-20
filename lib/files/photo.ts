@@ -56,9 +56,3 @@ export async function uploadPhotoBlob(blob: Blob, ext: PhotoExt, crid: string): 
   if (!put.ok) throw new Error(`upload failed (${put.status})`);
   return path;
 }
-
-/** Upload straight to Storage by signed URL; resolves to the object path for task_messages.file_path. */
-export async function uploadPhoto(file: File): Promise<string> {
-  const { blob, ext } = await shrinkPhoto(file);
-  return uploadPhotoBlob(blob, ext, crypto.randomUUID());
-}

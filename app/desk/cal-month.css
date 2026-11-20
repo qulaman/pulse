@@ -1,4 +1,4 @@
-/* «Календарь» of the desk (D-180): cal-month. One builder a file.
+/* «Календарь» of the desk (D-180): cal-month.
 
    The month (both roles) and the secretary's «Окна директора» with its side
    (components/desk/calendar/{CalendarGrids,Windows}.tsx).
@@ -7,9 +7,8 @@
    - The director's busy time is one look everywhere the secretary meets it: the amber hatch of
      «Стойка» (errands-stoika.css `.stoika-dayline-busy`), grey once it has passed; free windows
      in the ok ink, the next one outlined; «не беспокоить» violet; her own meetings sky pills.
-   The first block lays everything out for both looks (tokens fall back to the app's own for
-   «Журнал»); the second dresses it for «Графит». Motion: the chips' rise is listed with the other
-   calendar motion in planning.css (still under reduced motion). */
+   The first block lays everything out (tokens fall back to the app's own); the second dresses it
+   in «Графит». Motion: the chips' rise (cal-rise) and its stop under reduced motion are at the end. */
 
 html[data-surface="desk"][data-journal] {
   --cal-win-hatch: 70%;
@@ -106,7 +105,6 @@ html[data-surface="desk"][data-journal] {
     min-width: 0;
     flex-direction: column;
     overflow: hidden;
-    border: 1px solid var(--rule, var(--border));
   }
   .cal-win-axis {
     display: flex;
@@ -290,7 +288,6 @@ html[data-surface="desk"][data-journal] {
     }
     &[data-next] {
       background: color-mix(in srgb, var(--ok-ink, var(--ok)) 12%, transparent);
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok-ink, var(--ok)) 45%, transparent);
     }
   }
   /* busy time before or after the hours: words at the row's ends, on the lane's own ground */
@@ -419,7 +416,6 @@ html[data-surface="desk"][data-journal] {
     flex-direction: column;
     gap: 18px;
     padding: 16px;
-    border: 1px solid var(--rule, var(--border));
   }
   .cal-wside-door {
     display: flex;
@@ -606,14 +602,6 @@ html[data-surface="desk"][data-journal] {
   }
 }
 
-/* «Журнал» is print: the windows' lines are words on the sheet, its lamp still */
-html[data-surface="desk"][data-journal]:not([data-graphite]) {
-  .cal-win,
-  .cal-wside {
-    background: var(--page, var(--surface));
-  }
-}
-
 /* ==========================================================================================
    «Графит»
    ========================================================================================== */
@@ -678,7 +666,7 @@ html[data-surface="desk"][data-journal]:not([data-graphite]) {
     }
   }
   &[data-desk-theme="dark"] .cal-cell-day.desk-today {
-    color: #04130f;
+    color: var(--on-pen);
   }
   .cal-cell-new {
     border-radius: 7px;
@@ -788,16 +776,23 @@ html[data-surface="desk"][data-journal]:not([data-graphite]) {
   .cal-win-now {
     box-shadow: 0 0 8px color-mix(in srgb, var(--pencil) 55%, transparent);
   }
-  &[data-desk-theme="dark"] .cal-win-now > b {
-    color: #1d0604;
+  &[data-desk-theme] .cal-win-now > b {
+    color: var(--on-pencil);
   }
-  &[data-desk-theme="light"] .cal-win-now > b {
-    color: #fff;
+}
+
+@keyframes cal-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   :root[data-surface="desk"][data-journal][data-graphite] {
+    .cal-chip {
+      animation: none !important;
+    }
     .cal-win-pill,
     .cal-win-free {
       transition: none;

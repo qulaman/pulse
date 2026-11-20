@@ -16,15 +16,13 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createClient } from "@supabase/supabase-js";
 import { chromium } from "playwright";
 import webpush from "web-push";
 
-process.loadEnvFile(".env.local");
+import { signIn } from "./lib/login";
+import { APP_URL, finish, record, serviceClient } from "./lib/smoke";
 
-const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
-const DIRECTOR = process.env.DIRECTOR ?? "test@demo.local";
-const PASSWORD = process.env.PASSWORD ?? "1";
+const ACCOUNT = { email: process.env.DIRECTOR ?? "test@demo.local", password: process.env.PASSWORD ?? "1" };
 const PAGE = process.env.PAGE ?? "/profile/notifications";
 
 type Shown = { badge: string; lang: string; timestamp: number; actions: string[] } | null;
@@ -36,12 +34,6 @@ const shownScript = (tag: string) => `(async () => {
   return n ? { badge: n.badge, lang: n.lang, timestamp: n.timestamp, actions: (n.actions || []).map((a) => a.action) } : null;
 })()`;
 
-let failed = 0;
-function check(ok: boolean, what: string, detail = "") {
-  console.log(`${ok ? "ok  " : "FAIL"} ${what}${detail ? ` — ${detail}` : ""}`);
-  if (!ok) failed += 1;
-}
-
 async function main() {
   const context = await chromium.launchPersistentContext(mkdtempSync(join(tmpdir(), "pulse-push-")), {
     channel: "chrome",
@@ -52,11 +44,8 @@ async function main() {
   });
   const page = context.pages()[0] ?? (await context.newPage());
   try {
-    await page.goto(`${APP_URL}/login`, { waitUntil: "networkidle" });
-    await page.getByLabel("Почта").fill(DIRECTOR);
-    await page.getByLabel("Пароль").fill(PASSWORD);
-    await page.getByRole("button", { name: "Войти" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 20_000 });
+    // a computer's Chrome, the browser whose push this checks: the page has no desk twin (D-153)
+    await signIn(page, APP_URL, ACCOUNT);
 
     // the app registers the worker and the subscription by itself (PushSync, 1.5 s after paint)
     await page.goto(`${APP_URL}${PAGE}`, { waitUntil: "networkidle" });
@@ -69,7 +58,7 @@ async function main() {
         return (await reg.pushManager.getSubscription())?.endpoint ?? null;
       });
     }
-    check(Boolean(endpoint), "the app subscribed this browser by itself", endpoint?.slice(0, 48) ?? "no subscription");
+    record("the app subscribed this browser by itself", Boolean(endpoint), endpoint?.slice(0, 48) ?? "no subscription");
 
     await foreignKeyHeals(page);
 
@@ -83,13 +72,13 @@ async function main() {
       verdict = (await page.getByText(/Пришло на телефон|не включены|не прошёл|Не пришло|Не получилось/).first().textContent().catch(() => "")) ?? "";
       if (verdict) break;
     }
-    check(verdict.startsWith("Пришло на телефон"), "«Проверить» — the push came back as shown", verdict || "no answer in 37 s");
+    record("«Проверить» — the push came back as shown", verdict.startsWith("Пришло на телефон"), verdict || "no answer in 37 s");
 
     // how the shade shows it (D-125)
     const test = (await page.evaluate(shownScript("push-test"))) as Shown;
-    check(Boolean(test?.badge.endsWith("/icons/badge-96.png")), "the shade gets the monochrome badge", test?.badge ?? "no notification");
-    check(test?.lang === "ru", "the notification speaks Russian", test?.lang ?? "");
-    check(Boolean(test && Math.abs(Date.now() - test.timestamp) < 120_000), "it carries the moment of the event", String(test?.timestamp ?? ""));
+    record("the shade gets the monochrome badge", Boolean(test?.badge.endsWith("/icons/badge-96.png")), test?.badge ?? "no notification");
+    record("the notification speaks Russian", test?.lang === "ru", test?.lang ?? "");
+    record("it carries the moment of the event", Boolean(test && Math.abs(Date.now() - test.timestamp) < 120_000), String(test?.timestamp ?? ""));
 
     await acceptFromShade(page, context);
   } finally {
@@ -110,8 +99,7 @@ async function main() {
       .catch(() => undefined);
     await context.close();
   }
-  console.log(failed ? `${failed} failed` : "all ok");
-  process.exit(failed ? 1 : 0);
+  finish();
 }
 
 type Page = Awaited<ReturnType<Awaited<ReturnType<typeof chromium.launchPersistentContext>>["newPage"]>>;
@@ -123,9 +111,7 @@ type Context = Awaited<ReturnType<typeof chromium.launchPersistentContext>>;
  * start the app replaces it by itself and the server forgets the old one.
  */
 async function foreignKeyHeals(page: Page): Promise<void> {
-  const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const admin = serviceClient();
   const ours = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!;
   const foreign = webpush.generateVAPIDKeys().publicKey;
   const foreignEndpoint = (await page.evaluate(`(async () => {
@@ -162,7 +148,7 @@ async function foreignKeyHeals(page: Page): Promise<void> {
     now = (await page.evaluate(keyScript)) as Sub;
     if (now?.key === ours) break;
   }
-  check(now?.key === ours && now.endpoint !== foreignEndpoint, "a subscription under another key is replaced by itself", now?.key.slice(0, 12) ?? "none");
+  record("a subscription under another key is replaced by itself", now?.key === ours && now.endpoint !== foreignEndpoint, now?.key.slice(0, 12) ?? "none");
 
   const me = (await page.evaluate(`fetch("/api/me", { credentials: "include" }).then((r) => r.json())`)) as { profile?: { userId: string } };
   let rows: string[] = [];
@@ -173,25 +159,23 @@ async function foreignKeyHeals(page: Page): Promise<void> {
     await page.waitForTimeout(500);
   }
   // the person's other phones stay as they were: only the dead endpoint goes
-  check(
-    !rows.includes(foreignEndpoint) && rows.includes(now?.endpoint ?? ""),
+  record(
     "and the server forgets the dead endpoint",
+    !rows.includes(foreignEndpoint) && rows.includes(now?.endpoint ?? ""),
     `${rows.length} device(s)`,
   );
 }
 
 /** «Принял» from the shade (D-125), end to end through the real push and the real worker. */
 async function acceptFromShade(page: Page, context: Context): Promise<void> {
-  const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  const admin = serviceClient();
   const me = (await page.evaluate(`fetch("/api/me", { credentials: "include" }).then((r) => r.json())`)) as {
     profile?: { userId: string; companyId: string };
   };
   const myId = me.profile?.userId;
   const companyId = me.profile?.companyId;
   if (!myId || !companyId) {
-    check(false, "«Принял» from the shade — who am I", JSON.stringify(me).slice(0, 120));
+    record("«Принял» from the shade — who am I", false, JSON.stringify(me).slice(0, 120));
     return;
   }
 
@@ -201,7 +185,7 @@ async function acceptFromShade(page: Page, context: Context): Promise<void> {
     .select("id")
     .single();
   if (error || !task) {
-    check(false, "«Принял» from the shade — a task to myself", error?.message ?? "");
+    record("«Принял» from the shade — a task to myself", false, error?.message ?? "");
     return;
   }
   try {
@@ -212,13 +196,14 @@ async function acceptFromShade(page: Page, context: Context): Promise<void> {
       await page.waitForTimeout(1_000);
       shown = (await page.evaluate(shownScript(`task:${task.id}`))) as Shown;
     }
-    check(Boolean(shown?.actions.includes("accept") && shown.actions.includes("open")), "a new task arrives with «Принял» and «Открыть»", JSON.stringify(shown?.actions ?? null));
+    const bothActions = Boolean(shown?.actions.includes("accept") && shown.actions.includes("open"));
+    record("a new task arrives with «Принял» and «Открыть»", bothActions, JSON.stringify(shown?.actions ?? null));
 
     const worker = context.serviceWorkers()[0];
     const accepted = worker
       ? await worker.evaluate(`acceptFromShade({ task_id: ${JSON.stringify(task.id)}, url: "/tasks/${task.id}" })`)
       : false;
-    check(accepted === true, "the worker takes the task through /transition", String(accepted));
+    record("the worker takes the task through /transition", accepted === true, String(accepted));
 
     let status = "";
     let acted: string | null = null;
@@ -235,8 +220,8 @@ async function acceptFromShade(page: Page, context: Context): Promise<void> {
       if (status === "accepted" && acted) break;
       await page.waitForTimeout(500);
     }
-    check(status === "accepted", "the task is accepted", status);
-    check(Boolean(acted), "and the director's card gets «принял»", acted ?? "no acted_at");
+    record("the task is accepted", status === "accepted", status);
+    record("and the director's card gets «принял»", Boolean(acted), acted ?? "no acted_at");
   } finally {
     await admin.from("tasks").delete().eq("id", task.id);
   }

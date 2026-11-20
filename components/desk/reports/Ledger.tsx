@@ -4,13 +4,13 @@ import Link from "next/link";
 import { useLayoutEffect, useRef, useState, type MouseEvent } from "react";
 import { flushSync } from "react-dom";
 
+import { Face } from "@/components/desk/ui/Face";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
 import { hoursText, rangeText, spanText, taskMeta, tasksCount, timeOf } from "@/lib/daily-report/format";
 import type { DailyReport, DailyReportTask, TeamDayRow } from "@/lib/daily-report/types";
 import { aqtobeIsoToYmdHm } from "@/lib/datetime/calendar";
 import { pluralRu } from "@/lib/tasks/status-text";
 
-import { TileFace } from "../team/TeamGrid";
 
 /** «Только что» stays teal this long after the report came. */
 const FRESH_MS = 10 * 60_000;
@@ -153,7 +153,7 @@ function Entry({
   const words = wordsOf(report);
   const span = spanText(report.arrived_at, report.left_at);
   const hours = hoursText(row.hours);
-  const face = <TileFace person={{ id: row.user_id, full_name: row.full_name, avatar_url: row.avatar_url }} size={words ? 32 : 24} />;
+  const face = <Face person={{ id: row.user_id, full_name: row.full_name, avatar_url: row.avatar_url }} size={words ? 32 : 24} />;
   return (
     <li
       className="rep-day-entry"

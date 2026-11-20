@@ -7,7 +7,7 @@
 import { nowHm, parseHm, todayYmd, type Hm } from "@/lib/datetime/calendar";
 
 import type { Draft } from "./draft";
-import { hmOf, isoAt, minutesBetween } from "./format";
+import { isoAt, isoToHm, minutesBetween } from "./format";
 import type { MyDailyReportDay, SubmitDailyReportInput } from "./types";
 
 /** `settings.daily_report.ask_from` when the company has not set it (lib/settings.ts). */
@@ -73,7 +73,7 @@ export function oneTapInput(
   draft: Draft | null = null,
 ): SubmitDailyReportInput | null {
   if (day.tasks.length === 0 || day.date !== todayYmd(now)) return null;
-  const arrivedHm = hmOf(day.suggest.arrived_at);
+  const arrivedHm = isoToHm(day.suggest.arrived_at);
   const arrived = arrivedHm ? isoAt(day.date, arrivedHm) : null;
   const left = isoAt(day.date, nowHm(now));
   const own = draft?.date === day.date ? draft : null;

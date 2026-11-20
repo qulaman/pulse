@@ -12,8 +12,8 @@ import { rememberSend, usualNote } from "@/lib/errands/habits";
 import { askSecretary } from "@/lib/errands/pending";
 import { errandKeys, useSecretaries, useSecretaryActions, type Errand } from "@/lib/errands/queries";
 import { absenceLine, sceneOfAction } from "@/lib/errands/scene";
-import { useNow } from "@/lib/pulse/queries";
 import type { SecretaryAction } from "@/lib/settings";
+import { useNow } from "@/lib/useNow";
 
 /*
  * The director's ask from the desk, one for «Сегодня» and the keypad of «Заявки» (D-164, D-175):

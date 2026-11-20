@@ -10,8 +10,9 @@ import { IngestOverlay } from "@/components/voice/IngestOverlay";
 import { TextSheet } from "@/components/voice/TextSheet";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { useComposeStore } from "@/lib/store/compose";
-import { isCountable, useIngestStore } from "@/lib/store/ingest";
+import { useIngestStore } from "@/lib/store/ingest";
 import { useKeyboardDock } from "@/lib/ui/keyboard";
+import { isCountable } from "@/lib/confirm/entities";
 
 /**
  * What the director's screens share around the input (docs/FRONTEND.md "FAB"). The floating

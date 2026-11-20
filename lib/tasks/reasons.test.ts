@@ -8,7 +8,7 @@ import {
   reasonOf,
   receiptText,
   type DeskAction,
-} from "./desk";
+} from "./reasons";
 import type { TaskStatus } from "./status-text";
 
 // 2026-09-17 12:00 Aqtobe (UTC+5)

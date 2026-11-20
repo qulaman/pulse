@@ -5,17 +5,19 @@ import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { ACT_MS, Mascot, type MascotAct, type MascotState } from "@/components/brand/Mascot";
+import { estimateCost } from "@/lib/lab/costs";
 
 import { ChatBefore, CountUp, EcgLine, MiniCard, Reveal, Tile, TvWall } from "./parts";
 import styles from "./pitch.module.css";
+import { SNAPSHOT } from "./snapshot";
 import { VoiceDemo } from "./VoiceDemo";
 
 /**
  * «Как работает Pulse» — the product in five minutes, the page the owner opens before the live
  * demo (an investor, a new client). A scroll story in the product's own language: the real
- * face, the board's cards, the wall. Every number on it is measured — the parser evals
- * (tests/ai/results), the STT series (WORKLOG, 2026-08-20), the unit-cost model
- * (lib/lab/costs.ts) and the repository itself as of 2026-09-26; nothing here reads data.
+ * face, the board's cards, the wall. Every number on it is measured — the parser evals and the
+ * repository (frozen in ./snapshot.ts), the STT series (WORKLOG, 2026-08-20) and the unit-cost
+ * model (lib/lab/costs.ts); nothing here reads data.
  */
 export function PitchStory() {
   return (
@@ -278,11 +280,13 @@ function Secret() {
             ]}
           >
             <div className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-4">
-              <MiniStat value={<CountUp to={100} suffix=" %" />} label="исполнитель определён верно" />
-              <MiniStat value={<CountUp to={97.6} decimals={1} suffix=" %" />} label="точность разбора" />
-              <MiniStat value={<CountUp to={1.5} decimals={1} prefix="≈" suffix=" с" />} label="на разбор фразы" />
+              <MiniStat value={<CountUp to={SNAPSHOT.assigneeAccuracy} suffix=" %" />} label="исполнитель определён верно" />
+              <MiniStat value={<CountUp to={SNAPSHOT.parseF1} decimals={1} suffix=" %" />} label="точность разбора" />
+              <MiniStat value={<CountUp to={SNAPSHOT.parseSeconds} decimals={1} prefix="≈" suffix=" с" />} label="на разбор фразы" />
             </div>
-            <p className="mt-2 text-[12px] leading-4 text-muted">Автотесты на 66 фразах, включая казахские и смешанные · прогон 22.09.2026.</p>
+            <p className="mt-2 text-[12px] leading-4 text-muted">
+              Автотесты на {SNAPSHOT.evalPhrases} фразах, включая казахские и смешанные · прогон {SNAPSHOT.evalRunOn}.
+            </p>
           </Pillar>
         </Reveal>
         <Reveal>
@@ -448,6 +452,9 @@ function ForCompany() {
 /* 6. The business                                                             */
 /* -------------------------------------------------------------------------- */
 
+/** One more client of up to 50 people, a month: the «Себестоимость» tab's figure at its defaults. */
+const CLIENT_50_USD = Math.round(estimateCost(50, { cacheTtl: "5m", trimRoster: false }).month);
+
 function Business() {
   return (
     <Section
@@ -458,7 +465,7 @@ function Business() {
     >
       <div className="grid gap-3 md:grid-cols-3">
         <Reveal>
-          <Stat value={<CountUp to={29} prefix="≈ $" />} label="в месяц — себестоимость клиента до 50 человек: сервер, база и ИИ" />
+          <Stat value={<CountUp to={CLIENT_50_USD} prefix="≈ $" />} label="в месяц — себестоимость клиента до 50 человек: сервер, база и ИИ" />
         </Reveal>
         <Reveal delay={0.06}>
           <Stat value="$0,25–0,6" label="на сотрудника в месяц — чем больше компания, тем дешевле каждый" />
@@ -517,19 +524,18 @@ function Progress() {
       title="Это не макет — продукт уже работает"
       lead="Всё, что вы увидите дальше, — живое приложение."
     >
-      {/* counted in the repository on 2026-09-26: first commit 2026-08-14, D-01…D-123, tests/ai/parser_evals.jsonl */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Reveal>
-          <Stat value={<CountUp to={6} />} label="недель разработки" />
+          <Stat value={<CountUp to={SNAPSHOT.weeks} />} label="недель разработки" />
         </Reveal>
         <Reveal delay={0.05}>
-          <Stat value={<CountUp to={535} />} label="изменений в коде" />
+          <Stat value={<CountUp to={SNAPSHOT.commits} />} label="изменений в коде" />
         </Reveal>
         <Reveal delay={0.1}>
-          <Stat value={<CountUp to={123} />} label="продуктовых решения в журнале" />
+          <Stat value={<CountUp to={SNAPSHOT.decisions} />} label="продуктовых решения в журнале" />
         </Reveal>
         <Reveal delay={0.15}>
-          <Stat value={<CountUp to={66} />} label="фраз в автотестах ИИ" />
+          <Stat value={<CountUp to={SNAPSHOT.evalPhrases} />} label="фраз в автотестах ИИ" />
         </Reveal>
       </div>
 

@@ -5,11 +5,18 @@
  * code, D-135). `readOnly` answers every write of the screens in the browser: dev is shared with
  * live people, and a smoke that opens a card must not mark it read for them. Signing in is the one
  * thing of such a run that reaches the base. The password is never printed.
+ *
+ * `LOGIN_ONLY=1 pnpm smoke:…` checks just the way in: every write of the browser is answered, and
+ * the run ends with exit code 0 right after the first sign-in went through.
  */
 import type { BrowserContext, BrowserContextOptions, Page, Route } from "playwright";
 
 export const IPHONE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+/** A computer: the director and the secretary land on /desk (proxy.ts, D-153). */
+export const DESKTOP_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+/** Safari on a Mac: no client hint, the user agent alone says «computer». */
+export const SAFARI_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15";
 
 /** The phone the screens are made for: 375 × 667, touch, an iPhone user agent. */
 export const PHONE: BrowserContextOptions = {
@@ -23,8 +30,14 @@ export const PHONE: BrowserContextOptions = {
 
 export type Account = { email: string; password: string };
 
-/** Signs in by email and password and waits for the home screen the app sends the role to. */
+/**
+ * Signs in by email and password and waits for the home screen the app sends the role to. The
+ * switch to the email form comes first: on an iPhone the code form would ask for the home screen
+ * («Сначала — на главный экран») before anything else.
+ */
 export async function signIn(page: Page, appUrl: string, account: Account) {
+  const loginOnly = process.env.LOGIN_ONLY === "1";
+  if (loginOnly) await readOnly(page.context(), appUrl, []);
   await page.goto(`${appUrl}/login`, { waitUntil: "networkidle" });
   const mail = page.getByLabel("Почта");
   // the switch says «по почте» while the code form is up; a tap before hydration is lost — tap again
@@ -44,6 +57,12 @@ export async function signIn(page: Page, appUrl: string, account: Account) {
   await page.getByRole("button", { name: "Войти", exact: true }).click();
   await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 30_000 });
   await page.waitForLoadState("networkidle");
+  if (loginOnly) {
+    console.log(`LOGIN_ONLY: ${account.email} → ${new URL(page.url()).pathname}`);
+    const browser = page.context().browser();
+    await (browser ? browser.close() : page.context().close()).catch(() => undefined);
+    process.exit(0);
+  }
 }
 
 /** RPCs that only read; any other RPC writes and is answered in the browser. */

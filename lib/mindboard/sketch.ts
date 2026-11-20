@@ -227,6 +227,15 @@ export function isDrawn(sketch: unknown): boolean {
   return Array.isArray(strokes) && strokes.length > 0;
 }
 
+/**
+ * The words of a point after its pad said `caption` (D-141): the pad edits the first line, the rest
+ * of a point of several lines stays as it was. null — the first line did not change.
+ */
+export function withCaption(text: string, caption: string): string | null {
+  const [first = "", ...rest] = text.trim().split("\n");
+  return caption === first.trim() ? null : [caption, ...rest].join("\n").trim();
+}
+
 /** A line of a board that the wall shows: it has words or a drawing. */
 export function hasContent(row: { text: string; sketch?: unknown }): boolean {
   return row.text.trim() !== "" || isDrawn(row.sketch);

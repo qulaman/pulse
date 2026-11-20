@@ -4,7 +4,8 @@ import { useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
 import { SEC_ACT_MS, type SecretaryAct } from "@/components/secretary/SecretaryMascot";
-import { aqtobeDay, type Daypart } from "@/lib/errands/scene";
+import { type Daypart } from "@/lib/errands/scene";
+import { ymdAt } from "@/lib/datetime/calendar";
 
 /** What the secretary does at the desk while nobody asks (D-97); the evening is a tired one. */
 const DAY: readonly SecretaryAct[] = ["sip", "headset", "headsetRight", "stretch", "stretchSide", "clock", "papers", "plant"];
@@ -86,7 +87,7 @@ export function useSecretaryActs({
         wait = setTimeout(() => play(pick(acts, last.current)), between(GAP_MS));
       }, SEC_ACT_MS[act]);
     };
-    const first = morning && !arrivedToday(aqtobeDay(new Date())) ? "arrive" : null;
+    const first = morning && !arrivedToday(ymdAt(new Date())) ? "arrive" : null;
     wait = setTimeout(() => play(first ?? pick(acts, last.current)), first ? 300 : between(FIRST_MS));
     return () => {
       clearTimeout(wait);

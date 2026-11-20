@@ -25,7 +25,9 @@ import { useSentTasks } from "@/lib/tasks/queries";
 import { pluralRu, SHORT_STATUS } from "@/lib/tasks/status-text";
 import { holdUpdate } from "@/lib/update/client";
 
-import { isThought, useNotesDesk, type BoardTarget, type Intent } from "./NotesDesk";
+import type { Intent } from "./keys";
+import { useNotesDesk } from "./NotesDesk";
+import { isThought, type BoardTarget } from "./useNoteActions";
 
 /** A pause in typing this long saves the text — the phone's own rhythm. */
 const SAVE_DEBOUNCE_MS = 600;

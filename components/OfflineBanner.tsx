@@ -1,7 +1,9 @@
 "use client";
 
-import { notifyManager, onlineManager, useMutationState, useQueryClient } from "@tanstack/react-query";
+import { notifyManager, useMutationState, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, useSyncExternalStore } from "react";
+
+import { useOnline } from "@/lib/useOnline";
 
 import { humanAqtobe } from "@/lib/ai/time";
 import { isNetworkError } from "@/lib/net";
@@ -9,15 +11,6 @@ import { latestFetch } from "@/lib/offline/persist";
 import { outboxSize, subscribeOutbox } from "@/lib/outbox";
 import { countMedia, subscribeMedia } from "@/lib/media/pending";
 import { countOnTheirWay, subscribeKept } from "@/lib/voice/kept";
-
-// the same switch that pauses and resumes mutations — the line never disagrees with the queue
-const subscribe = (onChange: () => void) => onlineManager.subscribe(onChange);
-const online = () => onlineManager.isOnline();
-
-/** Only the network, as the mutation queue sees it. */
-export function useOnline(): boolean {
-  return useSyncExternalStore(subscribe, online, () => true);
-}
 
 /** When the data on the screens was last fetched — live: the phone's copy comes back after the first paint (D-127). */
 function useLatestFetch(): number | null {

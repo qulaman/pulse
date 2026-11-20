@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import { QrCode } from "@/components/people/QrCode";
 import { canShare, copyText } from "@/components/people/copy";
+import { useLoginCode } from "@/components/people/useLoginCode";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
-import { CODE_TTL_SECONDS, codeMessage, formatCode } from "@/lib/login-code/code";
-import { useIssueLoginCode, useLoginCodeStatus, type IssuedCode } from "@/lib/people/queries";
+import { codeMessage, formatCode } from "@/lib/login-code/code";
 
 /** «14:35» on the clock of Aqtobe. */
 function hm(iso: string): string {
@@ -43,57 +43,13 @@ export function LoginCodePanel({
   tv?: boolean;
   onDone: () => void;
 }) {
-  const issue = useIssueLoginCode();
-  const { mutate } = issue;
-  const [issued, setIssued] = useState<{ code: IssuedCode; at: number } | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState(() => Date.now());
   const [shared, setShared] = useState(false);
-
-  // Time left is counted from the moment the answer arrived, not from the server's clock read
-  // by this phone's clock: a phone minutes off would otherwise burn a live code on screen.
-  const leftMs = issued ? CODE_TTL_SECONDS * 1000 - (now - issued.at) : 0;
-  const status = useLoginCodeStatus(person.id, true, issued !== null && leftMs > 0);
-  // the code on screen is the one that was used: the same expiry, from the server both times
-  const landed =
-    issued !== null &&
-    status.data?.state === "used" &&
-    Date.parse(status.data.expires_at ?? "") === Date.parse(issued.code.expires_at);
-  const expired = issued !== null && !landed && leftMs <= 0;
+  const { pending, issued, error, status, leftMs, landed, expired, issueCode } = useLoginCode(person.id, autoIssue, () => setShared(false));
 
   const first = person.full_name.trim().split(/\s+/)[0] || person.full_name;
 
-  const doIssue = useRef((id: string) => {
-    setError(null);
-    setShared(false);
-    mutate(
-      { id, requestId: globalThis.crypto.randomUUID() },
-      {
-        onSuccess: (code) => {
-          setIssued({ code, at: Date.now() });
-          setNow(Date.now());
-        },
-        onError: (e) => setError(e.message),
-      },
-    );
-  });
-
-  const started = useRef(false);
-  useEffect(() => {
-    if (!autoIssue || started.current) return;
-    started.current = true;
-    doIssue.current(person.id);
-  }, [autoIssue, person.id]);
-
-  // the countdown ticks only while a live code is on screen
-  useEffect(() => {
-    if (!issued || landed || expired) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [issued, landed, expired]);
-
   const issueButton = (label: string) => (
-    <Button block loading={issue.isPending} onClick={() => doIssue.current(person.id)} data-testid="code-issue">
+    <Button block loading={pending} onClick={issueCode} data-testid="code-issue">
       {label}
     </Button>
   );

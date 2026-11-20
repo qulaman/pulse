@@ -6,9 +6,11 @@ import { useMemo, useRef, useState } from "react";
 import { Chip } from "@/components/ui/Chip";
 import { canEditPerson, type Who } from "@/lib/people/access";
 import type { Health } from "@/lib/push/health";
-import { AVAILABILITY_LABEL, ROLE_LABEL, initialsOf, type Person, type Role } from "@/lib/people/queries";
+import { AVAILABILITY_LABEL, ROLE_LABEL, type Person, type Role } from "@/lib/people/queries";
+import { textHas } from "@/lib/people/search";
 import { pluralRu } from "@/lib/tasks/status-text";
 import { useSearchHold } from "@/lib/ui/searchHold";
+import { initialsOf } from "@/lib/people/names";
 
 /** Filter chips in the order of the role picker; a chip shows only when someone holds the role. */
 const ROLE_CHIPS: { role: Role; label: string }[] = [
@@ -22,14 +24,8 @@ const ROLE_CHIPS: { role: Role; label: string }[] = [
 
 const ROLE_ORDER: Record<Role, number> = { director: 0, manager: 1, secretary: 2, shopkeeper: 3, employee: 4, tv: 9 };
 
-function normalise(s: string): string {
-  return s.toLowerCase().replace(/ё/g, "е").trim();
-}
-
 function matches(p: Person, q: string): boolean {
-  if (!q) return true;
-  const hay = normalise([p.full_name, p.position ?? "", ...p.aliases, ROLE_LABEL[p.role]].join(" "));
-  return q.split(/\s+/).every((word) => hay.includes(word));
+  return textHas([p.full_name, p.position, ...p.aliases, ROLE_LABEL[p.role]], q);
 }
 
 function Line({ person, editable, me, push }: { person: Person; editable: boolean; me: boolean; push?: Health }) {
@@ -94,7 +90,7 @@ export function TeamRoster({ people, me, push }: { people: Person[]; me: Who | n
   const holdSearch = useSearchHold(searchField, query);
   const [role, setRole] = useState<Role | null>(null);
   const [showInactive, setShowInactive] = useState(false);
-  const q = normalise(query);
+  const q = query.trim();
 
   const active = useMemo(() => people.filter((p) => p.is_active), [people]);
   const counts = useMemo(() => {

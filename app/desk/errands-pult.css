@@ -9,7 +9,7 @@
    violet — the closed door, sky — fresh, the pen — what is in progress and the chosen, the red
    pencil — the alarm and «не смогли». Motion is news: a quiet board stands still; the one loop is
    the live dot of a request nobody took (frozen after three quiet minutes, `[data-still]`) and the
-   alarm. Laid out for «Журнал» as well: every «Графит» token falls back to the journal's.
+   alarm. Every «Графит» token falls back to the base inks of journal.css.
    ========================================================================================== */
 
 html[data-surface="desk"][data-journal] {
@@ -1185,22 +1185,6 @@ html[data-surface="desk"][data-journal] {
   .pult[data-still] .pult-live {
     animation: none;
     opacity: 0.5;
-  }
-}
-
-/* «Журнал»: the same layout on the ruled sheet — hairlines and square corners, no cards' depth */
-html[data-surface="desk"][data-journal]:not([data-graphite]) {
-  :is(.pult-card, .pult-band, .pult-wait, .pult-trip, .pult-key, .pult-field, .pult-keypad-note) {
-    border-radius: 2px;
-    box-shadow: inset 0 0 0 1px var(--rule);
-  }
-  .pult-wait {
-    box-shadow:
-      inset 0 0 0 1px var(--rule),
-      inset 3px 0 0 var(--p-amber);
-  }
-  .pult-band {
-    background: var(--sheet);
   }
 }
 

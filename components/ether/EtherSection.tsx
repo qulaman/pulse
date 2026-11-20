@@ -1,6 +1,5 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -18,27 +17,11 @@ import {
   type Announcement,
   type EtherEvent,
 } from "@/lib/ether/queries";
-import { TEAM_ROLES } from "@/lib/routes";
-import { createBrowserSupabase } from "@/lib/supabase/client";
 import { pluralRu } from "@/lib/tasks/status-text";
 import { useMe } from "@/lib/tasks/queries";
+import { useTeamSize } from "@/lib/team-size";
 
 const FOLD_KEY = "ether.fold_open";
-
-function useTeamSize() {
-  return useQuery({
-    queryKey: ["people", "team-size"],
-    queryFn: async (): Promise<number> => {
-      const supabase = createBrowserSupabase();
-      const { count } = await supabase
-        .from("profiles")
-        .select("id", { count: "exact", head: true })
-        .eq("is_active", true)
-        .in("role", [...TEAM_ROLES]);
-      return count ?? 0;
-    },
-  });
-}
 
 type Props = {
   /**

@@ -17,34 +17,25 @@ export const serverEnvSchema = z.object({
   // AI
   OPENAI_API_KEY: required,
   ANTHROPIC_API_KEY: required,
-  STT_PROVIDER: optional,
-  STT_FALLBACK_PROVIDER: optional,
   DEEPGRAM_API_KEY: optional,
   ELEVENLABS_API_KEY: optional,
   DEEPSEEK_API_KEY: optional,
   PARSER_MODEL: optional,
   PARSER_ESCALATION_MODEL: optional,
-  QUERY_MODEL: optional,
 
   // Web Push
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: optional,
   VAPID_PRIVATE_KEY: optional,
   VAPID_SUBJECT: optional,
 
-  // Telegram
-  TELEGRAM_BOT_TOKEN: optional,
-  TELEGRAM_WEBHOOK_SECRET: optional,
-
-  // Internal calls / cron
-  INTERNAL_FN_SECRET: optional,
+  // Cron
   CRON_SECRET: optional,
 
   // The developers' console (D-157): its own host, and the app's address for sign-in links from it
   OPS_HOST: optional,
   OPS_APP_ORIGIN: z.url().optional(),
 
-  // Observability
-  SENTRY_DSN: optional,
+  // Read by nobody; lib/env.public.ts still checks it
   NEXT_PUBLIC_SENTRY_DSN: optional,
 });
 

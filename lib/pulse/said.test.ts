@@ -4,7 +4,7 @@ import { entitiesSummary } from "@/components/confirm/format";
 import type { PostprocessedEntity } from "@/lib/ai/postprocess";
 import type { CalendarEvent } from "@/lib/calendar/queries";
 import { nextEventLine } from "@/lib/calendar/say";
-import { isSendable, whyNothingToSend } from "@/lib/store/ingest";
+import { isSendable, whyNothingToSend } from "@/lib/confirm/entities";
 
 import { answer, type AnswerInput } from "./answers";
 import { openingLine, type BoardTask, type Lanes, type SpeechTone } from "./board";

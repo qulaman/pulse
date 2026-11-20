@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 
+import { CONFETTI } from "@/components/brand/confetti";
 import type { Daypart, DeskScene } from "@/lib/errands/scene";
 
 /**
@@ -17,15 +18,15 @@ export const SECRETARY_TONE = "color-mix(in srgb, var(--accent-2) 82%, var(--sur
 /** The headset and the bow tie: dark on the teal body, so the character reads at a glance. */
 export const GEAR = "color-mix(in srgb, var(--bg) 72%, var(--surface-2))";
 export const EDGE = "color-mix(in srgb, var(--border) 70%, var(--text-muted))";
-export const COFFEE = "color-mix(in srgb, var(--gold) 36%, #3b2415)";
+const COFFEE = "color-mix(in srgb, var(--gold) 36%, #3b2415)";
 export const TEA = "color-mix(in srgb, var(--gold) 70%, #8a3d10)";
 export const WATER = "color-mix(in srgb, var(--accent) 45%, #9fd8ff)";
 /** A hand held in front of the body: the body's colour, a shade lighter and outlined. */
-export const HAND = "color-mix(in srgb, var(--accent-2) 70%, white 12%)";
+const HAND = "color-mix(in srgb, var(--accent-2) 70%, white 12%)";
 const DESK = "color-mix(in srgb, var(--surface-2) 80%, white 7%)";
 const KRAFT = "color-mix(in srgb, var(--gold) 55%, #7a5534)";
 
-export const PROP_IN = "smc-env-in 0.45s cubic-bezier(0.34, 1.3, 0.64, 1) both";
+const PROP_IN = "smc-env-in 0.45s cubic-bezier(0.34, 1.3, 0.64, 1) both";
 const box = (origin: string, animation: string): CSSProperties => ({ transformBox: "fill-box", transformOrigin: origin, animation });
 
 /** An arm out of the body — drawn before the body, so the body covers its root. */
@@ -45,7 +46,7 @@ export function Mitten({ cx, cy, rx = 3.4, ry = 2.8, style }: { cx: number; cy: 
   return <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill={HAND} stroke="var(--bg)" strokeOpacity="0.35" strokeWidth="0.8" style={style} />;
 }
 
-export function Steam({ x, y }: { x: number; y: number }) {
+function Steam({ x, y }: { x: number; y: number }) {
   return (
     <g fill="none" stroke="var(--text-muted)" strokeWidth="1" strokeLinecap="round">
       <path d={`M${x - 2} ${y} q-1.3 -2.2 0 -4.4`} style={{ ...box("50% 100%", "mascot-steam 2.2s ease-out infinite"), opacity: 0 }} />
@@ -336,7 +337,7 @@ export function Pourer({ kind }: { kind: "teapot" | "carafe" }) {
 }
 
 /** Where the hand holds the sign up: its bottom edge, clear of the headset cup. */
-export const SIGN_GRIP = { x: 67.5, y: 30.2 };
+const SIGN_GRIP = { x: 67.5, y: 30.2 };
 
 /**
  * The «не беспокоить» sign held up on the right — a no-entry circle on a door hanger. It sways
@@ -718,22 +719,11 @@ export function Glyph({ scene }: { scene: DeskScene }) {
   }
 }
 
-/** celebrating a quick job (the game feel, after the D-40 gate): confetti off the crown. */
-const CONFETTI = [
-  { x: -24, y: -10, r: 220, color: "var(--accent)" },
-  { x: -15, y: -20, r: -160, color: "var(--gold)", round: true },
-  { x: -6, y: -25, r: 300, color: "var(--ok)" },
-  { x: 5, y: -26, r: -240, color: "#ffffff", round: true },
-  { x: 14, y: -21, r: 200, color: "var(--accent)" },
-  { x: 23, y: -12, r: -280, color: "var(--gold)" },
-  { x: -30, y: 2, r: 180, color: "var(--ok)", round: true },
-  { x: 30, y: 0, r: -200, color: "var(--warn)" },
-];
-
+/** celebrating a quick job (the game feel, after the D-40 gate): confetti off the crown, the first eight bits of the assistant's. */
 export function Confetti() {
   return (
     <g>
-      {CONFETTI.map((bit, i) => (
+      {CONFETTI.slice(0, 8).map((bit, i) => (
         <g key={i} transform="translate(32 8)">
           {bit.round ? (
             <circle r="1.5" fill={bit.color} style={{ ["--cx" as string]: `${bit.x}px`, ["--cy" as string]: `${bit.y}px`, ["--cr" as string]: `${bit.r}deg`, animation: "mascot-confetti 1.6s ease-out both", opacity: 0 }} />

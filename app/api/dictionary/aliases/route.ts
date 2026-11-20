@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { userSupabase, withAuth } from "@/lib/api/handler";
-import { apiError, apiOk } from "@/lib/api/respond";
+import { apiError, apiOk, rpcFailure } from "@/lib/api/respond";
 import { ALIAS_MAX, ENTRY_MAX_LENGTH, mergeEntries } from "@/lib/dictionary";
 
 const BodySchema = z.strictObject({
@@ -32,8 +32,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       .eq("id", body.person_id)
       .select("id, aliases");
     if (error) {
-      if (error.message.includes("forbidden")) return apiError(403, "forbidden", "Эту карточку тебе менять нельзя");
-      throw new Error(`aliases update failed: ${error.message}`);
+      return rpcFailure(error, { forbidden: [403, "Эту карточку тебе менять нельзя"] }, "aliases update");
     }
     // RLS filters a row the caller may not touch silently: an empty answer is a refusal
     if (!data?.length) return apiError(403, "not_permitted", "Эту карточку тебе менять нельзя");

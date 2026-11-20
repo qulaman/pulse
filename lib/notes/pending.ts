@@ -1,5 +1,6 @@
 "use client";
 
+import { idbStore } from "@/lib/offline/idb";
 import type { Json } from "@/lib/supabase/types";
 
 /**
@@ -62,65 +63,16 @@ export type NoteFields = {
 /** The fields of one note still owed to the server, merged — the latest value of each wins. */
 export type PendingEdit = { id: string; userId: string; fields: NoteFields; at: number };
 
-const DB_NAME = "pulse-notes";
-const DB_VERSION = 2;
 const CREATES = "creates";
 const EDITS = "edits";
 const BOARDS = "boards";
+/** The phones' database — its name, version and stores never change (lib/offline/idb.ts). */
+const db = idbStore("pulse-notes", 2, [CREATES, EDITS, BOARDS]);
 
-let opening: Promise<IDBDatabase | null> | null = null;
-
-function database(): Promise<IDBDatabase | null> {
-  if (typeof indexedDB === "undefined") return Promise.resolve(null);
-  opening ??= new Promise((resolve) => {
-    try {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
-      request.onupgradeneeded = () => {
-        const db = request.result;
-        if (!db.objectStoreNames.contains(CREATES)) db.createObjectStore(CREATES, { keyPath: "id" });
-        if (!db.objectStoreNames.contains(EDITS)) db.createObjectStore(EDITS, { keyPath: "id" });
-        if (!db.objectStoreNames.contains(BOARDS)) db.createObjectStore(BOARDS, { keyPath: "id" });
-      };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => resolve(null);
-      request.onblocked = () => resolve(null);
-    } catch {
-      resolve(null);
-    }
-  });
-  return opening;
-}
-
-/** One request in its own transaction; resolves when the transaction is durable. */
-async function run<T>(store: string, mode: IDBTransactionMode, make: (target: IDBObjectStore) => IDBRequest<T>): Promise<{ ok: boolean; value?: T }> {
-  const db = await database();
-  if (!db) return { ok: false };
-  return new Promise((resolve) => {
-    try {
-      const tx = db.transaction(store, mode);
-      const request = make(tx.objectStore(store));
-      tx.oncomplete = () => resolve({ ok: true, value: request.result });
-      tx.onerror = () => resolve({ ok: false });
-      tx.onabort = () => resolve({ ok: false });
-    } catch {
-      resolve({ ok: false });
-    }
-  });
-}
-
-const listeners = new Set<() => void>();
+const { run, changed } = db;
 
 /** The screen redraws its «ждёт связи» cards when the store changes. */
-export function subscribePending(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-}
-
-function changed() {
-  for (const listener of listeners) listener();
-}
+export const subscribePending: (listener: () => void) => () => void = db.subscribe;
 
 /* ---------------------------------------------------------------- creates */
 
@@ -223,16 +175,12 @@ export async function listEdits(userId: string): Promise<PendingEdit[]> {
  * and the replay must not both upload and transcribe it (the server would dedupe the
  * row, but STT would be paid twice).
  */
-const claimed = new Set<string>();
-
 export function claim(id: string): boolean {
-  if (claimed.has(id)) return false;
-  claimed.add(id);
-  return true;
+  return db.claim(id);
 }
 
 export function release(id: string): void {
-  claimed.delete(id);
+  db.release(id);
 }
 
 /**

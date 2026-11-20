@@ -44,7 +44,7 @@ describe("a handed-over task (D-128)", () => {
   });
 });
 
-import type { DeskReason } from "./desk";
+import type { DeskReason } from "./reasons";
 import {
   closedSections,
   closedTodayCount,

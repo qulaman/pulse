@@ -42,12 +42,12 @@ Push в `main` — выкатка для всех компаний: Vercel то�
 | `DEEPSEEK_API_KEY`, `DEEPGRAM_API_KEY`, `ELEVENLABS_API_KEY` | парсер `deepseek-*`, STT `deepgram`, `elevenlabs` | сервер | нет этих провайдеров |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push | браузер, сервер | пуши не уходят |
 | `CRON_SECRET` | Bearer тика | сервер, `dev:tick` | тик — 401 |
-| `LOGIN_CODE_SECRET` | ключ кодов входа (D-135), в шаблоне нет | сервер | берётся из сервисного ключа |
+| `LOGIN_CODE_SECRET` | ключ кодов входа (D-135), схема его не проверяет | сервер | берётся из сервисного ключа |
 | `OPS_HOST`, `OPS_APP_ORIGIN` | свой хост `/ops` (D-157) | сервер | консоль на любом хосте |
 | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD` | Supabase CLI, `smoke:ops` | скрипты | `supabase login` |
 | `PARSER_MODEL`, `PARSER_ESCALATION_MODEL` | модели `eval:parser` | evals | Haiku и Sonnet |
 
-Приложение берёт STT и модели из `settings.stt` и `settings.parser` компании. Не используются: `STT_PROVIDER`, `STT_FALLBACK_PROVIDER`, `QUERY_MODEL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `INTERNAL_FN_SECRET`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`.
+Приложение берёт STT и модели из `settings.stt` и `settings.parser` компании. `NEXT_PUBLIC_SENTRY_DSN` схема и `lib/env.public.ts` ещё принимают, но не читает никто.
 
 Подписка на пуши привязана к публичному ключу VAPID, поэтому всё, что шлёт пуши из одной базы (и локальный `next dev`), держит одну пару. Новая пара обрывает доставку, пока приложение не подпишется заново при открытии (D-125).
 

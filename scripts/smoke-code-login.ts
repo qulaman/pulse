@@ -7,27 +7,13 @@
  * attempt limits (one wrong code). Requires the migration 20261014150000 on the base and a
  * running app on APP_URL (default http://localhost:3000).
  */
-import { createClient } from "@supabase/supabase-js";
+import { IPHONE_UA } from "./lib/login";
+import { apiSession, APP_URL, finish, record, recordError, sessionCookie } from "./lib/smoke";
 
-process.loadEnvFile(".env.local");
-
-const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const AIGUL = "10000000-0000-0000-0000-000000000008";
 const DIRECTOR = "10000000-0000-0000-0000-000000000001";
-const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1";
 
-type Check = { name: string; ok: boolean; detail: string };
-const checks: Check[] = [];
-const record = (name: string, ok: boolean, detail: string) => checks.push({ name, ok, detail });
-
-async function bearer(email: string): Promise<string> {
-  const supabase = createClient(SUPABASE_URL, ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password: "demo1234" });
-  if (error || !data.session) throw new Error(`sign-in failed for ${email}: ${error?.message}`);
-  return data.session.access_token;
-}
+const bearer = async (email: string) => (await apiSession(email, "demo1234")).token;
 
 async function issue(token: string | null, cookie: string | null, id: string) {
   const res = await fetch(`${APP_URL}/api/people/${id}/login-code`, {
@@ -45,15 +31,10 @@ async function issue(token: string | null, cookie: string | null, id: string) {
 async function redeem(code: string, requestId: string, extra: Record<string, string> = {}) {
   const res = await fetch(`${APP_URL}/api/auth/code`, {
     method: "POST",
-    headers: { "content-type": "application/json", "user-agent": IPHONE, ...extra },
+    headers: { "content-type": "application/json", "user-agent": IPHONE_UA, ...extra },
     body: JSON.stringify({ code, client_request_id: requestId, device: "smoke-code-login" }),
   });
-  // the session cookies of this answer — what a fresh browser would keep
-  const cookie = res.headers
-    .getSetCookie()
-    .map((c) => c.split(";")[0])
-    .filter((c) => !c.endsWith("="))
-    .join("; ");
+  const cookie = sessionCookie(res);
   return { status: res.status, cookie, body: (await res.json()) as { ok?: boolean; brand?: { name?: string }; error?: { code?: string } } };
 }
 
@@ -105,17 +86,8 @@ async function main() {
   record("сотрудник не выдаёт код директору → 403", forDirector.status === 403, `status=${forDirector.status}`);
   const own = await issue(null, good.cookie, AIGUL);
   record("сотрудник выдаёт код себе (другое устройство) → 201", own.status === 201, `status=${own.status}`);
-
-  let failed = 0;
-  for (const c of checks) {
-    if (!c.ok) failed++;
-    console.log(`${c.ok ? "PASS" : "FAIL"}  ${c.name}  (${c.detail})`);
-  }
-  console.log(`\n${checks.length - failed}/${checks.length} passed`);
-  process.exit(failed ? 1 : 0);
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+main()
+  .catch((error: unknown) => recordError("smoke", error))
+  .finally(() => finish());

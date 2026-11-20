@@ -3,11 +3,10 @@
 import { useMemo } from "react";
 
 import { useSettled } from "@/components/desk/ui/SideNav";
-import { shiftDay } from "@/lib/calendar/agenda";
-import { todayYmd } from "@/lib/datetime/calendar";
+import { addDays, todayYmd } from "@/lib/datetime/calendar";
 import { doorHoldOf, doorOf, type BusySpan, type Door, type DoorHold } from "@/lib/desk/busy";
 import { useErrands, useSecretaryActions } from "@/lib/errands/queries";
-import { useNow } from "@/lib/pulse/queries";
+import { useNow } from "@/lib/useNow";
 
 import { useDirectorBusy } from "./useDirectorBusy";
 
@@ -28,7 +27,7 @@ export type DirectorDoor = {
  */
 export function useDirectorDoor(enabled: boolean, now: Date): DirectorDoor {
   const today = todayYmd(now);
-  const busy = useDirectorBusy(today, shiftDay(today, 1), enabled);
+  const busy = useDirectorBusy(today, addDays(today, 1), enabled);
   const errands = useErrands(enabled);
   const catalogue = useSecretaryActions(enabled);
   const hold = useMemo(() => (errands.data ? doorHoldOf(errands.data, catalogue.data ?? [], now) : null), [errands.data, catalogue.data, now]);

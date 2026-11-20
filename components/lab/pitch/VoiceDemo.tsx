@@ -145,7 +145,7 @@ const STEPS: { key: StepKey; ms: number; label: string; title: string; note: str
   },
 ];
 
-const STARTS = STEPS.reduce<number[]>((acc, step, i) => [...acc, i === 0 ? 0 : acc[i - 1] + STEPS[i - 1].ms], []);
+const STARTS = STEPS.reduce<number[]>((acc, _, i) => [...acc, i === 0 ? 0 : acc[i - 1] + STEPS[i - 1].ms], []);
 const REST = 2600;
 const TOTAL = STARTS[STEPS.length - 1] + STEPS[STEPS.length - 1].ms + REST;
 const TICK = 80;

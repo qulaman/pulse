@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 
-import { useOnline } from "@/components/OfflineBanner";
 import { Row } from "@/components/ui/Row";
 import { UpdateIcon } from "@/components/profile/icons";
 import { toast } from "@/components/ui/Toast";
@@ -10,6 +9,7 @@ import { useUpdateRequest } from "@/lib/update/client";
 import { useServerVersion } from "@/lib/update/queries";
 import { useHydrated } from "@/lib/useHydrated";
 import { BUILD, versionStatus } from "@/lib/version";
+import { useOnline } from "@/lib/useOnline";
 
 /**
  * Profile row «Версия» (D-115): whether this phone runs the server's build. «актуальная» in

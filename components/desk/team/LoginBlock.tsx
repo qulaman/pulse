@@ -8,6 +8,7 @@ import { Kbd } from "@/components/desk/ui/Kbd";
 import { copyText } from "@/components/people/copy";
 import { QrCode } from "@/components/people/QrCode";
 import { When } from "@/components/desk/ui/When";
+import { useLoginCode } from "@/components/people/useLoginCode";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
@@ -16,12 +17,9 @@ import { visibleEmail } from "@/lib/people/email";
 import { generatePassword, loginMessage } from "@/lib/people/password";
 import {
   useChangeLoginEmail,
-  useIssueLoginCode,
-  useLoginCodeStatus,
   usePersonLogin,
   useResetPassword,
   useRevokeSessions,
-  type IssuedCode,
   type Person,
 } from "@/lib/people/queries";
 
@@ -76,45 +74,11 @@ const CHECK = (
  * (or at once for a person just created) — never by a menu or a key.
  */
 function CodePanel({ person, autoIssue, onDone, focus }: { person: Person; autoIssue: boolean; onDone: () => void; focus: boolean }) {
-  const issue = useIssueLoginCode();
-  const { mutate } = issue;
-  const [issued, setIssued] = useState<{ code: IssuedCode; at: number } | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState(() => Date.now());
+  const { pending, issued, error, status, leftMs, landed, expired, issueCode } = useLoginCode(person.id, autoIssue);
   const issueBox = useRef<HTMLSpanElement>(null);
   const tv = person.role === "tv";
   const first = person.full_name.trim().split(/\s+/)[0] || person.full_name;
 
-  // counted from the moment the answer came, not from the server's clock read by this one
-  const leftMs = issued ? CODE_TTL_SECONDS * 1000 - (now - issued.at) : 0;
-  const status = useLoginCodeStatus(person.id, true, issued !== null && leftMs > 0);
-  const landed = issued !== null && status.data?.state === "used" && Date.parse(status.data.expires_at ?? "") === Date.parse(issued.code.expires_at);
-  const expired = issued !== null && !landed && leftMs <= 0;
-
-  const doIssue = useRef((id: string) => {
-    setError(null);
-    mutate(
-      { id, requestId: globalThis.crypto.randomUUID() },
-      {
-        onSuccess: (code) => {
-          setIssued({ code, at: Date.now() });
-          setNow(Date.now());
-        },
-        onError: (e) => setError(e.message),
-      },
-    );
-  });
-  const started = useRef(false);
-  useEffect(() => {
-    if (!autoIssue || started.current) return;
-    started.current = true;
-    doIssue.current(person.id);
-  }, [autoIssue, person.id]);
-  useEffect(() => {
-    if (!issued || landed || expired) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [issued, landed, expired]);
   // «Выдать код входа…» from the team's menu: the button in sight and under the caret, not pressed
   useEffect(() => {
     if (focus) issueBox.current?.querySelector("button")?.focus({ preventScroll: true });
@@ -152,7 +116,7 @@ function CodePanel({ person, autoIssue, onDone, focus }: { person: Person; autoI
           <ErrorLine text={error} />
         </div>
         <span ref={issueBox} className="shrink-0">
-          <Button size="sm" variant={focus ? "primary" : "secondary"} loading={issue.isPending} onClick={() => doIssue.current(person.id)} data-testid="code-issue">
+          <Button size="sm" variant={focus ? "primary" : "secondary"} loading={pending} onClick={issueCode} data-testid="code-issue">
             {last?.state === "open" ? "Выдать новый код" : "Выдать код"}
           </Button>
         </span>
@@ -182,7 +146,7 @@ function CodePanel({ person, autoIssue, onDone, focus }: { person: Person; autoI
       <div className="login-expired" data-testid="code-expired">
         <p className="min-w-0 flex-1 text-[14px] leading-5">Код сгорел — его не ввели за 15 минут.</p>
         <ErrorLine text={error} />
-        <Button size="sm" variant="secondary" className="desk-move" loading={issue.isPending} onClick={() => doIssue.current(person.id)} data-testid="code-issue">
+        <Button size="sm" variant="secondary" className="desk-move" loading={pending} onClick={issueCode} data-testid="code-issue">
           Выдать новый код
         </Button>
       </div>

@@ -1,51 +1,11 @@
 "use client";
 
-import { heldKeys, heldLine, type HeldRow } from "@/lib/tasks/held";
-import { receiptText, type ReceiptTone } from "@/lib/tasks/desk";
-import { useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
-import { createBrowserSupabase } from "@/lib/supabase/client";
-import type { Database } from "@/lib/supabase/types";
+import { heldLine } from "@/lib/tasks/held";
+import { receiptText, type ReceiptTone } from "@/lib/tasks/reasons";
+import { useTaskDelivery } from "@/lib/tasks/receipts";
 
-type Delivery = Database["public"]["Tables"]["notification_deliveries"]["Row"];
-
-type TaskDelivery = { receipt: Delivery | null; held: HeldRow[] };
-
-/**
- * The newest «task_sent» delivery of a task and what the task still holds for the morning
- * to its assignee (D-129), live; idle while no task is given. One query, one channel.
- */
-export function useTaskDelivery(taskId: string | null, assigneeId: string | null = null) {
-  return useRealtimeQuery<TaskDelivery, Delivery>({
-    queryKey: [...heldKeys.task(taskId ?? ""), assigneeId ?? ""],
-    queryFn: async () => {
-      const supabase = createBrowserSupabase();
-      const [receipt, held] = await Promise.all([
-        supabase
-          .from("notification_deliveries")
-          .select("*")
-          .eq("task_id", taskId as string)
-          .eq("event_kind", "task_sent")
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-        assigneeId
-          ? supabase
-              .from("notification_deliveries")
-              .select("event_kind, deliver_after, created_at")
-              .eq("task_id", taskId as string)
-              .eq("user_id", assigneeId)
-              .eq("status", "queued")
-              .gt("deliver_after", new Date().toISOString())
-          : Promise.resolve({ data: [] as HeldRow[], error: null }),
-      ]);
-      if (receipt.error) throw new Error(receipt.error.message);
-      if (held.error) throw new Error(held.error.message);
-      return { receipt: receipt.data, held: (held.data ?? []) as HeldRow[] };
-    },
-    channel: { table: "notification_deliveries", filter: `task_id=eq.${taskId ?? ""}` },
-    enabled: Boolean(taskId),
-  });
-}
+/** @deprecated import `useTaskDelivery` from "@/lib/tasks/receipts" — the query lives there. */
+export { useTaskDelivery } from "@/lib/tasks/receipts";
 
 export const RECEIPT_COLOR: Record<ReceiptTone, string> = {
   ok: "var(--ok)",

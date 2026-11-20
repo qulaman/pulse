@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { matchCommands, matchSections, matchTasks, searchPeople, taskLookup } from "./palette";
+import { matchCommands, matchSections, matchTasks, taskLookup } from "./palette";
 
 const sections = [
   { href: "/desk/today", label: "Сегодня" },
@@ -41,23 +41,6 @@ describe("matchSections", () => {
   it("finds nothing in an order", () => {
     expect(matchSections("Ерлану смета до пятницы", sections)).toEqual([]);
     expect(matchSections("  ", sections)).toEqual([]);
-  });
-});
-
-describe("searchPeople", () => {
-  it("is everybody for an empty query", () => {
-    expect(searchPeople(people, "").map((p) => p.id)).toEqual(["e1", "e2", "m1", "d1"]);
-  });
-
-  it("finds by the name, both words, and the position", () => {
-    expect(searchPeople(people, "ер б").map((p) => p.id)).toEqual(["e1"]);
-    expect(searchPeople(people, "бух").map((p) => p.id)).toEqual(["m1"]);
-    expect(searchPeople(people, "оспан").map((p) => p.id)).toEqual(["m1"]);
-  });
-
-  it("puts a first-name match before a surname one", () => {
-    const more = [...people, { id: "x1", full_name: "Айгуль Динова", position: null, aliases: null }];
-    expect(searchPeople(more, "дин").map((p) => p.id)).toEqual(["d1", "x1"]);
   });
 });
 

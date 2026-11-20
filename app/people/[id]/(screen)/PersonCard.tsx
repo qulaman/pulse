@@ -15,13 +15,7 @@ import { HeadButton } from "@/components/ui/HeadButton";
 import { PageHead } from "@/components/ui/PageHead";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
-import {
-  AVAILABILITY_LABEL,
-  ROLE_LABEL,
-  initialsOf,
-  usePerson,
-  usePersonMessages,
-} from "@/lib/people/queries";
+import { AVAILABILITY_LABEL, ROLE_LABEL, usePerson, usePersonMessages } from "@/lib/people/queries";
 import { useAwardPoints, useBalance, usePointsEnabled } from "@/lib/points/queries";
 import { useComposeStore } from "@/lib/store/compose";
 import { useTvControl } from "@/lib/tv/mutations";
@@ -30,6 +24,7 @@ import { effectiveMode } from "@/lib/tv/state";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { useMe, useMyTasks, type TaskWithPeople } from "@/lib/tasks/queries";
 import { STATUS_LABEL, isOverdue, type TaskStatus } from "@/lib/tasks/status-text";
+import { initialsOf } from "@/lib/people/names";
 
 const OPEN: TaskStatus[] = ["scheduled", "sent", "accepted", "in_progress", "rework"];
 const CLOSED: TaskStatus[] = ["done", "declined", "revoked"];
@@ -69,7 +64,7 @@ export function PersonCard() {
   const pointsEnabled = pointsSwitch.data === true;
   const award = useAwardPoints();
   const [awardTarget, setAwardTarget] = useState<AwardTarget | null>(null);
-  // пульт ТВ прямо с карточки: жест «сотрудник зашёл — я нажал — его дела на стене» (D-76 §10)
+  // the TV remote right from the card: «the person came in — I pressed — their work is on the wall» (D-76 §10)
   const wall = useTvState();
   const tv = useTvControl();
 

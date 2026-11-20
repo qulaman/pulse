@@ -3,15 +3,15 @@ import type { SecretaryAction } from "@/lib/settings";
 import { normalize, stem } from "@/lib/text/normalize";
 
 /**
- * Детерминированный матчер заявок (D-79, фаза D): «кофе» — это не задача и не повод
- * будить модель. Короткая фраза без имени из ростера, совпавшая с кнопкой каталога,
- * становится заявкой сразу, минуя парсер и /confirm.
+ * The deterministic errand matcher (D-79, phase D): «кофе» is not a task and no reason to
+ * wake the model. A short phrase with no roster name that matched a catalogue button
+ * becomes an errand at once, past the parser and /confirm.
  *
- * Границы намеренно узкие, потому что ошибка здесь дороже экономии: «Свари кофе Марату
- * к 15:00» — это поручение человеку, и его разбирает модель, как раньше.
+ * The bounds are narrow on purpose, because a mistake here costs more than it saves: «Свари кофе Марату
+ * к 15:00» is an order to a person, and the model reads it.
  */
 
-/** Длиннее — уже не просьба на бегу, а поручение: такое читает модель. */
+/** Longer is no request in passing but an order: the model reads such a phrase. */
 const MAX_WORDS = 3;
 
 export type ErrandMatch = { code: string; label: string; note: string | null };
@@ -20,7 +20,7 @@ function words(value: string): string[] {
   return normalize(value).split(" ").filter(Boolean);
 }
 
-/** Слово совпадает само с собой или своей основой: «врача» ловится «врач». */
+/** A word matches itself or its stem: «врача» is caught by «врач». */
 function sameWord(a: string, b: string): boolean {
   return a === b || stem(a) === stem(b);
 }
@@ -31,8 +31,8 @@ function leadingMatch(said: string[], phrase: string[]): boolean {
 }
 
 /**
- * Что сказали → какая кнопка каталога. Null означает «это не заявка» — фраза уходит
- * в парсер, как уходила всегда.
+ * What was said → which catalogue button. Null means «not an errand» — the phrase goes
+ * to the parser, as it always did.
  */
 export function matchErrand(
   transcript: string,
@@ -45,7 +45,7 @@ export function matchErrand(
   const said = words(transcript);
   if (said.length === 0 || said.length > MAX_WORDS) return null;
 
-  // имя в фразе означает адресата, а значит задачу: «Марат, кофе» — не заявка
+  // a name in the phrase is an addressee, and so a task: «Марат, кофе» is not an errand
   for (const word of said) {
     const match = matchName(
       { assignee_id: null, assignee_queries: [word], assignee_confidence: 1 },
@@ -54,7 +54,7 @@ export function matchErrand(
     if (match.status !== "unmatched") return null;
   }
 
-  // из двух подошедших кнопок выигрывает более длинная фраза: «зайди ко мне» важнее «зайди»
+  // of two buttons that fit, the longer phrase wins: «зайди ко мне» before «зайди»
   let best: { action: SecretaryAction; length: number } | null = null;
   for (const action of actions) {
     for (const phrase of [action.label, ...action.synonyms]) {
@@ -65,7 +65,7 @@ export function matchErrand(
   }
   if (!best) return null;
 
-  // остаток фразы — примечание: «кофе без сахара» → coffee + «без сахара»
+  // the rest of the phrase is a note: «кофе без сахара» → coffee + «без сахара»
   const rest = said.slice(best.length).join(" ").trim();
   return { code: best.action.code, label: best.action.label, note: rest || null };
 }

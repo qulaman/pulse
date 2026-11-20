@@ -1,22 +1,17 @@
 "use client";
 
-import { onlineManager, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
 import { uploadPhotoBlob, type PhotoExt } from "@/lib/files/photo";
+import { insertMessage } from "@/lib/media/message";
 import { listMedia, onMediaHandedOver, refreshMedia, type PendingMedia } from "@/lib/media/pending";
 import { mediaRound, type MediaDeps } from "@/lib/media/replay";
+import { useReplayRounds } from "@/lib/offline/rounds";
 import { kickPush } from "@/lib/push/client";
 import { createBrowserSupabase } from "@/lib/supabase/client";
-import type { Database } from "@/lib/supabase/types";
 import { taskKeys } from "@/lib/tasks/queries";
 import { voiceApi, type AudioExt } from "@/lib/voice/api";
-
-type MessageInsert = Database["public"]["Tables"]["task_messages"]["Insert"];
-
-/** While something waits on the phone, a quiet retry on this beat — `online` events lie on a captive network. */
-const RETRY_MS = 30_000;
 
 const deps: MediaDeps = {
   async upload(item: PendingMedia) {
@@ -27,12 +22,7 @@ const deps: MediaDeps = {
     }
     return uploadPhotoBlob(item.blob, item.ext as PhotoExt, item.crid);
   },
-  async insertMessage(row) {
-    const { error } = await createBrowserSupabase()
-      .from("task_messages")
-      .insert(row as unknown as MessageInsert);
-    return { error: error ? { message: error.message } : null };
-  },
+  insertMessage,
   async handIn(item, filePath) {
     let res: Response;
     try {
@@ -70,50 +60,26 @@ const deps: MediaDeps = {
 export function MediaReplay() {
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    let alive = true;
-    let running = false;
-    const round = async () => {
-      if (running || !onlineManager.isOnline()) return;
-      running = true;
-      try {
-        const { data } = await createBrowserSupabase().auth.getSession();
-        const userId = data.session?.user.id;
-        if (!userId || (await listMedia(userId)).length === 0) return;
-        const { sent, refused } = await mediaRound(userId, deps);
-        refreshMedia();
-        if (!alive) return;
-        if (sent + refused.length > 0) {
-          void queryClient.invalidateQueries({ queryKey: ["task-thread"] });
-          void queryClient.invalidateQueries({ queryKey: taskKeys.root });
-        }
-        if (sent > 0) {
-          kickPush();
-          toast(sent === 1 ? "Отправил то, что ждало связи" : `Отправил ${sent}, что ждало связи`);
-        }
-        if (refused.length > 0) toast(`Не прошло то, что ждало связи: ${refused[0]}`);
-      } finally {
-        running = false;
+  useReplayRounds(
+    async (alive) => {
+      const { data } = await createBrowserSupabase().auth.getSession();
+      const userId = data.session?.user.id;
+      if (!userId || (await listMedia(userId)).length === 0) return;
+      const { sent, refused } = await mediaRound(userId, deps);
+      refreshMedia();
+      if (!alive()) return;
+      if (sent + refused.length > 0) {
+        void queryClient.invalidateQueries({ queryKey: ["task-thread"] });
+        void queryClient.invalidateQueries({ queryKey: taskKeys.root });
       }
-    };
-    void round();
-    const offOnline = onlineManager.subscribe((online) => {
-      if (online) void round();
-    });
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void round();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    const beat = setInterval(() => void round(), RETRY_MS);
-    const offHanded = onMediaHandedOver(() => void round());
-    return () => {
-      alive = false;
-      offOnline();
-      offHanded();
-      document.removeEventListener("visibilitychange", onVisible);
-      clearInterval(beat);
-    };
-  }, [queryClient]);
+      if (sent > 0) {
+        kickPush();
+        toast(sent === 1 ? "Отправил то, что ждало связи" : `Отправил ${sent}, что ждало связи`);
+      }
+      if (refused.length > 0) toast(`Не прошло то, что ждало связи: ${refused[0]}`);
+    },
+    { on: true, exclusive: true, extra: onMediaHandedOver },
+  );
 
   return null;
 }

@@ -1,4 +1,5 @@
 import { humanAqtobe } from "@/lib/ai/time";
+import { nowHm } from "@/lib/datetime/calendar";
 import { pluralRu } from "@/lib/tasks/status-text";
 
 /**
@@ -22,7 +23,8 @@ export type BriefTask = {
 const TITLE_MAX = 36;
 
 export function greeting(now: Date, name: string): string {
-  const hour = (now.getUTCHours() + 5) % 24; // Asia/Aqtobe, UTC+5, no DST
+  // the hour on the Aqtobe wall clock
+  const hour = Number(nowHm(now).slice(0, 2));
   const word = hour < 5 ? "Доброй ночи" : hour < 12 ? "Доброе утро" : hour < 17 ? "Добрый день" : "Добрый вечер";
   return name ? `${word}, ${name}.` : `${word}.`;
 }

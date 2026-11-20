@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
+import { Face } from "@/components/desk/ui/Face";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SegmentTabs } from "@/components/desk/ui/Toolbar";
@@ -21,7 +22,6 @@ import { deskDraftOf } from "./draft";
 import { splitAliases } from "./fields";
 import { handOver } from "./handoff";
 import { PersonEditor, type EditorView } from "./PersonEditor";
-import { TileFace } from "./TeamGrid";
 
 type Tab = "one" | "list";
 
@@ -65,7 +65,7 @@ function CardPreview({ view, managers }: { view: EditorView; managers: Person[] 
       <p className="newp-card-label">{tv ? "Так экран встанет в «Команде»" : "Так человек появится в «Команде»"}</p>
       <div className="team-tile newp-tile" aria-hidden>
         <span className="team-tile-face">
-          <TileFace person={{ id: "new", full_name: name || (tv ? "Экран" : "Новый сотрудник"), avatar_url: avatar }} size={64} state={tv ? undefined : "free"} />
+          <Face person={{ id: "new", full_name: name || (tv ? "Экран" : "Новый сотрудник"), avatar_url: avatar }} size={64} state={tv ? undefined : "free"} />
         </span>
         <span className="team-tile-name" data-empty={name ? undefined : ""}>
           {name || (tv ? "Название экрана" : "Имя Фамилия")}

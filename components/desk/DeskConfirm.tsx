@@ -3,12 +3,11 @@
 import { ArrowRight, AudioLines, CircleHelp, Keyboard, SendHorizontal, TriangleAlert, ScanText } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { entitiesSummary } from "@/components/confirm/format";
 import { useSendBatch } from "@/components/confirm/useSendBatch";
 import { EntityEditor, type EditorContext } from "@/components/desk/confirm/EntityEditor";
-import { hasAssignee, chosenId, mainField } from "@/components/desk/confirm/kinds";
 import type { PickPerson } from "@/components/desk/confirm/PersonField";
 import { PanelHeader } from "@/components/desk/ui/DeskPanel";
 import { Kbd } from "@/components/desk/ui/Kbd";
@@ -23,12 +22,13 @@ import { failureTitle, IN_FLIGHT, linkAnswerLines, micLine, sentNotice, SPEAK_AG
 import { shortName } from "@/lib/people/names";
 import { usePeople } from "@/lib/people/queries";
 import { useRoster } from "@/lib/people/roster";
-import { useDeliveryWindow, usePointsEnabled } from "@/lib/points/queries";
-import { answer } from "@/lib/pulse/answers";
-import { lanesOf, toBriefTask, WORK_STATUSES } from "@/lib/pulse/board";
-import { isSendable, whyNothingToSend, useIngestStore, type IngestErrorCode } from "@/lib/store/ingest";
+import { usePointsEnabled } from "@/lib/points/queries";
+import { answer, answerInput, closedOf } from "@/lib/pulse/answers";
+import { lanesOf } from "@/lib/pulse/board";
+import { chosenId, hasAssignee, isSendable, mainField, whyNothingToSend } from "@/lib/confirm/entities";
+import { useIngestStore, type IngestErrorCode } from "@/lib/store/ingest";
 import { useMe, usePulseBoard, useSentTasks } from "@/lib/tasks/queries";
-import { isWithinDeliveryWindow, WINDOW_OPEN_HOUR } from "@/lib/voice/quietHours";
+import { useQuietHours } from "@/lib/voice/quietHours";
 
 /** What went wrong, in the assistant's words (DESIGN §5) — the typed path's share of the overlay's table. */
 const ERROR_LINE: Partial<Record<IngestErrorCode, string>> = {
@@ -61,19 +61,8 @@ function useDeskAnswer(question: string | null) {
   return useMemo(() => {
     if (!question || !me || !board.data || !people.data || sent.isLoading) return null;
     const rows = board.data;
-    const lanes = lanesOf(rows, now, me.userId);
-    const closed = (sent.data ?? []).filter((t) => t.status === "done" || t.status === "declined" || t.status === "revoked");
-    const reply = answer({
-      question,
-      now,
-      people: people.data.filter((p) => p.is_active && p.role !== "tv").map((p) => ({ id: p.id, fullName: p.full_name, aliases: p.aliases ?? [] })),
-      open: rows.filter((t) => WORK_STATUSES.includes(t.status)).map((t) => ({ ...toBriefTask(t), status: t.status })),
-      closed: closed.map((t) => ({ id: t.id, title: t.title, deadline: t.deadline, assignee: t.assignee?.full_name ? shortName(t.assignee.full_name) : null, assigneeId: t.assignee_id, status: t.status, closedAt: t.closed_at })),
-      overdue: lanes.overdue.map(toBriefTask),
-      declined: lanes.declined.map((t) => ({ ...toBriefTask(t), reason: t.decline_reason })),
-      questions: lanes.question.map(toBriefTask),
-      review: lanes.review.map(toBriefTask),
-    });
+    const closed = closedOf(sent.data ?? []);
+    const reply = answer(answerInput({ question, now, people: people.data, rows, lanes: lanesOf(rows, now, me.userId), sent: sent.data ?? [] }));
     const candidates: AnswerCandidate[] = [...rows, ...closed].map((t) => ({
       id: t.id,
       title: t.title,
@@ -101,15 +90,6 @@ function useMicBlocked(active: boolean): boolean | null {
     };
   }, [active]);
   return active ? blocked : null;
-}
-
-const noStore = () => () => {};
-
-/** Outside the company's delivery window the batch waits for the morning (D-38); read after hydration. */
-function useQuietHours(): { quiet: boolean; opensAt: string } {
-  const hydrated = useSyncExternalStore(noStore, () => true, () => false);
-  const window = useDeliveryWindow().data;
-  return { quiet: hydrated && !isWithinDeliveryWindow(new Date(), window), opensAt: window?.from ?? `0${WINDOW_OPEN_HOUR}:00` };
 }
 
 /**

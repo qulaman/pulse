@@ -2,9 +2,9 @@
 
 import type { CSSProperties } from "react";
 
-import { Icon } from "@/components/tasks/desk/icons";
 import type { CalendarScreen, DayStrip } from "@/lib/calendar/overview";
 import { TONE_VAR } from "@/lib/tasks/tone";
+import { Icon } from "@/components/tasks/icons";
 
 /**
  * The head of /calendar (D-100) in the language of «Задачи» (D-83): the moment in one number

@@ -5,13 +5,13 @@ import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/types";
 
 /**
- * «К вам посетитель» (D-96) и «Сообщение на экран» (D-116): визиты читают директор и
- * секретари своей компании (RLS); киоск таблицу не читает — надпись ему отдаёт `tv_overlay()`.
+ * «К вам посетитель» (D-96) and «Сообщение на экран» (D-116): visits are read by the director and the
+ * secretaries of their company (RLS); the kiosk does not read the table — `tv_overlay()` gives it the words.
  */
 
 export type VisitRow = Database["public"]["Tables"]["visits"]["Row"];
 export type VisitKind = "visitor" | "message";
-/** Посетителю — дверь; сообщению — «прочитал» («Понятно»). */
+/** To a visitor — the door; to a message — «прочитал» («Понятно»). */
 export type VisitAnswer = "invited" | "wait" | "declined" | "read";
 
 export type Visit = VisitRow & { author: { full_name: string } | null };
@@ -23,7 +23,7 @@ export const visitKeys = {
 
 const SELECT = "*, author:profiles!visits_author_id_fkey(full_name)";
 
-/** Визит живёт минуты; неделя — чтобы подсказать секретарю, кто приходил недавно. */
+/** A visit lives minutes; a week — to remind the secretary who came lately. */
 const WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 async function fetchVisits(): Promise<Visit[]> {
@@ -38,7 +38,7 @@ async function fetchVisits(): Promise<Visit[]> {
   return (data ?? []) as Visit[];
 }
 
-/** Живьём: ответ директора зажигает карточку секретаря без перезагрузки, и наоборот. */
+/** Live: the director's answer lights the secretary's card without a reload, and the other way round. */
 export function useVisits(enabled = true) {
   return useRealtimeQuery<Visit[], VisitRow>({
     queryKey: visitKeys.list(),

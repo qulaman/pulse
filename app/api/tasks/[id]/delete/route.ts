@@ -1,7 +1,5 @@
-import { z } from "zod";
-
-import { userSupabase, withAuth } from "@/lib/api/handler";
-import { apiError, apiOk } from "@/lib/api/respond";
+import { TASK_ID, userSupabase, withAuth } from "@/lib/api/handler";
+import { apiOk, NO_ACCESS, rpcFailure } from "@/lib/api/respond";
 
 /**
  * Hard delete of one order — cleanup, not a status. Revoke (D-01) is the way to take
@@ -11,24 +9,19 @@ import { apiError, apiOk } from "@/lib/api/respond";
  * outbox (D-139), so the same delete can arrive twice — after a page closed mid-call, or
  * from two directors at once. What is already gone answers «ok, nothing deleted».
  */
-export const POST = withAuth(["director"], async ({ req, params }) => {
-  const taskId = params.id;
-  if (!z.uuid().safeParse(taskId).success) {
-    return apiError(404, "task_not_found", "Задача не найдена");
-  }
+export const POST = withAuth(
+  ["director"],
+  async ({ req, params }) => {
+    const supabase = await userSupabase(req);
+    const { data, error } = await supabase.rpc("delete_task", { task_id: params.id });
 
-  const supabase = await userSupabase(req);
-  const { data, error } = await supabase.rpc("delete_task", { task_id: taskId });
-
-  if (error) {
-    if (error.message.includes("task_not_found")) {
-      return apiOk({ result: { deleted: 0 } });
+    if (error) {
+      if (error.message.includes("task_not_found")) return apiOk({ result: { deleted: 0 } });
+      return rpcFailure(error, { forbidden: NO_ACCESS }, "delete_task");
     }
-    if (error.message.includes("forbidden")) {
-      return apiError(403, "forbidden", "Нет доступа");
-    }
-    throw new Error(`delete_task failed: ${error.message}`);
-  }
 
-  return apiOk({ result: data ?? {} });
-});
+    return apiOk({ result: data ?? {} });
+  },
+  undefined,
+  { id: TASK_ID },
+);

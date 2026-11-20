@@ -9,8 +9,8 @@
    - Motion is news: a ticket drops in, its tile rings twice, a ring of the pen goes out once; a
      taken one slides into «У вас», a done one's icon flies to «Сегодня». A quiet page is still: the
      only loop is the live dot of a request nobody has taken, and it stops after three minutes.
-   The first block lays everything out for both looks (tokens fall back to the app's own for
-   «Журнал»); the second dresses it for «Графит». Keyframes at the end; still under reduced motion. */
+   The first block lays everything out (tokens fall back to the app's own); the second dresses it in
+   «Графит». Keyframes at the end; still under reduced motion. */
 
 html[data-surface="desk"][data-journal] {
   /* the inks of words on a plate of their own colour: deep enough for the light sheet */
@@ -109,9 +109,7 @@ html[data-surface="desk"][data-journal] {
     gap: 8px;
     height: 32px;
     padding: 0 10px 0 12px;
-    border: 1px solid var(--rule, var(--border));
     border-radius: 9999px;
-    background: var(--surface-2);
     color: var(--ink, var(--text));
     font-size: 13px;
     font-weight: 600;
@@ -197,8 +195,6 @@ html[data-surface="desk"][data-journal] {
   .stoika-card {
     position: relative;
     min-width: 0;
-    padding: 12px 0;
-    border-top: 1px solid var(--line, var(--border));
   }
   .stoika-card-head {
     display: flex;
@@ -239,7 +235,6 @@ html[data-surface="desk"][data-journal] {
     position: relative;
     overflow: hidden;
     min-width: 0;
-    border-top: 1px solid var(--line, var(--border));
   }
   .stoika-door-bone {
     height: 168px;
@@ -445,11 +440,9 @@ html[data-surface="desk"][data-journal] {
     flex-direction: column;
     gap: 16px;
     padding: 16px;
-    border: 1px solid var(--rule, var(--border));
     cursor: default;
 
     &[data-chosen] {
-      outline: 2px solid var(--pen, var(--accent));
       outline-offset: -1px;
     }
   }
@@ -565,7 +558,6 @@ html[data-surface="desk"][data-journal] {
 
     &:hover {
       color: var(--ink, var(--text));
-      background: var(--hover, var(--surface-2));
     }
   }
   .stoika-cap {
@@ -630,7 +622,6 @@ html[data-surface="desk"][data-journal] {
   /* ---- rows: what is in her hands --------------------------------------------------------- */
   .stoika-rows {
     container-type: inline-size;
-    padding: 0;
   }
   .stoika-row {
     position: relative;

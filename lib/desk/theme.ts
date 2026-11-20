@@ -3,16 +3,14 @@
 import { useSyncExternalStore } from "react";
 
 /**
- * The desk's two sheets (D-159): dark by default, light on request — and its two looks (D-171):
- * «Графит», the modern one, by default, the ruled «Журнал» one click away to compare. Both kept per
- * browser: the head script reads the same keys before the first paint (DESK_SHEET_SCRIPT), every
- * access is guarded, and without storage the choice lives until the page goes.
+ * The desk's two sheets (D-159): dark by default, light on request, kept per browser — the head
+ * script reads the same key before the first paint (DESK_SHEET_SCRIPT), every access is guarded,
+ * and without storage the choice lives until the page goes. The look is «Графит» (D-171) alone.
  */
 export type DeskTheme = "dark" | "light";
-export type DeskLook = "graphite" | "journal";
+export type DeskLook = "graphite";
 
 export const DESK_THEME_KEY = "pulse.desk.theme";
-export const DESK_LOOK_KEY = "pulse.desk.look";
 
 /** Anything but an explicit «light» is dark: a new browser and a broken value alike. */
 export function parseDeskTheme(value: string | null | undefined): DeskTheme {
@@ -21,15 +19,6 @@ export function parseDeskTheme(value: string | null | undefined): DeskTheme {
 
 export function otherDeskTheme(theme: DeskTheme): DeskTheme {
   return theme === "dark" ? "light" : "dark";
-}
-
-/** Anything but an explicit «journal» is «Графит»: the new look is the desk's own now. */
-export function parseDeskLook(value: string | null | undefined): DeskLook {
-  return value === "journal" ? "journal" : "graphite";
-}
-
-export function otherDeskLook(look: DeskLook): DeskLook {
-  return look === "graphite" ? "journal" : "graphite";
 }
 
 /** One choice kept in the browser: read through `useSyncExternalStore`, followed across tabs. */
@@ -71,7 +60,6 @@ function storedChoice<T extends string>(key: string, parse: (value: string | nul
 }
 
 const theme = storedChoice<DeskTheme>(DESK_THEME_KEY, parseDeskTheme, "dark");
-const look = storedChoice<DeskLook>(DESK_LOOK_KEY, parseDeskLook, "graphite");
 
 export function writeDeskTheme(value: DeskTheme): void {
   theme.write(value);
@@ -81,10 +69,7 @@ export function useDeskTheme(): DeskTheme {
   return useSyncExternalStore(theme.subscribe, theme.read, () => "dark");
 }
 
-export function writeDeskLook(value: DeskLook): void {
-  look.write(value);
-}
-
+/** @deprecated the desk has one look, «Графит»: DeskShell still reads it to set `data-graphite`. */
 export function useDeskLook(): DeskLook {
-  return useSyncExternalStore(look.subscribe, look.read, () => "graphite");
+  return "graphite";
 }

@@ -5,7 +5,10 @@
  * otherwise Enter with no row picked still sends the order. Pure: the line renders, this one matches.
  */
 
-import { fits, fold } from "./suggest";
+import { allFit, fits, foldRu, searchPeople, searchWords } from "@/lib/people/search";
+
+/** @deprecated use `searchPeople` from lib/people/search */
+export { searchPeople } from "@/lib/people/search";
 
 export type PaletteSection = { href: string; label: string; key?: string };
 export type PalettePerson = { id: string; full_name: string; position?: string | null; aliases?: string[] | null };
@@ -31,45 +34,15 @@ const SECTION_WORDS: Record<string, string> = {
 /** Closed work: below the open in the palette, still found. */
 const CLOSED = new Set(["done", "revoked", "declined"]);
 
-function words(text: string | null | undefined): string[] {
-  return fold(text ?? "")
-    .split(/[^\p{L}\d]+/u)
-    .filter(Boolean);
-}
-
-/** Every typed word fits some word of the item: «смет ерл» finds Ерлан's «Проверить смету». */
-function allFit(typed: string[], haystack: string[]): boolean {
-  return typed.length > 0 && typed.every((t) => haystack.some((w) => fits(t, w)));
-}
-
 /** The sections whose name (or its other words) fits every typed word; the name's own start first. */
 export function matchSections<T extends PaletteSection>(query: string, sections: readonly T[], limit = 3): T[] {
-  const typed = words(query);
-  const head = fold(query.trim());
+  const typed = searchWords(query);
+  const head = foldRu(query.trim());
   if (!head) return [];
   return sections
-    .filter((section) => allFit(typed, [...words(section.label), ...words(SECTION_WORDS[section.href])]))
-    .sort((a, b) => Number(!fold(a.label).startsWith(head)) - Number(!fold(b.label).startsWith(head)))
+    .filter((section) => allFit(typed, [...searchWords(section.label), ...searchWords(SECTION_WORDS[section.href])]))
+    .sort((a, b) => Number(!foldRu(a.label).startsWith(head)) - Number(!foldRu(b.label).startsWith(head)))
     .slice(0, limit);
-}
-
-/**
- * People by any part of the name, an alias or the position — «ер б» finds «Ерлан Бекмуханов»,
- * «бух» the accountant (as the phone's picker, D-108); the first name's match first. An empty
- * query is everybody, in the roster's order.
- */
-export function searchPeople<T extends PalettePerson>(people: readonly T[], query: string, limit = Infinity): T[] {
-  const typed = words(query);
-  if (typed.length === 0) return people.slice(0, limit);
-  const scored: { person: T; score: number }[] = [];
-  for (const person of people) {
-    const names = words(person.full_name);
-    const haystack = [...names, ...(person.aliases ?? []).flatMap((alias) => words(alias)), ...words(person.position)];
-    if (!allFit(typed, haystack)) continue;
-    scored.push({ person, score: names[0] && fits(typed[0], names[0]) ? 0 : names.some((w) => fits(typed[0], w)) ? 1 : 2 });
-  }
-  scored.sort((a, b) => a.score - b.score || a.person.full_name.localeCompare(b.person.full_name, "ru"));
-  return scored.slice(0, limit).map((entry) => entry.person);
 }
 
 /**
@@ -78,11 +51,11 @@ export function searchPeople<T extends PalettePerson>(people: readonly T[], quer
  * `found` — the ids the server's search brought: it has already matched them (`useTaskSearch`).
  */
 export function matchTasks<T extends PaletteTask>(query: string, tasks: readonly T[], limit = 5, found: ReadonlySet<string> = new Set()): T[] {
-  const head = fold(query.trim());
+  const head = foldRu(query.trim());
   if (head.length < 2) return [];
-  const typed = words(query);
-  const hits = tasks.filter((task) => found.has(task.id) || allFit(typed, [...words(task.title), ...words(task.assignee)]));
-  const rank = (task: T) => (CLOSED.has(task.status) ? 2 : 0) + (fold(task.title).startsWith(head) ? 0 : 1);
+  const typed = searchWords(query);
+  const hits = tasks.filter((task) => found.has(task.id) || allFit(typed, [...searchWords(task.title), ...searchWords(task.assignee)]));
+  const rank = (task: T) => (CLOSED.has(task.status) ? 2 : 0) + (foldRu(task.title).startsWith(head) ? 0 : 1);
   hits.sort((a, b) => rank(a) - rank(b) || b.created_at.localeCompare(a.created_at));
   return hits.slice(0, limit);
 }
@@ -93,10 +66,10 @@ export function matchTasks<T extends PaletteTask>(query: string, tasks: readonly
  * «ерлан» alone — stays a title's word: there is nothing else to look for.
  */
 export function taskLookup(query: string, people: readonly PalettePerson[]): { text: string; assignees: string[] } {
-  const typed = words(query);
+  const typed = searchWords(query);
   const assignees = new Set<string>();
   const rest = typed.filter((word) => {
-    const named = people.filter((person) => words(person.full_name).some((name) => fits(word, name)));
+    const named = people.filter((person) => searchWords(person.full_name).some((name) => fits(word, name)));
     for (const person of named) assignees.add(person.id);
     return named.length === 0;
   });
@@ -122,7 +95,7 @@ const REMOVE_VERB = /^(удал|увол|убер|убра|исключ)/;
 const FILLER = /^(сотрудн|человек|работник|из|команд|насовсем|карточк|профил)/;
 
 export function matchCommands<T extends PalettePerson>(query: string, people: readonly T[]): PaletteCommand<T>[] {
-  const typed = words(query);
+  const typed = searchWords(query);
   if (typed.length === 0) return [];
   const short = typed.length <= 5;
   if (NEW_VERB.test(typed[0]) && typed.some((word) => PERSON_WORD.test(word))) {

@@ -1,3 +1,6 @@
+import { useDeliveryWindow } from "@/lib/points/queries";
+import { useHydrated } from "@/lib/useHydrated";
+
 /**
  * Delivery window 08:00–21:00 Asia/Aqtobe (D-38). The authority is the RPC; this copy
  * only decides what /confirm promises the director before the batch leaves.
@@ -32,6 +35,16 @@ export function isWithinDeliveryWindow(now: Date = new Date(), window?: Delivery
   const open = minutesOf(window?.from, WINDOW_OPEN_HOUR);
   const close = minutesOf(window?.to, WINDOW_CLOSE_HOUR);
   return minute >= open && minute < close;
+}
+
+/**
+ * Outside the company's delivery window a batch waits for the morning (D-38): `quiet`, and the hour
+ * the window opens. Read after hydration — the server knows neither the hour nor the window.
+ */
+export function useQuietHours(): { quiet: boolean; opensAt: string } {
+  const hydrated = useHydrated();
+  const window = useDeliveryWindow().data;
+  return { quiet: hydrated && !isWithinDeliveryWindow(new Date(), window), opensAt: window?.from ?? `0${WINDOW_OPEN_HOUR}:00` };
 }
 
 /**

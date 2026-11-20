@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, Plus, Tags, Trash2, X } from "lucide-react";
-import { useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from "react";
+import { useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from "react";
 
 import { OfferPill, Strip, type GuideStep } from "@/components/desk/settings/dictionary/parts";
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
@@ -9,11 +9,8 @@ import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { MenuButton, useContextMenu, type MenuItem } from "@/components/desk/ui/Menu";
 import { Select } from "@/components/desk/ui/Toolbar";
-import { CleanupSheet } from "@/components/dictionary/CleanupSheet";
-import { ImportSheet } from "@/components/dictionary/ImportSheet";
-import { SpellingSheet } from "@/components/dictionary/SpellingSheet";
-import { TypesSheet } from "@/components/dictionary/TypesSheet";
-import { STALE_DAYS, timesLine, wordFacts, type WordFact } from "@/components/dictionary/word-facts";
+import { useWordsEditor } from "@/components/dictionary/useWordsEditor";
+import { STALE_DAYS, timesLine, type WordFact } from "@/components/dictionary/word-facts";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import {
@@ -23,15 +20,13 @@ import {
   byRussian,
   entryKey,
   kindLabel,
-  planWords,
   splitEntries,
   type RosterPerson,
-  type WordKind,
   type WordKindDef,
   type WordMeta,
 } from "@/lib/dictionary";
-import { useDismissWords, useEditVocabulary, useWaitingEdits, useWordStats } from "@/lib/dictionary-queries";
-import { dayMonth, whenLine, type WordSuggestion } from "@/lib/dictionary-usage";
+import { useWaitingEdits } from "@/lib/dictionary-queries";
+import { dayMonth, whenLine } from "@/lib/dictionary-usage";
 import { pluralRu } from "@/lib/tasks/status-text";
 
 export const WORDS_STEPS: GuideStep[] = [
@@ -48,20 +43,6 @@ export const WORDS_STEPS: GuideStep[] = [
 
 /** «Тип» of the toolbar: every type, one, «Без типа», or the words nobody said for a month. */
 export type WordsFilter = "all" | "none" | "stale" | `kind:${string}`;
-
-const KIND_STORE = "pulse:dictionary-kind";
-
-const words = (n: number) => `${n} ${pluralRu(n, ["слово", "слова", "слов"])}`;
-
-/** The add field's kind, remembered per browser — a convenience, never state that matters. */
-function rememberedKind(kinds: readonly WordKindDef[]): WordKind | null {
-  try {
-    const value = window.localStorage.getItem(KIND_STORE);
-    return value && kinds.some((k) => k.id === value) ? value : (kinds[0]?.id ?? null);
-  } catch {
-    return kinds[0]?.id ?? null;
-  }
-}
 
 /** The spelling of a word, fixed in its own cell: Enter saves, Esc puts it back, leaving saves a good one. */
 function RenameCell({ fact, taken, onRename, onDone }: { fact: WordFact; taken: ReadonlySet<string>; onRename: (to: string) => void; onDone: () => void }) {
@@ -126,41 +107,14 @@ export function WordsTab({
   filter: WordsFilter;
   addRef: RefObject<HTMLInputElement | null>;
 }) {
-  const edit = useEditVocabulary();
-  const stats = useWordStats();
-  const dismiss = useDismissWords();
   const waiting = useWaitingEdits();
   const menu = useContextMenu();
 
-  const [text, setText] = useState("");
-  const [kindState, setKindState] = useState<WordKind | null>(() => rememberedKind(kinds));
-  const kind = kindState && kinds.some((k) => k.id === kindState) ? kindState : null;
+  const editor = useWordsEditor({ vocabulary, meta, kinds, people });
+  const { edit, stats, dismiss, text, setText, kind, setKind, setImportText, setSpelling, setCleanup, setTypesOpen, fresh, setFresh, facts, keys, stale, entries, plan, single, add, submit, remove } = editor;
   const [selected, setSelected] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
-  const [importText, setImportText] = useState<string | null>(null);
-  const [spelling, setSpelling] = useState<WordSuggestion | null>(null);
-  const [cleanup, setCleanup] = useState(false);
-  const [typesOpen, setTypesOpen] = useState(false);
-  const [fresh, setFresh] = useState<ReadonlySet<string>>(new Set());
   const grid = useRef<HTMLDivElement>(null);
-
-  const setKind = (value: WordKind | null) => {
-    setKindState(value);
-    try {
-      if (value) window.localStorage.setItem(KIND_STORE, value);
-    } catch {
-      // storage off: the choice lives until the page closes
-    }
-  };
-
-  const facts = useMemo(() => wordFacts(vocabulary, meta, stats.data, kinds), [vocabulary, meta, stats.data, kinds]);
-  const keys = useMemo(() => new Set(vocabulary.map(entryKey)), [vocabulary]);
-  const perKind = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const f of facts) if (f.kind) counts[f.kind] = (counts[f.kind] ?? 0) + 1;
-    return counts;
-  }, [facts]);
-  const stale = facts.filter((f) => f.stale);
 
   const q = entryKey(query);
   const shown = facts
@@ -168,41 +122,6 @@ export function WordsTab({
     .filter((f) => (filter === "all" ? true : filter === "none" ? f.kind === null : filter === "stale" ? f.stale : f.kind === filter.slice(5)))
     .sort((a, b) => (b.usage?.count ?? 0) - (a.usage?.count ?? 0) || byRussian(a.word, b.word));
 
-  const entries = splitEntries(text);
-  const plan = planWords(vocabulary, text, people);
-  const single = entries.length === 1;
-
-  const add = (list: string[], as: WordKind | null) => {
-    if (!list.length) return;
-    edit.mutate({ add: list, kind: as });
-    setFresh((seen) => new Set([...seen, ...list.map(entryKey)]));
-    toast(list.length === 1 ? `Добавил «${list[0]}»` : `Добавил ${words(list.length)}`);
-  };
-  const submit = () => {
-    if (entries.length > 1) {
-      setImportText(text);
-      return;
-    }
-    if (!plan.add.length) return;
-    add(plan.add, kind);
-    setText("");
-  };
-  const remove = (list: WordFact[]) => {
-    if (!list.length) return;
-    edit.mutate({ remove: list.map((f) => f.word) });
-    toast(list.length === 1 ? `Убрал «${list[0].word}»` : `Убрал ${words(list.length)}`, {
-      lifetimeMs: 6000,
-      action: {
-        label: "Вернуть",
-        onClick: () => {
-          // back with their kinds: one call per kind
-          const byKind = new Map<WordKind | null, string[]>();
-          for (const f of list) byKind.set(f.kind, [...(byKind.get(f.kind) ?? []), f.word]);
-          for (const [k, group] of byKind) edit.mutate({ add: group, kind: k });
-        },
-      },
-    });
-  };
   const rename = (fact: WordFact, to: string) => {
     edit.mutate({ rename: { from: fact.word, to } });
     setFresh((seen) => new Set([...seen, entryKey(to)]));
@@ -342,7 +261,7 @@ export function WordsTab({
               }}
               placeholder="Новое слово или список через запятую"
               aria-label="Новое слово или список"
-              className="dict-addbar-field field h-9 min-w-0 flex-1 text-[14px] leading-5 outline-none"
+              className="field h-9 min-w-0 flex-1 text-[14px] leading-5 outline-none"
             />
             <Select aria-label="Тип нового слова" value={kind ?? ""} onChange={(event) => setKind(event.target.value || null)} className="w-[170px]">
               {kinds.map((k) => (
@@ -505,44 +424,7 @@ export function WordsTab({
         {menu.node}
 
 
-      <ImportSheet
-        text={importText}
-        vocabulary={vocabulary}
-        people={people}
-        kinds={kinds}
-        kind={kind}
-        onClose={() => setImportText(null)}
-        onAdd={(list, as) => {
-          add(list, as);
-          if (as !== kind) setKind(as);
-          setImportText(null);
-          setText("");
-        }}
-      />
-      <SpellingSheet
-        suggestion={spelling}
-        kinds={kinds}
-        kind={kind}
-        taken={keys}
-        onClose={() => setSpelling(null)}
-        onAdd={(word, as, suggestion) => {
-          setSpelling(null);
-          add([word], as);
-          // the heard spellings are this word now: none of them is offered again
-          dismiss.mutate(suggestion.keys);
-        }}
-      />
-      <TypesSheet open={typesOpen} onClose={() => setTypesOpen(false)} kinds={kinds} counts={perKind} />
-      <CleanupSheet
-        facts={stale}
-        kinds={kinds}
-        open={cleanup}
-        onClose={() => setCleanup(false)}
-        onRemove={(list) => {
-          setCleanup(false);
-          remove(list);
-        }}
-      />
+      {editor.sheets}
     </div>
   );
 }

@@ -13,53 +13,19 @@
  *   pnpm smoke:team             (against http://localhost:3000, APP_URL to override)
  *   EMPLOYEE=erlan.b@demo.local (default) — a demo employee with the demo password and no open work
  */
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { chromium, type Page } from "playwright";
 
-process.loadEnvFile(".env.local");
+import { IPHONE_UA, signIn } from "./lib/login";
+import { apiSession, APP_URL, finish, issueTask, record, recordError, refuseWhenBusy } from "./lib/smoke";
 
-const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui", "team");
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const EMPLOYEE = process.env.EMPLOYEE ?? "erlan.b@demo.local";
+const DIRECTOR = { email: "test@demo.local", password: "1" };
 
-if (!SUPABASE_URL || !ANON_KEY) {
-  console.error("NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY are missing in .env.local");
-  process.exit(1);
-}
 mkdirSync(SHOTS, { recursive: true });
-
-const checks: { name: string; ok: boolean }[] = [];
-const record = (name: string, ok: boolean, detail = "") => {
-  checks.push({ name, ok });
-  console.log(`${ok ? "ok  " : "FAIL"}  ${name}${detail ? `  ${detail}` : ""}`);
-};
-
-type Session = { supabase: SupabaseClient; userId: string };
-
-async function signIn(email: string, password: string): Promise<Session> {
-  const supabase = createClient(SUPABASE_URL!, ANON_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error || !data.session) throw new Error(`sign-in failed for ${email}: ${error?.message}`);
-  return { supabase, userId: data.session.user.id };
-}
-
-async function guardActivity() {
-  if (!SERVICE_KEY || process.env.FORCE === "1") return;
-  const admin = createClient(SUPABASE_URL!, SERVICE_KEY);
-  const since = new Date(Date.now() - 30 * 60_000).toISOString();
-  const voice = await admin.from("ai_logs").select("id").eq("source", "voice").gt("created_at", since).limit(1);
-  const touched = await admin.from("tasks").select("title").gt("updated_at", since).not("title", "ilike", "%smoke%").limit(3);
-  if ((voice.data?.length ?? 0) > 0 || (touched.data?.length ?? 0) > 0) {
-    console.error(`somebody is active on dev in the last 30 min (${touched.data?.map((t) => t.title).join("; ") || "voice"}); set FORCE=1 to run anyway`);
-    process.exit(2);
-  }
-}
 
 /** Waits until the page says so, polling: the change arrives over Realtime, not on a click. */
 async function until(page: Page, what: () => Promise<boolean>, ms = 15_000): Promise<boolean> {
@@ -72,9 +38,9 @@ async function until(page: Page, what: () => Promise<boolean>, ms = 15_000): Pro
 }
 
 async function main() {
-  await guardActivity();
-  const director = await signIn("test@demo.local", "1");
-  const employee = await signIn(EMPLOYEE, "demo1234");
+  await refuseWhenBusy();
+  const director = await apiSession(DIRECTOR.email, DIRECTOR.password);
+  const employee = await apiSession(EMPLOYEE, "demo1234");
   const title = `Team smoke ${Date.now().toString(36)}`;
   let taskId: string | null = null;
 
@@ -88,15 +54,11 @@ async function main() {
       .limit(1);
     if (open.data?.length) throw new Error(`${EMPLOYEE} has open work — the flight up needs an idler (EMPLOYEE=… another one)`);
 
-    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: "ru-RU" });
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: "ru-RU", userAgent: IPHONE_UA });
     const page = await context.newPage();
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
-    await page.goto(`${APP_URL}/login`, { waitUntil: "networkidle" });
-    await page.getByLabel("Почта").fill("test@demo.local");
-    await page.getByLabel("Пароль").fill("1");
-    await page.getByRole("button", { name: "Войти" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 20_000 });
+    await signIn(page, APP_URL, DIRECTOR);
     await page.goto(`${APP_URL}/pulse`, { waitUntil: "networkidle" });
     await page.locator('[data-testid="people-field"]').waitFor({ timeout: 20_000 });
 
@@ -105,19 +67,7 @@ async function main() {
     await page.screenshot({ path: join(SHOTS, "t1-idle.png") });
 
     // ---- handed out: through the face, out lit ---------------------------------------------
-    const confirmed = await director.supabase.rpc("confirm_voice_batch", {
-      payload: {
-        source: "typed",
-        transcript: title,
-        confirmed_entities: [{ kind: "task", assignee_id: employee.userId, group_id: null, title, body: null, deadline_iso: null, priority: "normal", scheduled_send_at: null }],
-        was_edited: false,
-        edit_fields: [],
-        force_now: true,
-      },
-      client_request_id: randomUUID(),
-    });
-    taskId = ((confirmed.data as { task_ids?: string[] } | null)?.task_ids ?? [])[0] ?? null;
-    if (!taskId) throw new Error(`confirm_voice_batch: ${confirmed.error?.message ?? "no task"}`);
+    taskId = await issueTask(director, employee.userId, title);
     const flew = await until(page, async () => (await page.locator('[data-testid="crew-flight"][data-dir="up"]').count()) > 0);
     await page.screenshot({ path: join(SHOTS, "t2-flight.png") });
     record("задача выдана — кружок летит через лицо", flew);
@@ -174,7 +124,7 @@ async function main() {
     record("без ошибок страницы", errors.length === 0, errors.join(" | "));
     await context.close();
   } catch (error) {
-    record("smoke:team", false, error instanceof Error ? error.message : String(error));
+    recordError("smoke:team", error);
   } finally {
     await browser.close();
     if (taskId) {
@@ -182,10 +132,7 @@ async function main() {
       if (removed.error && !/not_found/.test(removed.error.message)) console.error(`cleanup ${taskId}: ${removed.error.message}`);
     }
   }
-
-  const failed = checks.filter((c) => !c.ok);
-  console.log(`\n${checks.length - failed.length}/${checks.length} ok · screenshots in ${SHOTS}`);
-  process.exit(failed.length === 0 ? 0 : 1);
+  finish(`screenshots in ${SHOTS}`);
 }
 
 void main();

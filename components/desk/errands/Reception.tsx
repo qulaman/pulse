@@ -35,7 +35,7 @@ export function ReceptionCard({ visits, now, loading = false }: { visits: readon
   const close = useCloseVisit();
   const live = loading ? [] : reception(visits);
   return (
-    <section className="stoika-card stoika-reception" data-testid="stoika-reception" aria-label="Приёмная">
+    <section className="stoika-card" data-testid="stoika-reception" aria-label="Приёмная">
       <header className="stoika-card-head">
         <DoorOpen size={15} strokeWidth={2.25} aria-hidden className="text-muted" />
         <h2>Приёмная</h2>

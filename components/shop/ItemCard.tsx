@@ -6,16 +6,16 @@ import type { ShopItem } from "@/lib/shop/queries";
 
 type Props = {
   item: ShopItem;
-  /** Баланс того, кто смотрит; у директора и завхоза очков нет — им приходит undefined. */
+  /** The viewer's balance; the director and the storekeeper have no points — they get undefined. */
   balance?: number;
   busy?: boolean;
   onOrder?: (item: ShopItem) => void;
 };
 
 /**
- * Карточка ништяка: за что и сколько. Когда очков хватает — одна кнопка «Обменять»;
- * когда нет — полоска накопления и сколько осталось, чтобы цель читалась, а не запрет
- * (кнопки-обманки, которая ругается после тапа, здесь нет — она и не нажимается).
+ * A reward's card: what for and how much. With points enough — one button, «Обменять»; without —
+ * the savings bar and how much is left, so the goal reads instead of a refusal (there is no decoy
+ * button that scolds after the tap — it cannot be tapped at all).
  */
 export function ItemCard({ item, balance, busy, onOrder }: Props) {
   const canOrder = balance !== undefined && onOrder !== undefined;

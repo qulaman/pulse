@@ -5,11 +5,11 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 
 import { WallFrame } from "@/components/desk/screen/WallFrame";
 import { Kbd } from "@/components/desk/ui/Kbd";
+import { keysTaken } from "@/components/desk/ui/layers";
 import { Avatar } from "@/components/desk/ui/PersonCell";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SegmentTabs } from "@/components/desk/ui/Toolbar";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
-import { deskLayerUp } from "@/components/desk/voice/control";
 import { usePresenter, VIEW_LABEL } from "@/components/mindboard/BoardPresenter";
 import { Button } from "@/components/ui/Button";
 import { isTypingTarget } from "@/lib/desk/keys";
@@ -116,7 +116,7 @@ export function MeetingStage({
   const keys = useRef<(event: KeyboardEvent) => boolean>(() => false);
   useEffect(() => {
     keys.current = (event) => {
-      if (!presenter.onWall || isTypingTarget(event.target) || deskLayerUp() || event.altKey || event.shiftKey) return false;
+      if (!presenter.onWall || isTypingTarget(event.target) || keysTaken() || event.altKey || event.shiftKey) return false;
       const back = event.code === "ArrowLeft" || event.code === "PageUp";
       const forward = event.code === "ArrowRight" || event.code === "PageDown";
       if ((back || forward) && !event.ctrlKey && !event.metaKey) {

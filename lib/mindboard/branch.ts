@@ -162,7 +162,7 @@ export function parentsFirst<T extends { id: string; parentId?: string | null }>
   return out;
 }
 
-/** How a line of the board is doing on its way to words (принцип 5: the voice comes first). */
+/** How a line of the board is doing on its way to words (principle 5: the voice comes first). */
 export type LineState = "words" | "saving" | "phone" | "point" | "hearing" | "deaf";
 
 /**

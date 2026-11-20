@@ -4,19 +4,11 @@ import { useEffect } from "react";
 import { onlineManager, useQueryClient } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
+import { insertMessage } from "@/lib/media/message";
 import { outboxSize, replayOutbox, takeStale } from "@/lib/outbox";
 import { kickPush } from "@/lib/push/client";
-import { createBrowserSupabase } from "@/lib/supabase/client";
 import { taskKeys } from "@/lib/tasks/queries";
 import { pluralRu } from "@/lib/tasks/status-text";
-import type { Database } from "@/lib/supabase/types";
-
-type MessageInsert = Database["public"]["Tables"]["task_messages"]["Insert"];
-
-const writeMessage = async (row: unknown) => {
-  const { error } = await createBrowserSupabase().from("task_messages").insert(row as MessageInsert);
-  return { error: error ? { message: error.message } : null };
-};
 
 /**
  * On app start: whatever a previous session could not send (lib/outbox.ts) goes out now,
@@ -38,7 +30,7 @@ export function OutboxReplay() {
       if (size === 0) return;
       // a paused mutation in this session resumes by itself and clears its own entry
       if (queryClient.getMutationCache().getAll().some((m) => m.state.isPaused)) return;
-      const { sent, refused } = await replayOutbox(writeMessage);
+      const { sent, refused } = await replayOutbox(insertMessage);
       if (cancelled || sent + refused.length === 0) return;
       if (sent > 0) kickPush();
       void queryClient.invalidateQueries({ queryKey: taskKeys.root });

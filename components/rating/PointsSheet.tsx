@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { humanAqtobe } from "@/lib/ai/time";
-import { initialsOf } from "@/lib/people/queries";
+
 import { useDisputePoints, useMyDisputes, type MyDispute } from "@/lib/points/game";
 import { useBalance, usePointHistory, type PointRow, type RatingRow } from "@/lib/points/queries";
+import { initialsOf } from "@/lib/people/names";
 
 const SOURCE_LABEL: Record<string, string> = {
   manual: "от директора",

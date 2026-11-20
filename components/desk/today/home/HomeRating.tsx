@@ -10,8 +10,8 @@ import { topOf } from "@/lib/desk/home";
 import { loadStateOf } from "@/lib/desk/tasks";
 import { shortName } from "@/lib/people/names";
 import { useRating } from "@/lib/points/queries";
-import { useNow } from "@/lib/pulse/queries";
 import { useTvControl } from "@/lib/tv/mutations";
+import { useNow } from "@/lib/useNow";
 
 import { AllClear, Face, Mark, Meter, rise, Titled } from "./look";
 import { Aside, BlockLink, BlockNote, HeadMove, RowsBone } from "./parts";
@@ -40,7 +40,7 @@ export function HomeRating() {
 function WeekTop() {
   const rating = useRating("week");
   const control = useTvControl();
-  const now = useNow(60_000);
+  const now = useNow();
   const load = loadStateOf(rating);
   const rows = useMemo(() => topOf(rating.data ?? []), [rating.data]);
   const leader = Math.max(1, ...rows.map((row) => row.points));

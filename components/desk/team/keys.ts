@@ -2,14 +2,12 @@
 
 import { useEffect, useLayoutEffect, useRef } from "react";
 
+import { keysTaken } from "@/components/desk/ui/layers";
 import { isTypingTarget } from "@/lib/desk/keys";
 
 /** Something else holds the keys now: a dialog, a phone sheet drawn as a dialog, an open menu or popover. */
-export function keysTaken(): boolean {
-  if (typeof document === "undefined") return true;
-  const body = document.body;
-  return body.hasAttribute("data-dialog-open") || body.hasAttribute("data-sheet-open") || document.querySelector(".desk-pop") !== null;
-}
+/** @deprecated moved — import `keysTaken` from "@/components/desk/ui/layers". */
+export { keysTaken };
 
 /** The key went to a control of its own: its Enter and Space are the control's, not the screen's. */
 export function onControl(target: EventTarget | null): boolean {

@@ -1,27 +1,25 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { NAMES_STEPS, NamesTab } from "@/components/desk/settings/dictionary/NamesTab";
 import type { NamesFilter } from "@/components/desk/settings/dictionary/NamesTable";
 import { GuideButton } from "@/components/desk/settings/dictionary/parts";
 import { WORDS_STEPS, WordsTab, type WordsFilter } from "@/components/desk/settings/dictionary/WordsTab";
 import { usePageSearch } from "@/components/desk/settings/SettingsFrame";
+import { useScreenKeys } from "@/components/desk/team/keys";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { PageTitle } from "@/components/desk/ui/PageTitle";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SearchField, SegmentTabs, Select, Toolbar } from "@/components/desk/ui/Toolbar";
+import { useDictionaryLive, useHeard } from "@/components/dictionary/useDictionaryLive";
 import { Button } from "@/components/ui/Button";
 import { Bone } from "@/components/ui/Skeleton";
-import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
-import { nameReport, NO_KIND_LABEL, type RosterPerson } from "@/lib/dictionary";
-import { misheardQueryKey, useCompanySettings, useWaitingEdits, wordStatsKey } from "@/lib/dictionary-queries";
+import { nameReport, NO_KIND_LABEL } from "@/lib/dictionary";
+import { useCompanySettings, useWaitingEdits } from "@/lib/dictionary-queries";
 import type { DictionaryTab } from "@/lib/dictionary-tabs";
 import { canEditPerson } from "@/lib/people/access";
-import { peopleKeys, usePeople } from "@/lib/people/queries";
-import { useRealtimeListener } from "@/lib/realtime/useRealtimeQuery";
-import { settingsKey } from "@/lib/settings-query";
+import { usePeople } from "@/lib/people/queries";
 import { pluralRu } from "@/lib/tasks/status-text";
 import { useMe } from "@/lib/tasks/queries";
 
@@ -30,7 +28,7 @@ function Loading() {
   return (
     <div className="flex flex-col gap-4" aria-hidden>
       <Bone h={92} />
-      <div className="dict-bone desk-grid desk-list">
+      <div className="desk-grid desk-list">
         {Array.from({ length: 7 }, (_, index) => (
           <div key={index} className="flex items-center gap-3 px-3 py-3">
             <Bone round w={30} h={30} />
@@ -59,36 +57,14 @@ export function DictionaryDesk({ initialTab }: { initialTab: DictionaryTab }) {
   const people = usePeople();
   const settings = useCompanySettings();
   const me = useMe();
-  const queryClient = useQueryClient();
   const waiting = useWaitingEdits();
   const search = useRef<HTMLInputElement>(null);
   const addWord = useRef<HTMLInputElement>(null);
   usePageSearch(search);
 
-  // a name the other editor adds shows up here; an own edit in flight is not refetched under itself
-  useRealtimeListener(
-    { table: "profiles", filter: me.data ? `company_id=eq.${me.data.companyId}` : undefined },
-    () => {
-      if (queryClient.isMutating({ mutationKey: ["dictionary", "aliases"] }) === 0) void queryClient.invalidateQueries({ queryKey: peopleKeys.all });
-    },
-    () => void queryClient.invalidateQueries({ queryKey: peopleKeys.all }),
-    "desk-dictionary-people",
-    Boolean(me.data),
-  );
-  // words live in company.settings, which Realtime does not carry: read again when the window comes back
-  useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState !== "visible") return;
-      void queryClient.invalidateQueries({ queryKey: settingsKey });
-      void queryClient.invalidateQueries({ queryKey: misheardQueryKey });
-      void queryClient.invalidateQueries({ queryKey: wordStatsKey });
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [queryClient]);
+  useDictionaryLive(me.data?.companyId, "desk-dictionary-people");
 
-  const heard = useMemo(() => (people.data ?? []).filter((p) => p.is_active && p.role !== "tv"), [people.data]);
-  const roster: RosterPerson[] = useMemo(() => heard.map((p) => ({ id: p.id, full_name: p.full_name, aliases: p.aliases })), [heard]);
+  const { heard, roster } = useHeard(people.data);
   const who = me.data ? { id: me.data.userId, role: me.data.role } : null;
   const counts = useMemo(() => {
     const reports = new Map(roster.map((p) => [p.id, nameReport(p, roster)]));
@@ -112,25 +88,18 @@ export function DictionaryDesk({ initialTab }: { initialTab: DictionaryTab }) {
   };
 
   // 1/2 — the tabs; N — the new word's field (on «Слова»)
-  const latest = useRef({ select, tab });
-  useEffect(() => {
-    latest.current = { select, tab };
+  useScreenKeys((event) => {
+    if (event.shiftKey) return false;
+    if (event.code === "Digit1" || event.code === "Digit2") {
+      select(event.code === "Digit1" ? "names" : "words");
+      return true;
+    }
+    if (event.code === "KeyN" && tab === "words") {
+      addWord.current?.focus();
+      return true;
+    }
+    return false;
   });
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || !isPlainKey(event) || event.shiftKey || isTypingTarget(event.target)) return;
-      if (document.body.hasAttribute("data-dialog-open") || document.body.hasAttribute("data-sheet-open")) return;
-      if (event.code === "Digit1" || event.code === "Digit2") {
-        event.preventDefault();
-        latest.current.select(event.code === "Digit1" ? "names" : "words");
-      } else if (event.code === "KeyN" && latest.current.tab === "words") {
-        event.preventDefault();
-        addWord.current?.focus();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
 
   useShortcuts(
     "Словарь",

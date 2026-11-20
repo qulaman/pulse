@@ -5,11 +5,12 @@ import { withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
 import { loadCorpus } from "@/lib/ai/evals/corpus";
 import { runCase, type CaseRun } from "@/lib/ai/evals/run";
+import { parseOptionsOf } from "@/lib/ai/parse";
 import { failedCase } from "@/lib/ai/evals/score";
 import { evalSecret, runFingerprint, signPiece } from "@/lib/ai/evals/stamp";
 import { normalizeRules, PARSER_RULES_MAX } from "@/lib/ai/rules";
 import { EVAL_PIECE_MAX, type EvalPieceResponse } from "@/lib/lab/parser";
-import { callsCost, runModel, RunModelSchema } from "@/lib/lab/parser-run";
+import { callsCost, RunModelSchema } from "@/lib/lab/parser-run";
 import { loadCompanySettings } from "@/lib/roster";
 import { parseCompanySettings } from "@/lib/settings";
 
@@ -40,7 +41,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     const cases = body.ids.map((id) => corpus.cases.find((c) => c.id === id));
     if (cases.some((c) => c === undefined)) return apiError(400, "unknown_case", "В корпусе нет такого кейса");
 
-    const model = runModel(settings, body.run);
+    const options = parseOptionsOf(settings, body.run);
     const rules = normalizeRules(body.rules).slice(0, PARSER_RULES_MAX);
     // one try less than the voice route: a piece has to land inside the function's minute
     const client = new Anthropic({ timeout: 20_000, maxRetries: 1 });
@@ -51,15 +52,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     const runs = await Promise.all(
       cases.map(async (c): Promise<CaseRun> => {
         const run = await Promise.race([
-          runCase(c!, corpus, {
-            model: model.model,
-            escalate: model.escalate,
-            escalationModel: model.escalation_model,
-            rules,
-            kinds: settings.parser.kinds,
-            matching: settings.matching,
-            client,
-          }),
+          runCase(c!, corpus, { ...options, rules, matching: settings.matching, client }),
           late,
         ]);
         return run === "late" ? { result: failedCase(c!, "timeout: разбор не уложился в минуту функции"), usage: null, calls: [] } : run;
@@ -74,15 +67,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     }
 
     const piece: EvalPieceResponse = signPiece(evalSecret(), profile.companyId, {
-      fingerprint: runFingerprint({
-        rules,
-        model: model.model,
-        escalate: model.escalate,
-        escalationModel: model.escalation_model,
-        matching: settings.matching,
-        kinds: settings.parser.kinds,
-        corpusHash: corpus.hash,
-      }),
+      fingerprint: runFingerprint({ rules, ...options, matching: settings.matching, corpusHash: corpus.hash }),
       ran_at: new Date().toISOString(),
       results: runs.map((run) => run.result),
       cost_usd: cost,

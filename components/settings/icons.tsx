@@ -92,14 +92,6 @@ export const BuildingIcon = () => (
   </svg>
 );
 
-export const TrashIcon = () => (
-  <svg {...stroke}>
-    <path d="M4.5 6h11M8 6V4.6A1.1 1.1 0 0 1 9.1 3.5h1.8A1.1 1.1 0 0 1 12 4.6V6" />
-    <path d="M6 6l.7 9.4A1.6 1.6 0 0 0 8.3 17h3.4a1.6 1.6 0 0 0 1.6-1.6L14 6" />
-    <path d="M8.6 9v5M11.4 9v5" />
-  </svg>
-);
-
 /** «Программа»: the app's modules, four squares. */
 export const AppsIcon = () => (
   <svg {...stroke}>

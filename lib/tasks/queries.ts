@@ -1,84 +1,45 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { keepPreviousData, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { create } from "zustand";
 
-import { appendPage, ARCHIVE_STATUSES, foldFirstPage, rangeBounds, searchWords, wordPattern, type ArchiveStatus, type DayRange } from "@/lib/desk/archive";
-import {
-  applyMessage,
-  applyRead,
-  applyTaskChange,
-  BOARD_STATUSES,
-  HELD_STATUS,
-  CHAT_TYPES,
-  isOnBoard,
-  lanesOf,
-  toBoardTask,
-  withoutTask,
-  type BoardMessage,
-  type BoardNote,
-  type BoardTask,
-} from "@/lib/pulse/board";
-import {
-  lastSeqOf,
-  mergeBySeq,
-  useRealtimeInvalidate,
-  useRealtimeListener,
-  useRealtimeQuery,
-} from "@/lib/realtime/useRealtimeQuery";
+import { useRealtimeInvalidate, useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
 import { warmRecurrenceRules } from "@/lib/recurrence/queries";
 import { createBrowserSupabase } from "@/lib/supabase/client";
-import type { Database } from "@/lib/supabase/types";
-import { useDebounced } from "@/lib/useDebounced";
 import { myMoveFilter } from "./my-move";
-import { isOverdue, type TaskStatus } from "./status-text";
-import { applyMessageUpdate } from "./thread";
+import { CLOSED_PAGE, CLOSED_STATUSES, TASK_SELECT, taskKeys, useTaskDeletes, type Me, type TaskRow, type TaskWithPeople } from "./query-core";
+import { isOverdue } from "./status-text";
 
-export type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
-export type TaskMessageRow = Database["public"]["Tables"]["task_messages"]["Row"];
-export type Role = Database["public"]["Enums"]["user_role"];
-
-type Person = { full_name: string } | null;
-
-/** `passed` — who took over a reassigned task (D-128); absent on rows fetched without the join. */
-export type TaskWithPeople = TaskRow & { assignee: Person; author: Person; passed?: Person };
-export type TaskMessage = TaskMessageRow & { sender: Person };
-
-export type Me = {
-  userId: string;
-  companyId: string;
-  role: Role;
-  isActive: boolean;
-  fullName: string;
-};
-
-const TASK_SELECT =
-  "*, assignee:profiles!tasks_assignee_id_fkey(full_name), author:profiles!tasks_author_id_fkey(full_name), passed:profiles!tasks_passed_to_fkey(full_name)";
-const MESSAGE_SELECT = "*, sender:profiles!task_messages_sender_id_fkey(full_name)";
-
-/** Statuses an employee still has to act on — «Мои дела». */
-export const ACTIVE_STATUSES: readonly TaskStatus[] = [
-  "sent",
-  "accepted",
-  "rework",
-  "pending_review",
-];
-
-
-export const taskKeys = {
-  root: ["tasks"] as const,
-  mine: (userId: string) => ["tasks", "mine", userId] as const,
-  sent: (userId: string) => ["tasks", "sent", userId] as const,
-  board: () => ["tasks", "board"] as const,
-  detail: (taskId: string) => ["tasks", "detail", taskId] as const,
-  thread: (taskId: string) => ["task-thread", taskId] as const,
-  me: () => ["me"] as const,
-  fresh: (userId: string) => ["tasks", "fresh", userId] as const,
-  // plain lists under the root: every optimistic patch and every delete reaches them as it does the others
-  archive: (scope: string) => ["tasks", "archive", scope] as const,
-  search: (scope: string) => ["tasks", "search", scope] as const,
-};
+/*
+ * The task queries of the app, by area: this file holds the person's own lists (useMe, «Мои дела»,
+ * «Задачи» of the director); the archive and search, one task with its thread, and the live board
+ * live beside it and are re-exported here, so a screen imports every task query from one place.
+ */
+export { CLOSED_PAGE, taskKeys } from "./query-core";
+export type { Me, Role, TaskMessage, TaskMessageRow, TaskRow, TaskWithPeople } from "./query-core";
+export { SEARCH_HITS, useTaskArchive, useTaskSearch, type ArchiveFilter, type TaskSearch } from "./archive-queries";
+export {
+  fetchEarlierMessages,
+  isPendingMessage,
+  prependMessages,
+  THREAD_PAGE,
+  useOwnReadSeq,
+  useTask,
+  useTaskMessages,
+  useTaskThread,
+} from "./thread-queries";
+export {
+  EMPTY_INBOX,
+  inboxCounts,
+  inboxOf,
+  markBoardRead,
+  pruneClosed,
+  useDirectorInbox,
+  usePulseBoard,
+  type DeclinedTask,
+  type DirectorInbox,
+  type QuestionTask,
+} from "./board-queries";
 
 /* -------------------------------------------------------------------------- */
 /* Who am I                                                                    */
@@ -134,37 +95,7 @@ async function fetchMyTasks(userId: string): Promise<TaskWithPeople[]> {
     .eq("assignee_id", userId)
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
-  return sortByUrgency((data ?? []) as unknown as TaskWithPeople[]);
-}
-
-/**
- * A deleted task leaves every cached list at once, the way «Удалить» on the author's own phone
- * does it. Realtime delivers no DELETE to a filtered channel, and the employee's lists listen on
- * `assignee_id=eq.<me>` — so an order deleted on the director's phone used to stay in Лента and
- * «Мои дела» until the next snapshot (a return to the tab), and the face never played its
- * «рассыпалась» (tasks/020). This channel has no filter and takes DELETE only: the event carries
- * the id and nothing else, RLS has no row to check, and an id that is in no list changes nothing.
- * Every hook that mounts it shares one socket join (the registry keys the topic).
- */
-function useTaskDeletes(enabled: boolean) {
-  const queryClient = useQueryClient();
-  useRealtimeListener<TaskRow>(
-    { table: "tasks", event: "DELETE" },
-    (payload) => {
-      const id = (payload.old as Partial<TaskRow> | undefined)?.id;
-      if (!id) return;
-      queryClient.setQueriesData({ queryKey: taskKeys.root }, (old: unknown) =>
-        Array.isArray(old) && old.some((row) => (row as { id?: string } | null)?.id === id)
-          ? old.filter((row) => (row as { id?: string } | null)?.id !== id)
-          : old,
-      );
-    },
-    // nothing to catch up on: a delete missed while the socket was down is dropped by the
-    // snapshot every list takes on resubscribe
-    () => {},
-    "task-deletes",
-    enabled,
-  );
+  return sortByUrgency(data ?? []);
 }
 
 /**
@@ -210,11 +141,8 @@ export function useFreshTaskCount(userId: string | undefined) {
   });
 }
 
-/** Closed tasks come a page at a time (D-130); the open ones always all of them. */
-export const CLOSED_PAGE = 100;
 /** A guard, not a page: no director holds this many open orders — the list stays whole. */
 const OPEN_CAP = 2000;
-const CLOSED_STATUSES = ["done", "declined", "revoked"] as const;
 
 /**
  * How many closed tasks «Задачи» holds for a director right now and how many there are. Kept
@@ -256,7 +184,7 @@ async function fetchSentTasks(userId: string): Promise<TaskWithPeople[]> {
   if (open.error) throw new Error(open.error.message);
   if (closed.error) throw new Error(closed.error.message);
   useSentPages.setState((state) => ({ total: { ...state.total, [userId]: closed.count ?? 0 } }));
-  const rows = [...(open.data ?? []), ...(closed.data ?? [])] as unknown as TaskWithPeople[];
+  const rows: TaskWithPeople[] = [...(open.data ?? []), ...(closed.data ?? [])];
   return rows.sort(newestFirst);
 }
 
@@ -305,483 +233,4 @@ export function useClosedPages(userId: string | undefined) {
     return queryClient.refetchQueries({ queryKey: taskKeys.sent(userId), exact: true });
   };
   return { total, limit, more };
-}
-
-export function activeOnly(tasks: TaskWithPeople[] | undefined): TaskWithPeople[] {
-  return (tasks ?? []).filter((task) => ACTIVE_STATUSES.includes(task.status));
-}
-
-/* -------------------------------------------------------------------------- */
-/* The desk's archive and search: all of history, read from the server         */
-/* -------------------------------------------------------------------------- */
-
-/** A search asks once per pause, not per letter. */
-const SEARCH_PAUSE_MS = 250;
-/** How many rows one answer of a search brings: the people's lists are short, the rest is one more word away. */
-export const SEARCH_HITS = 30;
-
-const NO_TASKS: TaskWithPeople[] = [];
-const NO_PEOPLE: readonly string[] = [];
-
-/** How many rows each archive and each search has on the server, by its key — kept beside the list, which stays a plain array. */
-const useTotals = create<Record<string, number>>(() => ({}));
-
-export type ArchiveFilter = { range: DayRange | null; who: string | null; status: ArchiveStatus | null; text: string };
-
-type ArchiveScope = ArchiveFilter & { author: string | null };
-
-const closedOrder = (task: TaskWithPeople) => task.closed_at ?? task.updated_at;
-
-async function fetchArchivePage(scope: ArchiveScope, offset: number, signal?: AbortSignal): Promise<{ rows: TaskWithPeople[]; total: number }> {
-  const supabase = createBrowserSupabase();
-  const { gte, lt } = rangeBounds(scope.range);
-  let request = supabase
-    .from("tasks")
-    .select(TASK_SELECT, { count: "exact" })
-    .in("status", scope.status ? [scope.status] : [...ARCHIVE_STATUSES]);
-  if (scope.author) request = request.eq("author_id", scope.author);
-  if (scope.who) request = request.eq("assignee_id", scope.who);
-  if (gte) request = request.gte("closed_at", gte);
-  if (lt) request = request.lt("closed_at", lt);
-  for (const word of searchWords(scope.text)) request = request.ilike("title", wordPattern(word));
-  let ordered = request
-    .order("closed_at", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false })
-    .order("id")
-    .range(offset, offset + CLOSED_PAGE - 1);
-  if (signal) ordered = ordered.abortSignal(signal);
-  const { data, count, error } = await ordered;
-  if (error) throw new Error(error.message);
-  return { rows: (data ?? []) as unknown as TaskWithPeople[], total: count ?? 0 };
-}
-
-/**
- * «Закрытые» as an archive (D-130, the desk's second wave): done and recalled tasks of a range of
- * days, by the server, a page at a time. The list is the director's own, as «Задачи» is; a search
- * goes over everything `tasks_select` lets the person see — the company's boundary is RLS's,
- * `company_id = auth_company_id()` stands in the policy as a condition of its own. The rows stay a
- * plain array under the tasks' root, so an optimistic patch and a delete find them. «Показать ещё»
- * asks for the next page alone, an event for the first page alone (`foldFirstPage`): the phone's
- * limit-and-refetch would cost more with every page, and stop dead at PostgREST's max_rows.
- */
-export function useTaskArchive(userId: string, filter: ArchiveFilter, enabled = true) {
-  const queryClient = useQueryClient();
-  const text = useDebounced(filter.text, SEARCH_PAUSE_MS);
-  const typed = searchWords(text).join(" ");
-  const scope: ArchiveScope = { ...filter, text: typed, author: typed ? null : userId };
-  const name = JSON.stringify([scope.author, scope.range, scope.who, scope.status, scope.text]);
-  const queryKey = taskKeys.archive(name);
-  const [loadingMore, setLoadingMore] = useState(false);
-
-  const query = useQuery({
-    queryKey,
-    enabled,
-    // a whole archive has no place in the phone's copy of the app (D-127)
-    meta: { keep: false },
-    // the old rows stand while the next filter's are on their way; a stale request is aborted
-    placeholderData: keepPreviousData,
-    refetchOnReconnect: false,
-    queryFn: async ({ signal }): Promise<TaskWithPeople[]> => {
-      const { rows, total } = await fetchArchivePage(scope, 0, signal);
-      useTotals.setState({ [name]: total });
-      return foldFirstPage(rows, queryClient.getQueryData<TaskWithPeople[]>(queryKey) ?? NO_TASKS, CLOSED_PAGE, closedOrder);
-    },
-  });
-  // a task closing arrives on the director's own socket; deletes come by `useTaskDeletes`
-  useRealtimeInvalidate({ table: "tasks", filter: `author_id=eq.${userId}` }, queryKey, enabled);
-  const total = useTotals((state) => state[name]);
-
-  const more = async () => {
-    const held = queryClient.getQueryData<TaskWithPeople[]>(queryKey) ?? NO_TASKS;
-    setLoadingMore(true);
-    try {
-      const page = await fetchArchivePage(scope, held.length);
-      useTotals.setState({ [name]: page.total });
-      queryClient.setQueryData<TaskWithPeople[]>(queryKey, (now) => appendPage(now ?? held, page.rows));
-    } finally {
-      setLoadingMore(false);
-    }
-  };
-
-  return {
-    query,
-    rows: query.data ?? NO_TASKS,
-    total: query.isPlaceholderData ? null : (total ?? null),
-    /** The answer for these filters is still on its way: an empty list says nothing yet. */
-    busy: enabled && (text !== filter.text || (query.isFetching && (query.isPending || query.isPlaceholderData))),
-    more,
-    loadingMore,
-  };
-}
-
-export type TaskSearch = {
-  text: string;
-  /** Only these people's tasks: the person in the filter, or a name among the typed words. */
-  assignees?: readonly string[];
-  /** Closed work only, the most recently closed first. Otherwise every status, the newest first. */
-  closedOnly?: boolean;
-  enabled?: boolean;
-};
-
-/**
- * Every task the person may see, by the words of the title: all the words, each anywhere. RLS is
- * the only scope (`tasks_select`): a director finds the company's tasks and nobody else's. A new
- * word aborts the request on its way; the old hits stand until the new ones land.
- */
-export function useTaskSearch({ text, assignees = NO_PEOPLE, closedOnly = false, enabled = true }: TaskSearch) {
-  const settled = useDebounced(text, SEARCH_PAUSE_MS);
-  const words = searchWords(settled);
-  const live = enabled && words.length > 0;
-  const name = JSON.stringify([words, assignees, closedOnly]);
-
-  const query = useQuery({
-    queryKey: taskKeys.search(name),
-    enabled: live,
-    meta: { keep: false },
-    placeholderData: keepPreviousData,
-    queryFn: async ({ signal }): Promise<TaskWithPeople[]> => {
-      const supabase = createBrowserSupabase();
-      let request = supabase.from("tasks").select(TASK_SELECT, { count: "exact" });
-      if (closedOnly) request = request.in("status", [...CLOSED_STATUSES]);
-      if (assignees.length > 0) request = request.in("assignee_id", [...assignees]);
-      for (const word of words) request = request.ilike("title", wordPattern(word));
-      const ordered = closedOnly ? request.order("closed_at", { ascending: false, nullsFirst: false }) : request.order("created_at", { ascending: false });
-      const { data, count, error } = await ordered.limit(SEARCH_HITS).abortSignal(signal);
-      if (error) throw new Error(error.message);
-      useTotals.setState({ [name]: count ?? 0 });
-      return (data ?? []) as unknown as TaskWithPeople[];
-    },
-  });
-  const total = useTotals((state) => state[name]);
-  const asked = enabled && searchWords(text).length > 0;
-
-  return {
-    query,
-    rows: live ? (query.data ?? NO_TASKS) : NO_TASKS,
-    /** How many there are in all; more than `rows` holds — the search stopped at SEARCH_HITS. */
-    total: live && !query.isPlaceholderData ? (total ?? null) : null,
-    /** The rows on screen answer an older text: the words have changed, the answer has not landed. */
-    stale: query.isPlaceholderData || text !== settled,
-    /** Still looking: an empty list says nothing yet. */
-    searching: asked && (text !== settled || query.isFetching),
-  };
-}
-
-/* -------------------------------------------------------------------------- */
-/* One task and its thread                                                     */
-/* -------------------------------------------------------------------------- */
-
-async function fetchTask(taskId: string): Promise<TaskWithPeople> {
-  const supabase = createBrowserSupabase();
-  const { data, error } = await supabase
-    .from("tasks")
-    .select(TASK_SELECT)
-    .eq("id", taskId)
-    .single();
-  if (error) throw new Error(error.message);
-  return data as unknown as TaskWithPeople;
-}
-
-/**
- * The same task as it sits in any cached list (feed, «Мои дела», inbox stacks,
- * «Отправленные»): opening a card must paint it at once, not after a skeleton.
- */
-function findCachedTask(queryClient: ReturnType<typeof useQueryClient>, taskId: string) {
-  for (const [, data] of queryClient.getQueriesData<unknown>({ queryKey: taskKeys.root })) {
-    const lists: unknown[] = Array.isArray(data)
-      ? [data]
-      : data && typeof data === "object"
-        ? Object.values(data as Record<string, unknown>)
-        : [];
-    for (const list of lists) {
-      if (!Array.isArray(list)) continue;
-      const hit = (list as TaskWithPeople[]).find((task) => task?.id === taskId);
-      if (hit) return hit;
-    }
-  }
-  return undefined;
-}
-
-export function useTask(taskId: string) {
-  const queryClient = useQueryClient();
-  return useRealtimeQuery<TaskWithPeople, TaskRow>({
-    queryKey: taskKeys.detail(taskId),
-    queryFn: () => fetchTask(taskId),
-    channel: { table: "tasks", filter: `id=eq.${taskId}` },
-    placeholderData: () => findCachedTask(queryClient, taskId),
-  });
-}
-
-/** A message still in flight carries `meta.pending` and no server seq yet. */
-export function isPendingMessage(message: TaskMessage): boolean {
-  const meta = message.meta;
-  if (!meta || typeof meta !== "object" || Array.isArray(meta)) return false;
-  return (meta as Record<string, unknown>).pending === true;
-}
-
-/** How many messages the thread opens with, and how many «Показать раньше» adds. */
-export const THREAD_PAGE = 50;
-
-/** One page of older messages, before `beforeSeq` — the button above the thread. */
-export async function fetchEarlierMessages(taskId: string, beforeSeq: number): Promise<TaskMessage[]> {
-  const supabase = createBrowserSupabase();
-  const { data, error } = await supabase
-    .from("task_messages")
-    .select(MESSAGE_SELECT)
-    .eq("task_id", taskId)
-    .lt("seq", beforeSeq)
-    .order("seq", { ascending: false })
-    .limit(THREAD_PAGE);
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as unknown as TaskMessage[]).reverse();
-}
-
-/** An older page in front of the cached tail — «Показать раньше» folds it in by seq. */
-export function prependMessages(queryClient: QueryClient, taskId: string, older: TaskMessage[]): void {
-  queryClient.setQueryData<TaskMessage[]>(taskKeys.thread(taskId), (cached) => mergeBySeq(older, cached ?? []));
-}
-
-/**
- * Thread messages with the seq cursor: a refetch after a dead socket asks only
- * for `seq > lastSeq` and folds the answer into the cached page
- * (docs/FRONTEND.md "State management"). An empty cache reads the tail — the last
- * THREAD_PAGE messages, the ones a person opens a thread to see; older ones come
- * page by page through `fetchEarlierMessages`.
- * Optimistic rows are excluded from the cursor — their seq is a placeholder and
- * would otherwise skip the real row that replaces them.
- */
-export function useTaskMessages(taskId: string, enabled = true) {
-  const queryClient = useQueryClient();
-  const queryKey = taskKeys.thread(taskId);
-
-  return useRealtimeQuery<TaskMessage[], TaskMessageRow>({
-    queryKey,
-    enabled,
-    queryFn: async () => {
-      const cached = queryClient.getQueryData<TaskMessage[]>(queryKey) ?? [];
-      const lastSeq = lastSeqOf(cached.filter((message) => !isPendingMessage(message)));
-
-      const supabase = createBrowserSupabase();
-      if (lastSeq === 0) {
-        const { data, error } = await supabase
-          .from("task_messages")
-          .select(MESSAGE_SELECT)
-          .eq("task_id", taskId)
-          .order("seq", { ascending: false })
-          .limit(THREAD_PAGE);
-        if (error) throw new Error(error.message);
-        return ((data ?? []) as unknown as TaskMessage[]).reverse();
-      }
-
-      const { data, error } = await supabase
-        .from("task_messages")
-        .select(MESSAGE_SELECT)
-        .eq("task_id", taskId)
-        .gt("seq", lastSeq)
-        .order("seq", { ascending: true });
-      if (error) throw new Error(error.message);
-      // merged into the cache as it is NOW, not as it was when the request left: an UPDATE that
-      // landed meanwhile (the answered_at of a question, closed by the very reply that set off
-      // this fetch) stays — it used to be overwritten, and «ждёт ответа» hung until a reload (D-142)
-      const latest = queryClient.getQueryData<TaskMessage[]>(queryKey) ?? cached;
-      return mergeBySeq(latest, (data ?? []) as unknown as TaskMessage[]);
-    },
-    channel: { table: "task_messages", filter: `task_id=eq.${taskId}` },
-    onEvent: (payload, client) => {
-      if (payload.eventType === "UPDATE") {
-        // An UPDATE is the answered_at stamp on a question (or a transcript landing on a
-        // voice message): the payload is the whole row, so the cached row is patched in
-        // place. An invalidate here would repaint the thread the person is reading (Д-2).
-        client.setQueryData<TaskMessage[]>(queryKey, (old) => applyMessageUpdate(old, payload.new as TaskMessageRow));
-        return;
-      }
-      // An INSERT carries no joined sender name, a DELETE carries no row at all —
-      // go back through the cursor.
-      void client.invalidateQueries({ queryKey });
-    },
-  });
-}
-
-export function useTaskThread(taskId: string) {
-  const task = useTask(taskId);
-  const messages = useTaskMessages(taskId);
-  return { task, messages };
-}
-
-/* -------------------------------------------------------------------------- */
-/* Director: the live board — one query, two channels, patches from payloads   */
-/* -------------------------------------------------------------------------- */
-
-/** A task the employee could not take, with the reason they gave («Не могу» + chip or words). */
-export type DeclinedTask = TaskWithPeople & { decline_reason: string | null };
-
-/** A task with an open question from the employee — the newest unanswered words. */
-export type QuestionTask = TaskWithPeople & { question: string | null };
-
-/** The board split the old way — the tab badge and «Задачи» still read these stacks. */
-export type DirectorInbox = {
-  overdue: TaskWithPeople[];
-  declined: DeclinedTask[];
-  questions: QuestionTask[];
-  review: TaskWithPeople[];
-};
-
-export const EMPTY_INBOX: DirectorInbox = { overdue: [], declined: [], questions: [], review: [] };
-
-/**
- * Tasks with their question and decline notes (a short list), the newest real message
- * of the thread (one row) and the caller's read cursor (their own row, by RLS).
- */
-const BOARD_SELECT = `${TASK_SELECT}, notes:task_messages(id, content, meta, created_at, sender_id), last:task_messages(id, content, type, sender_id, seq, created_at), reads:task_reads(last_seq)`;
-
-type BoardRow = TaskWithPeople & { notes: BoardNote[] | null; last: BoardMessage[] | null; reads: { last_seq: number }[] | null };
-
-/**
- * Everything on the board in one request: tasks in work or waiting for the director,
- * each with the messages that matter to the board (open questions, decline reasons).
- * Company scoping is RLS's job — a director sees their company and nothing else.
- * Everybody but the director asks for their own rows only: RLS would also hand a manager
- * their subordinates', and Лента is about the person (the same narrowing as useMyTasks).
- */
-async function fetchBoard(assigneeId?: string): Promise<BoardTask[]> {
-  const supabase = createBrowserSupabase();
-  // the director's board also holds what waits for the morning — the team on Пульс shows it (D-139);
-  // a person's own board never does: a held task is not theirs yet (D-38)
-  let request = supabase
-    .from("tasks")
-    .select(BOARD_SELECT)
-    .in("status", assigneeId ? [...BOARD_STATUSES] : [...BOARD_STATUSES, HELD_STATUS]);
-  if (assigneeId) request = request.eq("assignee_id", assigneeId);
-  const { data, error } = await request
-    // the words the board reads: questions, refusals, requests for time, reminders, «не всё» (D-128),
-    // the director's words with a return for rework (D-173)
-    .or(
-      "meta->>is_question.eq.true,meta->>decline_reason.eq.true,meta->>time_request.eq.true,meta->>nudge.eq.true,meta->>partial.eq.true,meta->>rework_comment.eq.true",
-      { referencedTable: "notes" },
-    )
-    .order("created_at", { referencedTable: "notes", ascending: false })
-    .in("last.type", [...CHAT_TYPES])
-    .order("seq", { referencedTable: "last", ascending: false })
-    .limit(1, { referencedTable: "last" });
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as unknown as BoardRow[]).map(({ notes, last, reads, ...task }) => toBoardTask(task, notes ?? [], last?.[0] ?? null, reads?.[0]?.last_seq ?? 0));
-}
-
-/** Bursts of events (a batch confirmed, a cron tick) ask for one refetch, not one each. */
-const REFETCH_COALESCE_MS = 150;
-let refetchTimer: ReturnType<typeof setTimeout> | null = null;
-
-function scheduleBoardRefetch(queryClient: QueryClient) {
-  if (refetchTimer !== null) return;
-  refetchTimer = setTimeout(() => {
-    refetchTimer = null;
-    void queryClient.invalidateQueries({ queryKey: taskKeys.board() });
-  }, REFETCH_COALESCE_MS);
-}
-
-/**
- * The director's board, live. A `tasks` event patches the cached row from its payload
- * — the tile recolours before any request is made; only an unknown row (a new task) or
- * a new assignee needs the joined names and asks for one coalesced refetch. A
- * `task_messages` event lands a question or a reason the same way. Closed rows keep
- * their closed status until the screen has said goodbye (`pruneClosed`).
- */
-export function usePulseBoard(me: Me | undefined, enabled = true) {
-  const queryKey = taskKeys.board();
-  const queryClient = useQueryClient();
-  const meId = me?.userId ?? "";
-  // the person's own rows, on the socket as in the query; only the director takes the
-  // whole company. A manager lands on Лента like anyone else, and RLS would hand them their
-  // subordinates' tasks — a secretary's task then played on the manager's mascot as theirs.
-  const assigneeId = me && me.role !== "director" ? meId : undefined;
-  const live = enabled && Boolean(me);
-  // the filtered socket of Лента never hears a DELETE: deletes come on their own channel; the
-  // director's socket has no filter and takes them below
-  useTaskDeletes(live && Boolean(assigneeId));
-
-  const query = useRealtimeQuery<BoardTask[], TaskRow>({
-    queryKey,
-    queryFn: () => fetchBoard(assigneeId),
-    channel: { table: "tasks", filter: assigneeId ? `assignee_id=eq.${assigneeId}` : undefined },
-    enabled: live,
-    onEvent: (payload, client) => {
-      if (payload.eventType === "DELETE") {
-        const id = (payload.old as Partial<TaskRow>).id;
-        if (id) client.setQueryData<BoardTask[]>(queryKey, (old) => (old ? withoutTask(old, id) : old));
-        return;
-      }
-      const row = payload.new as TaskRow;
-      const cached = client.getQueryData<BoardTask[]>(queryKey);
-      if (!cached) return; // nothing to patch yet — the first fetch will have it
-      const next = applyTaskChange(cached, row, { held: !assigneeId });
-      if (next === "refetch") scheduleBoardRefetch(client);
-      else if (next) client.setQueryData(queryKey, next);
-    },
-  });
-
-  // No filter on this channel on purpose: a `task_messages` row carries no assignee_id,
-  // so there is nothing to narrow it by. RLS cuts it on the server — the socket only ever
-  // delivers messages of threads the reader is part of — and applyMessage drops whatever
-  // belongs to a task the board does not hold.
-  useRealtimeListener<TaskMessageRow>(
-    { table: "task_messages" },
-    (payload) => {
-      if (payload.eventType === "DELETE") return;
-      const message = payload.new as TaskMessageRow;
-      const cached = queryClient.getQueryData<BoardTask[]>(queryKey);
-      if (!cached) return;
-      const next = applyMessage(cached, message, meId);
-      if (next) queryClient.setQueryData(queryKey, next);
-    },
-    // the settle snapshot after a (re)subscribe belongs to the tasks channel; nothing to do here
-    () => {},
-    "board-messages",
-    live,
-  );
-
-  return query;
-}
-
-/** The read cursor moved: the row's unread mark goes at once (the server row follows). */
-export function markBoardRead(queryClient: QueryClient, taskId: string, seq: number) {
-  queryClient.setQueryData<BoardTask[]>(taskKeys.board(), (old) => (old ? (applyRead(old, taskId, seq) ?? old) : old));
-}
-
-/** A closed row has said goodbye: drop it from the cache (a refetch would too). */
-export function pruneClosed(queryClient: QueryClient, taskId: string) {
-  queryClient.setQueryData<BoardTask[]>(taskKeys.board(), (old) => (old ? withoutTask(old, taskId) : old));
-}
-
-/** The board as the four stacks of D-05 — derived, never fetched on its own. */
-export function inboxOf(rows: readonly BoardTask[], now: Date, meId: string): DirectorInbox {
-  const lanes = lanesOf(rows, now, meId);
-  return {
-    overdue: lanes.overdue,
-    declined: lanes.declined,
-    // every open question, whichever lane the task sits in — «Задачи» marks them all; a request
-    // for time is a question to the director too (D-128)
-    questions: rows.filter(
-      (task) => (task.question || (task.time_request && task.time_request.senderId !== meId)) && isOnBoard(task.status),
-    ),
-    review: lanes.review,
-  };
-}
-
-export function useDirectorInbox(me: Me | undefined, enabled = true) {
-  const board = usePulseBoard(me, enabled);
-  const rows = board.data;
-  const meId = me?.userId ?? "";
-  const data = useMemo(() => (rows ? inboxOf(rows, new Date(), meId) : undefined), [rows, meId]);
-  return { data, isLoading: board.isLoading, isError: board.isError };
-}
-
-export function inboxCounts(inbox: DirectorInbox | undefined) {
-  const value = inbox ?? EMPTY_INBOX;
-  return {
-    overdue: value.overdue.length,
-    declined: value.declined.length,
-    questions: value.questions.length,
-    review: value.review.length,
-    total: value.overdue.length + value.declined.length + value.questions.length + value.review.length,
-  };
 }

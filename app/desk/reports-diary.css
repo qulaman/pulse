@@ -1,8 +1,8 @@
-/* «Отчёты» of the desk (D-183): rep-diary. One builder a file.
+/* «Отчёты» of the desk (D-183): rep-diary.
    «Дневник» — one person's reports in the shell's right-hand panel (components/desk/reports/Diary.tsx):
    the head with the moves, the month as a calendar of day states, the reports newest first, and the
    popover of «Уважительная причина…» (portalled to <body>, so it carries its own tokens).
-   Both looks: the tokens fall back from «Графит» (graphite.css) to the journal's inks. Colour says
+   The tokens fall back from «Графит» (graphite.css) to the base inks of journal.css. Colour says
    state only — green handed in, red missed, grey away / excused / off; teal only for today, the
    ringed day and «только что»; amber only a task on review (StatusGlyph). Hours stay grey. */
 

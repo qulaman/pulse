@@ -13,7 +13,8 @@ import { Sheet } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
 import { haptic } from "@/lib/haptics";
 import { demotedPlace, numbersOf, promotedPlace } from "@/lib/mindboard/branch";
-import { boardSummary, boardText, cleanTitle, openPoints } from "@/lib/mindboard/list";
+import { boardSummary, cleanTitle, openPoints } from "@/lib/mindboard/list";
+import { copyBoardText, saveSketch, untickAll } from "@/lib/mindboard/moves";
 import { waitOf } from "@/lib/mindboard/offline";
 import { hasContent, isDrawn, nextTurn, pointLabel, sheetOf, sketchFrom, turnOf, withFrame, type Sketch } from "@/lib/mindboard/sketch";
 import type { SplitPoint } from "@/lib/mindboard/split";
@@ -352,39 +353,13 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
     .filter((branch) => branch.point.parent_id === null && hasContent(branch.point))
     .map((branch) => ({ id: branch.point.id, text: firstLine(pointLabel(branch.point.text, branch.point.sketch)), done: branch.point.done_at !== null }));
 
-  const saveSketch = (sketch: Sketch | null, caption: string) => {
+  const saveIt = (sketch: Sketch | null, caption: string) => {
     const row = sketching?.row ?? null;
     setSketching(null);
-    if (!row) {
-      if (sketch) actions.writeSketch(sketch, caption);
-      else if (caption) actions.write(caption, null);
-      return;
-    }
-    // the pad edits the first line; the rest of a point of several lines stays as it was
-    const [first = "", ...rest] = row.text.trim().split("\n");
-    const text = caption === first.trim() ? null : [caption, ...rest].join("\n").trim();
-    actions.edit(row, { sketch, ...(text === null ? {} : { text }) });
-    toast(sketch ? "Рисунок сохранён" : "Рисунок стёрт — пункт остался");
+    saveSketch(row, sketch, caption, { edit: actions.edit, add: (drawn, words) => (drawn ? actions.writeSketch(drawn, words) : actions.write(words, null)) });
   };
 
-  const copyText = async () => {
-    try {
-      await navigator.clipboard.writeText(boardText(board.title, rows));
-      toast("Скопировал доску текстом");
-    } catch {
-      toast("Не получилось скопировать");
-    }
-  };
-
-  const untickAll = () => {
-    const ticked = rows.filter((row) => row.done_at !== null && !phone.has(row.id));
-    if (ticked.length === 0) return;
-    for (const row of ticked) actions.edit(row, { done_at: null });
-    haptic(10);
-    toast(`Снял ${ticked.length} ${pluralRu(ticked.length, ["отметку", "отметки", "отметок"])}`, {
-      action: { label: "Вернуть", onClick: () => ticked.forEach((row) => actions.edit(row, { done_at: row.done_at })) },
-    });
-  };
+  const untickIt = () => untickAll(rows, phone, actions.edit, () => haptic(10));
 
   const startHanding = () => {
     if (accordion.openId) accordion.toggle(accordion.openId);
@@ -421,8 +396,8 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
     { key: "pin", label: board.pinned_at ? "Открепить" : "Закрепить сверху", icon: "pin", run: () => actions.pin(!board.pinned_at) },
     ...(handable.size > 0 ? [{ key: "hand", label: "Раздать поручения", detail: "кому какой пункт — и одним тапом", icon: "task" as const, run: startHanding }] : []),
     ...(open.length > 0 ? [{ key: "copy", label: "Новая доска из открытых", detail: `${openWords(open.length)} — на следующую встречу`, icon: "stack" as const, run: actions.copyOpen }] : []),
-    ...(ticks > 0 ? [{ key: "untick", label: "Снять все отметки", detail: `${ticks} ${pluralRu(ticks, ["отметка", "отметки", "отметок"])}`, icon: "retry" as const, run: untickAll }] : []),
-    ...(summary.total > 0 ? [{ key: "text", label: "Скопировать текстом", detail: "пункты по номерам — для мессенджера", icon: "copy" as const, run: () => void copyText() }] : []),
+    ...(ticks > 0 ? [{ key: "untick", label: "Снять все отметки", detail: `${ticks} ${pluralRu(ticks, ["отметка", "отметки", "отметок"])}`, icon: "retry" as const, run: untickIt }] : []),
+    ...(summary.total > 0 ? [{ key: "text", label: "Скопировать текстом", detail: "пункты по номерам — для мессенджера", icon: "copy" as const, run: () => void copyBoardText(board.title, rows) }] : []),
     board.finished_at
       ? { key: "finish", label: "Вернуть в работу", icon: "restore", run: () => actions.finish(false) }
       : { key: "finish", label: "Завершить доску", detail: "уйдёт в «Завершённые», целиком", icon: "flag", run: () => actions.finish(true) },
@@ -593,7 +568,7 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
           caption={sketching.row?.text.trim().split("\n")[0].trim() ?? ""}
           editing={sketching.row !== null}
           onClose={() => setSketching(null)}
-          onSave={saveSketch}
+          onSave={saveIt}
         />
       ) : null}
 

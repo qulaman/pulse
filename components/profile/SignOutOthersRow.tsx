@@ -1,14 +1,10 @@
 "use client";
 
-import { useState } from "react";
-
 import { ExitIcon } from "@/components/profile/icons";
+import { useSignOutOthers } from "@/components/profile/useSignOutOthers";
 import { Button } from "@/components/ui/Button";
 import { Row } from "@/components/ui/Row";
 import { Sheet } from "@/components/ui/Sheet";
-import { toast } from "@/components/ui/Toast";
-import { useRevokeSessions } from "@/lib/people/queries";
-import { thisDeviceEndpoint } from "@/lib/push/client";
 
 /**
  * «Выйти на других устройствах» (D-135): a phone left at home, a tablet given away — every
@@ -16,35 +12,14 @@ import { thisDeviceEndpoint } from "@/lib/push/client";
  * keeps its own notifications.
  */
 export function SignOutOthersRow({ userId }: { userId: string }) {
-  const [open, setOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const revoke = useRevokeSessions();
-  const close = () => !revoke.isPending && setOpen(false);
-
-  const submit = async () => {
-    setError(null);
-    const keepEndpoint = await thisDeviceEndpoint();
-    revoke.mutate(
-      { id: userId, keepCurrent: true, keepEndpoint },
-      {
-        onSuccess: ({ sessions }) => {
-          toast(sessions > 0 ? `Вход закрыт на других устройствах · ${sessions}` : "Других входов не было");
-          setOpen(false);
-        },
-        onError: (e) => setError(e.message),
-      },
-    );
-  };
+  const { open, error, pending, ask, close, submit } = useSignOutOthers(userId);
 
   return (
     <>
       <Row
         icon={<ExitIcon />}
         title="Выйти на других устройствах"
-        onClick={() => {
-          setError(null);
-          setOpen(true);
-        }}
+        onClick={ask}
       />
       <Sheet open={open} onClose={close} title="Выйти на других устройствах?">
         <div className="flex flex-col gap-3">
@@ -56,10 +31,10 @@ export function SignOutOthersRow({ userId }: { userId: string }) {
               {error}
             </p>
           ) : null}
-          <Button block variant="danger" loading={revoke.isPending} onClick={() => void submit()} data-testid="revoke-others">
+          <Button block variant="danger" loading={pending} onClick={() => void submit()} data-testid="revoke-others">
             Выйти на других устройствах
           </Button>
-          <Button block variant="ghost" disabled={revoke.isPending} onClick={close}>
+          <Button block variant="ghost" disabled={pending} onClick={close}>
             Отмена
           </Button>
         </div>

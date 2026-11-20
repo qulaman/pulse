@@ -342,22 +342,6 @@ html[data-surface="desk"][data-journal] {
       transform: scale(1.18);
     }
   }
-
-  /* «Журнал» without «Графит»: paper, no rounding, no light */
-  &:not([data-graphite]) {
-    .ps-tile {
-      border-radius: 2px;
-      background: transparent;
-      box-shadow: inset 0 0 0 1px var(--rule, var(--border));
-
-      &::before {
-        display: none;
-      }
-    }
-    .ps-delta {
-      border-radius: 2px;
-    }
-  }
 }
 
 @keyframes ps-in {

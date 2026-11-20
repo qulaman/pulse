@@ -7,7 +7,7 @@ import { EntryInput } from "@/components/dictionary/EntryInput";
 import { toast } from "@/components/ui/Toast";
 import { ALIAS_MAX, byRussian, entryKey, planAliases, type NameReport, type RosterPerson } from "@/lib/dictionary";
 import { useEditAliases } from "@/lib/dictionary-queries";
-import { initialsOf } from "@/lib/people/queries";
+import { initialsOf } from "@/lib/people/names";
 
 function quoted(list: string[]): string {
   return list.map((s) => `«${s}»`).join(", ");

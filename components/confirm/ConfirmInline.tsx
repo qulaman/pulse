@@ -5,9 +5,10 @@ import { useImperativeHandle, useState, useSyncExternalStore, type Ref } from "r
 import { ConfirmList } from "@/components/confirm/ConfirmList";
 import { useCardFlight } from "@/components/confirm/useCardFlight";
 import { useSendBatch } from "@/components/confirm/useSendBatch";
-import { useDeliveryWindow, usePointsEnabled } from "@/lib/points/queries";
-import { isSendable, useIngestStore } from "@/lib/store/ingest";
-import { isWithinDeliveryWindow, WINDOW_OPEN_HOUR } from "@/lib/voice/quietHours";
+import { usePointsEnabled } from "@/lib/points/queries";
+import { isSendable } from "@/lib/confirm/entities";
+import { useIngestStore } from "@/lib/store/ingest";
+import { useQuietHours } from "@/lib/voice/quietHours";
 
 /** What the face can ask of the cards under it; `true` — the batch is on its way. */
 export type ConfirmHandle = { throwBatch: () => boolean };
@@ -89,15 +90,7 @@ export function ConfirmInline({ ref }: { ref?: Ref<ConfirmHandle> }) {
     [firstBlocked, sendBatch, sendable, sending, entities, pointsEnabled],
   );
 
-  // Read after hydration: the server renders «within the window» so both passes match.
-  const hydrated = useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false,
-  );
-  const window = useDeliveryWindow().data;
-  const quiet = hydrated && !isWithinDeliveryWindow(new Date(), window);
-  const opensAt = window?.from ?? `0${WINDOW_OPEN_HOUR}:00`;
+  const { quiet, opensAt } = useQuietHours();
   const sendHint = useSendHint();
 
   return (

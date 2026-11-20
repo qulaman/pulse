@@ -3,7 +3,7 @@ import { z } from "zod";
 import { userSupabase, withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
 import { DAILY_REPORT_ERROR_TEXT, errorCodeOf } from "@/lib/daily-report/format";
-import { DAILY_REPORT_RPC, type SubmitDailyReportResult } from "@/lib/daily-report/types";
+import { DAILY_REPORT_RPC } from "@/lib/daily-report/types";
 import { TEAM_ROLES } from "@/lib/routes";
 
 const BodySchema = z.strictObject({
@@ -38,7 +38,8 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       throw new Error(`submit_daily_report failed: ${error.message}`);
     }
 
-    return apiOk(data as unknown as SubmitDailyReportResult);
+    // the answer is SubmitDailyReportResult (lib/daily-report/types.ts), passed on as is
+    return apiOk(data);
   },
   BodySchema,
 );

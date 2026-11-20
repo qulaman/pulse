@@ -14,8 +14,8 @@ import {
 } from "@/lib/dictionary";
 import type { Misheard } from "@/lib/dictionary-learn";
 import type { WordSuggestion, WordUsage } from "@/lib/dictionary-usage";
-import { NetworkError, isNetworkError } from "@/lib/net";
-import { dequeue, enqueue } from "@/lib/outbox";
+import { postJson } from "@/lib/api/client";
+import { isNetworkError } from "@/lib/net";
 import { peopleKeys, type Person } from "@/lib/people/queries";
 import type { CompanySettings } from "@/lib/settings";
 import { fetchSettings, settingsKey } from "@/lib/settings-query";
@@ -47,22 +47,7 @@ const WAITING = "Нет связи — правка уйдёт сама, как 
  * nothing.
  */
 async function postDictionary<T>(path: string, payload: unknown, key: string, fallback: string): Promise<T> {
-  let res: Response;
-  try {
-    res = await fetch(path, {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-  } catch {
-    enqueue({ id: key, path, payload });
-    throw new NetworkError(WAITING);
-  }
-  dequeue(key);
-  const body = (await res.json().catch(() => ({}))) as T & { error?: { message_ru?: string } };
-  if (!res.ok) throw new Error(body.error?.message_ru ?? fallback);
-  return body;
+  return ((await postJson(path, payload, { key, offline: WAITING, fallback })) ?? {}) as T;
 }
 
 /**

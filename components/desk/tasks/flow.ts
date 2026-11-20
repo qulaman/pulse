@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, type RefObject } from "react";
 
 import { inPlaceOf, widthBucket } from "@/lib/desk/tasks";
+import type { BoardTask } from "@/lib/pulse/board";
+import type { DeskReason } from "@/lib/tasks/desk";
 import type { TaskActions } from "@/lib/tasks/mutations";
+import { reasonFor } from "@/lib/tasks/overview";
+import type { TaskWithPeople } from "@/lib/tasks/queries";
 
 import type { PanelNext } from "./TaskPanel";
 
@@ -108,4 +112,28 @@ export function usePanelFlow(ids: readonly string[], openId: string | null, open
   }, [advance, inPlace, openTask]);
   const next: PanelNext | null = openId && gone && !advance ? { id: acted === openId ? null : inPlace, onGo: () => inPlace && openTask(inPlace) } : null;
   return { next, mark: setActed };
+}
+
+/**
+ * The board as one director's lists read it (D-154): `rows` — his own (only the author's answer
+ * closes a question), `boardById` — every row of the company, `reasons` — why each of his tasks
+ * waits on him (`reasonFor`). Kept by identity while nothing under them changes.
+ */
+export function useDirectorBoard(board: readonly BoardTask[], all: readonly TaskWithPeople[], meId: string, now: Date) {
+  const rows = useMemo(() => {
+    const map = new Map<string, BoardTask>();
+    for (const row of board) if (row.author_id === meId) map.set(row.id, row);
+    return map;
+  }, [board, meId]);
+  const boardById = useMemo(() => new Map(board.map((row) => [row.id, row])), [board]);
+  const reasons = useMemo(() => {
+    const map = new Map<string, DeskReason>();
+    for (const task of all) {
+      const row = rows.get(task.id);
+      const reason = reasonFor(task, row?.question, now, Boolean(row?.time_request));
+      if (reason) map.set(task.id, reason);
+    }
+    return map;
+  }, [all, rows, now]);
+  return { rows, boardById, reasons };
 }

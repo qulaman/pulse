@@ -12,10 +12,10 @@ import type { Visit, VisitAnswer } from "@/lib/visits/queries";
 import { awaitingDirector, waitedSince } from "@/lib/visits/text";
 
 /**
- * «К вам посетитель» на Пульсе директора (D-96): человек у стола секретаря ждёт ответа —
- * три кнопки, как три кнопки сотрудника (принцип 2): «Пусть заходит» / «Подождёт» /
- * «Не приму». После «Подождёт» карточка остаётся тише — человек всё ещё там, и решить
- * можно позже. Одно нажатие — ответ секретарю пушем и надпись на стене меняется.
+ * «К вам посетитель» on the director's Пульс (D-96): a person at the secretary's desk waits for an
+ * answer — three buttons, like the employee's three (principle 2): «Пусть заходит» / «Подождёт» /
+ * «Не приму». After «Подождёт» the card stays, quieter — the person is still there, and the decision
+ * can come later. One press — a push answer to the secretary, and the words on the wall change.
  */
 export const ANSWERS: { value: VisitAnswer; label: string }[] = [
   { value: "invited", label: "Пусть заходит" },

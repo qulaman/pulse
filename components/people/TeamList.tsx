@@ -4,9 +4,12 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { Chip } from "@/components/ui/Chip";
-import { AVAILABILITY_LABEL, ROLE_LABEL, initialsOf, type Person } from "@/lib/people/queries";
+import { AVAILABILITY_LABEL, ROLE_LABEL, type Person } from "@/lib/people/queries";
+import { textHas } from "@/lib/people/search";
 import { LOAD_COLOR, LOAD_LABEL, loadColor, type Load } from "@/lib/people/loads";
 import { useTeamBalances } from "@/lib/points/queries";
+import { pluralRu } from "@/lib/tasks/status-text";
+import { initialsOf } from "@/lib/people/names";
 
 type Filter = "all" | "present" | "away" | "busy" | "free";
 type Sort = "name" | "load" | "points";
@@ -28,22 +31,8 @@ function groupOf(p: Person): "lead" | "staff" | "tv" {
   return "staff";
 }
 
-function normalise(s: string): string {
-  return s.toLowerCase().replace(/ё/g, "е").trim();
-}
-
 function matches(p: Person, q: string): boolean {
-  if (!q) return true;
-  const hay = normalise([p.full_name, p.position ?? "", ...p.aliases, ROLE_LABEL[p.role]].join(" "));
-  return q.split(/\s+/).every((word) => hay.includes(word));
-}
-
-function plural(n: number, forms: [string, string, string]): string {
-  const m10 = n % 10;
-  const m100 = n % 100;
-  if (m10 === 1 && m100 !== 11) return forms[0];
-  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return forms[1];
-  return forms[2];
+  return textHas([p.full_name, p.position, ...p.aliases, ROLE_LABEL[p.role]], q);
 }
 
 /** One person: avatar with the load dot, name and position, load and points on the right. */
@@ -89,7 +78,7 @@ function Row({ person, load, balance, pointsOn }: { person: Person; load: Load |
             <span className="text-[13px] leading-4 text-muted">свободен</span>
           ) : (
             <span className="nums text-[13px] leading-4" style={{ color: LOAD_COLOR[color] }}>
-              {active} {plural(active, ["задача", "задачи", "задач"])}
+              {active} {pluralRu(active, ["задача", "задачи", "задач"])}
               {load && load.overdue > 0 ? ` · ${load.overdue} просроч.` : load && load.review > 0 ? ` · ${load.review} на приёмке` : ""}
             </span>
           )}
@@ -116,7 +105,7 @@ export function TeamList({ people, loads, pointsOn }: { people: Person[]; loads:
   const [sort, setSort] = useState<Sort>("name");
   const [showInactive, setShowInactive] = useState(false);
 
-  const q = normalise(query);
+  const q = query.trim();
   const loadMap = useMemo(() => loads ?? {}, [loads]);
   const balanceMap = useMemo(() => balances.data ?? {}, [balances.data]);
   // the clock is read once per mount — «дедлайн близко» does not need a live tick here
@@ -195,7 +184,7 @@ export function TeamList({ people, loads, pointsOn }: { people: Person[]; loads:
 
       <div className="mt-3 flex items-center justify-between gap-3 text-[13px] leading-4 text-muted">
         <span className="nums">
-          {visible.length} {plural(visible.length, ["человек", "человека", "человек"])}
+          {visible.length} {pluralRu(visible.length, ["человек", "человека", "человек"])}
         </span>
         <span className="flex items-center gap-1">
           <span>Сортировка:</span>

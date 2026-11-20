@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 
-import { Switch } from "@/components/desk/settings/form";
 import { Dialog } from "@/components/desk/ui/Dialog";
 import { Kbd } from "@/components/desk/ui/Kbd";
+import { Switch } from "@/components/desk/ui/Switch";
 import { ItemCard } from "@/components/shop/ItemCard";
 import { Button } from "@/components/ui/Button";
 import { formatNum } from "@/lib/desk/format";

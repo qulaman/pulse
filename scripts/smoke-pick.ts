@@ -14,16 +14,12 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright";
 
-const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
+import { IPHONE_UA, signIn } from "./lib/login";
+import { APP_URL, finish, record, recordError } from "./lib/smoke";
+
 const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui", "pick");
 const WAV = process.env.FAKE_MIC_WAV;
 mkdirSync(SHOTS, { recursive: true });
-
-const checks: { name: string; ok: boolean }[] = [];
-const record = (name: string, ok: boolean, detail = "") => {
-  checks.push({ name, ok });
-  console.log(`${ok ? "ok  " : "FAIL"}  ${name}${detail ? `  ${detail}` : ""}`);
-};
 
 async function main() {
   const browser = await chromium.launch({
@@ -37,6 +33,7 @@ async function main() {
     isMobile: true,
     hasTouch: true,
     locale: "ru-RU",
+    userAgent: IPHONE_UA,
     permissions: ["microphone"],
   });
   const page = await context.newPage();
@@ -44,11 +41,7 @@ async function main() {
   page.on("pageerror", (error) => errors.push(error.message));
 
   try {
-    await page.goto(`${APP_URL}/login`, { waitUntil: "networkidle" });
-    await page.getByLabel("Почта").fill("test@demo.local");
-    await page.getByLabel("Пароль").fill("1");
-    await page.getByRole("button", { name: "Войти" }).click();
-    await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 20_000 });
+    await signIn(page, APP_URL, { email: "test@demo.local", password: "1" });
     await page.goto(`${APP_URL}/pulse`, { waitUntil: "networkidle" });
     await page.locator('[data-testid="people-field"]').waitFor({ timeout: 20_000 });
     await page.waitForTimeout(1200);
@@ -68,7 +61,8 @@ async function main() {
     const cardBox = await card.boundingBox();
     const faceBox = await page.locator('[data-testid="mascot-lever"]').boundingBox();
     record("карточка — прямо над лицом", Boolean(cardBox && faceBox && cardBox.y + cardBox.height <= faceBox.y + 20));
-    record("маскот смотрит на человека", (await page.locator('[data-gaze="on"]').count()) === 1 && (await page.locator('[data-testid="look-line"]').count()) === 1);
+    const looks = (await page.locator('[data-gaze="on"]').count()) === 1 && (await page.locator('[data-testid="look-line"]').count()) === 1;
+    record("маскот смотрит на человека", looks);
     // the face, not the small secretary at the desk (D-85), who is a mascot too
     record("маскот проснулся", (await page.locator('[data-testid="mascot-lever"] svg.mascot').first().getAttribute("data-state")) !== "sleeping");
     record("кружок выбран", (await page.locator('[data-testid="crew"][data-picked="1"]').getAttribute("data-person")) === person);
@@ -102,7 +96,8 @@ async function main() {
     } else {
       await page.locator('[data-testid="pick-close"]').click();
       await page.waitForTimeout(600);
-      record("× снимает выбор, взгляд отпущен", (await page.locator('[data-testid="pick-card"]').count()) === 0 && (await page.locator('[data-gaze="on"]').count()) === 0);
+      const released = (await page.locator('[data-testid="pick-card"]').count()) === 0 && (await page.locator('[data-gaze="on"]').count()) === 0;
+      record("× снимает выбор, взгляд отпущен", released);
 
       // somebody at work (D-118): his card, his tasks as links, the face on him, a touch away closes
       const lit = page.locator('[data-testid="crew"][data-busy="1"]:not([data-ring="done"])');
@@ -118,21 +113,19 @@ async function main() {
         record("маскот смотрит на занятого", (await page.locator('[data-gaze="on"]').count()) === 1);
         await page.mouse.click(12, 200);
         await page.waitForTimeout(500);
-        record("касание мимо убирает карточку", (await page.locator('[data-testid="crew-card"]').count()) === 0 && (await page.locator('[data-gaze="on"]').count()) === 0);
+        const cardGone = (await page.locator('[data-testid="crew-card"]').count()) === 0 && (await page.locator('[data-gaze="on"]').count()) === 0;
+        record("касание мимо убирает карточку", cardGone);
       } else {
         console.log("—     занятых на доске нет: карточка не проверена");
       }
     }
     record("без ошибок страницы", errors.length === 0, errors.join(" | "));
   } catch (error) {
-    record("smoke:pick", false, error instanceof Error ? error.message : String(error));
+    recordError("smoke:pick", error);
   } finally {
     await browser.close();
   }
-
-  const failed = checks.filter((check) => !check.ok);
-  console.log(`\n${checks.length - failed.length}/${checks.length} ok · screenshots in ${SHOTS}`);
-  process.exit(failed.length === 0 ? 0 : 1);
+  finish(`screenshots in ${SHOTS}`);
 }
 
 void main();

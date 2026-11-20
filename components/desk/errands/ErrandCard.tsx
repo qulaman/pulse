@@ -162,7 +162,7 @@ export function ErrandDetails({
   pointsOn: boolean;
 }) {
   return (
-    <div className="errands-details flex flex-col gap-5 pr-8" data-testid="desk-errand-details">
+    <div className="flex flex-col gap-5 pr-8" data-testid="desk-errand-details">
       <ErrandBody errand={errand} now={now} catalogue={catalogue} />
       {/* the director's side answers the question itself (DirectorLink); the secretary reads it here */}
       {viewer === "secretary" && errand.question ? (

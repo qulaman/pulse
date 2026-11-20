@@ -15,16 +15,6 @@ export function rng(seed: number): () => number {
   };
 }
 
-/** A number in [min, max). */
-export function between(random: () => number, min: number, max: number): number {
-  return min + random() * (max - min);
-}
-
-/** One of the items, uniformly. */
-export function pick<T>(random: () => number, items: readonly T[]): T {
-  return items[Math.min(items.length - 1, Math.floor(random() * items.length))]!;
-}
-
 /** A seed that is different every time — for a scene nobody is going to compare to anything. */
 export function looseSeed(): number {
   return (Math.random() * 0xffffffff) >>> 0;

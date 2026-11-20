@@ -2,30 +2,27 @@
 
 import { ReactionBadge } from "@/components/points/ReactionBar";
 import { AudioOriginal } from "@/components/tasks/AudioOriginal";
-import { Button } from "@/components/ui/Button";
+import { WordBubble } from "@/components/tasks/detail/WordBubble";
+import { Note, RevokedNote, TimeRequestNote, TranscriptSpoiler } from "@/components/tasks/TaskNotes";
 import { humanAqtobe } from "@/lib/ai/time";
+import { shortName } from "@/lib/people/names";
 import { hasUnread, type BoardTask } from "@/lib/pulse/board";
-import { passedWord, untilWords } from "@/lib/tasks/lifecycle";
+import { isWorking } from "@/lib/tasks/lifecycle";
 import { statusWord, stepsOf } from "@/lib/tasks/overview";
 import type { ReactionCode } from "@/lib/points/reactions";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
-import { BUTTON, TEXT } from "@/lib/tasks/status-text";
+import { TEXT, wordText } from "@/lib/tasks/status-text";
 
-import { Icon } from "../desk/icons";
-import { CardFoot, CardHead, CardShell, LastWord, Note, Stepper } from "./TaskList";
-
-export type EmployeeAction = "accept" | "ask" | "decline" | "complete";
-
-/** A key of the new order's row: its words' width plus an equal share, as on Лента's card (D-173). */
-const KEY = "min-w-0 flex-auto !px-2 whitespace-nowrap [&>span]:gap-1";
+import { Icon } from "../icons";
+import { EmployeeKeys, type EmployeeAction } from "./EmployeeKeys";
+import { CardFoot, CardHead, CardShell, Stepper } from "./TaskList";
 
 /**
  * A card of «Мои дела». Closed: the state mark, the title, «when», the state. Open: what
  * the director wrote and said (the recording and the words), a return for rework, the
- * director's last word, the buttons of FRONTEND «Состояние задачи → набор кнопок» — Принял /
- * Уточнить / Не могу on a new task (принцип 2), Выполнено / Уточнить / Не могу on work in
- * hand: «Не могу» after «Принял» asks for time, names the right colleague or refuses (D-128) —
- * and under them the four steps (D-173: the buttons first, so «Принял» is in sight on a phone).
+ * director's last word, the buttons of FRONTEND «Состояние задачи → набор кнопок» (`EmployeeKeys`,
+ * principle 2) — and under them the four steps (D-173: the buttons first, so «Принял» is in sight
+ * on a phone).
  * A request still waiting is said on the card.
  */
 export function EmployeeTaskCard({
@@ -54,18 +51,12 @@ export function EmployeeTaskCard({
   const unread = row ? hasUnread(row, meId) : false;
   const closed = task.status === "done" || task.status === "revoked" || task.status === "declined";
   const last = row?.last_message ?? null;
-  const lastText = last
-    ? last.type === "photo"
-      ? `фото${last.content ? ` · ${last.content}` : ""}`
-      : last.type === "voice"
-        ? `голосовое${last.content ? ` · ${last.content}` : ""}`
-        : (last.content ?? "")
-    : "";
+  const lastText = last ? wordText(last) : "";
   const lastName = last ? (last.sender_id === meId ? "Вы" : (task.author?.full_name ?? "Директор")) : "";
-  const author = task.author?.full_name?.trim().split(/\s+/)[0];
-  // my own request for time, still waiting for the director (D-128)
-  const request = row?.time_request && (task.status === "accepted" || task.status === "in_progress" || task.status === "rework") ? row.time_request : null;
-  const suggested = task.status === "declined" ? row?.suggestion?.name.trim().split(/\s+/)[0] : undefined;
+  const author = shortName(task.author?.full_name);
+  // my own request for time, still waiting for the director (D-128); a new task has none to wait on
+  const request = row?.time_request && isWorking(task.status) && task.status !== "sent" ? row.time_request : null;
+  const suggested = task.status === "declined" ? shortName(row?.suggestion?.name) : undefined;
 
   return (
     <CardShell
@@ -104,83 +95,24 @@ export function EmployeeTaskCard({
             {TEXT.reworkBanner}
           </Note>
         ) : null}
-        {request ? (
-          <Note tone="warn" icon={<Icon name="clock" size={15} />}>
-            Просите срок {untilWords(request.proposed, now)} · ждёт ответа директора
-          </Note>
-        ) : null}
-        {task.status === "revoked" ? (
-          task.passed_to ? (
-            <Note tone="muted" icon={<Icon name="swap" size={15} />}>
-              {passedWord(task.passed?.full_name)}
-            </Note>
-          ) : (
-            <Note tone="muted" icon={<Icon name="undo" size={15} />}>
-              {TEXT.revoked}
-            </Note>
-          )
-        ) : null}
+        {request ? <TimeRequestNote proposed={request.proposed} now={now} /> : null}
+        {task.status === "revoked" ? <RevokedNote task={task} /> : null}
         {task.status === "declined" ? (
           <Note tone="danger" icon={<Icon name="hand" size={15} />}>
             Отказ отправлен директору{suggested ? ` · вы предложили: ${suggested}` : ""}
           </Note>
         ) : null}
 
-        {last && lastText ? <LastWord name={lastName} text={lastText} at={last.created_at} now={now} unread={unread} /> : null}
+        {last && lastText ? <WordBubble name={lastName} text={lastText} at={last.created_at} now={now} unread={unread} brief /> : null}
 
         {task.source_audio_path ? <AudioOriginal path={task.source_audio_path} /> : null}
-        {/* a typed order's «transcript» is its own title — only a voice one says something new;
-            the whole row is the finger's target (44 px, D-173), its words keep their size */}
-        {task.source_transcript && task.source_transcript.trim() !== task.title.trim() ? (
-          <details className="group mt-1">
-            <summary className="-mx-1.5 flex min-h-[44px] cursor-pointer list-none items-center gap-1.5 rounded-[10px] px-1.5 text-[13px] leading-4 text-muted transition-colors duration-[120ms] active:bg-white/[0.04] [&::-webkit-details-marker]:hidden">
-              <Icon name="quote" size={14} />
-              {TEXT.transcriptSpoiler}
-              <span aria-hidden className="ml-auto transition-transform duration-[120ms] group-open:rotate-180">
-                ▾
-              </span>
-            </summary>
-            <blockquote
-              className="mt-1 border-l-2 pl-3 text-[14px] italic leading-[19px] text-muted"
-              style={{ borderColor: "color-mix(in srgb, var(--accent) 45%, transparent)" }}
-            >
-              «{task.source_transcript}»
-            </blockquote>
-          </details>
-        ) : null}
+        <TranscriptSpoiler task={task} />
       </div>
 
       {/* the buttons come before the steps (D-173): «Принял» stays in sight on a phone, and the
           steps are where the task stands, not what to do. Handed-in work has no buttons: its
           steps («Сдана · Проверка») say it waits for the director */}
-      {task.status === "sent" ? (
-        // three keys in a row, each as wide as its words plus an equal share of the rest, the icon
-        // close to its word: in equal thirds «Уточнить» ran its icon into the edge at 360 px (D-173)
-        <div className="mt-4 flex gap-2">
-          <Button data-testid="task-action-accept" className={KEY} icon={<Icon name="check" />} onClick={() => onAction("accept", task)}>
-            {BUTTON.accept}
-          </Button>
-          <Button variant="secondary" className={KEY} icon={<Icon name="question" />} onClick={() => onAction("ask", task)}>
-            {BUTTON.ask}
-          </Button>
-          <Button variant="danger" className={KEY} icon={<Icon name="x" />} onClick={() => onAction("decline", task)}>
-            {BUTTON.cant}
-          </Button>
-        </div>
-      ) : task.status === "accepted" || task.status === "in_progress" || task.status === "rework" ? (
-        // «Выполнено» leads on its own row: three keys of a third each clip it on an iPhone SE
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <Button data-testid="task-action-complete" className="col-span-2 whitespace-nowrap" icon={<Icon name="check" />} onClick={() => onAction("complete", task)}>
-            {BUTTON.complete}
-          </Button>
-          <Button variant="secondary" className="!px-2 whitespace-nowrap" icon={<Icon name="question" />} onClick={() => onAction("ask", task)}>
-            {BUTTON.ask}
-          </Button>
-          <Button data-testid="task-action-cant" variant="secondary" className="!px-2 whitespace-nowrap" icon={<Icon name="clock" />} onClick={() => onAction("decline", task)}>
-            {BUTTON.cant}
-          </Button>
-        </div>
-      ) : null}
+      <EmployeeKeys status={task.status} onPress={(action) => onAction(action, task)} />
 
       <div className="mt-4">
         {/* the holder's own steps: a new one «Ждёт вас», not «В работе» (D-173) */}

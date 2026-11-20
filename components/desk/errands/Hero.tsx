@@ -34,13 +34,13 @@ export function ErrandsHero({
   return (
     <section className="desk-total errands-hero @container flex flex-col gap-3.5" data-testid="desk-errands-hero" data-tone={tone ?? undefined}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
-        <div className="errands-hero-words min-w-0 flex-1">
+        <div className="min-w-0 flex-1">
           <p className="text-[17px] font-semibold leading-[22px] [overflow-wrap:anywhere]" data-testid="hero-title">
             {title}
           </p>
           {sub ? <p className="mt-0.5 text-[13px] leading-[18px] text-muted">{sub}</p> : null}
         </div>
-        {lead ? <div className="errands-hero-lead -order-1 shrink-0">{lead}</div> : null}
+        {lead ? <div className="-order-1 shrink-0">{lead}</div> : null}
         {aside ? <div className="min-w-0 @min-[1040px]:ml-auto">{aside}</div> : null}
       </div>
       {children}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { DESK_SHEET_SCRIPT } from "./device";
-import { DESK_LOOK_KEY, DESK_THEME_KEY, otherDeskLook, otherDeskTheme, parseDeskLook, parseDeskTheme } from "./theme";
+import { DESK_THEME_KEY, otherDeskTheme, parseDeskTheme } from "./theme";
 
 describe("the desk's theme", () => {
   it("is dark unless light was chosen", () => {
@@ -21,13 +21,8 @@ describe("the desk's theme", () => {
     expect(DESK_SHEET_SCRIPT).toContain(DESK_THEME_KEY);
   });
 
-  it("looks «Графит» unless «Журнал» was chosen (D-171)", () => {
-    expect(parseDeskLook("journal")).toBe("journal");
-    expect(parseDeskLook("graphite")).toBe("graphite");
-    expect(parseDeskLook(null)).toBe("graphite");
-    expect(parseDeskLook("sepia")).toBe("graphite");
-    expect(otherDeskLook("graphite")).toBe("journal");
-    expect(otherDeskLook("journal")).toBe("graphite");
-    expect(DESK_SHEET_SCRIPT).toContain(DESK_LOOK_KEY);
+  it("looks «Графит» always (D-171): the head script no longer reads a look", () => {
+    expect(DESK_SHEET_SCRIPT).toContain('r.dataset.graphite=""');
+    expect(DESK_SHEET_SCRIPT).not.toContain("pulse.desk.look");
   });
 });

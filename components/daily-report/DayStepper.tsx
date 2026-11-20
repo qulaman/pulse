@@ -1,9 +1,10 @@
 "use client";
 
-import { Icon } from "@/components/tasks/desk/icons";
 import { Bone } from "@/components/ui/Skeleton";
-import { addDaysYmd, dayTitle } from "@/lib/daily-report/format";
+import { dayTitle } from "@/lib/daily-report/format";
 import type { Ymd } from "@/lib/datetime/calendar";
+import { Icon } from "@/components/tasks/icons";
+import { addDays } from "@/lib/datetime/calendar";
 
 const STEP =
   "relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] btn-secondary text-text transition-transform duration-[120ms] active:scale-[0.94] disabled:opacity-35 disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/35";
@@ -20,7 +21,7 @@ export function DayStepper({ date, today, onChange }: { date: Ymd | null; today:
         type="button"
         aria-label="Предыдущий день"
         disabled={!onChange || !date}
-        onClick={() => date && onChange?.(addDaysYmd(date, -1))}
+        onClick={() => date && onChange?.(addDays(date, -1))}
         className={STEP}
       >
         <Icon name="left" size={18} />
@@ -48,7 +49,7 @@ export function DayStepper({ date, today, onChange }: { date: Ymd | null; today:
         type="button"
         aria-label="Следующий день"
         disabled={!onChange || !date || isToday}
-        onClick={() => date && onChange?.(addDaysYmd(date, 1))}
+        onClick={() => date && onChange?.(addDays(date, 1))}
         className={STEP}
       >
         <Icon name="right" size={18} />

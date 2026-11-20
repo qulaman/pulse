@@ -1,8 +1,8 @@
 import { after } from "next/server";
 import { z } from "zod";
 
-import { userSupabase, withAuth } from "@/lib/api/handler";
-import { apiError, apiOk } from "@/lib/api/respond";
+import { TASK_ID, userSupabase, withAuth } from "@/lib/api/handler";
+import { apiOk, NO_ACCESS, NO_PERSON, NO_TASK, rpcFailure, rpcResult, STATUS_MOVED } from "@/lib/api/respond";
 import { kickDeliveries } from "@/lib/push/send";
 import { createServiceSupabase } from "@/lib/supabase/service";
 import type { Database } from "@/lib/supabase/types";
@@ -42,10 +42,6 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
   "any",
   async ({ req, profile, body, params }) => {
     const taskId = params.id;
-    if (!z.uuid().safeParse(taskId).success) {
-      return apiError(404, "task_not_found", "Задача не найдена");
-    }
-
     const supabase = await userSupabase(req);
     const { data, error } = await supabase.rpc("transition_task", {
       task_id: taskId,
@@ -60,21 +56,19 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     });
 
     if (error) {
-      if (error.message.includes("invalid_transition")) {
-        return apiError(409, "invalid_transition", "Так нельзя: статус уже изменился");
-      }
-      if (error.message.includes("task_not_found")) {
-        return apiError(404, "task_not_found", "Задача не найдена");
-      }
-      if (error.message.includes("forbidden")) {
-        return apiError(403, "forbidden", "Нет доступа");
-      }
-      if (error.message.includes("assignee_not_found")) return apiError(404, "assignee_not_found", "Такого сотрудника нет");
-      if (error.message.includes("same_assignee")) return apiError(409, "same_assignee", "Себя предложить нельзя");
-      throw new Error(`transition_task failed: ${error.message}`);
+      return rpcFailure(
+        error,
+        {
+          invalid_transition: STATUS_MOVED,
+          task_not_found: NO_TASK,
+          forbidden: NO_ACCESS,
+          assignee_not_found: NO_PERSON,
+          same_assignee: [409, "Себя предложить нельзя"],
+        },
+        "transition_task",
+      );
     }
 
-    const { duplicate = false, ...result } = (data ?? {}) as Record<string, unknown>;
     after(async () => {
       if (body.to_status === "accepted") {
         // «принял» (D-32): the receipt on the director's card
@@ -92,7 +86,8 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       // awaited: the platform keeps the function alive only for work it is handed (D-125)
       await kickDeliveries();
     });
-    return apiOk({ result, duplicate });
+    return apiOk(rpcResult(data));
   },
   BodySchema,
+  { id: TASK_ID },
 );

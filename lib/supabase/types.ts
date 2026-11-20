@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -763,7 +763,7 @@ export type Database = {
           id: string
           issue_request_id: string | null
           issued_at: string
-          issued_by: string
+          issued_by: string | null
           redeem_request_id: string | null
           used_at: string | null
           used_device: string | null
@@ -777,7 +777,7 @@ export type Database = {
           id?: string
           issue_request_id?: string | null
           issued_at?: string
-          issued_by: string
+          issued_by?: string | null
           redeem_request_id?: string | null
           used_at?: string | null
           used_device?: string | null
@@ -791,7 +791,7 @@ export type Database = {
           id?: string
           issue_request_id?: string | null
           issued_at?: string
-          issued_by?: string
+          issued_by?: string | null
           redeem_request_id?: string | null
           used_at?: string | null
           used_device?: string | null
@@ -1272,7 +1272,7 @@ export type Database = {
           {
             foreignKeyName: "point_disputes_transaction_id_fkey"
             columns: ["transaction_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "point_transactions"
             referencedColumns: ["id"]
           },
@@ -2091,6 +2091,108 @@ export type Database = {
           },
         ]
       }
+      tv_pair_attempts: {
+        Row: {
+          at: string
+          id: number
+          ok: boolean
+          user_id: string
+        }
+        Insert: {
+          at?: string
+          id?: never
+          ok: boolean
+          user_id: string
+        }
+        Update: {
+          at?: string
+          id?: never
+          ok?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tv_pair_attempts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tv_pairings: {
+        Row: {
+          cancelled_at: string | null
+          claimed_at: string | null
+          code_hash: string
+          company_id: string | null
+          confirm_request_id: string | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          device: string | null
+          expires_at: string
+          id: string
+          ip_hash: string
+          secret_hash: string
+          tv_user_id: string | null
+        }
+        Insert: {
+          cancelled_at?: string | null
+          claimed_at?: string | null
+          code_hash: string
+          company_id?: string | null
+          confirm_request_id?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          device?: string | null
+          expires_at: string
+          id?: string
+          ip_hash: string
+          secret_hash: string
+          tv_user_id?: string | null
+        }
+        Update: {
+          cancelled_at?: string | null
+          claimed_at?: string | null
+          code_hash?: string
+          company_id?: string | null
+          confirm_request_id?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          device?: string | null
+          expires_at?: string
+          id?: string
+          ip_hash?: string
+          secret_hash?: string
+          tv_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tv_pairings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tv_pairings_confirmed_by_fkey"
+            columns: ["confirmed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tv_pairings_tv_user_id_fkey"
+            columns: ["tv_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tv_state: {
         Row: {
           applied_version: number | null
@@ -2108,10 +2210,13 @@ export type Database = {
           expires_at: string | null
           guest: boolean
           guest_until: string | null
+          health: Json | null
           mode: string
           rating_view: string
           reload_requested_at: string | null
+          scale: number
           scene: string
+          scene_set_at: string | null
           seen_at: string | null
           task_id: string | null
           updated_at: string
@@ -2136,10 +2241,13 @@ export type Database = {
           expires_at?: string | null
           guest?: boolean
           guest_until?: string | null
+          health?: Json | null
           mode?: string
           rating_view?: string
           reload_requested_at?: string | null
+          scale?: number
           scene?: string
+          scene_set_at?: string | null
           seen_at?: string | null
           task_id?: string | null
           updated_at?: string
@@ -2164,10 +2272,13 @@ export type Database = {
           expires_at?: string | null
           guest?: boolean
           guest_until?: string | null
+          health?: Json | null
           mode?: string
           rating_view?: string
           reload_requested_at?: string | null
+          scale?: number
           scene?: string
+          scene_set_at?: string | null
           seen_at?: string | null
           task_id?: string | null
           updated_at?: string
@@ -2217,6 +2328,13 @@ export type Database = {
             columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tv_state_week_board_id_fkey"
+            columns: ["week_board_id"]
+            isOneToOne: false
+            referencedRelation: "mind_boards"
             referencedColumns: ["id"]
           },
         ]
@@ -2290,6 +2408,42 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voice_kept: {
+        Row: {
+          company_id: string
+          created_at: string
+          kept_by: string | null
+          path: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          kept_by?: string | null
+          path: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          kept_by?: string | null
+          path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_kept_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "voice_kept_kept_by_fkey"
+            columns: ["kept_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2379,6 +2533,7 @@ export type Database = {
       }
       auth_company_id: { Args: never; Returns: string }
       auth_role: { Args: never; Returns: string }
+      auth_session_live: { Args: never; Returns: boolean }
       award_points: {
         Args: {
           client_request_id?: string
@@ -2461,19 +2616,51 @@ export type Database = {
         Args: { client_request_id?: string; p_item_id: string }
         Returns: Json
       }
+      daily_report_checked_on: { Args: { p_settings: Json }; Returns: string }
+      daily_report_clock: {
+        Args: { p_default: string; p_key: string; p_settings: Json }
+        Returns: string
+      }
+      daily_report_holiday: {
+        Args: { p_day: string; p_settings: Json }
+        Returns: boolean
+      }
+      daily_report_json: {
+        Args: { p_report: Database["public"]["Tables"]["daily_reports"]["Row"] }
+        Returns: Json
+      }
+      daily_report_on: { Args: { p_settings: Json }; Returns: boolean }
+      daily_report_refund_early_fines: { Args: never; Returns: number }
+      daily_report_reminders_due: { Args: { p_now?: string }; Returns: number }
+      daily_report_started_on: { Args: { p_settings: Json }; Returns: string }
+      daily_report_state: {
+        Args: {
+          p_active: boolean
+          p_availability: Database["public"]["Enums"]["availability_t"]
+          p_day: string
+          p_joined: string
+          p_settings: Json
+          p_status: string
+          p_today: string
+        }
+        Returns: string
+      }
+      daily_report_tasks: {
+        Args: { p_company: string; p_day: string; p_user: string }
+        Returns: Json
+      }
+      daily_report_workday: {
+        Args: { p_day: string; p_settings: Json }
+        Returns: boolean
+      }
+      daily_reports_due_missed: { Args: { p_now?: string }; Returns: number }
       deadline_reminders_due: { Args: { p_now?: string }; Returns: number }
       delete_event: { Args: { p_event: string }; Returns: undefined }
       delete_task: { Args: { task_id: string }; Returns: Json }
-      dispute_points: {
-        Args: { client_request_id?: string; p_text: string; p_transaction: string }
-        Returns: Json
-      }
       delivery_category: {
         Args: { p_kind: string; p_meta: Json }
         Returns: string
       }
-      daily_report_reminders_due: { Args: { p_now?: string }; Returns: number }
-      daily_reports_due_missed: { Args: { p_now?: string }; Returns: number }
       director_busy: {
         Args: { p_from: string; p_to: string }
         Returns: {
@@ -2494,6 +2681,14 @@ export type Database = {
       director_quiet_until: {
         Args: { p_at: string; p_prefs: Json }
         Returns: string
+      }
+      dispute_points: {
+        Args: {
+          client_request_id?: string
+          p_text: string
+          p_transaction: string
+        }
+        Returns: Json
       }
       edit_event: {
         Args: {
@@ -2575,6 +2770,10 @@ export type Database = {
         Returns: undefined
       }
       events_due_reminders: { Args: { p_now?: string }; Returns: number }
+      excuse_daily_report: {
+        Args: { client_request_id?: string; p_reason: string; p_report: string }
+        Returns: Json
+      }
       extend_task_deadline: {
         Args: {
           client_request_id?: string
@@ -2595,6 +2794,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      is_event_participant: { Args: { p_event: string }; Returns: boolean }
       issue_login_code: {
         Args: {
           p_code_hash: string
@@ -2605,7 +2805,6 @@ export type Database = {
         }
         Returns: Json
       }
-      is_event_participant: { Args: { p_event: string }; Returns: boolean }
       mark_thread_read: {
         Args: { seq: number; task_id: string }
         Returns: number
@@ -2636,6 +2835,8 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      my_daily_report: { Args: { p_date?: string }; Returns: Json }
+      my_daily_report_history: { Args: { p_limit?: number }; Returns: Json }
       next_delivery_slot: {
         Args: { p_company: string; p_now?: string }
         Returns: string
@@ -2661,7 +2862,158 @@ export type Database = {
         Args: { client_request_id?: string; task_id: string }
         Returns: Json
       }
+      ops_add_person: {
+        Args: {
+          p_aliases: string[]
+          p_company: string
+          p_full_name: string
+          p_position: string
+          p_role: string
+          p_ticket: string
+          p_user: string
+        }
+        Returns: undefined
+      }
+      ops_adjust_points: {
+        Args: {
+          p_amount: number
+          p_company: string
+          p_reason: string
+          p_ticket: string
+          p_user: string
+        }
+        Returns: Json
+      }
+      ops_audit_list: {
+        Args: { p_before: number; p_company: string; p_limit: number }
+        Returns: Json
+      }
+      ops_change_director: {
+        Args: {
+          p_company: string
+          p_new: string
+          p_old: string
+          p_old_fate: string
+          p_ticket: string
+        }
+        Returns: Json
+      }
+      ops_companies: { Args: never; Returns: Json }
+      ops_company_card: { Args: { p_company: string }; Returns: Json }
+      ops_company_footprint: { Args: { p_company: string }; Returns: Json }
+      ops_create_company: {
+        Args: { p_payload: Json; p_ticket: string }
+        Returns: Json
+      }
+      ops_delete_task: {
+        Args: { p_company: string; p_task: string; p_ticket: string }
+        Returns: undefined
+      }
+      ops_export_begin: {
+        Args: { p_company: string; p_ticket: string }
+        Returns: string
+      }
+      ops_export_files: {
+        Args: { p_export: string; p_limit: number; p_offset: number }
+        Returns: Json
+      }
+      ops_export_finish: {
+        Args: { p_counts: Json; p_export: string; p_sha256: string }
+        Returns: undefined
+      }
+      ops_export_page: {
+        Args: {
+          p_export: string
+          p_limit: number
+          p_offset: number
+          p_table: string
+        }
+        Returns: Json
+      }
+      ops_grant_operator: {
+        Args: { p_note: string; p_user: string }
+        Returns: undefined
+      }
+      ops_log_action: {
+        Args: {
+          p_action: string
+          p_company: string
+          p_result: Json
+          p_ticket: string
+        }
+        Returns: undefined
+      }
+      ops_login_state: { Args: never; Returns: Json }
+      ops_operators: { Args: never; Returns: Json }
+      ops_prepare_company: { Args: { p_ticket: string }; Returns: Json }
+      ops_purge_company: {
+        Args: { p_company: string; p_confirm_name: string; p_ticket: string }
+        Returns: Json
+      }
+      ops_revoke_operator: { Args: { p_user: string }; Returns: undefined }
+      ops_revoke_sessions: {
+        Args: { p_company: string; p_ticket: string; p_user: string }
+        Returns: Json
+      }
+      ops_slug_free: { Args: { p_slug: string }; Returns: boolean }
+      ops_storage_done: { Args: { p_ids: number[] }; Returns: undefined }
+      ops_storage_left: { Args: { p_company: string }; Returns: number }
+      ops_storage_next: { Args: { p_limit: number }; Returns: Json }
+      ops_task_get: {
+        Args: { p_company_or_null: string; p_task: string; p_ticket: string }
+        Returns: Json
+      }
+      ops_ticket: {
+        Args: {
+          p_action: string
+          p_client_request_id: string
+          p_company: string
+          p_reason: string
+          p_target: Json
+        }
+        Returns: Json
+      }
+      ops_update_company: {
+        Args: {
+          p_company: string
+          p_name: string
+          p_settings: Json
+          p_slug: string
+          p_ticket: string
+        }
+        Returns: undefined
+      }
+      ops_update_person: {
+        Args: {
+          p_company: string
+          p_patch: Json
+          p_ticket: string
+          p_user: string
+        }
+        Returns: undefined
+      }
+      ops_update_task: {
+        Args: {
+          p_company: string
+          p_patch: Json
+          p_task: string
+          p_ticket: string
+        }
+        Returns: undefined
+      }
+      ops_wipe_activity: {
+        Args: { p_company: string; p_confirm_name: string; p_ticket: string }
+        Returns: Json
+      }
       overdue_alerts_due: { Args: { p_now?: string }; Returns: number }
+      person_daily_reports: {
+        Args: { p_from: string; p_to: string; p_user_id: string }
+        Returns: Json
+      }
+      points_rule: {
+        Args: { p_default: number; p_key: string; p_settings: Json }
+        Returns: number
+      }
       publish_due_scheduled: { Args: { p_now?: string }; Returns: number }
       purge_closed_tasks: { Args: never; Returns: Json }
       push_health: {
@@ -2679,8 +3031,13 @@ export type Database = {
       }
       push_when: { Args: { p_at: string; p_now?: string }; Returns: string }
       react_to_task: {
-        Args: { client_request_id?: string; p_code: string | null; p_task: string }
+        Args: { client_request_id?: string; p_code: string; p_task: string }
         Returns: Json
+      }
+      reaction_glyph: { Args: { p_code: string }; Returns: string }
+      reaction_points: {
+        Args: { p_code: string; p_settings: Json }
+        Returns: number
       }
       reassign_task: {
         Args: {
@@ -2692,6 +3049,34 @@ export type Database = {
           task_id: string
         }
         Returns: Json
+      }
+      recurrence_falls_on: {
+        Args: {
+          d: string
+          r: Database["public"]["Tables"]["recurrence_rules"]["Row"]
+        }
+        Returns: boolean
+      }
+      recurrence_in_phase: {
+        Args: {
+          d: string
+          r: Database["public"]["Tables"]["recurrence_rules"]["Row"]
+        }
+        Returns: boolean
+      }
+      recurrence_next_on: {
+        Args: {
+          p_after: string
+          r: Database["public"]["Tables"]["recurrence_rules"]["Row"]
+        }
+        Returns: string
+      }
+      recurrence_run_at: {
+        Args: {
+          p_on: string
+          r: Database["public"]["Tables"]["recurrence_rules"]["Row"]
+        }
+        Returns: string
       }
       recurrence_spawn: { Args: { p_now?: string }; Returns: number }
       redeem_login_code: {
@@ -2705,6 +3090,10 @@ export type Database = {
         Returns: Json
       }
       release_login_code: { Args: { p_code_id: string }; Returns: undefined }
+      remind_daily_report: {
+        Args: { client_request_id?: string; p_user_ids: string[] }
+        Returns: Json
+      }
       request_deadline: {
         Args: {
           client_request_id?: string
@@ -2741,7 +3130,11 @@ export type Database = {
         }
       }
       revoke_sessions: {
-        Args: { p_keep_current?: boolean; p_keep_endpoint?: string; p_user_id: string }
+        Args: {
+          p_keep_current?: boolean
+          p_keep_endpoint?: string
+          p_user_id: string
+        }
         Returns: Json
       }
       revoke_task: {
@@ -2760,10 +3153,6 @@ export type Database = {
         Args: { client_request_id?: string; task_id: string }
         Returns: Json
       }
-      set_event_participants: {
-        Args: { p_add?: string[]; p_event: string; p_remove?: string[] }
-        Returns: undefined
-      }
       set_notify_prefs: { Args: { p_prefs: Json }; Returns: Json }
       set_shop_order_status: {
         Args: {
@@ -2773,9 +3162,6 @@ export type Database = {
         }
         Returns: Json
       }
-      subordinates: { Args: { mgr: string }; Returns: string[] }
-      my_daily_report: { Args: { p_date?: string }; Returns: Json }
-      my_daily_report_history: { Args: { p_limit?: number }; Returns: Json }
       submit_daily_report: {
         Args: {
           client_request_id?: string
@@ -2785,27 +3171,27 @@ export type Database = {
         }
         Returns: Json
       }
-      team_daily_report_day: { Args: { p_date?: string }; Returns: Json }
-      team_daily_report_period: { Args: { p_from: string; p_to: string }; Returns: Json }
+      subordinates: { Args: { mgr: string }; Returns: string[] }
+      task_sent_at: {
+        Args: { p_fallback: string; p_task: string }
+        Returns: string
+      }
+      task_streak_of: {
+        Args: { p_company: string; p_user: string }
+        Returns: number
+      }
       team_channel_alerts_due: { Args: { p_now?: string }; Returns: number }
+      team_daily_report_day: { Args: { p_date?: string }; Returns: Json }
+      team_daily_report_period: {
+        Args: { p_from: string; p_to: string }
+        Returns: Json
+      }
       team_role: {
         Args: { r: Database["public"]["Enums"]["user_role"] }
         Returns: boolean
       }
       thank_errand: {
         Args: { client_request_id?: string; p_id: string }
-        Returns: Json
-      }
-      person_daily_reports: {
-        Args: { p_from: string; p_to: string; p_user_id: string }
-        Returns: Json
-      }
-      excuse_daily_report: {
-        Args: { client_request_id?: string; p_reason: string; p_report: string }
-        Returns: Json
-      }
-      remind_daily_report: {
-        Args: { client_request_id?: string; p_user_ids: string[] }
         Returns: Json
       }
       transition_errand: {
@@ -2827,43 +3213,7 @@ export type Database = {
         Returns: Json
       }
       tv_board: { Args: { p_guest?: boolean }; Returns: Json }
-      tv_week_board: {
-        Args: { p_board?: string }
-        Returns: {
-          applied_version: number | null
-          awake_until: string | null
-          board_guest: boolean
-          board_id: string | null
-          board_point: string | null
-          board_until: string | null
-          board_view: string
-          calendar_view: string
-          carousel: boolean
-          clock_style: string
-          company_id: string
-          employee_id: string | null
-          expires_at: string | null
-          guest: boolean
-          guest_until: string | null
-          mode: string
-          rating_view: string
-          reload_requested_at: string | null
-          scene: string
-          seen_at: string | null
-          task_id: string | null
-          updated_at: string
-          updated_by: string | null
-          version: number
-          week_board_id: string | null
-          week_board_until: string | null
-        }
-        SetofOptions: {
-          from: "*"
-          to: "tv_state"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+      tv_board_cap: { Args: never; Returns: string }
       tv_board_control: {
         Args: {
           p_board_until?: string
@@ -2887,15 +3237,20 @@ export type Database = {
           expires_at: string | null
           guest: boolean
           guest_until: string | null
+          health: Json | null
           mode: string
           rating_view: string
           reload_requested_at: string | null
+          scale: number
           scene: string
+          scene_set_at: string | null
           seen_at: string | null
           task_id: string | null
           updated_at: string
           updated_by: string | null
           version: number
+          week_board_id: string | null
+          week_board_until: string | null
         }
         SetofOptions: {
           from: "*"
@@ -2921,6 +3276,7 @@ export type Database = {
           p_mode?: string
           p_rating?: string
           p_reload?: boolean
+          p_scale?: number
           p_scene?: string
           p_task_id?: string
           p_wake?: boolean
@@ -2941,15 +3297,20 @@ export type Database = {
           expires_at: string | null
           guest: boolean
           guest_until: string | null
+          health: Json | null
           mode: string
           rating_view: string
           reload_requested_at: string | null
+          scale: number
           scene: string
+          scene_set_at: string | null
           seen_at: string | null
           task_id: string | null
           updated_at: string
           updated_by: string | null
           version: number
+          week_board_id: string | null
+          week_board_until: string | null
         }
         SetofOptions: {
           from: "*"
@@ -2976,11 +3337,39 @@ export type Database = {
         Args: { p_state: Database["public"]["Tables"]["tv_state"]["Row"] }
         Returns: boolean
       }
-      tv_heartbeat: { Args: { p_applied_version?: number }; Returns: undefined }
+      tv_heartbeat: {
+        Args: { p_applied_version?: number; p_health?: Json }
+        Returns: undefined
+      }
       tv_overlay: { Args: never; Returns: Json }
+      tv_pair_confirm: {
+        Args: {
+          p_code_hash: string
+          p_request_id: string
+          p_screen_id?: string
+        }
+        Returns: Json
+      }
+      tv_pair_issue: {
+        Args: {
+          p_code_hash: string
+          p_device?: string
+          p_ip_hash: string
+          p_prev_secret_hash?: string
+          p_secret_hash: string
+          p_ttl_seconds?: number
+        }
+        Returns: Json
+      }
+      tv_pair_poll: { Args: { p_secret_hash: string }; Returns: Json }
+      tv_pair_release: { Args: { p_id: string }; Returns: undefined }
       tv_rating: {
         Args: { p_guest?: boolean; p_period?: string }
         Returns: Json
+      }
+      tv_stage: {
+        Args: { p_status: Database["public"]["Enums"]["task_status"] }
+        Returns: string
       }
       tv_summary: { Args: { p_guest?: boolean }; Returns: Json }
       tv_task_story: { Args: { p_task: string }; Returns: Json }
@@ -2988,10 +3377,67 @@ export type Database = {
         Args: { p_company: string; p_guest_minutes?: number }
         Returns: number
       }
+      tv_week_board: {
+        Args: { p_board?: string }
+        Returns: {
+          applied_version: number | null
+          awake_until: string | null
+          board_guest: boolean
+          board_id: string | null
+          board_point: string | null
+          board_until: string | null
+          board_view: string
+          calendar_view: string
+          carousel: boolean
+          clock_style: string
+          company_id: string
+          employee_id: string | null
+          expires_at: string | null
+          guest: boolean
+          guest_until: string | null
+          health: Json | null
+          mode: string
+          rating_view: string
+          reload_requested_at: string | null
+          scale: number
+          scene: string
+          scene_set_at: string | null
+          seen_at: string | null
+          task_id: string | null
+          updated_at: string
+          updated_by: string | null
+          version: number
+          week_board_id: string | null
+          week_board_until: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tv_state"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      tv_week_end: { Args: never; Returns: string }
       unseen_task_alerts_due: { Args: { p_now?: string }; Returns: number }
       update_company_profile: { Args: { p_name: string }; Returns: Json }
       update_company_settings: { Args: { patch: Json }; Returns: Json }
       visits_due_expiry: { Args: { p_now?: string }; Returns: number }
+      voice_keep: {
+        Args: { p_keep: boolean; p_path: string }
+        Returns: boolean
+      }
+      voice_mark_purged: { Args: { p_paths: string[] }; Returns: number }
+      voice_purge_due: {
+        Args: { p_limit?: number; p_now?: string }
+        Returns: {
+          company_id: string
+          path: string
+        }[]
+      }
+      voice_retention_days: {
+        Args: { p_default: number; p_key: string; p_settings: Json }
+        Returns: number
+      }
     }
     Enums: {
       absence_kind: "vacation" | "sick" | "other"

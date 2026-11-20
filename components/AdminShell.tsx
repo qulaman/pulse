@@ -4,22 +4,17 @@ import type { ReactNode } from "react";
 import { DirectorShell } from "@/components/DirectorShell";
 import { RoleScope } from "@/components/RoleScope";
 import { TabBar } from "@/components/TabBar";
-import { AuthError, getSessionProfile, homeForRole } from "@/lib/auth";
+import { homeForRole } from "@/lib/auth";
+import { profileOrLogin } from "@/lib/auth-layout";
 import { canManageTeam } from "@/lib/routes";
 
 /**
  * Layout of the routes the director shares with the secretary — «Настройки» and «Команда»
  * (D-104). The director keeps the full chrome of the (director) group; the secretary gets
- * her own tab bar with «Настройки» in it; everyone else goes home.
+ * her own tab bar; everyone else goes home.
  */
 export async function AdminShell({ children }: { children: ReactNode }) {
-  let profile;
-  try {
-    profile = await getSessionProfile();
-  } catch (error) {
-    if (error instanceof AuthError) redirect("/login");
-    throw error;
-  }
+  const profile = await profileOrLogin();
   if (!canManageTeam(profile.role)) redirect(homeForRole(profile.role));
 
   if (profile.role === "director") {

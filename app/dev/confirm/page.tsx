@@ -6,17 +6,18 @@ import { IngestOverlay } from "@/components/voice/IngestOverlay";
 import type { PostprocessedEntity } from "@/lib/ai/postprocess";
 import { useIngestStore } from "@/lib/store/ingest";
 
+import { CAST, NAMESAKES } from "../fixtures/people";
+
 /** Component sandbox: /confirm with no network, no session and no roster behind it. */
 
-const ERLAN_ONE = "11111111-1111-1111-1111-111111111111";
-const ERLAN_TWO = "22222222-2222-2222-2222-222222222222";
-const MARAT = "33333333-3333-3333-3333-333333333333";
+const [ERLAN_ONE, ERLAN_TWO] = NAMESAKES;
+const MARAT = CAST.marat;
 
 const FIXTURE: PostprocessedEntity[] = [
   {
     kind: "task",
     assignee_queries: ["Марат"],
-    assignee_id: MARAT,
+    assignee_id: MARAT.id,
 
     assignee_name: null,
     assignee_confidence: 0.95,
@@ -31,8 +32,8 @@ const FIXTURE: PostprocessedEntity[] = [
     source_span: "Марату подготовить КП для Казхрома завтра до обеда",
     assignee: {
       status: "matched",
-      user_id: MARAT,
-      candidates: [{ user_id: MARAT, full_name: "Марат Абдулов", score: 1 }],
+      user_id: MARAT.id,
+      candidates: [{ user_id: MARAT.id, full_name: MARAT.full_name, score: 1 }],
       flag: "ok",
     },
   },
@@ -56,8 +57,8 @@ const FIXTURE: PostprocessedEntity[] = [
       status: "ambiguous",
       user_id: null,
       candidates: [
-        { user_id: ERLAN_ONE, full_name: "Ерлан Сатов", score: 0.82 },
-        { user_id: ERLAN_TWO, full_name: "Ерлан Ким", score: 0.79 },
+        { user_id: ERLAN_ONE.id, full_name: ERLAN_ONE.full_name, score: 0.82 },
+        { user_id: ERLAN_TWO.id, full_name: ERLAN_TWO.full_name, score: 0.79 },
       ],
       flag: "check",
     },
@@ -90,7 +91,7 @@ const FIXTURE: PostprocessedEntity[] = [
   {
     kind: "points",
     assignee_queries: ["Марат"],
-    assignee_id: MARAT,
+    assignee_id: MARAT.id,
 
     assignee_name: null,
     assignee_confidence: 0.95,
@@ -99,8 +100,8 @@ const FIXTURE: PostprocessedEntity[] = [
     source_span: "плюс десять Марату",
     assignee: {
       status: "matched",
-      user_id: MARAT,
-      candidates: [{ user_id: MARAT, full_name: "Марат Абдулов", score: 1 }],
+      user_id: MARAT.id,
+      candidates: [{ user_id: MARAT.id, full_name: MARAT.full_name, score: 1 }],
       flag: "ok",
     },
   },
@@ -111,8 +112,8 @@ const REPEATS: PostprocessedEntity[] = [
   {
     kind: "recurrence",
     assignee_queries: ["Марат"],
-    assignee_id: MARAT,
-    assignee_name: "Марат Абдулов",
+    assignee_id: MARAT.id,
+    assignee_name: MARAT.full_name,
     assignee_confidence: 0.95,
     title: "Отчёт по продажам",
     every: "week",
@@ -123,8 +124,8 @@ const REPEATS: PostprocessedEntity[] = [
     source_span: "Каждый понедельник Марат отчёт по продажам",
     assignee: {
       status: "matched",
-      user_id: MARAT,
-      candidates: [{ user_id: MARAT, full_name: "Марат Абдулов", score: 1 }],
+      user_id: MARAT.id,
+      candidates: [{ user_id: MARAT.id, full_name: MARAT.full_name, score: 1 }],
       flag: "ok",
     },
   },

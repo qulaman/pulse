@@ -53,7 +53,7 @@ function walkNav(event: KeyboardEvent<HTMLElement>) {
   items[(at + (event.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
 }
 
-/** The icon beside each section's name (D-174: «Графит» only — the journal keeps the words). */
+/** The icon beside each section's name (D-174). */
 const NAV_ICON: Record<string, LucideIcon> = {
   company: Building2,
   app: AppWindow,
@@ -97,8 +97,7 @@ function NavItem({
       data-settings-nav=""
       data-dirty={dirty ? "" : undefined}
       title={keyHint ? `${label} · ${keyHint}` : label}
-      // «Журнал»: words only (D-158), the chosen one marked by a line of the pen in the margin;
-      // «Графит»: an icon, and a plate with the accent's rail gliding to the chosen one (settings.css)
+      // an icon, and a plate with the accent's rail gliding to the chosen one (settings.css)
       className={`set-nav-item group relative flex h-8 items-center gap-2.5 text-[14px] leading-5 outline-none transition-colors duration-[120ms] focus-visible:ring-2 focus-visible:ring-accent/45 ${
         active ? "font-semibold text-text" : "text-muted hover:text-text"
       }`}
@@ -116,7 +115,7 @@ function NavItem({
         </span>
       ) : null}
       {keyHint && !dirty ? (
-        <span aria-hidden className="set-nav-key nums relative text-[11px] font-semibold text-muted/0 transition-colors duration-[120ms] group-hover:text-muted/70">
+        <span aria-hidden className="nums relative text-[11px] font-semibold text-muted/0 transition-colors duration-[120ms] group-hover:text-muted/70">
           {keyHint}
         </span>
       ) : null}
@@ -320,7 +319,7 @@ function FrameBody({ children }: { children: ReactNode }) {
   ]);
   return (
     <PageSearchContext.Provider value={register}>
-      <div className="set-frame flex w-full gap-10 px-8 pb-12 pt-4" data-settings-frame="">
+      <div className="flex w-full gap-10 px-8 pb-12 pt-4" data-settings-frame="">
         <SettingsNav searchRef={settingsSearch} />
         <DeskLinks className="min-w-0 flex-1">{children}</DeskLinks>
       </div>

@@ -3,12 +3,13 @@
 import { useState } from "react";
 
 import { DirectorTasksView } from "@/components/tasks/list/DirectorTasksView";
-import { useMinute } from "@/components/tasks/list/TaskList";
+
 import { SentSkeleton } from "@/components/ui/PageSkeletons";
 import { useNamesKey } from "@/lib/people/names";
 import { useRecurrenceRulesSettled } from "@/lib/recurrence/queries";
 import { usePurgeClosed, useTaskActions } from "@/lib/tasks/mutations";
 import { useClosedPages, useMe, usePulseBoard, useSentTasks } from "@/lib/tasks/queries";
+import { useNow } from "@/lib/useNow";
 
 /**
  * «Задачи» директора (D-83): the data and the actions; the screen itself is
@@ -22,7 +23,7 @@ export default function SentPage() {
   const board = usePulseBoard(me.data);
   const actions = useTaskActions(me.data);
   const purge = usePurgeClosed();
-  const now = useMinute();
+  const now = useNow();
   const pages = useClosedPages(me.data?.userId);
   // «Повторы» stand between the people and the tabs: landing after the list, they pushed it
   // down — the screen comes with them (warmed with the list, so this is no wait in the common case)

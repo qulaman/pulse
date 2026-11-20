@@ -5,7 +5,10 @@
  */
 import type { Page } from "playwright";
 
-process.loadEnvFile(".env.local");
+import { APP_URL } from "../lib/smoke";
+
+// .env.local, the address and the list of checks are every smoke's (scripts/lib/smoke.ts)
+export { APP_URL, checks, record, skip, type Check } from "../lib/smoke";
 
 /**
  * On while a part answers 500 itself to see the screen name a failure: those are not the app's
@@ -13,21 +16,6 @@ process.loadEnvFile(".env.local");
  * «no such row» about them is the part's doing, not the app's.
  */
 export const injected = { failures: false, ids: [] as string[] };
-
-export const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
-
-export type Check = { name: string; ok: boolean; detail: string };
-export const checks: Check[] = [];
-
-export function record(name: string, ok: boolean, detail = "") {
-  checks.push({ name, ok, detail });
-  console.log(`${ok ? "ok  " : "FAIL"}  ${name}${detail ? `  ${detail}` : ""}`);
-}
-
-export function skip(name: string, why: string) {
-  checks.push({ name, ok: true, detail: `пропущено: ${why}` });
-  console.log(`skip  ${name}  ${why}`);
-}
 
 /**
  * What every part gets: the page (signed in, desktop 1440×900), a run stamp for names it makes,

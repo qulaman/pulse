@@ -25,7 +25,8 @@ import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { deadlineLabel, isOverdue } from "@/lib/tasks/status-text";
 import { useDeepRest } from "@/lib/useDeepRest";
 
-import { BlockLink, WorkList, WorkRow } from "./TodayParts";
+import { BlockLink } from "./home/parts";
+import { WorkList, WorkRow } from "./TodayParts";
 
 /** A person of «Люди»: what they are at now, in the words of «Команда сейчас» (`personNow`). */
 export type PersonRow = {

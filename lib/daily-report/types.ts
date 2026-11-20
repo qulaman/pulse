@@ -88,11 +88,11 @@ export type DailyReportHistoryItem = DailyReport;
 
 /**
  * Where a person stands on a day, for the director:
- * submitted — сдал; missed — прошедший обязательный день без отчёта (штраф пишет утренний тик,
- * состояние то же и до него); pending — сегодня, ещё не сдал;
+ * submitted — handed in; missed — a past required day without a report (the morning tick writes the fine,
+ * the state is the same before it too); pending — today, not handed in yet;
  * a day the morning tick has closed (`settings.daily_report.checked_on`) and left without a row —
  * away (it skipped the person: leave or sick); days it has not closed yet use today's availability;
- * away — отпуск или больничный; off — не рабочий день / ещё не работал / модуль выключен.
+ * away — on leave or sick; off — not a workday / not working here yet / the module is off.
  */
 export type TeamDayState = "submitted" | "missed" | "pending" | "away" | "off";
 

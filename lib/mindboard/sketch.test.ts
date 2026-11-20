@@ -15,10 +15,23 @@ import {
   strokePath,
   turnOf,
   turnTransform,
+  withCaption,
   withFrame,
   withStroke,
   type Sketch,
 } from "./sketch";
+
+describe("withCaption", () => {
+  it("changes the first line only", () => {
+    expect(withCaption("Схема склада\nворота слева", "Склад")).toBe("Склад\nворота слева");
+    expect(withCaption("Схема склада", "")).toBe("");
+  });
+
+  it("says nothing when the first line is the same", () => {
+    expect(withCaption("  Схема склада \nворота", "Схема склада")).toBeNull();
+    expect(withCaption("", "")).toBeNull();
+  });
+});
 
 describe("sketchFrom", () => {
   it("takes a drawing as it was written", () => {

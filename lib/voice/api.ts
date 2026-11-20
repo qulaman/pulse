@@ -1,3 +1,5 @@
+import { ApiError, postJson } from "@/lib/api/client";
+
 import type { PostprocessedEntity } from "../ai/postprocess";
 import type { Entity } from "../ai/schema";
 
@@ -45,7 +47,7 @@ export type ParseResponse = {
   transcript?: string;
   inbox_id?: string | null;
   suspicious?: boolean;
-  /** «Кофе» поймал матчер до модели (D-79): это заявка секретарю, не сущность. */
+  /** The matcher caught «Кофе» before the model (D-79): an errand for the secretary, not an entity. */
   errand?: { code: string; label: string; note: string | null } | null;
 };
 
@@ -95,6 +97,12 @@ export class VoiceApiError extends Error {
   }
 }
 
+/** The object of this key is in Storage already: an earlier attempt landed, its answer was lost. */
+export function alreadyStored(error: unknown): boolean {
+  if (!(error instanceof VoiceApiError) || error.code !== "upload_failed") return false;
+  return error.status === 409 || /duplicate|already exists/i.test(JSON.stringify(error.body ?? ""));
+}
+
 function errorCodeOf(body: unknown, status: number): string {
   const error = (body as { error?: { code?: unknown } } | null)?.error;
   if (error && typeof error.code === "string") return error.code;
@@ -111,24 +119,15 @@ async function readJson(res: Response): Promise<unknown> {
   }
 }
 
+/** No outbox: a phrase keeps itself on the phone (lib/voice/kept.ts) and comes back by its own replay. */
 async function post<T>(path: string, payload: unknown): Promise<T> {
-  let res: Response;
   try {
-    res = await fetch(path, {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-  } catch (cause) {
-    throw new VoiceApiError("network", 0, cause);
+    return (await postJson(path, payload, { outbox: false })) as T;
+  } catch (error) {
+    if (error instanceof ApiError) throw new VoiceApiError(errorCodeOf(error.body, error.status), error.status, error.body);
+    // what is left is a dead network (NetworkError)
+    throw new VoiceApiError("network", 0, error);
   }
-
-  const body = await readJson(res);
-  // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- full reload on purpose: drop every client cache of the dead session
-  if (res.status === 401 && typeof window !== "undefined") window.location.assign(`${window.location.origin}/login`);
-  if (!res.ok) throw new VoiceApiError(errorCodeOf(body, res.status), res.status, body);
-  return body as T;
 }
 
 export interface VoiceApi {

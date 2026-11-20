@@ -1,15 +1,15 @@
 import { create } from "zustand";
 
 import { toast } from "@/components/ui/Toast";
-import { pluralRu } from "@/components/confirm/format";
+import { isNotesOnly, isSendable, strip, toConfirmed } from "@/lib/confirm/entities";
 import { askSecretary } from "@/lib/errands/pending";
 import { firstLine, restLines } from "@/lib/notes/list";
 import { softDeleteNotes } from "@/lib/notes/mutations";
+import { pluralRu } from "@/lib/tasks/status-text";
 import type { BlockedReason, ParticipantMatch, PostprocessedEntity } from "../ai/postprocess";
 import type {
   AnnouncementEntity,
   DelegationEntity,
-  Entity,
   EventEntity,
   PointsEntity,
   QueryEntity,
@@ -27,18 +27,7 @@ import {
   type IngestSource,
   type ParseResponse,
 } from "../voice/api";
-import {
-  claimPhrase,
-  dropPhrase,
-  forgetParked,
-  isReady,
-  keepPhrase,
-  markParked,
-  patchPhrase,
-  releasePhrase,
-  type KeptPhrase,
-  type KeptStage,
-} from "../voice/kept";
+import { claimPhrase, forgetParked, isReady, type KeptPhrase } from "../voice/kept";
 import {
   createRecorder,
   extForMime,
@@ -47,6 +36,11 @@ import {
   type RecordedAudio,
   type Recorder,
 } from "../voice/recorder";
+import { keptCopy } from "./ingest-kept";
+
+export { bindIngestOwner, KEPT_MS } from "./ingest-kept";
+/** @deprecated moved — import the entity rules from "@/lib/confirm/entities". */
+export { describeParticipants, isCountable, isNotesOnly, isSendable, whyNothingToSend } from "@/lib/confirm/entities";
 
 /**
  * The director's ingest pipeline as one state machine (docs/FRONTEND.md "FAB",
@@ -116,9 +110,6 @@ export type EntityPatch = Partial<
 /** Anything shorter is a slip of the finger, not speech (docs/AI.md §11). */
 export const MIN_RECORDING_MS = 1000;
 
-/** How long the face says «сохранил, отправлю сам» before it is free again (D-130). */
-export const KEPT_MS = 1500;
-
 const KNOWN_CODES = new Set<string>([
   "record_too_short",
   "mic_silent",
@@ -135,7 +126,7 @@ const KNOWN_CODES = new Set<string>([
   "network",
 ]);
 
-type IngestState = {
+export type IngestState = {
   stage: IngestStage;
   error: IngestError | null;
   retryFrom: RetryFrom | null;
@@ -238,16 +229,6 @@ const initialState: IngestState = {
 let activeRecorder: Recorder | null = null;
 const levelListeners = new Set<(level: number) => void>();
 
-/**
- * Whose phone keeps the phrase (D-130): the director's shell binds it once `me` is known. Not
- * state — nothing renders from it — and a phrase begun before it is known is simply not kept.
- */
-let owner: string | null = null;
-
-export function bindIngestOwner(userId: string | null): void {
-  owner = userId;
-}
-
 /** Microphone loudness, 0..1, straight to the caller — no re-render per frame. */
 export function subscribeIngestLevel(cb: (level: number) => void): () => void {
   levelListeners.add(cb);
@@ -278,74 +259,6 @@ function retryTargetFor(code: IngestErrorCode, from: RetryFrom): RetryFrom | nul
   // A guard-rejected transcript will not improve on a re-run — the fix is to speak again.
   if (code === "empty_transcript" || code === "mic_denied" || code === "mic_unavailable") return null;
   return from;
-}
-
-/** Fields the API never sees: they are matcher output, not parser output. */
-function strip(entity: PostprocessedEntity): Entity {
-  const wire: Record<string, unknown> = { ...entity };
-  delete wire.assignee;
-  delete wire.participants;
-  delete wire.blocked;
-  return wire as unknown as Entity;
-}
-
-/** A confirmed entity carries the assignee the director actually saw on the chip. */
-function toConfirmed(entity: PostprocessedEntity): Entity {
-  const wire = strip(entity);
-  if ("assignee_id" in wire && entity.assignee) {
-    return { ...wire, assignee_id: entity.assignee.user_id ?? wire.assignee_id };
-  }
-  return wire;
-}
-
-/** Questions go to the assistant, not the batch; points count only once the company switched them on (D-48). */
-export function isCountable(entity: PostprocessedEntity, pointsEnabled = false): boolean {
-  if (entity.kind === "query") return false;
-  if (entity.kind === "points") return pointsEnabled;
-  return true;
-}
-
-/**
- * The «Кто» chip of an event card: «Все» / «Только я» / «Марат, Айгуль» / «Марат +2».
- * The author is always in the meeting, so an empty list is not «nobody» but «only me».
- */
-export function describeParticipants(
-  entity: { everyone: boolean; participant_ids: string[] },
-  nameOf: (id: string) => string | undefined,
-): string {
-  if (entity.everyone) return "Все";
-  const names = entity.participant_ids.map((id) => nameOf(id) ?? "?");
-  if (names.length === 0) return "Только я";
-  if (names.length <= 2) return names.join(", ");
-  return `${names[0]} +${names.length - 1}`;
-}
-
-export function isSendable(entity: PostprocessedEntity, pointsEnabled = false): boolean {
-  return isCountable(entity, pointsEnabled) && entity.blocked === undefined;
-}
-
-/**
- * Why a phrase has nothing to send — the face's line on Пульс says the real reason, not always
- * «исполнителя» (D-137): a name nobody recognised, a meeting without a time, points while the
- * company has them off, points from shared text (D-36). Empty when something can go.
- */
-export function whyNothingToSend(entities: PostprocessedEntity[], pointsEnabled = false): string {
-  if (entities.length === 0 || entities.some((entity) => isSendable(entity, pointsEnabled))) return "";
-  if (entities.some((entity) => entity.blocked === "assignee_unmatched")) return "Не хватает исполнителя.";
-  if (entities.some((entity) => entity.blocked === "time_missing")) return "Не хватает времени встречи.";
-  if (entities.some((entity) => entity.kind === "points" && !pointsEnabled)) return "Очки выключены в Настройках.";
-  if (entities.some((entity) => entity.blocked === "points_blocked")) return "Очки из пересланного текста не начисляются.";
-  return "Отправлять нечего.";
-}
-
-/**
- * A phrase that held nothing but thoughts needs no confirm screen (D-75 §3): there is
- * no assignee to pick and no deadline to check, so the note is saved straight away and
- * the toast offers «Отменить». An empty parse is not «notes only» — that is the
- * «ничего не нашёл» screen.
- */
-export function isNotesOnly(entities: PostprocessedEntity[]): boolean {
-  return entities.length > 0 && entities.every((entity) => entity.kind === "note");
 }
 
 /** note_ids of the batch — what «Отменить» in the toast soft-deletes. */
@@ -388,94 +301,8 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
     set(patch);
   }
 
-  /* ------------------------------------------------ the phone's copy (D-130) */
-
-  /**
-   * The phrase goes on the phone before anything else happens to it (principle 5): the
-   * recording before the first byte leaves, typed words before the parser sees them.
-   */
-  async function keepFresh(stage: KeptStage, audio: RecordedAudio | null): Promise<void> {
-    const s = get();
-    const id = s.clientRequestId;
-    if (!owner || !id || s.keptId) return;
-    // claimed before it is written: the write wakes the replay, which must find it taken
-    claimPhrase(id);
-    const kept = await keepPhrase({
-      id,
-      userId: owner,
-      createdAt: new Date().toISOString(),
-      updatedAt: Date.now(),
-      crid: id,
-      source: s.source,
-      audio: audio ? { blob: audio.blob, mime: audio.mime, durationMs: audio.durationMs } : null,
-      audioPath: s.audioPath,
-      inboxId: s.inboxId,
-      transcript: s.transcript,
-      address: s.address,
-      pinned: s.pinned,
-      toSecretary: s.toSecretary,
-      suspicious: s.suspicious,
-      stage,
-      entities: [],
-      parsedEntities: [],
-      errand: null,
-      confirm: null,
-      failure: null,
-      attempts: 0,
-    });
-    if (!kept) {
-      releasePhrase(id);
-      return;
-    }
-    // the phrase moved on while the phone wrote (a reset, another phrase): the copy is nobody's
-    if (get().clientRequestId !== id) {
-      releasePhrase(id);
-      void dropPhrase(id);
-      return;
-    }
-    set({ keptId: id });
-  }
-
-  /** Every step is written down: a dead app leaves the phrase where it got to. */
-  function mirror(patch: Parameters<typeof patchPhrase>[1]): Promise<unknown> {
-    const id = get().keptId;
-    return id ? patchPhrase(id, patch) : Promise.resolve(null);
-  }
-
-  /** The phrase is over — on the server, or let go by the director: the phone forgets it. */
-  function forget(): void {
-    const id = get().keptId;
-    if (!id) return;
-    releasePhrase(id);
-    forgetParked(id);
-    void dropPhrase(id);
-    set({ keptId: null });
-  }
-
-  /** Another phrase takes the face: the one it held is not dropped — the replay carries it on. */
-  function abandon(): void {
-    const id = get().keptId;
-    if (id) releasePhrase(id);
-  }
-
-  /**
-   * No network (D-130): the phrase stays on the phone — kept at the release, every step since
-   * written down — and the replay carries it on once there is one. The face says so for a beat,
-   * then is free for the next phrase. False — nothing was kept (no IndexedDB here): the old
-   * «нет связи, повторить?» stays the way out.
-   */
-  function park(line: string): boolean {
-    const id = get().keptId;
-    if (!id) return false;
-    releasePhrase(id);
-    markParked(id);
-    set({ ...initialState, stage: "kept" });
-    toast(line);
-    setTimeout(() => {
-      if (get().stage === "kept") set({ ...initialState });
-    }, KEPT_MS);
-    return true;
-  }
+  // the phone's copy of the phrase (D-130): kept, written down at every step, forgotten, parked
+  const { keepFresh, mirror, forget, abandon, park } = keptCopy(get, set, initialState);
 
   const hearLater = () =>
     get().source === "voice"
@@ -507,8 +334,8 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
   ): Promise<void> {
     const { transcript, clientRequestId, audioPath } = get();
 
-    // «Кофе» — заявка секретарю, а не сущность: ни /confirm, ни модели (D-79).
-    // Пять секунд тост держит «Отменить», запись уже лежит в Storage (принцип 5).
+    // «Кофе» is a request to the secretary, not an entity: no /confirm, no model (D-79).
+    // The toast keeps «Отменить» for five seconds; the recording is already in Storage (principle 5).
     if (errand) {
       askSecretary(
         { code: errand.code, label: errand.label, icon: "" },

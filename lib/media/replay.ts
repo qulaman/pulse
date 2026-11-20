@@ -1,7 +1,10 @@
 import { isNetworkError } from "@/lib/net";
 import { VoiceApiError } from "@/lib/voice/api";
 
+import type { MessageRow } from "./message";
 import { claimMedia, dropMedia, listMedia, patchMedia, releaseMedia, type PendingMedia } from "./pending";
+
+export type { MessageRow };
 
 /**
  * The replay of the files a person's phone kept (D-130): a voice message or a photo of a
@@ -11,17 +14,6 @@ import { claimMedia, dropMedia, listMedia, patchMedia, releaseMedia, type Pendin
 
 /** A step the server keeps refusing is given up after this many rounds — and the person is told. */
 export const MAX_MEDIA_ATTEMPTS = 3;
-
-export type MessageRow = {
-  id: string;
-  task_id: string;
-  company_id: string;
-  sender_id: string;
-  type: "voice" | "photo";
-  content: string | null;
-  file_path: string;
-  meta: Record<string, unknown>;
-};
 
 export type MediaDeps = {
   /** The file into Storage under `item.crid`; resolves to its path. */

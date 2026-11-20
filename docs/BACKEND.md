@@ -32,9 +32,9 @@
 
 **Под чьей личностью идёт запрос.** `userSupabase(req)` несёт токен вызывающего — его RLS, RPC сами проверяют роль и компанию. `createServiceSupabase()` — service role, без RLS. Всё, что меняет состояние компании, идёт под вызывающим: RPC задач, визитов, отчёта, настроек, правил пушей, вставка заявки, имена и фото человека. Service role — только там, куда RLS не пускает: Storage, `auth.admin`, `ai_logs` и `inbox_items` конвейера, `ai_logs` для «Лаб» и словаря, свои подписки и доставки, карточка человека, `lib/roster.ts`, тик. Правило: каждый такой запрос сужен до `company_id` профиля или `user_id` вызывающего; чужое и несуществующее дают одно «не найдено»; право на файл решает чтение под вызывающим, service role лишь подписывает URL. Исключение: `/api/company/logo` и `PATCH /api/lab` пишут `companies.settings` напрямую по компании вызывающего, мимо `update_company_settings`.
 
-**Шаблон роута** — `withAuth(roles, fn, schema?)`: по очереди личность, роль (`'any'` — любой работающий), JSON и zod (почти везде `strictObject`), затем `fn({ req, profile, body, params })`. Провал JSON или схемы — `400 validation_error`, `AuthError` — его статус, прочее — `console.error` и `500 internal`. Id пути роут проверяет сам (`z.uuid()` или `z.guid()`: id сида не RFC 4122), мусор — `404`. Ошибку RPC (`raise exception '<код>'`) роут узнаёт по коду в `error.message`, незнакомая — `500`. Роуты задач с ключом отвечают `{ result, duplicate }`. `after()` нужен только чтобы отправить пуши после ответа: колбэк возвращает промис `kickDeliveries()`, и платформа держит функцию до конца отправки (D-125).
+**Шаблон роута** — `withAuth(roles, fn, schema?)`: по очереди личность, роль (`'any'` — любой работающий), JSON и zod (почти везде `strictObject`), затем `fn({ req, profile, body, params })`. Провал JSON или схемы — `400 validation_error`, `AuthError` — его статус, прочее — `console.error` и `500 internal`. Id пути проверяет `withAuth` (четвёртый аргумент `{ id: TASK_ID | PERSON_ID }`, правило `z.guid()`: id сида не RFC 4122) до тела, мусор — `404`. Ошибку RPC (`raise exception '<код>'`) роут переводит таблицей `rpcFailure(error, MAP)` (`lib/api/respond.ts`), незнакомая — `500`; ответ с ключом собирает `rpcResult`. Роуты задач с ключом отвечают `{ result, duplicate }`. `after()` нужен только чтобы отправить пуши после ответа: колбэк возвращает промис `kickDeliveries()`, и платформа держит функцию до конца отправки (D-125).
 
-Без `withAuth`: `/api/me` (тот же контракт), `/api/company/logo` (multipart), `/api/auth/code` (без сессии, §13), `/api/push/sweep` (секрет cron, §10), `/api/health` и `/api/version` (публичные), роуты `app/api/ops/` (§14). Лимитов частоты нет, кроме входа по коду.
+Без `withAuth`: `/api/auth/code` (без сессии, §13), `/api/push/sweep` (секрет cron, §10), `/api/health` и `/api/version` (публичные), роуты `app/api/ops/` (§14). Лимитов частоты нет, кроме входа по коду.
 
 **Идемпотентность.** Ключ один на намерение, рождается на клиенте и живёт до ответа: TanStack Query возобновляет мутацию, `lib/outbox.ts` хранит POST и досылает при запуске (до 24 ч), фраза ждёт в IndexedDB (`lib/voice/kept.ts`, D-130). У фразы ключ один от `upload-url` до `confirm`. Повтор сервер узнаёт: RPC — по `ingest_batches` (сохранённый результат и `duplicate: true`); роуты, пишущие сами, — по уникальному индексу (`errands`, `inbox_items`, `profiles.client_request_id`); `parse` — по удачной строке `ai_logs`; проверка пушей — по `crid` в `meta`; правила парсера — по `parser_rules.request_id`; консоль — по журналу. Без ключа — мутации, повтор которых безвреден: абсолютное состояние или множество (ответ на визит, настройки, словарь, правила пушей, фото, отзыв сессий) и удаление (`delete_task`, `purge_closed_tasks`).
 
@@ -221,13 +221,13 @@ Cron из `vercel.json` зовёт `/api/push/sweep` (`GET` или `POST`) с `A
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | клиенты Supabase |
 | `SUPABASE_SERVICE_ROLE_KEY` | `createServiceSupabase()`; основа ключей кодов входа и подписи прогонов |
 | `OPENAI_API_KEY`, `DEEPGRAM_API_KEY`, `ELEVENLABS_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY` | провайдеры STT и разбора |
-| `STT_PROVIDER`, `STT_FALLBACK_PROVIDER`, `PARSER_MODEL`, `PARSER_ESCALATION_MODEL` | умолчания, если компания не задала своё |
+| `PARSER_MODEL`, `PARSER_ESCALATION_MODEL` | умолчания, если компания не задала своё |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | воркер пушей |
 | `CRON_SECRET`, `LOGIN_CODE_SECRET` | тик; HMAC кодов (без него — производный от service role) |
 | `OPS_HOST`, `OPS_APP_ORIGIN` | хост консоли, адрес приложения для её ссылок входа |
 | `PULSE_BUILD_ID`, `PULSE_BUILD_SHA`, `PULSE_BUILD_AT` | `/api/version`, ставит `next.config.ts` |
 
-`QUERY_MODEL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `INTERNAL_FN_SECRET`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN` есть в схеме, но не читаются.
+`NEXT_PUBLIC_SENTRY_DSN` есть в схеме, но не читается.
 
 ## 12. Наблюдаемость
 

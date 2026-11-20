@@ -10,27 +10,46 @@ export const maxDuration = 60;
 /** A hand on the sweep's minute: the queue itself gets the 40 seconds of `sweepDeliveries`. */
 const OPS_DRAIN_MS = 5_000;
 
-type Service =ReturnType<typeof createServiceSupabase>;
-type Tick =
-  | "daily_reports_due_missed"
-  | "recurrence_spawn"
-  | "publish_due_scheduled"
-  | "events_due_reminders"
-  | "errands_due_escalation"
-  | "errands_expire"
-  | "errands_due_remind"
-  | "notes_due_reminders"
-  | "notes_purge_trash"
-  | "visits_due_expiry"
-  | "unseen_task_alerts_due"
-  | "overdue_alerts_due"
-  | "deadline_reminders_due"
-  | "daily_report_reminders_due"
-  | "director_day_summaries_due"
-  | "director_digests_due"
-  | "team_channel_alerts_due"
-  | "notification_deliveries_purge"
-  | "tv_events_prune";
+type Service = ReturnType<typeof createServiceSupabase>;
+
+/**
+ * The ticks in their order, each with the field of the answer that counts it (null — none).
+ * Each tick is a SQL function that queues what is due and answers how much it did.
+ */
+const TICKS = [
+  // yesterday's daily reports not sent become «не сдан» (and the minus with points on, D-152);
+  // first, so the day's book is closed before anything else of the morning
+  ["daily_reports_due_missed", "daily_missed"],
+  // the repeating orders make this day's tasks and the series their next meeting (D-148) —
+  // before the publishing, so a task made for the window goes out with this very sweep
+  ["recurrence_spawn", "repeated"],
+  // then the tasks held for the delivery window (D-38, tasks/017): their «task_sent» rows
+  // then go out with this very sweep, not a minute later
+  ["publish_due_scheduled", "published"],
+  ["events_due_reminders", "reminders"], // D-78
+  ["errands_due_escalation", "escalations"], // D-79
+  ["errands_expire", null], // «не беспокоить на 30 мин» ends by itself, D-99
+  ["errands_due_remind", "due_reminders"], // «такси к 18:00», D-106 §8
+  ["notes_due_reminders", "note_reminders"], // «напомни мне», D-95
+  ["notes_purge_trash", "notes_purged"],
+  ["visits_due_expiry", "visits_expired"], // D-96
+  // the director's signals (D-114): «задача не принята», «просрочено», «уведомления не
+  // доходят», «итог дня» — and last, the digests, so a signal held for one goes into it
+  ["unseen_task_alerts_due", "unseen"],
+  ["overdue_alerts_due", "overdue"],
+  ["deadline_reminders_due", "deadline_soon"], // «Скоро срок» to the employee, D-128
+  ["daily_report_reminders_due", "daily_reminders"], // «Сдайте отчёт за день», D-152
+  ["team_channel_alerts_due", "team"], // «уведомления не доходят»
+  ["director_day_summaries_due", "summaries"],
+  ["director_digests_due", "digests"],
+  // the outbox cleans itself: 30 days for what went, 7 for what never did, a batch a minute
+  ["notification_deliveries_purge", "purged"],
+  // the wall's feed lives on its last month (tv_events_prune, 30 days by default); the
+  // function existed since D-76 but nothing called it, so the table only grew (D-126)
+  ["tv_events_prune", "tv_pruned"],
+] as const;
+
+type Tick = (typeof TICKS)[number][0];
 
 /** Each tick on its own: a failing one is logged and the rest — and the queue — still go. */
 async function tick(service: Service, name: Tick): Promise<number> {
@@ -52,36 +71,11 @@ export async function POST(req: Request) {
   if (!secret || given !== secret) return apiError(401, "unauthorized", "Нет доступа");
   try {
     const service = createServiceSupabase();
-    // yesterday's daily reports not sent become «не сдан» (and the minus with points on, D-152);
-    // first, so the day's book is closed before anything else of the morning
-    const dailyMissed = await tick(service, "daily_reports_due_missed");
-    // the repeating orders make this day's tasks and the series their next meeting (D-148) —
-    // before the publishing, so a task made for the window goes out with this very sweep
-    const repeated = await tick(service, "recurrence_spawn");
-    // then the tasks held for the delivery window (D-38, tasks/017): their «task_sent» rows
-    // then go out with this very sweep, not a minute later
-    const published = await tick(service, "publish_due_scheduled");
-    const reminders = await tick(service, "events_due_reminders"); // D-78
-    const escalations = await tick(service, "errands_due_escalation"); // D-79
-    await tick(service, "errands_expire"); // «не беспокоить на 30 мин» ends by itself, D-99
-    const dueReminders = await tick(service, "errands_due_remind"); // «такси к 18:00», D-106 §8
-    const noteReminders = await tick(service, "notes_due_reminders"); // «напомни мне», D-95
-    const notesPurged = await tick(service, "notes_purge_trash");
-    const visitsExpired = await tick(service, "visits_due_expiry"); // D-96
-    // the director's signals (D-114): «задача не принята», «просрочено», «уведомления не
-    // доходят», «итог дня» — and last, the digests, so a signal held for one goes into it
-    const unseen = await tick(service, "unseen_task_alerts_due");
-    const overdue = await tick(service, "overdue_alerts_due");
-    const deadlineSoon = await tick(service, "deadline_reminders_due"); // «Скоро срок» to the employee, D-128
-    const dailyReminders = await tick(service, "daily_report_reminders_due"); // «Сдайте отчёт за день», D-152
-    const team = await tick(service, "team_channel_alerts_due"); // «уведомления не доходят»
-    const summaries = await tick(service, "director_day_summaries_due");
-    const digests = await tick(service, "director_digests_due");
-    // the outbox cleans itself: 30 days for what went, 7 for what never did, a batch a minute
-    const purged = await tick(service, "notification_deliveries_purge");
-    // the wall's feed lives on its last month (tv_events_prune, 30 days by default); the
-    // function existed since D-76 but nothing called it, so the table only grew (D-126)
-    const tvPruned = await tick(service, "tv_events_prune");
+    const counts: Record<string, number> = {};
+    for (const [name, field] of TICKS) {
+      const count = await tick(service, name);
+      if (field) counts[field] = count;
+    }
     // voice files past their term (D-155 §3): removed through Storage, then their paths cleared;
     // a failure is logged inside and the sweep goes on — what stayed comes again next time
     const voicePurged = await purgeVoice(service);
@@ -90,26 +84,9 @@ export async function POST(req: Request) {
     // the rows just queued go out on this very tick, not on the next one
     return apiOk({
       ...(await sweepDeliveries({ budgetMs: 40_000 })),
-      repeated,
-      published,
-      reminders,
-      escalations,
-      due_reminders: dueReminders,
-      note_reminders: noteReminders,
-      notes_purged: notesPurged,
-      visits_expired: visitsExpired,
-      unseen,
-      overdue,
-      deadline_soon: deadlineSoon,
-      daily_missed: dailyMissed,
-      daily_reminders: dailyReminders,
-      team,
-      summaries,
-      tv_pruned: tvPruned,
+      ...counts,
       voice_purged: voicePurged,
       ops_files: opsFiles,
-      digests,
-      purged,
     });
   } catch (err) {
     console.error("sweep failed:", err instanceof Error ? err.message : err);

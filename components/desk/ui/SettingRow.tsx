@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { Switch as DeskSwitch } from "@/components/desk/ui/Switch";
+
 /**
  * A group of desk settings (D-154 wave 3): a flat working plane — `--surface` 40 % and a hairline,
  * no shadow — its rows split by hairlines. The phone's 58 px rows with icons and chevrons are
@@ -44,24 +46,7 @@ export function SettingRow({
   );
 }
 
-/** An on/off of the desk: small, the accent when on; Space toggles it as any switch. */
+/** @deprecated use `Switch` from "@/components/desk/ui/Switch" (`checked` instead of `on`). */
 export function Switch({ on, onChange, label, disabled = false }: { on: boolean; onChange: (on: boolean) => void; label: string; disabled?: boolean }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange(!on)}
-      className="desk-focus relative h-5 w-9 shrink-0 rounded-full transition-colors duration-[120ms] disabled:opacity-40"
-      style={{ background: on ? "var(--accent)" : "var(--surface-2)", boxShadow: on ? undefined : "inset 0 0 0 1px var(--border)" }}
-    >
-      <span
-        aria-hidden
-        className="absolute left-0 top-0.5 h-4 w-4 rounded-full transition-transform duration-[120ms]"
-        style={{ background: on ? "var(--bg)" : "var(--text-muted)", transform: on ? "translateX(18px)" : "translateX(2px)" }}
-      />
-    </button>
-  );
+  return <DeskSwitch checked={on} onChange={onChange} label={label} disabled={disabled} />;
 }

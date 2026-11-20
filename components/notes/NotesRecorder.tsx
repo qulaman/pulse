@@ -1,7 +1,6 @@
 "use client";
 
-import { onlineManager } from "@tanstack/react-query";
-import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { splitCounts, splitLabel, splitList, type SplitPoint } from "@/lib/mindboard/split";
@@ -9,12 +8,11 @@ import type { Dictation, Receipt } from "@/lib/notes/dictation";
 import type { NotesHero } from "@/lib/notes/list";
 import { TONE_VAR, type Tone } from "@/lib/tasks/tone";
 import { fitHeight } from "@/lib/ui/fitHeight";
+import { useOnline } from "@/lib/useOnline";
 
 import { NoteIcon } from "./icons";
 import css from "./notes.module.css";
 
-const subscribeOnline = (onChange: () => void) => onlineManager.subscribe(onChange);
-const isOnline = () => onlineManager.isOnline();
 
 function clock(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -116,7 +114,7 @@ type Props = {
  * and the round microphone: hold it and talk, or tap it and talk until the next tap (D-81).
  */
 export function NotesRecorder({ hero, idle, words = NOTE_WORDS, receipt, dictation, writing, onWrite, onSplit, onSketch, onCapture }: Props) {
-  const online = useSyncExternalStore(subscribeOnline, isOnline, () => true);
+  const online = useOnline();
   const [draft, setDraft] = useState("");
   const [armed, setArmed] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);

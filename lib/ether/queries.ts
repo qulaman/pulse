@@ -31,7 +31,7 @@ async function fetchFeed(): Promise<Announcement[]> {
     .order("created_at", { ascending: false })
     .limit(50);
   if (error) throw new Error(error.message);
-  return (data ?? []) as unknown as Announcement[];
+  return data ?? [];
 }
 
 /** Эфир: announcements newest first, acks embedded; both tables feed the same query. */
@@ -230,7 +230,8 @@ export function useEtherEvents(enabled = true) {
         .order("created_at", { ascending: false })
         .limit(30);
       if (error) throw new Error(error.message);
-      return (data ?? []) as unknown as EtherEvent[];
+      // `kind` is text in the table, a closed set in the contract
+      return (data ?? []) as EtherEvent[];
     },
     channel: { table: "ether_events" },
     enabled,

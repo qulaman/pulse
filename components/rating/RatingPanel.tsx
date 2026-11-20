@@ -4,18 +4,19 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
-import { initialsOf } from "@/lib/people/queries";
+
 import { useOpenDisputes } from "@/lib/points/game";
 import { useRating } from "@/lib/points/queries";
 import { useTvControl } from "@/lib/tv/mutations";
+import { initialsOf } from "@/lib/people/names";
 
-/** Кольца медалей — те же, что у пьедестала «Рейтинга» (Podium.tsx). */
+/** The medal rings — the same as on the «Рейтинг» podium (Podium.tsx). */
 const RING = ["var(--gold)", "#B8C2CC", "#C98A5B"];
 
 /**
- * Шарик «Рейтинг» на Пульсе директора (D-123): пятёрка недели в один тап от лица, дальше —
- * «Весь рейтинг» (экран `/rating` с месяцем, всем временем и «+») и «На стену» — та же
- * пятёрка заставкой в кабинете. Раньше рейтинг у директора жил только в «Настройках».
+ * The «Рейтинг» ball on the director's Пульс (D-123): the week's top five one tap from the face,
+ * then «Весь рейтинг» (the `/rating` screen with the month, all time and «+») and «На стену» — the
+ * same five as a screensaver in the office.
  */
 export function RatingPanel() {
   const rating = useRating("week");

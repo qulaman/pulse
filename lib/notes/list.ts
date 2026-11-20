@@ -4,13 +4,13 @@ import { pluralRu } from "@/lib/tasks/status-text";
 import type { PendingCreate } from "./pending";
 import type { Note } from "./queries";
 
-/** A note that exists only on the phone yet, drawn as a row of the feed or of its board (D-95, D-102). */
-export function phoneRow(entry: PendingCreate): Note {
+/** What a note not on the server yet is made of; the rest of its row is a fresh note's. */
+export type DraftFields = Pick<Note, "id" | "company_id" | "user_id" | "text" | "created_at"> &
+  Partial<Pick<Note, "board_id" | "position" | "parent_id" | "sketch" | "client_request_id">>;
+
+/** A note drawn before the server has it: nothing pinned, ticked, handed out or reminded yet. */
+export function draftRow(fields: DraftFields): Note {
   return {
-    id: entry.id,
-    company_id: entry.companyId,
-    user_id: entry.userId,
-    text: entry.text,
     raw_transcript: null,
     audio_path: null,
     inbox_item_id: null,
@@ -21,15 +21,31 @@ export function phoneRow(entry: PendingCreate): Note {
     deleted_at: null,
     remind_at: null,
     reminded_at: null,
+    sketch: null,
+    board_id: null,
+    position: null,
+    parent_id: null,
+    done_at: null,
+    client_request_id: null,
+    updated_at: fields.created_at,
+    ...fields,
+  };
+}
+
+/** A note that exists only on the phone yet, drawn as a row of the feed or of its board (D-95, D-102). */
+export function phoneRow(entry: PendingCreate): Note {
+  return draftRow({
+    id: entry.id,
+    company_id: entry.companyId,
+    user_id: entry.userId,
+    text: entry.text,
     sketch: entry.sketch ?? null,
     board_id: entry.boardId ?? null,
     position: entry.position ?? null,
     parent_id: entry.parentId ?? null,
-    done_at: null,
     client_request_id: entry.crid,
     created_at: entry.createdAt,
-    updated_at: entry.createdAt,
-  };
+  });
 }
 
 /**
@@ -118,7 +134,7 @@ export function restLines(text: string): string {
 }
 
 /**
- * A dictated note is a row before it is words (принцип 5): the recording is saved
+ * A dictated note is a row before it is words (principle 5): the recording is saved
  * first, the text arrives after STT. An empty text next to a recording is that state —
  * being transcribed right now, or left without words by a failed STT.
  */

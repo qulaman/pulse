@@ -2,8 +2,8 @@
 
 import { useState, useSyncExternalStore } from "react";
 
-import { shiftDay, ymdOfEvent } from "@/lib/calendar/agenda";
-import { addMonths, monthOf, parseYmd, todayYmd, ymdOf, type Month, type Ymd } from "@/lib/datetime/calendar";
+import { ymdOfEvent } from "@/lib/calendar/agenda";
+import { addMonths, monthOf, parseYmd, todayYmd, ymdOf, type Month, type Ymd, addDays } from "@/lib/datetime/calendar";
 
 export type GridMode = "month" | "week";
 
@@ -49,7 +49,7 @@ export function useCalendarNav() {
   const step = (delta: -1 | 1) => {
     setDirection(delta);
     if (mode === "week") {
-      const day = shiftDay(selected, delta * 7);
+      const day = addDays(selected, delta * 7);
       setSelected(day);
       setMonth(monthOf(day));
       return;

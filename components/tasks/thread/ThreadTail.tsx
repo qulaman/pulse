@@ -3,16 +3,10 @@
 import { humanAqtobe } from "@/lib/ai/time";
 import { shortName } from "@/lib/people/names";
 import { useTaskMessages } from "@/lib/tasks/queries";
+import { wordText } from "@/lib/tasks/status-text";
 import { CHAT_TYPES } from "@/lib/pulse/board";
 
 const TAIL = 3;
-
-/** «фото» / «голосовое» / the words — one line per reply, whatever it carried. */
-function wordsOf(type: string, content: string | null): string {
-  if (type === "photo") return content ? `фото: ${content}` : "фото";
-  if (type === "voice") return content ? content : "голосовое";
-  return content ?? "";
-}
 
 /**
  * The last few replies of a thread, right on the card in «Сообщения»: the director
@@ -35,7 +29,7 @@ export function ThreadTail({ taskId, meId, enabled }: { taskId: string; meId: st
             <span className="text-muted">
               {mine ? "Вы" : shortName(message.sender?.full_name) || "—"} · <span className="nums">{humanAqtobe(new Date(message.created_at))}</span>
             </span>{" "}
-            <span className={mine ? "text-muted" : "text-text"}>{wordsOf(message.type, message.content)}</span>
+            <span className={mine ? "text-muted" : "text-text"}>{wordText(message)}</span>
           </p>
         );
       })}

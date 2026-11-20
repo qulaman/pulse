@@ -1,4 +1,4 @@
-import { aqtobeDay } from "@/lib/errands/scene";
+import { ymdAt } from "@/lib/datetime/calendar";
 import type { SecretaryAction } from "@/lib/settings";
 import { aqtobeHour } from "@/lib/voice/quietHours";
 
@@ -131,7 +131,7 @@ export function rememberSend(code: string, note: string | null, now: Date = new 
  * next one, so a button never jumps under a finger between two opens of the card.
  */
 export function orderFor(actions: readonly SecretaryAction[], isAlarm: (action: SecretaryAction) => boolean, now: Date = new Date()): SecretaryAction[] {
-  const day = aqtobeDay(now);
+  const day = ymdAt(now);
   const part = habitPartOf(now);
   const kept = read(ORDER_KEY) as { day?: unknown; part?: unknown; codes?: unknown } | null;
   if (kept && kept.day === day && kept.part === part && Array.isArray(kept.codes)) {

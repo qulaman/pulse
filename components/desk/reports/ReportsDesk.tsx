@@ -12,7 +12,6 @@ import { IconButton } from "@/components/desk/ui/IconButton";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SearchField, SegmentTabs, Toolbar } from "@/components/desk/ui/Toolbar";
-import { useMinute } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { askFromOf } from "@/lib/daily-report/due";
@@ -35,8 +34,10 @@ import {
 import { useCompanyCard } from "@/lib/desk/settings-queries";
 import { useCompanySettings } from "@/lib/dictionary-queries";
 import { useNamesKey } from "@/lib/people/names";
+import { personFits } from "@/lib/people/search";
 import { useMe } from "@/lib/tasks/queries";
 import { useHydrated } from "@/lib/useHydrated";
+import { useNow } from "@/lib/useNow";
 
 import { arrowOf, onControl, stepKey, useScreenKeys } from "../team/keys";
 import { Diary } from "./Diary";
@@ -51,16 +52,7 @@ const TABS: { value: ReportsTab; label: string }[] = [
   { value: "tabel", label: "Табель" },
 ];
 
-const normalise = (text: string) => text.toLowerCase().replace(/ё/g, "е").trim();
 const ROWS = '[data-testid="desk-reports-day"] [data-row-key], [data-testid="desk-tabel"] [data-row-key]';
-
-/** A person by the words typed: the name, the position — every word somewhere in them. */
-function matches(row: { full_name: string; position: string | null }, query: string): boolean {
-  const words = normalise(query).split(/\s+/).filter(Boolean);
-  if (words.length === 0) return true;
-  const hay = normalise(`${row.full_name} ${row.position ?? ""}`);
-  return words.every((word) => hay.includes(word));
-}
 
 /**
  * «Отчёты» on the desk (D-152; D-183): two forms of the same reports and one of a person.
@@ -78,7 +70,7 @@ export function ReportsDesk() {
   useNamesKey();
   const { pointsEnabled } = useDeskScope();
   const me = useMe();
-  const now = useMinute();
+  const now = useNow();
   const today = todayYmd(now);
   const pathname = usePathname();
   const params = useSearchParams();
@@ -147,7 +139,7 @@ export function ReportsDesk() {
     // the panel follows the choice while it is open; walking the people with ↑/↓ is one step of history
     if (openId && openId !== id) go({ person: id }, replace);
   };
-  const match = (row: { full_name: string; position: string | null }) => matches(row, query);
+  const match = (row: { full_name: string; position: string | null }) => personFits(row, query);
 
   const chosenId = selected ?? openId;
   useScreenKeys(

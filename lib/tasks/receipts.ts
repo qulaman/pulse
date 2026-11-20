@@ -3,7 +3,7 @@
 import { keepPreviousData } from "@tanstack/react-query";
 
 import { humanAqtobe } from "@/lib/ai/time";
-import { whenHeld } from "@/lib/tasks/held";
+import { heldKeys, whenHeld, type HeldRow } from "@/lib/tasks/held";
 import { useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/types";
@@ -72,10 +72,49 @@ export function useThreadReceipt(taskId: string, enabled: boolean, meId: string 
         .order("created_at", { ascending: false })
         .limit(1);
       if (error) throw new Error(error.message);
-      return (data?.[0] ?? null) as DeliveryRow | null;
+      return data?.[0] ?? null;
     },
     channel: { table: "notification_deliveries", filter: `task_id=eq.${taskId}` },
     enabled: enabled && Boolean(meId),
+  });
+}
+
+export type TaskDelivery = { receipt: DeliveryRow | null; held: HeldRow[] };
+
+/**
+ * The newest «task_sent» delivery of a task and what the task still holds for the morning
+ * to its assignee (D-129), live; idle while no task is given. One query, one channel.
+ */
+export function useTaskDelivery(taskId: string | null, assigneeId: string | null = null) {
+  return useRealtimeQuery<TaskDelivery, DeliveryRow>({
+    queryKey: [...heldKeys.task(taskId ?? ""), assigneeId ?? ""],
+    queryFn: async () => {
+      const supabase = createBrowserSupabase();
+      const [receipt, held] = await Promise.all([
+        supabase
+          .from("notification_deliveries")
+          .select("*")
+          .eq("task_id", taskId as string)
+          .eq("event_kind", "task_sent")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        assigneeId
+          ? supabase
+              .from("notification_deliveries")
+              .select("event_kind, deliver_after, created_at")
+              .eq("task_id", taskId as string)
+              .eq("user_id", assigneeId)
+              .eq("status", "queued")
+              .gt("deliver_after", new Date().toISOString())
+          : Promise.resolve({ data: [] as HeldRow[], error: null }),
+      ]);
+      if (receipt.error) throw new Error(receipt.error.message);
+      if (held.error) throw new Error(held.error.message);
+      return { receipt: receipt.data, held: (held.data ?? []) as HeldRow[] };
+    },
+    channel: { table: "notification_deliveries", filter: `task_id=eq.${taskId ?? ""}` },
+    enabled: Boolean(taskId),
   });
 }
 
@@ -97,7 +136,7 @@ export function useTaskReceipts(taskIds: readonly string[], enabled = true) {
         .eq("event_kind", "task_sent")
         .order("created_at", { ascending: false });
       if (error) throw new Error(error.message);
-      return newestByTask((data ?? []) as DeliveryRow[]);
+      return newestByTask(data ?? []);
     },
     channel: { table: "notification_deliveries", filter: "event_kind=eq.task_sent" },
     enabled: enabled && ids.length > 0,

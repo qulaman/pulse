@@ -1,21 +1,11 @@
-import type { RosterEntry } from "@/lib/people/roster";
 import type { CalendarEvent } from "@/lib/calendar/queries";
 
-/** Ids of the sandbox people — not real rows; nothing here reaches the database. */
-export const DIRECTOR = "fx-dir";
-export const MARAT = "fx-marat";
+import { CAST, ROSTER } from "../fixtures/people";
 
-export const ROSTER: RosterEntry[] = [
-  { id: DIRECTOR, full_name: "Ерлан Сапаров", position: "Директор", avatar_url: null, role: "director" },
-  { id: MARAT, full_name: "Марат Оспанов", position: "Менеджер по продажам", avatar_url: null, role: "employee" },
-  { id: "fx-aigul", full_name: "Айгуль Нурланова", position: "Бухгалтер", avatar_url: null, role: "employee" },
-  { id: "fx-dana", full_name: "Дана Жумабаева", position: "Юрист", avatar_url: null, role: "employee" },
-  { id: "fx-erlanb", full_name: "Ерлан Бекенов", position: "Снабжение", avatar_url: null, role: "employee" },
-  { id: "fx-askhat", full_name: "Асхат Тулегенов", position: "Прораб", avatar_url: null, role: "employee" },
-  { id: "fx-madi", full_name: "Мади Каримов", position: "Инженер ПТО", avatar_url: null, role: "employee" },
-  { id: "fx-saule", full_name: "Сауле Ахметова", position: "Секретарь", avatar_url: null, role: "employee" },
-  { id: "fx-timur", full_name: "Тимур Ибраев", position: "Водитель", avatar_url: null, role: "employee" },
-];
+/** The sandbox director and the employee the «Сотрудник» view is: ids of the cast, not real rows. */
+export const DIRECTOR = CAST.director.id;
+export const MARAT = CAST.marat.id;
+export { ROSTER };
 
 const nameOf = (id: string) => ROSTER.find((person) => person.id === id)?.full_name ?? "Сотрудник";
 
@@ -93,12 +83,12 @@ export function buildEvents(now: Date): CalendarEvent[] {
     meeting("fx-e1", "Обучение по охране труда", atDay(now, -3, "14:00"), atDay(now, -3, "15:30"), "Актовый зал", everyone()),
     meeting("fx-e2", "Планёрка отдела продаж", atDay(now, 0, "09:00"), atDay(now, 0, "09:30"), "Переговорка 1", [
       [MARAT, "going"],
-      ["fx-aigul", "going"],
+      [CAST.aigul.id, "going"],
     ]),
     meeting("fx-e3", "Созвон с «Казхромом» по поставке", fromNow(now, -25), fromNow(now, 35), "Zoom", [
       [MARAT, "going"],
-      ["fx-erlanb", "going"],
-      ["fx-dana", "invited"],
+      [CAST.erlan.id, "going"],
+      [CAST.dana.id, "invited"],
     ]),
     meeting(
       "fx-e4",
@@ -108,8 +98,8 @@ export function buildEvents(now: Date): CalendarEvent[] {
       "Офис, 3 этаж",
       [
         [MARAT, "invited"],
-        ["fx-askhat", "going"],
-        ["fx-madi", "going"],
+        [CAST.askhat.id, "going"],
+        [CAST.madi.id, "going"],
       ],
       { body: "Сверить цены на А500С, условия отсрочки. Взять акт сверки за август." },
     ),
@@ -119,24 +109,24 @@ export function buildEvents(now: Date): CalendarEvent[] {
       atDay(now, 0, "17:00"),
       atDay(now, 0, "18:00"),
       "Переговорка 1",
-      everyone({ "fx-timur": "declined", "fx-saule": "invited", "fx-dana": "invited" }, { "fx-timur": "Буду в отъезде" }),
+      everyone({ [CAST.timur.id]: "declined", [CAST.saule.id]: "invited", [CAST.dana.id]: "invited" }, { [CAST.timur.id]: "Буду в отъезде" }),
       { everyone: true },
     ),
     meeting("fx-e6", "Выезд на объект «Жубанова 12»", atDay(now, 1, "10:00"), atDay(now, 1, "12:30"), "ЖК «Жубанова»", [
       [MARAT, "invited"],
-      ["fx-askhat", "going"],
-      ["fx-timur", "going"],
+      [CAST.askhat.id, "going"],
+      [CAST.timur.id, "going"],
     ]),
-    meeting("fx-e7", "Приёмка сметы с ПТО", atDay(now, 1, "15:00"), null, null, [["fx-madi", "going"]]),
+    meeting("fx-e7", "Приёмка сметы с ПТО", atDay(now, 1, "15:00"), null, null, [[CAST.madi.id, "going"]]),
     meeting("fx-e8", "Корпоратив ко Дню строителя", atDay(now, 2, "19:00"), atDay(now, 2, "23:00"), "Ресторан «Дастархан»", everyone(), {
       everyone: true,
     }),
     meeting("fx-e9", "Совещание в акимате", atDay(now, 5, "11:00"), atDay(now, 5, "12:00"), "Акимат, каб. 214", [
-      ["fx-dana", "going"],
+      [CAST.dana.id, "going"],
       [MARAT, "declined", "Занят срочным"],
     ]),
     meeting("fx-e10", "Планёрка", atDay(now, 7, "09:00"), atDay(now, 7, "09:30"), "Переговорка 1", everyone(), { everyone: true }),
-    meeting("fx-e11", "Аудит склада", atDay(now, 12, "10:00"), atDay(now, 12, "13:00"), "Склад №2", [["fx-erlanb", "going"]]),
+    meeting("fx-e11", "Аудит склада", atDay(now, 12, "10:00"), atDay(now, 12, "13:00"), "Склад №2", [[CAST.erlan.id, "going"]]),
   ];
 }
 

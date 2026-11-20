@@ -1,5 +1,5 @@
 import type { TaskStatus } from "@/lib/tasks/status-text";
-import { TONE_VAR, type Tone } from "@/lib/tasks/tone";
+import { toneOf, TONE_VAR } from "@/lib/tasks/tone";
 
 /**
  * The state of a task as one small mark at the head of its card — a ring that fills as
@@ -16,27 +16,11 @@ const FILL: Partial<Record<TaskStatus, number>> = {
   pending_review: 0.75,
 };
 
-const TONE: Record<TaskStatus, Tone> = {
-  scheduled: "muted",
-  sent: "accent",
-  accepted: "ok",
-  in_progress: "ok",
-  rework: "warn",
-  pending_review: "warn",
-  done: "gold",
-  declined: "danger",
-  revoked: "muted",
-};
-
 const PIE_R = 3.4;
 const PIE_C = 2 * Math.PI * PIE_R;
 
-export function statusToneOf(status: TaskStatus, overdue: boolean): Tone {
-  return overdue ? "danger" : TONE[status];
-}
-
 export function StatusGlyph({ status, overdue = false, size = 22 }: { status: TaskStatus; overdue?: boolean; size?: number }) {
-  const color = TONE_VAR[statusToneOf(status, overdue)];
+  const color = TONE_VAR[toneOf(status, overdue)];
 
   if (status === "done" || status === "declined") {
     return (

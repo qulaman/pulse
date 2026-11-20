@@ -11,6 +11,7 @@ import {
   latestSuggestion,
   latestTimeRequest,
   metaOf as lifecycleMeta,
+  ON_BOARD,
   suggestionOf,
   timeRequestOf,
   untilWords,
@@ -70,24 +71,18 @@ export const LANE_ORDER: readonly Lane[] = ["overdue", "declined", "question", "
 /** Lanes that need the director; «work» is the calm rest of the board. */
 export const ATTENTION_LANES: ReadonlySet<Lane> = new Set<Lane>(["overdue", "declined", "question", "review"]);
 
-/** Statuses that keep a task on the board. Closed ones (done / revoked) leave it. */
-export const BOARD_STATUSES: readonly TaskStatus[] = ["sent", "accepted", "in_progress", "rework", "pending_review", "declined"];
-
 /**
  * A task held for the morning (D-38). The director's board fetches it too — the team on Пульс
  * shows who gets what in the morning (D-139) — but it sits in no lane: nobody has it yet.
  */
 export const HELD_STATUS: TaskStatus = "scheduled";
 
-/** Still being worked on — the quiet line and the answers count these. */
-export const WORK_STATUSES: readonly TaskStatus[] = ["sent", "accepted", "in_progress", "rework"];
-
 export type Lanes = Record<Lane, BoardTask[]>;
 
 export type LaneCounts = Record<Lane, number> & { attention: number };
 
 export function isOnBoard(status: TaskStatus): boolean {
-  return BOARD_STATUSES.includes(status);
+  return ON_BOARD.includes(status);
 }
 
 const metaOf = (meta: Json): Record<string, unknown> => lifecycleMeta(meta);

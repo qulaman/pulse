@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 
-import { useMinute } from "@/components/tasks/list/TaskList";
 import { periodOf, type PeriodKind } from "@/lib/daily-report/format";
 import { useTeamDailyReportDay, useTeamDailyReportPeriod } from "@/lib/daily-report/queries";
 import { todayYmd, type Ymd } from "@/lib/datetime/calendar";
 import { useNamesKey } from "@/lib/people/names";
 import { useMe } from "@/lib/tasks/queries";
 import { useHydrated } from "@/lib/useHydrated";
+import { useNow } from "@/lib/useNow";
 
 import { ReportsSkeleton } from "./Skeletons";
 import { TeamReportsView, type ReportsTab } from "./TeamReportsView";
@@ -22,7 +22,7 @@ export function TeamReportsScreen({ initialTab }: { initialTab: ReportsTab }) {
   // a namesake on screen gets the surname's initial once the roster has come (D-146)
   useNamesKey();
   const me = useMe();
-  const now = useMinute();
+  const now = useNow();
   const today = todayYmd(now);
 
   const [tab, setTab] = useState<ReportsTab>(initialTab);

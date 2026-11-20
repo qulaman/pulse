@@ -6,7 +6,7 @@ import { useRef, useState, type CSSProperties } from "react";
 
 import { ReportDoneIcon, ReportIcon } from "@/components/daily-report/icons";
 import { PointsPop, type Pop } from "@/components/daily-report/PointsPop";
-import { Icon } from "@/components/tasks/desk/icons";
+
 import { Button } from "@/components/ui/Button";
 import { HapticSwitch } from "@/components/ui/HapticSwitch";
 import { clearDraft, readDraft } from "@/lib/daily-report/draft";
@@ -16,6 +16,7 @@ import { useMyDailyReport, useRefreshAfterReplay, useReportDue, useSubmitDailyRe
 import { springs } from "@/lib/design/tokens";
 import { isNetworkError } from "@/lib/net";
 import { pluralRu } from "@/lib/tasks/status-text";
+import { Icon } from "@/components/tasks/icons";
 
 type Look = "quiet" | "asking" | "submitted";
 

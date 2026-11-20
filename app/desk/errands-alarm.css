@@ -57,11 +57,6 @@
     background: radial-gradient(120% 95% at 50% 42%, transparent 32%, var(--alarm-edge) 100%);
     opacity: 0.55;
   }
-  /* «Журнал»: flat, no gradient — the edge is one tone over the whole sheet */
-  &:not([data-graphite]) .desk-alarm::before {
-    background: var(--alarm-edge);
-    opacity: 0.35;
-  }
   .desk-alarm[data-state="calling"]::before {
     animation: desk-alarm-breath 1.6s ease-in-out infinite;
   }

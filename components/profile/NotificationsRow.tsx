@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 import { usePushTest } from "@/components/push/usePushTest";
 import { Row } from "@/components/ui/Row";
 import { BellIcon, PulseIcon } from "@/components/profile/icons";
+import { usePushSwitch } from "@/components/profile/usePushSwitch";
 import { toast } from "@/components/ui/Toast";
-import { enablePush, pushPlatform, pushState, type PushState } from "@/lib/push/client";
-import { pushBlocker, pushEnabledToast } from "@/lib/push/words";
+import { pushPlatform, type PushState } from "@/lib/push/client";
+import { pushBlocker } from "@/lib/push/words";
 
 const LABEL: Record<PushState, string> = {
   granted: "включены",
@@ -26,14 +25,8 @@ const TONE_COLOR = { ok: "var(--ok)", warn: "var(--danger)", muted: undefined } 
  * system decides for them.
  */
 export function NotificationsRow({ director = false }: { director?: boolean }) {
-  const [state, setState] = useState<PushState | null>(null);
-  const [busy, setBusy] = useState(false);
+  const { state, busy, enable: switchOn } = usePushSwitch();
   const test = usePushTest();
-
-  useEffect(() => {
-    const timer = setTimeout(() => setState(pushState()), 0);
-    return () => clearTimeout(timer);
-  }, []);
 
   const canEnable = state === "default";
 
@@ -43,19 +36,7 @@ export function NotificationsRow({ director = false }: { director?: boolean }) {
       if (blocker) toast(blocker);
       return;
     }
-    setBusy(true);
-    try {
-      const next = await enablePush();
-      setState(next);
-      if (next === "granted") {
-        const done = pushEnabledToast(pushPlatform());
-        toast(done.text, { lifetimeMs: done.lifetimeMs });
-      } else if (next === "denied") toast("Уведомления запрещены в настройках браузера");
-    } catch {
-      toast("Не получилось включить уведомления");
-    } finally {
-      setBusy(false);
-    }
+    await switchOn();
   };
 
   const value = state ? LABEL[state] : "";

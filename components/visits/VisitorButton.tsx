@@ -10,16 +10,16 @@ import type { Visit, VisitKind } from "@/lib/visits/queries";
 import { recentNotes } from "@/lib/visits/text";
 
 /**
- * Две кнопки секретаря на главном экране — одна шторка.
+ * The secretary's two buttons on the home screen — one sheet.
  *
- * «Посетитель» (D-96): человек подошёл к столу — секретарь жмёт кнопку, пишет, кто это (можно
- * и не писать), и директор видит «К вам посетитель» на стене в кабинете и в телефоне.
+ * «Посетитель» (D-96): a person came to the desk — the secretary presses the button, writes who it
+ * is (or not), and the director sees «К вам посетитель» on the office wall and on the phone.
  *
- * «Сообщение» (D-116): слова секретаря — во всю стену в кабинете и пушем директору, ответ —
- * «Понятно». Без слов сообщения нет, поэтому кнопка отправки ждёт текста.
+ * «Сообщение» (D-116): the secretary's words — across the whole office wall and as a push to the
+ * director, the answer is «Понятно». No words, no message, so the send button waits for text.
  *
- * Недавние слова — чипами: тот же поставщик приходит не раз, то же «Звонил Ахметов» пишется
- * не раз, печатать второй раз незачем.
+ * Recent words as chips: the same supplier comes more than once, the same «Звонил Ахметов» is
+ * written more than once, there is no point typing it again.
  */
 
 const MAX = 120;

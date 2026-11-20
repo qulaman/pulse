@@ -36,6 +36,7 @@ import { useOpenDisputes } from "@/lib/points/game";
 import { ordersWaiting } from "@/lib/shop/format";
 import { useOrders } from "@/lib/shop/queries";
 import { inboxCounts, useDirectorInbox, useMe } from "@/lib/tasks/queries";
+import { useNow } from "@/lib/useNow";
 import { useVisits } from "@/lib/visits/queries";
 import { awaitingDirector } from "@/lib/visits/text";
 
@@ -54,15 +55,6 @@ export function useSettled(): boolean {
     };
   }, []);
   return settled;
-}
-
-function useMinute(): Date {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 60_000);
-    return () => clearInterval(timer);
-  }, []);
-  return now;
 }
 
 export type DeskBadges = { counts: Partial<Record<DeskBadge, number>>; tones: Partial<Record<DeskBadge, Tone>> };
@@ -88,7 +80,7 @@ export function useDeskBadges(role: DeskRole): DeskBadges {
   const errands = useErrands(settled);
   const visits = useVisits(director && settled);
   const calendar = useCalendar(settled);
-  const now = useMinute();
+  const now = useNow();
   const myId = me?.userId;
   return useMemo(() => {
     const ask = inbox.data ? inboxCounts(inbox.data) : null;
@@ -134,7 +126,7 @@ function NavIcon({ href }: { href: string }) {
 
 /**
  * The chosen section's plate (D-171): one element that glides from the section left to the one
- * chosen, on a spring without overshoot. «Журнал» draws the chosen tab itself and hides it.
+ * chosen, on a spring without overshoot.
  */
 const NAV_GLIDE = { type: "spring", stiffness: 520, damping: 42, mass: 0.8 } as const;
 
@@ -169,8 +161,7 @@ function NavLink({
         aria-current={active ? "page" : undefined}
         aria-label={count ? `${label}, ${count}` : label}
         data-chord={chord}
-        // «Журнал»: the chosen section is a tab of the sheet, words alone (journal.css); «Графит»: an
-        // icon beside every name and a plate that glides to the chosen one (graphite.css, D-171)
+        // an icon beside every name and a plate that glides to the chosen one (graphite.css, D-171)
         className={`desk-focus desk-nav-link group relative flex w-full items-center leading-5 ${folded ? "justify-center px-0" : "gap-2.5 pl-2.5 pr-3.5"}`}
       >
         {active ? <motion.span layoutId="desk-nav-active" aria-hidden className="desk-nav-active" transition={NAV_GLIDE} /> : null}

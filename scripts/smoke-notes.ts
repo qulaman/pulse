@@ -12,48 +12,20 @@
  * Screenshots land in SHOTS_DIR (default ./.smoke-ui). Everything the run created is
  * hard-deleted at the end by id (service role) — the owner's notes are never touched.
  */
-import { createClient } from "@supabase/supabase-js";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { chromium, type BrowserContext, type Page } from "playwright";
 
-process.loadEnvFile(".env.local");
+import { IPHONE_UA, signIn } from "./lib/login";
+import { APP_URL, finish, record, refuseWhenBusy, serviceClient } from "./lib/smoke";
 
-const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui");
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const FAKE_MIC_WAV = process.env.FAKE_MIC_WAV;
 const STAMP = Date.now().toString(36);
 
 mkdirSync(SHOTS, { recursive: true });
 
-const checks: { name: string; ok: boolean; detail: string }[] = [];
-const record = (name: string, ok: boolean, detail = "") => {
-  checks.push({ name, ok, detail });
-  console.log(`${ok ? "ok  " : "FAIL"}  ${name}${detail ? `  ${detail}` : ""}`);
-};
-
-const admin = SUPABASE_URL && SERVICE_KEY ? createClient(SUPABASE_URL, SERVICE_KEY) : null;
-
-/** The owner tests on the same dev project: a live voice session there means «not now». */
-async function guardActivity() {
-  if (!admin || process.env.FORCE === "1") return;
-  const since = new Date(Date.now() - 30 * 60_000).toISOString();
-  const voice = await admin.from("ai_logs").select("id").eq("source", "voice").gt("created_at", since).limit(1);
-  if ((voice.data?.length ?? 0) > 0) {
-    console.error("somebody is dictating on dev in the last 30 min; set FORCE=1 to run anyway");
-    process.exit(2);
-  }
-}
-
-async function login(page: Page) {
-  await page.goto(`${APP_URL}/login`, { waitUntil: "networkidle" });
-  await page.getByLabel("Почта").fill("test@demo.local");
-  await page.getByLabel("Пароль").fill("1");
-  await page.getByRole("button", { name: "Войти" }).click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 20_000 });
-}
+const admin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY ? serviceClient() : null;
 
 const shot = (page: Page, name: string) => page.screenshot({ path: join(SHOTS, `notes-${name}.png`) });
 
@@ -101,7 +73,7 @@ const settled = (promise: Promise<unknown>) =>
   );
 
 async function main() {
-  await guardActivity();
+  await refuseWhenBusy();
   const created = new Set<string>();
   const deliveries = new Set<string>();
 
@@ -118,12 +90,13 @@ async function main() {
     isMobile: true,
     hasTouch: true,
     locale: "ru-RU",
+    userAgent: IPHONE_UA,
     permissions: ["microphone", "clipboard-read", "clipboard-write"],
   });
   let page = await openPage(context);
 
   try {
-    await login(page);
+    await signIn(page, APP_URL, { email: "test@demo.local", password: "1" });
     await page.goto(`${APP_URL}/notes`, { waitUntil: "networkidle" });
     await page.getByTestId("notes-lcd").waitFor({ timeout: 20_000 });
     await shot(page, "01-open");
@@ -203,7 +176,8 @@ async function main() {
       const sent = await admin.from("notification_deliveries").select("id, meta").eq("event_kind", "note_reminder").like("meta->>url", `%${typedId}`);
       for (const delivery of sent.data ?? []) deliveries.add(delivery.id);
       const meta = (sent.data?.[0]?.meta ?? {}) as { title?: string; body?: string; url?: string };
-      record("the tick queues one push to the author", !tick.error && (sent.data?.length ?? 0) === 1 && meta.url === `/notes?n=${typedId}`, `${meta.title} · ${meta.body}`);
+      const onePush = !tick.error && (sent.data?.length ?? 0) === 1 && meta.url === `/notes?n=${typedId}`;
+      record("the tick queues one push to the author", onePush, `${meta.title} · ${meta.body}`);
       const again = await admin.rpc("notes_due_reminders");
       const twice = await admin.from("notification_deliveries").select("id").eq("event_kind", "note_reminder").like("meta->>url", `%${typedId}`);
       record("a second tick sends nothing", !again.error && (twice.data?.length ?? 0) === 1);
@@ -397,9 +371,7 @@ async function main() {
     await browser.close();
   }
 
-  const failed = checks.filter((check) => !check.ok);
-  console.log(`\n${checks.length - failed.length}/${checks.length} checks passed · shots in ${SHOTS}`);
-  process.exit(failed.length > 0 ? 1 : 0);
+  finish(`shots in ${SHOTS}`);
 }
 
 void main();

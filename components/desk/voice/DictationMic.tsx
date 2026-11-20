@@ -4,7 +4,8 @@ import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 
 import { Tooltip } from "@/components/desk/ui/Tooltip";
-import { deskLayerUp, markPageRecording } from "@/components/desk/voice/control";
+import { keysTaken } from "@/components/desk/ui/layers";
+import { markPageRecording } from "@/components/desk/voice/control";
 import { MicGlyph, RecordingPill } from "@/components/desk/voice/MicButton";
 import { isTypingTarget } from "@/lib/desk/keys";
 import { isVoiceKey, VOICE_KEY } from "@/lib/desk/voice";
@@ -49,7 +50,7 @@ export function useDeskDictationKeys(dictation: Dictation, isMine: () => boolean
       }
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || !isVoiceKey(event) || isTypingTarget(event.target) || deskLayerUp() || !isMine()) return;
+      if (event.defaultPrevented || !isVoiceKey(event) || isTypingTarget(event.target) || keysTaken() || !isMine()) return;
       if (useIngestStore.getState().stage === "recording") return;
       const d = live.current;
       if (d.stage === "recording" || d.stage === "saving" || d.stage === "failed") return;

@@ -7,7 +7,7 @@ import { humanAqtobe } from "@/lib/ai/time";
 import { useCompanyLedger } from "@/lib/shop/queries";
 import { pluralRu } from "@/lib/tasks/status-text";
 
-/** Откуда пришла строка — человеческими словами, без имён источников из БД. */
+/** Where a line came from — in human words, without the database's source names. */
 const SOURCE_LABEL: Record<string, string> = {
   manual: "решение директора",
   auto_rule: "за задачу",
@@ -19,8 +19,8 @@ const SOURCE_LABEL: Record<string, string> = {
 const PAGE = 20;
 
 /**
- * Вся история очков компании — список внутри шторки «Вся история». На самом пульте её
- * нет намеренно: директору нужен итог, а построчная бухгалтерия — по запросу.
+ * The company's whole points history — a list inside the «Вся история» sheet. It is not on the
+ * console itself on purpose: the director needs the total, line-by-line bookkeeping is on request.
  */
 export function PointsLedger({ open }: { open: boolean }) {
   const [shown, setShown] = useState(PAGE);

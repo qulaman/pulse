@@ -3,40 +3,15 @@
  * end to end against a running `pnpm dev` and the dev Supabase project.
  * One real Claude call (~$0.01); STT is not exercised — no audio fixture here.
  */
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 
-process.loadEnvFile(".env.local");
+import { apiSession, APP_URL, finish, record, recordError } from "./lib/smoke";
 
-const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const PASSWORD = "demo1234";
 const TRANSCRIPT =
   "Марат, подготовь КП по Казхрому завтра до обеда. Ерлану Б. плюс десять";
 
-if (!SUPABASE_URL || !ANON_KEY) {
-  console.error("NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY are missing in .env.local");
-  process.exit(1);
-}
-
-type Check = { name: string; ok: boolean; detail: string };
-const checks: Check[] = [];
-
-function record(name: string, ok: boolean, detail: string) {
-  checks.push({ name, ok, detail });
-}
-
-type Session = { supabase: SupabaseClient; token: string; userId: string };
-
-async function signIn(email: string): Promise<Session> {
-  const supabase = createClient(SUPABASE_URL!, ANON_KEY!, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password: PASSWORD });
-  if (error || !data.session) throw new Error(`sign-in failed for ${email}: ${error?.message}`);
-  return { supabase, token: data.session.access_token, userId: data.session.user.id };
-}
+const signIn = (email: string) => apiSession(email, PASSWORD);
 
 type ApiResult = { status: number; body: Record<string, unknown> };
 
@@ -233,13 +208,5 @@ async function main() {
 }
 
 main()
-  .catch((error: unknown) => {
-    record("smoke", false, error instanceof Error ? error.message : String(error));
-  })
-  .finally(() => {
-    const width = Math.max(...checks.map((check) => check.name.length));
-    for (const check of checks) {
-      console.log(`${check.ok ? "ok  " : "FAIL"}  ${check.name.padEnd(width)}  ${check.detail}`);
-    }
-    process.exit(checks.some((check) => !check.ok) ? 1 : 0);
-  });
+  .catch((error: unknown) => recordError("smoke", error))
+  .finally(() => finish());

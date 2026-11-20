@@ -7,6 +7,7 @@ import { PeoplePicker, type PickedPerson } from "@/components/people/PeoplePicke
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { humanAqtobe } from "@/lib/ai/time";
+import { shortName } from "@/lib/people/names";
 import { reassignNeedsDeadline } from "@/lib/tasks/lifecycle";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
@@ -16,15 +17,8 @@ import { ReworkSheet } from "../TaskSheets";
 
 export type DirectorSheetName = "rework" | "extend" | "reassign" | "revoke" | "delete" | "passDeadline" | "reissueTo" | "reissueDeadline";
 
-const NAMES: readonly string[] = ["rework", "extend", "reassign", "revoke", "delete", "passDeadline", "reissueTo", "reissueDeadline"];
-
 /** A reassign waiting for its new deadline (D-128): who takes the task and the director's word. */
 export type PassTo = { person: PickedPerson; note: string };
-
-/** Narrows a card's open-sheet state to the director's sheets. */
-export function directorSheetOf(name: string): DirectorSheetName | null {
-  return NAMES.includes(name) ? (name as DirectorSheetName) : null;
-}
 
 /**
  * The director's sheets of a task, in one place: the thread card and the cards of
@@ -59,7 +53,7 @@ export function DirectorSheets({
 }) {
   const [note, setNote] = useState("");
   const now = new Date();
-  const passFirst = passTo?.person.full_name.trim().split(/\s+/)[0] ?? "";
+  const passFirst = shortName(passTo?.person.full_name);
   const oldLine = task.deadline
     ? new Date(task.deadline).getTime() < now.getTime()
       ? `Прежний срок прошёл: ${humanAqtobe(new Date(task.deadline), now)}`

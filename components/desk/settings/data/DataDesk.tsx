@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboa
 
 import type { Column, TableSpec } from "@/components/admin/DataTable";
 import { usePageSearch } from "@/components/desk/settings/SettingsFrame";
+import { useScreenKeys } from "@/components/desk/team/keys";
 import { InPanel } from "@/components/desk/ui/DeskPanel";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { PageTitle } from "@/components/desk/ui/PageTitle";
@@ -18,7 +19,6 @@ import { toast } from "@/components/ui/Toast";
 import { ADMIN_TABLES } from "@/lib/admin/tables";
 import { formatAqtobe } from "@/lib/ai/time";
 import { formatNum } from "@/lib/desk/format";
-import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
 import { useCompanyTable, type TableRow } from "@/lib/desk/settings-queries";
 import { usePeople } from "@/lib/people/queries";
 
@@ -351,28 +351,13 @@ export function DataDesk({ initialTable }: { initialTable: string | null }) {
   };
 
   // < > (the keys of «,» and «.») — pages, R — read again; outside a field. «[» is the shell's: it folds the navigation
-  const latest = useRef({ pages, refetch: query.refetch });
-  useEffect(() => {
-    latest.current = { pages, refetch: query.refetch };
+  useScreenKeys((event) => {
+    if (event.code === "Comma") setPage((p) => Math.max(0, p - 1));
+    else if (event.code === "Period") setPage((p) => Math.min(pages - 1, p + 1));
+    else if (event.code === "KeyR" && !event.shiftKey && !event.repeat) void query.refetch().then(() => toast("Таблица прочитана заново"));
+    else return false;
+    return true;
   });
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || !isPlainKey(event) || isTypingTarget(event.target)) return;
-      if (document.body.hasAttribute("data-dialog-open")) return;
-      if (event.code === "Comma") {
-        event.preventDefault();
-        setPage((p) => Math.max(0, p - 1));
-      } else if (event.code === "Period") {
-        event.preventDefault();
-        setPage((p) => Math.min(latest.current.pages - 1, p + 1));
-      } else if (event.code === "KeyR" && !event.shiftKey && !event.repeat) {
-        event.preventDefault();
-        void latest.current.refetch().then(() => toast("Таблица прочитана заново"));
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
 
   useShortcuts("Данные", [
     { keys: ["← →", "↑ ↓"], label: "По ячейкам (в таблице); вкладки — ← → на них" },

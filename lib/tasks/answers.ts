@@ -5,8 +5,8 @@ import { humanAqtobe } from "@/lib/ai/time";
  * «Да / Нет» used to answer everything — the employee's own ready-made questions included
  * («Какой формат?», «Где взять данные?», «Когда срок?»), and «Да» to «Какой формат?» is noise.
  *
- *   yesno   «Сделать сегодня?» — Да / Нет / Позже / Действуй сам
- *   urgent  «Это срочно?»      — Срочно / Не срочно / Действуй сам
+ *   yesno   «Сделать сегодня?» — «Да» / «Нет» / «Позже» / «Действуй сам»
+ *   urgent  «Это срочно?»      — «Срочно» / «Не срочно» / «Действуй сам»
  *   when    «Когда срок?»      — the deadline as it is, today 18:00, tomorrow 12:00: a new date is
  *                                set on the task too, not only said in words
  *   open    «Какой формат?»    — no chip can answer it: words first (the caller shows

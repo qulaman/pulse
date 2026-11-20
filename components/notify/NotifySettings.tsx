@@ -1,15 +1,16 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 
 import { PeoplePicker } from "@/components/people/PeoplePicker";
 import { NotifyDevices } from "@/components/notify/NotifyDevices";
+import { SwitchPill } from "@/components/people/SwitchPill";
 import { Chip } from "@/components/ui/Chip";
 import { TimeField } from "@/components/ui/datetime/TimeField";
 import { Row, RowGroup } from "@/components/ui/Row";
 import { Sheet } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
+import { useNotifyPrefs, useSaveNotifyPrefs } from "@/lib/desk/shell-queries";
 import { shortName } from "@/lib/people/names";
 import { useRoster } from "@/lib/people/roster";
 import {
@@ -29,25 +30,6 @@ import {
 } from "@/lib/push/prefs-plain";
 import type { NotifyPrefs } from "@/lib/push/prefs";
 
-export const notifyPrefsKey = ["notify-prefs"] as const;
-
-async function fetchPrefs(): Promise<NotifyPrefs> {
-  const res = await fetch("/api/me/notifications", { credentials: "include" });
-  if (!res.ok) throw new Error("prefs failed");
-  return ((await res.json()) as { prefs: NotifyPrefs }).prefs;
-}
-
-async function putPrefs(prefs: NotifyPrefs): Promise<NotifyPrefs> {
-  const res = await fetch("/api/me/notifications", {
-    method: "PUT",
-    credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(prefs),
-  });
-  if (!res.ok) throw new Error("prefs failed");
-  return ((await res.json()) as { prefs: NotifyPrefs }).prefs;
-}
-
 type SheetKind =
   | { kind: "category"; category: NotifyCategory }
   | { kind: "digest" }
@@ -63,28 +45,11 @@ type SheetKind =
  * — optimistic, and the waiting queue obeys it on the server too.
  */
 export function NotifySettings({ meId }: { meId: string }) {
-  const queryClient = useQueryClient();
-  const prefsQuery = useQuery({ queryKey: notifyPrefsKey, queryFn: fetchPrefs });
+  const prefsQuery = useNotifyPrefs();
   const roster = useRoster();
   const [sheet, setSheet] = useState<SheetKind | null>(null);
-
-  const save = useMutation({
-    // one save at a time, in order: two quick taps never land out of order
-    scope: { id: "notify-prefs" },
-    mutationFn: putPrefs,
-    onMutate: async (next) => {
-      await queryClient.cancelQueries({ queryKey: notifyPrefsKey });
-      const before = queryClient.getQueryData<NotifyPrefs>(notifyPrefsKey);
-      queryClient.setQueryData(notifyPrefsKey, next);
-      return { before };
-    },
-    onError: (_error, _next, context) => {
-      if (context?.before) queryClient.setQueryData(notifyPrefsKey, context.before);
-      toast("Не сохранилось — проверьте связь и попробуйте ещё раз");
-    },
-    onSuccess: (saved) => queryClient.setQueryData(notifyPrefsKey, saved),
-  });
-
+  // one save at a time, in order: two quick taps never land out of order
+  const save = useSaveNotifyPrefs(() => toast("Не сохранилось — проверьте связь и попробуйте ещё раз"));
   const prefs = prefsQuery.data;
   if (prefsQuery.isError) {
     return <p className="mt-6 text-[16px] leading-[22px] text-muted">Не получилось загрузить настройки. Обновите экран.</p>;
@@ -389,16 +354,7 @@ function Toggle({ label, hint, checked, onChange }: { label: string; hint?: stri
         <span className="block text-[16px] leading-[22px]">{label}</span>
         {hint ? <span className="block text-[13px] leading-[18px] text-muted">{hint}</span> : null}
       </span>
-      <span
-        aria-hidden
-        className="relative h-7 w-12 shrink-0 rounded-full transition-colors duration-[120ms]"
-        style={{ background: checked ? "var(--accent)" : "var(--border)" }}
-      >
-        <span
-          className="absolute top-1 h-5 w-5 rounded-full bg-bg transition-transform duration-[120ms]"
-          style={{ transform: checked ? "translateX(24px)" : "translateX(4px)" }}
-        />
-      </span>
+      <SwitchPill on={checked} />
     </button>
   );
 }

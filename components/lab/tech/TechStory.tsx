@@ -4,6 +4,7 @@ import { MotionConfig } from "motion/react";
 import type { ReactNode } from "react";
 
 import { CountUp, EcgLine, Reveal } from "@/components/lab/pitch/parts";
+import { SNAPSHOT } from "@/components/lab/pitch/snapshot";
 
 import { RlsDemo } from "./RlsDemo";
 import { TechMap } from "./TechMap";
@@ -115,7 +116,7 @@ const PARTS: { area: string; tech: string; text: string }[] = [
   },
   {
     area: "Смысл",
-    tech: "Claude Haiku 4.5",
+    tech: SNAPSHOT.parserModel,
     text: "Structured outputs по своей JSON-схеме. Сложные фразы перепроверяет Sonnet; длинные обе модели разбирают сразу, параллельно.",
   },
   {
@@ -159,12 +160,13 @@ function Stack() {
         <div className="card p-4 md:p-6">
           <p className="font-display text-[19px] font-bold leading-6">Разбор — по замерам, а не по ощущениям</p>
           <div className="mt-4 grid grid-cols-3 gap-3">
-            <Measure value={<CountUp to={100} suffix=" %" />} label="исполнитель определён верно" />
-            <Measure value={<CountUp to={97.6} decimals={1} suffix=" %" />} label="точность разбора (F1)" />
-            <Measure value={<CountUp to={1.5} decimals={1} suffix=" с" />} label="разбор фразы, медиана" />
+            <Measure value={<CountUp to={SNAPSHOT.assigneeAccuracy} suffix=" %" />} label="исполнитель определён верно" />
+            <Measure value={<CountUp to={SNAPSHOT.parseF1} decimals={1} suffix=" %" />} label="точность разбора (F1)" />
+            <Measure value={<CountUp to={SNAPSHOT.parseSeconds} decimals={1} suffix=" с" />} label="разбор фразы, медиана" />
           </div>
           <p className="mt-3 text-[13px] leading-[18px] text-muted">
-            Claude Haiku 4.5 с перепроверкой на Sonnet · автотесты на 66 фразах, включая казахские и смешанные · прогон 22.09.2026. Любая правка
+            {SNAPSHOT.parserModel} с перепроверкой на Sonnet · автотесты на {SNAPSHOT.evalPhrases} фразах, включая казахские и смешанные · прогон{" "}
+            {SNAPSHOT.evalRunOn}. Любая правка
             промпта проходит этот корпус, иначе не принимается.
           </p>
           <p className="mt-3 border-t border-border pt-3 text-[15px] leading-[22px] text-muted">

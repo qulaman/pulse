@@ -1,9 +1,8 @@
 "use client";
 
-import { addDaysYmd } from "@/lib/daily-report/format";
 import { useTeamDailyReportPeriod } from "@/lib/daily-report/queries";
 import type { TeamPeriodRow } from "@/lib/daily-report/types";
-import { aqtobeIsoToYmdHm, todayYmd, ymdHmToAqtobeIso, type Ymd } from "@/lib/datetime/calendar";
+import { addDays, aqtobeIsoToYmdHm, todayYmd, ymdHmToAqtobeIso, type Ymd } from "@/lib/datetime/calendar";
 import { formatNum } from "@/lib/desk/format";
 import { handInVerdict } from "@/lib/desk/tasks";
 import { useCompanySettings } from "@/lib/dictionary-queries";
@@ -26,8 +25,8 @@ export type Window = { from: Ymd; to: Ymd };
 /** The last 30 days with today, and the 30 before them. */
 export function periodWindows(today: Ymd): { current: Window; previous: Window } {
   return {
-    current: { from: addDaysYmd(today, 1 - PERIOD_DAYS), to: today },
-    previous: { from: addDaysYmd(today, 1 - 2 * PERIOD_DAYS), to: addDaysYmd(today, -PERIOD_DAYS) },
+    current: { from: addDays(today, 1 - PERIOD_DAYS), to: today },
+    previous: { from: addDays(today, 1 - 2 * PERIOD_DAYS), to: addDays(today, -PERIOD_DAYS) },
   };
 }
 
@@ -106,12 +105,15 @@ export function periodLines({ tasks, reports, pointsOn }: PeriodInput): PeriodLi
     const compared = hasTasks(previous);
     const timed = current.onTime + current.late;
     const onTime = share(current.onTime, timed);
-    lines.push({ key: "handed", label: "Сдано задач", value: formatNum(current.handed), change: compared ? changeWords(current.handed - previous.handed) : null });
+    const delta = (a: number, b: number) => (compared ? changeWords(a - b) : null);
+    lines.push({ key: "handed", label: "Сдано задач", value: formatNum(current.handed), change: delta(current.handed, previous.handed) });
     if (onTime !== null) {
       const before = compared ? share(previous.onTime, previous.onTime + previous.late) : null;
-      lines.push({ key: "onTime", label: "В срок", value: `${onTime}%`, detail: `${current.onTime} из ${timed}`, change: shareChange(onTime, before) });
+      const detail = `${current.onTime} из ${timed}`;
+      lines.push({ key: "onTime", label: "В срок", value: `${onTime}%`, detail, change: shareChange(onTime, before) });
     }
-    lines.push({ key: "returned", label: "Возвратов на доработку", value: formatNum(current.returned), change: compared ? changeWords(current.returned - previous.returned) : null });
+    const returned = formatNum(current.returned);
+    lines.push({ key: "returned", label: "Возвратов на доработку", value: returned, change: delta(current.returned, previous.returned) });
   }
   const now = reports.current;
   const before = reports.previous;
@@ -125,14 +127,21 @@ export function periodLines({ tasks, reports, pointsOn }: PeriodInput): PeriodLi
       change: compared ? shareChange(share(now.submitted, due), share(before?.submitted ?? 0, reportsDue(before))) : null,
     });
     if (pointsOn) {
-      lines.push({ key: "points", label: "Очки за отчёты", value: formatNum(now.points, { signed: true }), change: compared ? changeWords(now.points - (before?.points ?? 0)) : null });
+      const change = compared ? changeWords(now.points - (before?.points ?? 0)) : null;
+      lines.push({ key: "points", label: "Очки за отчёты", value: formatNum(now.points, { signed: true }), change });
     }
   }
   return lines;
 }
 
 /** The block's words, tighter: the right-hand panel says them in one line. */
-export const SHORT_LABEL: Record<PeriodLine["key"], string> = { handed: "сдано", onTime: "в срок", returned: "возвратов", reports: "отчётов", points: "очков" };
+export const SHORT_LABEL: Record<PeriodLine["key"], string> = {
+  handed: "сдано",
+  onTime: "в срок",
+  returned: "возвратов",
+  reports: "отчётов",
+  points: "очков",
+};
 
 type PeriodRaw = { tasks: PeriodTask[]; returns: string[] };
 

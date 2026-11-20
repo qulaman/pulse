@@ -3,22 +3,17 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
 import { opsFetch } from "./client";
-import type { AuditAnswer, CompaniesAnswer, MeAnswer, OperatorsAnswer } from "./contract";
+import type { AuditAnswer, CompaniesAnswer, OperatorsAnswer } from "./contract";
 
 /** The console's cache lives in its own QueryClient (OpsProviders): nothing here is kept on the device. */
 export const opsKeys = {
   all: ["ops"] as const,
-  me: () => [...opsKeys.all, "me"] as const,
   companies: () => [...opsKeys.all, "companies"] as const,
   audit: (company: string | null) => [...opsKeys.all, "audit", company] as const,
   /** Every view of the journal, filtered or not: what an action invalidates. */
   auditAll: () => [...opsKeys.all, "audit"] as const,
   operators: () => [...opsKeys.all, "operators"] as const,
 };
-
-export function useMe() {
-  return useQuery({ queryKey: opsKeys.me(), queryFn: () => opsFetch<MeAnswer>("/api/ops/me") });
-}
 
 /** A minute: the registry is what is watched while something burns; a hidden tab does not ask. */
 export const LIVE_MS = 60_000;

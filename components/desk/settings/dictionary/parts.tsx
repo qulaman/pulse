@@ -71,7 +71,7 @@ export function Strip({ title, count, about, children, testId }: { title: string
         {count ? <span className="dict-strip-count nums text-[12px] leading-4 text-muted">{count}</span> : null}
         {about ? <p className="min-w-0 truncate text-[13px] leading-[18px] text-muted">{about}</p> : null}
       </div>
-      <div className="dict-strip-body mt-0.5">{children}</div>
+      <div className="mt-0.5">{children}</div>
     </section>
   );
 }
@@ -91,7 +91,7 @@ export function GuideButton({ steps }: { steps: GuideStep[] }) {
         onClick={(event) => setAnchor(anchor ? null : event.currentTarget)}
         className="dict-guide inline-flex items-center gap-1.5 whitespace-nowrap text-[13px] leading-5 text-muted transition-colors duration-[120ms] hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45"
       >
-        <CircleHelp size={15} strokeWidth={2} aria-hidden className="dict-guide-icon" />
+        <CircleHelp size={15} strokeWidth={2} aria-hidden />
         Как это работает
       </button>
       <Popover open={Boolean(anchor)} onClose={() => setAnchor(null)} anchor={anchor} align="end" width={420} label="Как это работает">

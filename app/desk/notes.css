@@ -1,5 +1,5 @@
-/* «Заметки» of the desk (D-177): the notebook — capture card, rows, the note as a document. Owned by the
-   notes builder. Both looks: the tokens fall back from «Графит» (graphite.css) to the journal's inks. */
+/* «Заметки» of the desk (D-177): the notebook — capture card, rows, the note as a document. The tokens
+   fall back from «Графит» (graphite.css) to the base inks of journal.css. */
 
 html[data-surface="desk"] .nb {
   --nb-page: var(--page, var(--bg));
@@ -683,17 +683,6 @@ html[data-surface="desk"] .nb {
 @media (min-width: 1920px) {
   html[data-surface="desk"] .nb {
     --nb-stream: 540px;
-  }
-}
-
-/* the journal's print: rows are lines on the sheet, the paper has no card under it */
-html[data-surface="desk"][data-journal]:not([data-graphite]) .nb {
-  .nb-main,
-  .nb-capture {
-    box-shadow: inset 0 0 0 1px var(--rule);
-  }
-  .nb-row[data-current] {
-    box-shadow: none;
   }
 }
 

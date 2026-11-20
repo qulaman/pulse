@@ -3,8 +3,7 @@ import { z } from "zod";
 import { withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
 import type { SessionProfile } from "@/lib/auth";
-import { CODE_TTL_SECONDS, generateCode } from "@/lib/login-code/code";
-import { hashCode, signInLink } from "@/lib/login-code/server";
+import { issueLoginCode, signInLink } from "@/lib/login-code/server";
 import { canResetLogin } from "@/lib/people/access";
 import { createServiceSupabase } from "@/lib/supabase/service";
 
@@ -66,37 +65,23 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     const { service, target, company } = loaded;
     if (!target.is_active) return apiError(ISSUE_ERRORS.inactive[0], "inactive", ISSUE_ERRORS.inactive[1]);
 
-    // eight digits from 10^8: a clash with an open code is rare, a second draw settles it
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const code = generateCode();
-      const { data, error } = await service.rpc("issue_login_code", {
-        p_user_id: target.id,
-        p_issued_by: profile.userId,
-        p_code_hash: hashCode(code),
-        p_ttl_seconds: CODE_TTL_SECONDS,
-        p_request_id: body?.client_request_id,
-      });
-      if (error) {
-        if (error.message === "collision") continue;
-        const known = ISSUE_ERRORS[error.message];
-        if (known) return apiError(known[0], error.message, known[1]);
-        console.error("issue_login_code failed:", error.message);
-        return apiError(502, "issue_failed", "Не получилось выдать код — можно ещё раз");
-      }
-      const issued = data as { id: string; expires_at: string };
-      return apiOk(
-        {
-          code,
-          expires_at: issued.expires_at,
-          link: signInLink(req, company.slug),
-          company: company.name,
-          name: target.full_name,
-        },
-        201,
-      );
+    const issued = await issueLoginCode(service, { userId: target.id, issuedBy: profile.userId, requestId: body?.client_request_id });
+    if (!issued.ok) {
+      const known = ISSUE_ERRORS[issued.message];
+      if (known) return apiError(known[0], issued.message, known[1]);
+      if (issued.message !== "issue_failed") console.error("issue_login_code failed:", issued.message);
+      return apiError(502, "issue_failed", "Не получилось выдать код — можно ещё раз");
     }
-    console.error("issue_login_code: five collisions in a row");
-    return apiError(502, "issue_failed", "Не получилось выдать код — можно ещё раз");
+    return apiOk(
+      {
+        code: issued.code,
+        expires_at: issued.expires_at,
+        link: signInLink(req, company.slug),
+        company: company.name,
+        name: target.full_name,
+      },
+      201,
+    );
   },
   BodySchema,
 );

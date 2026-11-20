@@ -14,9 +14,9 @@ export type ErrandTransition = {
 };
 
 /**
- * Переходы заявки — только через RPC (политик update у таблицы нет). Идемпотентность
- * на `client_request_id`, как на всякой мутации (принцип 7); гонку двух секретарей
- * разрешает сама функция: опоздавший получает `already_claimed`.
+ * An errand moves only through an RPC (the table has no update policies). Idempotent
+ * on `client_request_id`, like every mutation (principle 7); the race of two secretaries
+ * is settled by the function itself: the late one gets `already_claimed`.
  */
 export function useErrandActions() {
   const queryClient = useQueryClient();
@@ -56,8 +56,8 @@ export function useErrandActions() {
 }
 
 /**
- * «Спасибо» директора за закрытую заявку (D-97) — реакция, не статус. Повтор безвреден: RPC
- * держит время первого «спасибо», ключ идемпотентности — на каждом вызове (принцип 7).
+ * The director's «Спасибо» for a closed errand (D-97) — a reaction, not a status. A repeat is harmless: the RPC
+ * keeps the time of the first «спасибо», the idempotency key is on every call (principle 7).
  */
 export function useThankErrand() {
   const queryClient = useQueryClient();
@@ -77,7 +77,7 @@ export function useThankErrand() {
   });
 }
 
-/** Причины «Не могу» — чипами, как у задач (принцип 2); без рода (docs/DESIGN.md). */
+/** The reasons of «Не могу» — as chips, like a task's (principle 2); no grammatical gender (docs/DESIGN.md). */
 export const DECLINE_REASONS = ["Сейчас не могу", "Не на месте", "Закончилось"] as const;
 
 /**

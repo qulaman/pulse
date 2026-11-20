@@ -1,109 +1,64 @@
 "use client";
 
-import { Bell, CalendarClock, Undo2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 
 import { useDeskScope } from "@/components/desk/DeskScope";
-import { TileFace } from "@/components/desk/team/TeamGrid";
-import { DataGrid, type Column, type Group } from "@/components/desk/ui/DataGrid";
+import { DataGrid, type Group } from "@/components/desk/ui/DataGrid";
 import { InPanel, useDeskPanel } from "@/components/desk/ui/DeskPanel";
-import { Dialog } from "@/components/desk/ui/Dialog";
-import { EmptyState } from "@/components/desk/ui/EmptyState";
-import { Kbd } from "@/components/desk/ui/Kbd";
+import { Face, useAvatars } from "@/components/desk/ui/Face";
 import { useContextMenu, type MenuItem } from "@/components/desk/ui/Menu";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
-import { PersonCell } from "@/components/desk/ui/PersonCell";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
-import { SearchField, SegmentTabs, Select, Toolbar } from "@/components/desk/ui/Toolbar";
-import { Tooltip } from "@/components/desk/ui/Tooltip";
-import { When } from "@/components/desk/ui/When";
 import { RecurrenceSection } from "@/components/recurrence/RecurrenceSection";
-import { Icon } from "@/components/tasks/desk/icons";
-import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
-import { useMinute } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
-import { humanAqtobe } from "@/lib/ai/time";
-import { appendPage, ARCHIVE_STATUSES, inRange, parseRange, rowsLeft, type DayRange } from "@/lib/desk/archive";
+import { appendPage, inRange, parseRange, rowsLeft, type DayRange } from "@/lib/desk/archive";
 import { useDraftTasks } from "@/lib/desk/drafts";
-import { useDeskLook } from "@/lib/desk/theme";
-import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
+import { isPlainKey } from "@/lib/desk/keys";
 import { shortName, useNamesKey } from "@/lib/people/names";
 import { useGoneIds, usePeople } from "@/lib/people/queries";
-import { hasUnread, HELD_STATUS, type BoardTask } from "@/lib/pulse/board";
+import { HELD_STATUS, type BoardTask } from "@/lib/pulse/board";
 import { useRecurrenceRulesSettled } from "@/lib/recurrence/queries";
 import { useHydrated } from "@/lib/useHydrated";
-import { queueOf, REASON_ORDER, type DeskReason } from "@/lib/tasks/desk";
-import { usePurgeClosed, useTaskActions, type TaskActions } from "@/lib/tasks/mutations";
-import {
-  closedAtOf,
-  directorScreen,
-  directorTabOf,
-  matchesQuery,
-  peopleLoad,
-  reasonFor,
-  type DirectorTab,
-  type Section,
-} from "@/lib/tasks/overview";
+import { useNow } from "@/lib/useNow";
+import { queueOf } from "@/lib/tasks/desk";
+import { usePurgeClosed, useTaskActions } from "@/lib/tasks/mutations";
+import { closedAtOf, directorScreen, directorTabOf, matchesQuery, peopleLoad, type DirectorTab, type Section } from "@/lib/tasks/overview";
 import { useClosedPages, useMe, usePulseBoard, useSentTasks, useTaskArchive, useTaskSearch, type Me, type TaskWithPeople } from "@/lib/tasks/queries";
 import { useTaskReceipts } from "@/lib/tasks/receipts";
-import { deadlineLabel, isOverdue, pluralRu, TEXT } from "@/lib/tasks/status-text";
+import { isOverdue } from "@/lib/tasks/status-text";
 
 import {
   archiveStatusOf,
-  bulkPlan,
-  columnFits,
-  deliveryLine,
-  DUE_FILTERS,
-  DUE_LABEL,
-  firstChanged,
-  fitColumn,
   groupChoices,
   groupOf,
-  handInVerdict,
-  inPlaceOf,
-  latestLine,
   loadStateOf,
   matchesDue,
   matchesStatus,
   parseDue,
   parseStatus,
   parseTab,
-  pickedInOrder,
-  pickRange,
   rowKeys,
   rowMoves,
-  rowSignature,
-  stageOf,
-  STATUS_FILTERS,
-  statusFilterLabel,
   TABS,
   tableSections,
-  togglePick,
-  underTitle,
-  verdictRank,
   worstLoad,
   type DueFilter,
   type LoadState,
   type Move,
   type StatusFilter,
 } from "@/lib/desk/tasks";
-import { DateRangeField } from "./DateRange";
-import { FaceName, useAvatars } from "./Face";
-import { taggedActions, useWidthBucket, writeParams } from "./flow";
+import { taggedActions, useDirectorBoard, useWidthBucket, writeParams } from "./flow";
 import { FailedScreen, LoadFailure, LoadNote } from "./LoadState";
-import { MomentBar, type MomentCounter } from "./MomentBar";
-import { DraftMark, MoreButton, MoveRow } from "./RowMoves";
-import { DeliveryCell } from "./TaskParts";
-import { deskLayerOpen, TaskPanel, type PanelNext } from "./TaskPanel";
-import { useDeskActs } from "./useDeskActs";
-
-const GLOW_MS = 1300;
-
-/** The calm moment's quiet line on the desk: a new order is a line away, not the phone's voice (D-154). */
-export const DESK_NEW_TASK = "Новую задачу — строкой сверху · Ctrl K";
+import { DESK_NEW_TASK, MomentBar, type MomentCounter } from "./MomentBar";
+import { BulkBar, PurgeDialog, TableKeysHint, TasksEmpty, TasksToolbar } from "./TableParts";
+import { taskColumns } from "./taskColumns";
+import { pressTaskKey } from "./taskKeys";
+import { TaskPanel } from "./TaskPanel";
+import { useRowActs } from "./useRowActs";
+import { rowsOnScreen, useTaskSelection } from "./useTaskSelection";
 
 /** The screen's frame while the lists land: the head, the moment (the archive has none), the tool bar, the rows. */
 export function TasksSkeleton({ moment = true }: { moment?: boolean }) {
@@ -111,7 +66,7 @@ export function TasksSkeleton({ moment = true }: { moment?: boolean }) {
     <DeskPage>
       <PageTitle title="Задачи" />
       <SkeletonGroup className="tasks-skel flex flex-col gap-3.5" grow>
-        {/* the moment's own box (a card in «Графит»), so nothing moves when it lands */}
+        {/* the moment's own box, so nothing moves when it lands */}
         {moment ? (
           <div className="desk-total">
             <div className="flex h-11 items-center gap-4">
@@ -141,7 +96,7 @@ export function TasksSkeleton({ moment = true }: { moment?: boolean }) {
  * grouped by reason, person or deadline, the row's two moves under the hand, filters, and the
  * task in the right-hand panel that goes on to the next one after the director's move. Wave 3:
  * rows of 34 px with columns as wide as their words, a right click for a row's menu, rows marked
- * with Ctrl/Shift and X for a reminder, a new date or a recall in bulk (never «Принять», принцип 3).
+ * with Ctrl/Shift and X for a reminder, a new date or a recall in bulk (never «Принять», principle 3).
  * «Закрытые» is the archive, by the server: when each closed and whether in time, a range of days
  * in the address, «Показать ещё» a page at a time, no total of what waits. The search reads the
  * loaded lists at once and the server's titles a moment later: on the two working tabs what it
@@ -175,16 +130,8 @@ export function TasksScreen() {
 
 type Tile = "yours" | "working" | "today" | "overdue" | "held";
 
-/** The rows of the table as the eye sees them — sorted by a column, folded groups left out. */
-function rowsOnScreen(box: HTMLElement | null): string[] {
-  if (!box) return [];
-  return [...box.querySelectorAll<HTMLElement>('[data-testid="desk-row"]')].map((row) => row.dataset.rowKey ?? "").filter(Boolean);
-}
-
 const NO_TASKS: TaskWithPeople[] = [];
 const NO_PEOPLE: string[] = [];
-
-const STAGE_ORDER = (task: TaskWithPeople, reason: DeskReason | null) => (reason ? REASON_ORDER.indexOf(reason) : 10 + ["sent", "accepted", "in_progress", "rework", "pending_review", "scheduled", "done", "revoked", "declined"].indexOf(task.status));
 
 function TasksView({
   me,
@@ -211,7 +158,7 @@ function TasksView({
   const people = usePeople();
   const goneIds = useGoneIds();
   const avatars = useAvatars();
-  const now = useMinute();
+  const now = useNow();
   const { pointsEnabled } = useDeskScope();
   const panel = useDeskPanel();
   const params = useSearchParams();
@@ -243,22 +190,7 @@ function TasksView({
   const closeTask = useCallback(() => writeParams({ id: null }), []);
 
   // the board holds the company; the table is this director's — only the author's answer closes a question
-  const rows = useMemo(() => {
-    const map = new Map<string, BoardTask>();
-    for (const row of board) if (row.author_id === me.userId) map.set(row.id, row);
-    return map;
-  }, [board, me.userId]);
-  const boardById = useMemo(() => new Map(board.map((row) => [row.id, row])), [board]);
-
-  const reasons = useMemo(() => {
-    const map = new Map<string, DeskReason>();
-    for (const task of all) {
-      const row = rows.get(task.id);
-      const reason = reasonFor(task, row?.question, now, Boolean(row?.time_request));
-      if (reason) map.set(task.id, reason);
-    }
-    return map;
-  }, [all, rows, now]);
+  const { rows, boardById, reasons } = useDirectorBoard(board, all, me.userId, now);
   // «Доставка»: the push receipts of every not yet accepted task — one query, one channel
   const sentIds = useMemo(() => all.filter((task) => task.status === "sent").map((task) => task.id), [all]);
   const receipts = useTaskReceipts(sentIds);
@@ -340,76 +272,18 @@ function TasksView({
   const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
   const foldKey = (key: string) => `${tab}:${group}:${key}`;
 
-  /* ---- the row in hand: selected, or open in the panel; a row that leaves gives its place ---- */
-  const [selected, setSelected] = useState<string | null>(null);
-  const focusKey = openId ?? selected;
-  const [anchor, setAnchor] = useState<{ id: string; index: number; tab: DirectorTab } | null>(null);
-  const at = focusKey ? ids.indexOf(focusKey) : -1;
-  if (focusKey && at >= 0 && (anchor?.id !== focusKey || anchor.index !== at || anchor.tab !== tab)) setAnchor({ id: focusKey, index: at, tab });
-  const gone = Boolean(focusKey) && at < 0 && anchor !== null && anchor.id === focusKey && anchor.tab === tab;
-  const inPlace = gone && anchor ? inPlaceOf(ids, anchor.index) : null;
-  if (!openId && selected && gone && inPlace !== selected) setSelected(inPlace);
-
-  // the director's own move on the open task: when it leaves the tab, the panel goes on to the next one
-  const [acted, setActed] = useState<string | null>(null);
-  const advance = Boolean(openId && gone && inPlace && acted === openId);
-  useEffect(() => {
-    if (advance && inPlace) openTask(inPlace);
-  }, [advance, inPlace, openTask]);
-  const panelNext: PanelNext | null =
-    openId && gone && !advance ? { id: acted === openId ? null : inPlace, onGo: () => inPlace && openTask(inPlace) } : null;
-
-  /* ---- the marked rows (Ctrl/Shift-click, X, Shift+↑/↓, Ctrl+A): kept while they stay in the table ---- */
-  const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set());
-  const [pickFrom, setPickFrom] = useState<string | null>(null);
-  const marked = useMemo(() => pickedInOrder(ids, picked), [ids, picked]);
-  const markedTasks = useMemo(() => marked.map((id) => byId.get(id)).filter((task): task is TaskWithPeople => Boolean(task)), [marked, byId]);
-  const plan = useMemo(
-    () => bulkPlan(markedTasks.map((task) => ({ ...task, nudged_at: rows.get(task.id)?.nudged_at ?? null, time_request: rows.get(task.id)?.time_request ?? null })), now),
-    [markedTasks, rows, now],
-  );
-  const unpick = () => {
-    setPicked(new Set());
-    setPickFrom(null);
-  };
-  const pickOne = (id: string) => {
-    setPicked((was) => togglePick(was, id));
-    setPickFrom(id);
-  };
-  const pickTo = (id: string) => {
-    const range = pickRange(rowsOnScreen(gridBox.current), pickFrom ?? focusKey, id);
-    setPicked((was) => new Set([...was, ...range]));
-    setPickFrom(id);
-  };
-
-  // Esc takes the marks off wherever the caret is (the bar's buttons, the page) — before the panel closes
-  const hasPicks = picked.size > 0;
-  useEffect(() => {
-    if (!hasPicks) return;
-    const onKey = (event: globalThis.KeyboardEvent) => {
-      if (event.defaultPrevented || event.key !== "Escape" || isTypingTarget(event.target) || deskLayerOpen()) return;
-      event.preventDefault();
-      setPicked(new Set());
-      setPickFrom(null);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [hasPicks]);
-
-  /* ---- a row changed under the eyes (Realtime, or the director's own move): it glows once ---- */
-  const signatures = useMemo(() => new Map(all.map((task) => [task.id, rowSignature(task, rows.get(task.id))])), [all, rows]);
-  const [seen, setSeen] = useState(signatures);
-  const [glow, setGlow] = useState<string | null>(null);
-  if (seen !== signatures) {
-    const changed = firstChanged(seen, signatures, (id) => all.find((task) => task.id === id)?.status);
-    setSeen(signatures);
-    if (changed) setGlow(changed);
-  }
-  useEffect(() => {
-    if (!glow) return;
-    const timer = setTimeout(() => setGlow(null), GLOW_MS);
-    return () => clearTimeout(timer);
-  }, [glow]);
+  /* ---- the row in hand, the marked rows, the row that glows ---- */
+  const { selected, setSelected, focusKey, mark, panelNext, picked, marked, plan, unpick, pickOne, pickTo, pickAll, pickStep, glow } = useTaskSelection({
+    ids,
+    tab,
+    openId,
+    openTask,
+    gridBox,
+    byId,
+    all,
+    rows,
+    now,
+  });
 
   // the table takes the keys from the first look, and again once the panel is closed
   useEffect(() => {
@@ -420,30 +294,22 @@ function TasksView({
   }, [openId, tab]);
 
   /* ---- the director's moves: the desk's own (a popover from the cell, a small dialog), not the phone's sheets ---- */
-  const deskActions: TaskActions = taggedActions(
-    {
-      ...actions,
-      reissue: (input) => actions.reissue({ ...input, onOpen: openTask }),
-      reassign: (input) => actions.reassign({ ...input, onOpen: openTask }),
-    },
-    setActed,
-  );
   const reply = (task: TaskWithPeople) => {
     setSelected(task.id);
     setFocus(task.id);
     openTask(task.id);
   };
-  const acts = useDeskActs({
-    base: deskActions,
+  const acts = useRowActs({
+    actions,
+    mark,
     tasks: known,
-    flagsOf: (id) => ({ question: rows.get(id)?.question ?? null, request: rows.get(id)?.time_request ?? null, suggestion: rows.get(id)?.suggestion ?? null }),
+    rowOf: (id) => rows.get(id),
     now,
     companyId: me.companyId,
+    openId,
+    openTask,
+    closeTask,
     onReply: reply,
-    onOpen: openTask,
-    afterRemove: (id) => {
-      if (openId === id) closeTask();
-    },
   });
 
   const choose = (id: string) => {
@@ -485,7 +351,7 @@ function TasksView({
     // Ctrl/Cmd+A — every row in sight is marked
     if ((event.ctrlKey || event.metaKey) && !event.altKey && event.code === "KeyA") {
       event.preventDefault();
-      setPicked(new Set(rowsOnScreen(gridBox.current)));
+      pickAll();
       return true;
     }
     if (!isPlainKey(event)) return false;
@@ -502,11 +368,8 @@ function TasksView({
       const here = row ? order.indexOf(row.id) : -1;
       const next = order[here < 0 ? 0 : Math.min(order.length - 1, Math.max(0, here + step))];
       if (!next) return true;
-      if (event.shiftKey) {
-        // Shift+↑/↓ marks as it goes, from the row in hand
-        setPicked((was) => new Set([...was, ...(row ? [row.id] : []), next]));
-        setPickFrom(next);
-      }
+      // Shift+↑/↓ marks as it goes, from the row in hand
+      if (event.shiftKey) pickStep(row?.id ?? null, next);
       choose(next);
       return true;
     }
@@ -522,17 +385,13 @@ function TasksView({
       pickOne(row.id);
       return true;
     }
-    if (event.code === "Period") {
-      event.preventDefault();
-      gridBox.current?.querySelector<HTMLElement>(`[data-row-key="${CSS.escape(row.id)}"] [data-testid="desk-row-more"]`)?.click();
-      return true;
-    }
-    const key = keysOf(row).find((one) => one.code === event.code);
-    if (!key) return false;
-    event.preventDefault();
-    if (key.action === "reply") reply(row);
-    else acts.press(key.action, row);
-    return true;
+    const taken = pressTaskKey(event.code, row, {
+      root: gridBox.current,
+      letters: keysOf(row),
+      onLetter: (action) => (action === "reply" ? reply(row) : acts.press(action, row)),
+    });
+    if (taken) event.preventDefault();
+    return taken;
   };
 
   /* ---- the mouse: Ctrl/Shift-click marks, a right click is the row's menu ---- */
@@ -628,289 +487,35 @@ function TasksView({
   const leftInArchive = rowsLeft(archive.total, archive.rows.length);
 
   /* ---- the table: 34 px rows, columns as wide as their words ---- */
-  const panelOpen = panel.isOpen;
-  // grouped by the person, the group's head names them: the column would only repeat it
-  const byPerson = group === "person";
-  const closedRow = (task: TaskWithPeople) => task.status === "done" || task.status === "revoked" || archivedIds.has(task.id);
-  // a column with nothing to say on this tab is not drawn: history has no receipts, no waiting
-  // words; the rest give way on a narrow list so that «Что» stays readable (COLUMN_FLOOR)
-  const showDelivery = !panelOpen && columnFits("delivery", bucket) && shown.some((task) => task.status === "sent" || task.status === "scheduled");
-  const showLast = !panelOpen && columnFits("last", bucket) && shown.some((task) => latestLine(task, rows.get(task.id), now) !== null);
-  // grouped by the reason or the stage, the group's head already says it
-  const showStage = group !== "reason" && columnFits("stage", bucket);
-  const showWho = !byPerson && columnFits("who", bucket);
-  const showDue = columnFits("due", bucket);
-  // the verdict leaves with the tick: on the narrowest list «Закрыта» says the most
-  // the archive's own column: the panel says the same, so it leaves as early as the stage does
-  const showVerdict = columnFits("stage", bucket);
-  const anyPicked = picked.size > 0;
-  const verdictOf = (task: TaskWithPeople) => (task.status === "pending_review" ? handInVerdict(task) : null);
-  const closedText = (task: TaskWithPeople) => humanAqtobe(new Date(closedAtOf(task)), now);
-  // with «Последнее» gone, a handed-in row's deadline makes room for how it was handed in; under
-  // the head «Срок» a row of «В архиве» says what its date is
-  const dueText = (task: TaskWithPeople) =>
-    (showLast ? null : verdictOf(task)?.text) ??
-    (closedRow(task) ? `закрыта ${closedText(task)}` : !task.deadline && task.priority === "high" ? TEXT.urgent : deadlineLabel(task, now).text);
-  // under the floor of «Последнее» the columns keep to lower ceilings: their sum never leaves «Что» under its minimum
-  const snug = !columnFits("last", bucket);
-  // «Графит» shows the person's face before the name (D-171, D-174): the column keeps room for it
-  const graphite = useDeskLook() === "graphite";
-  const face = graphite ? 30 : 0;
-  const widths = {
-    who: fitColumn(shown.map((task) => shortName(task.assignee?.full_name)), { min: 96 + face, max: (snug ? 120 : 160) + face, extra: 10 + face }),
-    due: fitColumn([...shown, ...archived].map(dueText), { min: 116, max: archived.length > 0 ? 196 : snug ? 132 : 172, perChar: archived.length > 0 ? 8 : undefined }),
-    closed: fitColumn(shown.map(closedText), { min: 116, max: snug ? 136 : 172 }),
-    verdict: fitColumn(shown.map((task) => handInVerdict(task)?.text ?? ""), { min: 84, max: snug ? 148 : 180, perChar: 8 }),
-    stage: fitColumn(shown.map((task) => stageOf(task, reasons.get(task.id) ?? null, now).text), { min: 88, max: snug ? 110 : 150, extra: 34 }),
-    // never narrower than its own head («ДОСТАВКА» in capitals)
-    delivery: fitColumn(
-      shown.map((task) => (task.status === "sent" ? (deliveryLine(task, receipts.data?.[task.id] ?? null, now)?.text ?? "") : "—")),
-      { min: 104, max: snug ? 150 : 200 },
-    ),
-  };
-  const everyColumn: Column<TaskWithPeople>[] = [
-    {
-      key: "pick",
-      title: (
-        <span className="sr-only">Отметка</span>
-      ),
-      // the journal: no room of its own — the mark hangs in the sheet's margin, the table starts on
-      // its vertical; «Графит» holds its rows in a card that clips the margin, so the mark has a slot
-      width: graphite ? "28px" : "0px",
-      render: (task) => {
-        const on = picked.has(task.id);
-        return (
-          <>
-            {/* a marked row is tinted whole — the cell reaches over the row (it is the positioned parent) */}
-            {on ? <span aria-hidden className="tasks-picked pointer-events-none absolute inset-0 bg-accent/[0.07]" /> : null}
-            <button
-              type="button"
-              role="checkbox"
-              aria-checked={on}
-              aria-label={on ? "Снять отметку" : "Отметить"}
-              title={`${on ? "Снять отметку" : "Отметить"} · X`}
-              data-testid="desk-row-pick"
-              data-on={on ? "" : undefined}
-              onClick={(event) => {
-                event.stopPropagation();
-                pickOne(task.id);
-                setSelected(task.id);
-              }}
-              className={`tasks-pick flex h-4 w-4 items-center justify-center rounded-[2px] border transition-opacity duration-[120ms] after:absolute ${
-                graphite ? "relative after:-inset-2" : "absolute -left-[26px] top-1/2 -translate-y-1/2 after:-inset-y-2 after:-left-1 after:-right-2.5"
-              } ${on ? "border-accent bg-accent text-bg opacity-100" : `border-muted/60 ${anyPicked ? "opacity-100" : "opacity-0 [.desk-row:hover_&]:opacity-100 focus-visible:opacity-100"}`}`}
-            >
-              {on ? (
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="m5 12.5 4.5 4.5L19 7.5" />
-                </svg>
-              ) : null}
-            </button>
-          </>
-        );
-      },
+  const { columns, tight } = taskColumns({
+    shown,
+    archived,
+    archivedIds,
+    rows,
+    reasons,
+    receipts: receipts.data,
+    now,
+    meId: me.userId,
+    bucket,
+    group,
+    archiveTab,
+    panelOpen: panel.isOpen,
+    picked,
+    avatars,
+    goneIds,
+    drafts,
+    onPick: (id) => {
+      pickOne(id);
+      setSelected(id);
     },
-    ...(byPerson
-      ? []
-      : ([
-          {
-            key: "who",
-            title: "Кто",
-            width: widths.who,
-            sort: (a, b) => (a.assignee?.full_name ?? "").localeCompare(b.assignee?.full_name ?? "", "ru"),
-            render: (task) => (
-              <span className="block" data-act-for={task.id} data-act="reassign handoff reissue">
-                {graphite ? (
-                  <FaceName
-                    id={task.assignee_id}
-                    name={task.assignee?.full_name}
-                    avatar={avatars.get(task.assignee_id)}
-                    muted={closedRow(task)}
-                    gone={!closedRow(task) && goneIds.has(task.assignee_id)}
-                  />
-                ) : (
-                  <PersonCell name={task.assignee?.full_name} size={24} muted={closedRow(task)} gone={!closedRow(task) && goneIds.has(task.assignee_id)} />
-                )}
-              </span>
-            ),
-          },
-        ] satisfies Column<TaskWithPeople>[])),
-    {
-      key: "what",
-      title: "Что",
-      width: columnFits("pick", bucket) ? "minmax(160px,1fr)" : "minmax(120px,1fr)",
-      sort: (a, b) => a.title.localeCompare(b.title, "ru"),
-      render: (task) => {
-        const row = rows.get(task.id);
-        const under = underTitle(task, row, me.userId, now);
-        const unread = row ? hasUnread(row, me.userId) : false;
-        return (
-          // one line: the title, then the thread's newest word in grey — a row stays 34 px
-          <span className="tasks-what flex min-w-0 items-center gap-2.5">
-            <span className="shrink-0" data-testid="desk-glyph" data-status={task.status} title={stageOf(task, reasons.get(task.id) ?? null, now).text}>
-              <StatusGlyph status={task.status} overdue={isOverdue(task, now)} size={16} />
-            </span>
-            <span className="flex min-w-0 items-baseline gap-2" title={under ? `${task.title}\n${under}` : task.title}>
-              <span className={`min-w-0 shrink truncate font-medium ${closedRow(task) ? "text-text/70" : ""}`}>{task.title}</span>
-              {under ? <span className="tasks-under min-w-0 max-w-[45%] shrink-[2] truncate text-[13px] text-muted">{under}</span> : null}
-            </span>
-            {task.recurrence_rule_id ? (
-              <span className="shrink-0 text-muted" title="Повторяется">
-                <Icon name="repeat" size={13} />
-              </span>
-            ) : null}
-            {drafts.has(task.id) && task.status !== "revoked" ? <DraftMark /> : null}
-            {unread ? (
-              <span aria-label="новое сообщение" title="Новое сообщение" className="tasks-unread shrink-0 text-[12px] leading-4 text-accent">
-                новое
-              </span>
-            ) : null}
-          </span>
-        );
-      },
+    movesOf,
+    onMove: pressMove,
+    // the row's own menu: the row is the chosen one, the panel stays as it is
+    menuOf: (task) => {
+      setSelected(task.id);
+      return rowMenu(task);
     },
-    ...(archiveTab
-      ? ([
-          {
-            key: "closed",
-            title: "Закрыта",
-            width: widths.closed,
-            sort: (a, b) => closedAtOf(a).localeCompare(closedAtOf(b)),
-            render: (task) => (
-              <span className="block truncate whitespace-nowrap text-[13px] text-muted" data-testid="desk-row-closed">
-                <When>{closedText(task)}</When>
-              </span>
-            ),
-          },
-          ...(showVerdict
-            ? ([
-                {
-                  key: "verdict",
-                  title: "В срок",
-                  width: widths.verdict,
-                  sort: (a, b) => verdictRank(handInVerdict(a)) - verdictRank(handInVerdict(b)),
-                  render: (task) => {
-                    const verdict = handInVerdict(task);
-                    if (!verdict) return <span className="text-muted/60">—</span>;
-                    return (
-                      <span
-                        className="block truncate whitespace-nowrap text-[13px]"
-                        title={`Сдано ${humanAqtobe(new Date(task.completed_at as string), now)} · срок ${humanAqtobe(new Date(task.deadline as string), now)}`}
-                        data-testid="desk-row-verdict"
-                      >
-                        <When overdue={verdict.late}>{verdict.text}</When>
-                      </span>
-                    );
-                  },
-                },
-              ] satisfies Column<TaskWithPeople>[])
-            : []),
-        ] satisfies Column<TaskWithPeople>[])
-      : []),
-    {
-      key: "due",
-      title: "Срок",
-      width: widths.due,
-      sort: (a, b) => (a.deadline ?? "9").localeCompare(b.deadline ?? "9"),
-      render: (task) => {
-        const verdict = verdictOf(task);
-        if (verdict) {
-          // a hand-in after the deadline is this row's missed deadline: the one colour it may carry (D-158)
-          return (
-            <span className="block truncate whitespace-nowrap text-[13px]" title={`Сдано ${verdict.text} · срок ${deadlineLabel(task, now).text}`} data-testid="desk-row-handin">
-              <When overdue={verdict.late}>{dueText(task)}</When>
-            </span>
-          );
-        }
-        // a row of «В архиве» says when it closed; a refusal keeps its deadline — the director still decides it
-        if (closedRow(task)) {
-          return (
-            <span className="block truncate whitespace-nowrap text-[13px] text-muted">
-              <When>{dueText(task)}</When>
-            </span>
-          );
-        }
-        if (!task.deadline && task.priority === "high") return <span className="text-[13px] font-medium" data-act-for={task.id} data-act="extend retime">{TEXT.urgent}</span>;
-        const label = deadlineLabel(task, now);
-        return (
-          <span className={`block truncate whitespace-nowrap text-[13px] ${label.none ? "text-muted" : ""}`} data-act-for={task.id} data-act="extend retime">
-            <When overdue={label.overdue}>{label.text}</When>
-          </span>
-        );
-      },
-    },
-    {
-      key: "stage",
-      title: "Стадия",
-      width: widths.stage,
-      sort: (a, b) => STAGE_ORDER(a, reasons.get(a.id) ?? null) - STAGE_ORDER(b, reasons.get(b.id) ?? null),
-      // the stage in words, neutral: the ring at the title already says it (D-158)
-      render: (task) => (
-        <span className="block truncate text-[13px] text-text/80" data-testid="desk-stage">
-          {stageOf(task, reasons.get(task.id) ?? null, now).text}
-        </span>
-      ),
-    },
-    ...(showDelivery
-      ? ([{ key: "delivery", title: "Доставка", width: widths.delivery, render: (task) => <DeliveryCell task={task} receipt={receipts.data?.[task.id]} now={now} /> }] satisfies Column<TaskWithPeople>[])
-      : []),
-    ...(!showLast
-      ? []
-      : ([
-          {
-            key: "last",
-            title: "Последнее",
-            width: "minmax(0,0.8fr)",
-            render: (task) => {
-              const line = latestLine(task, rows.get(task.id), now);
-              return line ? (
-                <span className="block truncate text-[13px] text-text/80" title={line.text}>
-                  {line.text}
-                </span>
-              ) : (
-                <span className="text-muted/60">—</span>
-              );
-            },
-          },
-        ] satisfies Column<TaskWithPeople>[])),
-    {
-      key: "more",
-      title: "",
-      width: "44px",
-      align: "right",
-      render: (task) => {
-        const moves = movesOf(task);
-        return (
-          <span className="flex justify-end">
-            {moves.length > 0 ? (
-              // the row's two moves under the hand: over the row's right end while it is hovered or
-              // chosen (with the panel open the panel holds the chosen row's moves)
-              <span
-                className={`desk-row-moves pointer-events-none absolute inset-y-0 right-8 hidden items-center pl-3 [.desk-row:hover_&]:pointer-events-auto [.desk-row:hover_&]:flex ${
-                  panelOpen ? "" : "[.desk-row[aria-selected=true]_&]:pointer-events-auto [.desk-row[aria-selected=true]_&]:flex"
-                }`}
-              >
-                <MoveRow className="flex-row-reverse" moves={moves} onPress={(move, target) => pressMove(move, task, target)} />
-              </span>
-            ) : null}
-            <MoreButton
-              items={() => {
-                // the row's own menu: the row is the chosen one, the panel stays as it is
-                setSelected(task.id);
-                return rowMenu(task);
-              }}
-            />
-          </span>
-        );
-      },
-    },
-  ];
-
-  // the tool bar tightens with the table, so that the rows start higher: the person's list and the
-  // search give up their spare width, and on the narrowest list the count (the tab says the same)
-  const tight = !columnFits("delivery", bucket);
-  const givenWay = new Set([!showWho && "who", (!showDue || archiveTab) && "due", !showDue && "closed", !showStage && "stage"]);
-  const columns = everyColumn.filter((column) => !givenWay.has(column.key));
+  });
 
   const toggleFold = (section: Section<TaskWithPeople>) => {
     const key = foldKey(section.key);
@@ -924,13 +529,12 @@ function TasksView({
     // the chosen row folded away lets go of the choice; an open one keeps the panel
     if (!shut && selected && !openId && section.tasks.some((task) => task.id === selected)) setSelected(null);
   };
-  // grouped by the person, «Графит» opens each group with the person's face
+  // grouped by the person, each group opens with the person's face
   const personTitle = (section: Section<TaskWithPeople>) => {
     const id = section.key.slice("person:".length);
-    if (!graphite) return shortName(section.title);
     return (
       <span className="tasks-group-face inline-flex items-center gap-2">
-        <TileFace person={{ id, full_name: section.title, avatar_url: avatars.get(id) ?? null }} size={20} />
+        <Face person={{ id, full_name: section.title, avatar_url: avatars.get(id) ?? null }} size={20} />
         {shortName(section.title)}
       </span>
     );
@@ -945,45 +549,24 @@ function TasksView({
   }));
 
   const boardDown = boardLoad.kind === "failed";
-  // no verdict while the answer is on its way: an empty list says nothing yet
-  const looking = archiveTab ? archive.busy : search.searching;
-  const empty =
-    looking ? (
-      <EmptyState title={query.trim() ? `Ищу «${query.trim()}»…` : "Загружаю закрытые задачи…"} />
-    ) : archiveTab && archiveLoad.kind === "failed" ? (
-      <LoadFailure what="закрытые задачи" offline={archiveLoad.offline} busy={archive.query.isFetching} onRetry={() => void archive.query.refetch()} />
-    ) : all.length === 0 ? (
-      <EmptyState title="Пока ничего не отправлено" hint="Новая задача — строкой поручения сверху (Ctrl K) или голосом с телефона" />
-    ) : filtered ? (
-      <EmptyState
-        title={query.trim() ? `Ничего не нашёл по «${query.trim()}»` : archiveTab && range ? "За этот период ничего не закрыто" : "Под эти фильтры ничего не подходит"}
-        action={
-          <Button size="sm" variant="secondary" onClick={resetFilters}>
-            Сбросить фильтры
-          </Button>
-        }
-      />
-    ) : tab === "yours" && boardDown ? (
-      // the statuses are known, the questions and the requests for time are not: no green here
-      <EmptyState title="Вопросы и просьбы о сроке не загрузились" hint="Приёмки, отказов и просрочек нет, остальное станет видно после загрузки" />
-    ) : tab === "yours" ? (
-      <EmptyState
-        tone="ok"
-        title="Ваших решений ничего не ждёт"
-        hint="Приёмка, вопросы, отказы и просрочки появятся здесь — и в «Разобрать» по одной"
-        action={
-          piles.working.length > 0 ? (
-            <Button size="sm" variant="secondary" onClick={() => setTab("working")}>
-              Что в работе · {piles.working.length}
-            </Button>
-          ) : undefined
-        }
-      />
-    ) : tab === "working" ? (
-      <EmptyState title="У команды нет открытых задач" hint={DESK_NEW_TASK} />
-    ) : (
-      <EmptyState title="Закрытых пока нет" hint="Принятые и отозванные лягут сюда по дням" />
-    );
+  const empty = (
+    <TasksEmpty
+      tab={tab}
+      // no verdict while the answer is on its way: an empty list says nothing yet
+      looking={archiveTab ? archive.busy : search.searching}
+      query={query}
+      archiveLoad={archiveTab ? archiveLoad : null}
+      archiveBusy={archive.query.isFetching}
+      onArchiveRetry={() => void archive.query.refetch()}
+      nothingSent={all.length === 0}
+      filtered={filtered}
+      range={range}
+      onReset={resetFilters}
+      boardDown={boardDown}
+      working={piles.working.length}
+      onWorking={() => setTab("working")}
+    />
+  );
 
   const calm = screen.value === null && screen.closedToday === 0;
 
@@ -1011,72 +594,36 @@ function TasksView({
         <RecurrenceSection personId={who} />
       </div>
 
-      <Toolbar
-        end={
-          // the button clears all of history: with a range on, its name would promise less than it does
-          archiveTab && !who && !range && closedCount > 0 ? (
-            <Button size="sm" variant="ghost" className="!min-h-8 !px-2" onClick={() => setPurgeAsk(true)} data-testid="desk-purge">
-              Очистить закрытые
-            </Button>
-          ) : undefined
-        }
-      >
-        <SegmentTabs<DirectorTab>
-          aria-label="Задачи"
-          value={tab}
-          onChange={setTab}
-          items={[
-            { value: "yours", label: "Ждут вас", count: piles.yours.length },
-            { value: "working", label: "В работе", count: piles.working.length },
-            // a person or a filter narrows what is loaded; the plain tab counts what the server has —
-            // less the refusals, which wait in «Ждут вас»
-            { value: "closed", label: "Закрытые", count: archiveTab ? Math.max(closedRows.length, archive.total ?? 0) : narrowed ? Math.max(piles.closed.length, search.total ?? 0) : Math.max(piles.closed.length, closedCount - declinedLoaded) },
-          ]}
-        />
-        <Select
-          aria-label="Группы"
-          value={group}
-          onChange={(event) => writeParams({ group: event.target.value === choices[0].value ? null : event.target.value })}
-          className="w-[140px]"
-          data-testid="desk-group"
-        >
-          {choices.map((choice) => (
-            <option key={choice.value} value={choice.value}>
-              {choice.label}
-            </option>
-          ))}
-        </Select>
-        <Select aria-label="Человек" value={who ?? ""} onChange={(event) => writeParams({ who: event.target.value || null })} className={tight ? "w-[116px]" : "w-[140px]"}>
-          <option value="">Все люди</option>
-          {personOptions.map((option) => (
-            <option key={option.id} value={option.id}>
-              {shortName(option.name)}
-              {option.open > 0 ? ` · ${option.open}` : ""}
-            </option>
-          ))}
-        </Select>
-        <Select aria-label="Статус" value={(archiveTab ? archiveStatus : status) ?? ""} onChange={(event) => setStatus(parseStatus(event.target.value))} className="w-[148px]">
-          <option value="">Любой статус</option>
-          {(archiveTab ? ARCHIVE_STATUSES : STATUS_FILTERS).map((value) => (
-            <option key={value} value={value}>
-              {statusFilterLabel(value)}
-            </option>
-          ))}
-        </Select>
-        {archiveTab ? (
-          <DateRangeField value={range} onChange={setRange} now={now} />
-        ) : (
-          <Select aria-label="Срок" value={due ?? ""} onChange={(event) => setDue(parseDue(event.target.value))} className="w-[136px]">
-            <option value="">Любой срок</option>
-            {DUE_FILTERS.map((value) => (
-              <option key={value} value={value}>
-                {DUE_LABEL[value]}
-              </option>
-            ))}
-          </Select>
-        )}
-        <SearchField value={query} onChange={setQuery} placeholder={tight ? "Поиск" : "Поиск по задачам"} width={tight ? 128 : 176} />
-      </Toolbar>
+      <TasksToolbar
+        tab={tab}
+        onTab={setTab}
+        counts={{
+          yours: piles.yours.length,
+          working: piles.working.length,
+          // a person or a filter narrows what is loaded; the plain tab counts what the server has —
+          // less the refusals, which wait in «Ждут вас»
+          closed: archiveTab ? Math.max(closedRows.length, archive.total ?? 0) : narrowed ? Math.max(piles.closed.length, search.total ?? 0) : Math.max(piles.closed.length, closedCount - declinedLoaded),
+        }}
+        group={group}
+        choices={choices}
+        onGroup={(value) => writeParams({ group: value === choices[0].value ? null : value })}
+        who={who}
+        people={personOptions}
+        onWho={(id) => writeParams({ who: id })}
+        archiveTab={archiveTab}
+        status={archiveTab ? archiveStatus : status}
+        onStatus={setStatus}
+        range={range}
+        onRange={setRange}
+        due={due}
+        onDue={setDue}
+        now={now}
+        query={query}
+        onQuery={setQuery}
+        tight={tight}
+        // the button clears all of history: with a range on, its name would promise less than it does
+        onPurge={archiveTab && !who && !range && closedCount > 0 ? () => setPurgeAsk(true) : null}
+      />
 
       <div ref={gridBox} data-desk-tasks="" onMouseDownCapture={onGridMouseDown} onClickCapture={onGridClick} onContextMenu={onGridMenu}>
         <DataGrid<TaskWithPeople>
@@ -1095,62 +642,17 @@ function TasksView({
         />
       </div>
 
-      {ids.length > 0 && !anyPicked ? (
-        // the chosen row's letters stand on its own buttons: the hint keeps to the walk
-        <p className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-muted" data-testid="desk-keys-hint">
-          <span>
-            <Kbd>↑</Kbd> <Kbd>↓</Kbd> выбор
-          </span>
-          <span>
-            <Kbd>Enter</Kbd> открыть
-          </span>
-          <span>
-            <Kbd>?</Kbd> все клавиши
-          </span>
-        </p>
-      ) : null}
+      {ids.length > 0 && picked.size === 0 ? <TableKeysHint /> : null}
 
-      {anyPicked ? (
-        // the marked rows' bar stands at the screen's foot while the table scrolls (принцип 3: no «Принять» here)
-        <div className="sticky bottom-4 z-20 flex justify-center" data-testid="desk-bulk-bar">
-          <div className="tasks-bulk flex items-center gap-1 rounded-[2px] border border-text bg-surface px-2 py-1">
-            <span className="tasks-bulk-count nums px-2 text-[13px] leading-4">
-              {/* the figure is keyed: a new count arrives instead of changing in place */}
-              <b key={marked.length} className="tasks-bulk-n font-[inherit]">
-                {marked.length}
-              </b>{" "}
-              {pluralRu(marked.length, ["отмечена", "отмечены", "отмечено"])}
-            </span>
-            <span aria-hidden className="tasks-bulk-rule h-5 w-px bg-border" />
-            <Tooltip label="Тем, кому не напоминали последние полчаса">
-              <Button size="sm" variant="ghost" className="!min-h-8 !px-2.5 !text-text" disabled={plan.nudge.length === 0} onClick={bulkNudge} data-bulk="nudge">
-                <Bell aria-hidden size={14} strokeWidth={2} className="tasks-ico" />
-                Напомнить <span className="nums text-muted">{plan.nudge.length}</span>
-              </Button>
-            </Tooltip>
-            <Tooltip label="Один новый срок всем, кто в работе">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="!min-h-8 !px-2.5 !text-text"
-                disabled={plan.extend.length === 0}
-                onClick={() => acts.bulk.extend(plan.extend, bulkAnchor("extend"), unpick)}
-                data-bulk="extend"
-              >
-                <CalendarClock aria-hidden size={14} strokeWidth={2} className="tasks-ico" />
-                Перенести срок <span className="nums text-muted">{plan.extend.length}</span>
-              </Button>
-            </Tooltip>
-            <Button size="sm" variant="ghost" className="!min-h-8 !px-2.5 !text-danger" disabled={plan.revoke.length === 0} onClick={() => acts.bulk.revoke(plan.revoke, unpick)} data-bulk="revoke">
-              <Undo2 aria-hidden size={14} strokeWidth={2} className="tasks-ico" />
-              Отозвать <span className="nums opacity-70">{plan.revoke.length}</span>
-            </Button>
-            <span aria-hidden className="tasks-bulk-rule h-5 w-px bg-border" />
-            <Button size="sm" variant="ghost" className="!min-h-8 !px-2.5" onClick={unpick} data-testid="desk-bulk-clear">
-              Снять <Kbd>Esc</Kbd>
-            </Button>
-          </div>
-        </div>
+      {picked.size > 0 ? (
+        <BulkBar
+          count={marked.length}
+          plan={plan}
+          onNudge={bulkNudge}
+          onExtend={() => acts.bulk.extend(plan.extend, bulkAnchor("extend"), unpick)}
+          onRevoke={() => acts.bulk.revoke(plan.revoke, unpick)}
+          onClear={unpick}
+        />
       ) : null}
 
       {archiveTab ? <LoadNote state={archiveLoad} failed="Архив не ответил: показаны только последние закрытые" now={now} onRetry={() => void archive.query.refetch()} /> : null}
@@ -1182,20 +684,13 @@ function TasksView({
       {acts.node}
       {context.node}
 
-      <Dialog open={purgeAsk} onClose={() => setPurgeAsk(false)} title="Очистить закрытые" width="sm">
-        <p className="text-[14px] leading-5 text-muted">
-          Удалить {closedCount} {pluralRu(closedCount, ["закрытую задачу", "закрытые задачи", "закрытых задач"])} насовсем, вместе с перепиской? Отказы тоже уйдут.
-          Начисленные очки останутся.
-        </p>
-        <div className="mt-4 flex justify-end gap-2">
-          <Button size="sm" variant="secondary" onClick={() => setPurgeAsk(false)}>
-            Не сейчас
-          </Button>
-          <Button size="sm" variant="danger" loading={purge.isPending} onClick={() => purge.mutate(undefined, { onSettled: () => setPurgeAsk(false) })}>
-            Удалить
-          </Button>
-        </div>
-      </Dialog>
+      <PurgeDialog
+        open={purgeAsk}
+        count={closedCount}
+        busy={purge.isPending}
+        onClose={() => setPurgeAsk(false)}
+        onConfirm={() => purge.mutate(undefined, { onSettled: () => setPurgeAsk(false) })}
+      />
 
       {openId ? (
         <InPanel panelKey={`task:${openId}`} onClose={closeTask}>
@@ -1204,7 +699,7 @@ function TasksView({
             taskId={openId}
             me={me}
             row={boardById.get(openId)}
-            base={taggedActions(actions, setActed)}
+            base={taggedActions(actions, mark)}
             now={now}
             pointsEnabled={pointsEnabled}
             onOpenTask={openTask}

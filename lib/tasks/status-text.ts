@@ -1,6 +1,8 @@
 import { humanAqtobe } from "@/lib/ai/time";
 import type { Database } from "@/lib/supabase/types";
 
+import { WORKING } from "./lifecycle";
+
 export type TaskStatus = Database["public"]["Enums"]["task_status"];
 
 /**
@@ -103,15 +105,13 @@ export const TEXT = {
 
 export type DeadlineLabel = { text: string; overdue: boolean; none: boolean };
 
-const OPEN_STATUSES: readonly TaskStatus[] = ["sent", "accepted", "in_progress", "rework"];
-
 /** Overdue is computed, never stored (docs/DATABASE.md comment on tasks). */
 export function isOverdue(
   task: { deadline: string | null; status: TaskStatus },
   now: Date = new Date(),
 ): boolean {
   if (!task.deadline) return false;
-  if (!OPEN_STATUSES.includes(task.status)) return false;
+  if (!WORKING.includes(task.status)) return false;
   return new Date(task.deadline).getTime() < now.getTime();
 }
 
@@ -225,16 +225,15 @@ export function unreadWordOf<M extends WordMessage>(
   return null;
 }
 
+/** The director's words were spoken: a typed order's «transcript» is its own title and says nothing new. */
+export function spokenOf(task: { title: string; source_transcript: string | null }): boolean {
+  return Boolean(task.source_transcript && task.source_transcript.trim() !== task.title.trim());
+}
+
 /** A word in one line, as «Дела» shows the last one: «голосовое · …», «фото · …», or the words. */
 export function wordText(message: Pick<WordMessage, "type" | "content">): string {
   const words = message.content?.trim() ?? "";
   if (message.type === "voice") return words ? `голосовое · ${words}` : "голосовое";
   if (message.type === "photo") return words ? `фото · ${words}` : "фото";
   return words;
-}
-
-/** Русское имя перехода для системной строки треда. */
-export function statusChangeLine(newStatus: string): string {
-  const label = STATUS_LABEL[newStatus as TaskStatus];
-  return label ? `Статус: ${label}` : `Статус: ${newStatus}`;
 }

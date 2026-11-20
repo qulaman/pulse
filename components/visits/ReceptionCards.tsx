@@ -13,11 +13,11 @@ const TONE: Record<VisitTone, string> = {
 };
 
 /**
- * Посетители и сообщения на экран глазами секретаря (D-96, D-116): карточка на каждого, кто
- * ещё не убран. Сверху — что ответил директор («Директор прочитал» — у сообщения), под ним
- * квитанция стены («На экране у директора»), одна кнопка — «Отменить», пока не решено,
- * «Готово», когда вошёл, «Понятно» — иначе. Ответ приходит по Realtime, карточка меняется
- * без перезагрузки.
+ * Visitors and messages to the wall as the secretary sees them (D-96, D-116): a card for everyone
+ * not yet cleared. On top — what the director answered («Директор прочитал» for a message), under
+ * it the wall's receipt («На экране у директора»), one button — «Отменить» while undecided,
+ * «Готово» once they went in, «Понятно» otherwise. The answer comes by Realtime, the card changes
+ * without a reload.
  */
 export function ReceptionCards({ visits, now }: { visits: readonly Visit[]; now: Date }) {
   const close = useCloseVisit();

@@ -50,7 +50,7 @@ export const recurrenceKind: KindModule = {
   section,
   modelSchema: ModelRecurrenceEntitySchema,
   examples: [
-    // П13. Два повтора в одной фразе: дни недели со временем и будни с частью дня (D-148).
+    // П13. Two repeats in one phrase: weekdays with a time and workdays with a part of the day (D-148).
     {
       n: 13,
       user: "Сакен, каждую пятницу к пяти сдавай кассу. И Динара, по будням с утра присылай сводку по звонкам",

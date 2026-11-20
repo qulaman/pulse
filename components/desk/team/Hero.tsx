@@ -2,9 +2,10 @@
 
 import { motion } from "motion/react";
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { TONE_VAR, type Tone } from "@/components/desk/ui/tone";
+import { useSectionSpy } from "@/components/desk/ui/useSectionSpy";
 import { formatNum } from "@/lib/desk/format";
 
 /** One number beside the hero's own: «2 с просрочкой». A zero stays quiet; a fact may filter or lead. */
@@ -180,39 +181,6 @@ export function CardSection({
 
 export type PageSectionLink = { id: string; label: string; count?: number };
 
-/** The section that sits under the top of the window now: the last whose top has passed 140 px below it. */
-function useSectionSpy(ids: readonly string[]): string | null {
-  const key = ids.join("|");
-  const [current, setCurrent] = useState<string | null>(ids[0] ?? null);
-  useEffect(() => {
-    const list = key.split("|").filter(Boolean);
-    const scroller = document.getElementById("desk-main");
-    if (!scroller || list.length === 0) return;
-    let frame = 0;
-    const read = () => {
-      frame = 0;
-      const line = scroller.getBoundingClientRect().top + 140;
-      let found = list[0];
-      for (const id of list) {
-        const node = document.getElementById(id);
-        if (node && node.getBoundingClientRect().top <= line) found = id;
-      }
-      if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4) found = list[list.length - 1];
-      setCurrent(found);
-    };
-    const onScroll = () => {
-      if (!frame) frame = requestAnimationFrame(read);
-    };
-    read();
-    scroller.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      scroller.removeEventListener("scroll", onScroll);
-      if (frame) cancelAnimationFrame(frame);
-    };
-  }, [key]);
-  return current;
-}
-
 const TAB_GLIDE = { type: "spring", stiffness: 560, damping: 44, mass: 0.8 } as const;
 
 /**
@@ -221,7 +189,7 @@ const TAB_GLIDE = { type: "spring", stiffness: 560, damping: 44, mass: 0.8 } as 
  * tabs only lead.
  */
 export function SectionTabs({ sections, label }: { sections: PageSectionLink[]; label: string }) {
-  const current = useSectionSpy(sections.map((section) => section.id));
+  const current = useSectionSpy(sections.map((section) => section.id), 140);
   return (
     <nav className="section-tabs" aria-label={label} data-testid="section-tabs">
       {sections.map((section) => {

@@ -28,7 +28,10 @@ export type Cleanup = { rows: Record<string, number>; files_queued: number };
 export type QueuedFile = { id: number; bucket: string; name: string };
 export type ExportFile = { bucket: string; name: string; bytes: number };
 
-/** Every `ops_*` call: arguments, then answer. They reach lib/supabase/types.ts with the next `db:types`. */
+/**
+ * Every `ops_*` call: arguments, then answer. Truer than lib/supabase/types.ts: the generated
+ * Args cannot say an argument may be null, and the answers are jsonb there.
+ */
 type Rpcs = {
   // under the operator's JWT
   ops_login_state: [None, { operator: boolean }];
@@ -70,11 +73,6 @@ type Rpcs = {
   ops_storage_next: [{ p_limit: number }, QueuedFile[]];
   ops_storage_done: [{ p_ids: number[] }, null];
   ops_storage_left: [{ p_company: string | null }, number];
-  // `p_issued_by` became nullable with the console's migration (tasks/029)
-  issue_login_code: [
-    { p_user_id: string; p_issued_by: null; p_code_hash: string; p_ttl_seconds: number; p_request_id: string },
-    { id: string; expires_at: string },
-  ];
 };
 
 /** A failure throws `OpsRpcError` with the base's own words: `withOps` turns it into an answer. */
@@ -83,6 +81,7 @@ export async function opsRpc<Name extends keyof Rpcs>(
   name: Name,
   args: Rpcs[Name][0],
 ): Promise<Rpcs[Name][1]> {
+  // the table above is the contract (nullable arguments); the generated overloads would refuse it
   const { data, error } = await client.rpc(name as never, args as never);
   if (error) throw new OpsRpcError(error.message, error.code ?? null);
   return data as Rpcs[Name][1];

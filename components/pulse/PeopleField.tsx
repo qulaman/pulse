@@ -10,9 +10,9 @@ import { TOUCHES, type DreamId } from "@/components/pulse/DreamOrbit";
 import { haptic } from "@/lib/haptics";
 import type { Chase } from "@/lib/idle/flight";
 import { lookOf, wordOf, type CrewTask, type Look } from "@/lib/idle/look";
-import { addressOf, initialsOf, RING_OUT, teamField, type Member, type Pick, type Seat } from "@/lib/idle/people";
+import { addressOf, RING_OUT, teamField, type Member, type Pick, type Seat } from "@/lib/idle/people";
 import { brushesOf, keyframesOfBrushes } from "@/lib/idle/wake";
-import { shortName, useNamesKey } from "@/lib/people/names";
+import { shortName, useNamesKey, initialsOf } from "@/lib/people/names";
 import { useDeepRest } from "@/lib/useDeepRest";
 
 /** The trip up is three acts (D-74) and needs room to read; the way back is a calm float. */

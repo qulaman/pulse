@@ -5,9 +5,10 @@ import { useState } from "react";
 import { PointsLedger } from "@/components/shop/PointsLedger";
 import { Sheet } from "@/components/ui/Sheet";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
-import { initialsOf, usePeople } from "@/lib/people/queries";
+import { usePeople } from "@/lib/people/queries";
 import { nearestGoal } from "@/lib/shop/format";
 import { useShopSummary, type ShopItem } from "@/lib/shop/queries";
+import { initialsOf } from "@/lib/people/names";
 
 function Chevron() {
   return (
@@ -18,10 +19,10 @@ function Chevron() {
 }
 
 /**
- * Очки команды — про людей, а не про бухгалтерию: одна строка движения за месяц и трое,
- * кто ближе всех к своей награде (это и есть рычаг директора — видно, кого дотянуть).
- * Крупная цифра «на руках» живёт в герое экрана, здесь её нет намеренно: одна цифра —
- * одно место. Построчная история — за тапом, в шторке.
+ * The team's points — about people, not bookkeeping: one line of the month's movement and the three
+ * closest to their reward (that is the director's lever — it shows whom to pull up). The big «на
+ * руках» number lives in the screen's hero and is absent here on purpose: one number, one place.
+ * The line-by-line history is behind a tap, in a sheet.
  */
 export function TeamPoints({ items }: { items: ShopItem[] }) {
   const summary = useShopSummary(true);

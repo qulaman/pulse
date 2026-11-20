@@ -6,6 +6,7 @@ import { dismissToast, toast } from "@/components/ui/Toast";
 import { GRACE_MS, graceLine } from "@/lib/desk/home";
 import { rememberSend } from "@/lib/errands/habits";
 import { askSecretary } from "@/lib/errands/pending";
+import { flushOnLeave } from "@/lib/leave";
 import type { SecretaryAction } from "@/lib/settings";
 
 /**
@@ -57,22 +58,14 @@ export function useHeldCodes(): readonly string[] {
   );
 }
 
-let listening = false;
-function listen() {
-  if (listening || typeof window === "undefined") return;
-  listening = true;
-  const flush = () => {
-    for (const send of [...waiting.values()]) send();
-  };
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") flush();
-  });
-  window.addEventListener("pagehide", flush);
+/** Leaving the page sends what waits at once. */
+function flush() {
+  for (const send of [...waiting.values()]) send();
 }
 
 /** Holds the request for its window; returns its key — the same uuid the errand row will carry. */
 export function askAfterWindow({ action, note, untilMin = null, absence, onSent }: DeskAsk): string {
-  listen();
+  flushOnLeave(flush);
   const id = crypto.randomUUID();
   let toastId = 0;
   const settle = () => {

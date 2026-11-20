@@ -16,7 +16,6 @@ import {
   type SelectHTMLAttributes,
 } from "react";
 
-import { Kbd } from "@/components/desk/ui/Kbd";
 import { Popover } from "@/components/desk/ui/Popover";
 
 /** A row of the desk's controls over a table: tabs and filters on the left, counts and actions on the right. */
@@ -206,7 +205,7 @@ export function Select({ className = "", children, value, defaultValue, onChange
         <span className="min-w-0 flex-1 truncate">{chosen?.label ?? ""}</span>
         <ChevronDown size={14} strokeWidth={2.25} aria-hidden className="desk-select-chevron shrink-0" />
       </button>
-      <Popover open={open} onClose={() => setOpen(false)} anchor={button} matchAnchor role="presentation" className="desk-select-pop">
+      <Popover open={open} onClose={() => setOpen(false)} anchor={button} matchAnchor role="presentation">
         <div id={listId} role="listbox" aria-label={label} className="flex max-h-[min(60vh,360px)] flex-col overflow-y-auto p-1">
           {choices.map((choice, index) => {
             const on = index === chosenAt;
@@ -282,9 +281,4 @@ export function SegmentTabs<V extends string>({
       })}
     </div>
   );
-}
-
-/** «/» — a hint of the keyboard next to a field or a button. */
-export function KeyHint({ children }: { children: ReactNode }) {
-  return <Kbd>{children}</Kbd>;
 }

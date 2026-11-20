@@ -1,15 +1,16 @@
 "use client";
 
 import { Button } from "@/components/ui/Button";
-import { initialsOf } from "@/lib/people/queries";
+
 import { isOpenOrder, pointsWord, waitingRu } from "@/lib/shop/format";
 import { useCancelOrder, useSetOrderStatus, type Order } from "@/lib/shop/queries";
+import { initialsOf } from "@/lib/people/names";
 
 /**
- * «Выдать» — единственное место пульта, где от директора ждут действия сегодня.
- * Поэтому у карточки ровно одна крупная кнопка: «Выдал». Промежуточный статус
- * «подтверждён» директору не показывается и не предлагается — это ярус завхоза;
- * отмена живёт мелкой ссылкой рядом, чтобы её не нажали вместо выдачи.
+ * «Выдать» — the one place of the console where the director is expected to act today. So the
+ * card has exactly one big button: «Выдал». The in-between status «подтверждён» is neither shown
+ * nor offered to the director — that is the storekeeper's tier; cancelling lives in a small link
+ * beside it, so it is not tapped instead of handing out.
  */
 export function DeliverList({ orders, meId }: { orders: Order[]; meId?: string }) {
   const setStatus = useSetOrderStatus();

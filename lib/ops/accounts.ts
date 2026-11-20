@@ -1,7 +1,6 @@
 import "server-only";
 
-import { CODE_TTL_SECONDS, generateCode } from "@/lib/login-code/code";
-import { hashCode, signInLink } from "@/lib/login-code/server";
+import { issueLoginCode, signInLink } from "@/lib/login-code/server";
 import { suggestAliases } from "@/lib/people/aliases";
 import { syntheticEmail } from "@/lib/people/email";
 import { loadRoster } from "@/lib/roster";
@@ -124,39 +123,21 @@ function appLink(req: Request, slug: string | null): string {
   return slug ? `${origin}/c/${slug}` : `${origin}/login`;
 }
 
-/**
- * A sign-in code issued by nobody of the company (`p_issued_by` null): the journal says who. Eight
- * digits from 10^8: a clash with an open code is rare, a further draw settles it.
- */
+/** A sign-in code issued by nobody of the company (`p_issued_by` null): the journal says who. */
 export async function issueOpsCode(
   service: OpsClient,
   req: Request,
   input: { userId: string; name: string; company: { name: string; slug: string | null }; requestId: string },
 ): Promise<IssuedCode> {
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const code = generateCode();
-    try {
-      const issued = await opsRpc(service, "issue_login_code", {
-        p_user_id: input.userId,
-        p_issued_by: null,
-        p_code_hash: hashCode(code),
-        p_ttl_seconds: CODE_TTL_SECONDS,
-        p_request_id: input.requestId,
-      });
-      return {
-        code,
-        expires_at: issued.expires_at,
-        link: appLink(req, input.company.slug),
-        company: input.company.name,
-        name: input.name,
-      };
-    } catch (error) {
-      if (error instanceof OpsRpcError && error.message === "collision") continue;
-      throw error;
-    }
-  }
-  console.error("ops issue_login_code: five collisions in a row");
-  throw new OpsRpcError("issue_failed");
+  const issued = await issueLoginCode(service, { userId: input.userId, issuedBy: null, requestId: input.requestId });
+  if (!issued.ok) throw new OpsRpcError(issued.message, issued.sqlstate);
+  return {
+    code: issued.code,
+    expires_at: issued.expires_at,
+    link: appLink(req, input.company.slug),
+    company: input.company.name,
+    name: input.name,
+  };
 }
 
 /** After a change that already happened: no code is no failure, a new one comes from the card. */

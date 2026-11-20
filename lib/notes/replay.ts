@@ -5,9 +5,10 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { toast } from "@/components/ui/Toast";
 import { isNetworkError } from "@/lib/net";
+import { useReplayRounds } from "@/lib/offline/rounds";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import { pluralRu } from "@/lib/tasks/status-text";
-import { voiceApi, VoiceApiError } from "@/lib/voice/api";
+import { alreadyStored, voiceApi, VoiceApiError } from "@/lib/voice/api";
 import { extForMime } from "@/lib/voice/recorder";
 
 import { parentsFirst } from "@/lib/mindboard/branch";
@@ -41,12 +42,6 @@ type Me = { userId: string; companyId: string };
 export function isTransient(error: unknown): boolean {
   if (isNetworkError(error)) return true;
   return error instanceof VoiceApiError && (error.code === "network" || error.status === 0 || error.status >= 500);
-}
-
-/** The object of this key is in Storage already: an earlier attempt landed, its answer was lost. */
-function alreadyStored(error: unknown): boolean {
-  if (!(error instanceof VoiceApiError) || error.code !== "upload_failed") return false;
-  return error.status === 409 || /duplicate|already exists/i.test(JSON.stringify(error.body ?? ""));
 }
 
 /**
@@ -268,9 +263,6 @@ export function flushPendingNotes(me: Me, queryClient: QueryClient): Promise<num
   return running;
 }
 
-/** While something waits on the phone, a quiet retry on this beat — `online` events lie on a captive network. */
-const RETRY_MS = 30_000;
-
 /**
  * The replay of kept notes, for the whole director app (mounted in the layout): on
  * start, when the network is back, when the app comes to the front, and on a slow beat
@@ -282,34 +274,16 @@ export function useNotesReplay(me: Me | undefined) {
   const userId = me?.userId;
   const companyId = me?.companyId;
 
-  useEffect(() => {
-    if (!userId || !companyId) return;
-    const who = { userId, companyId };
-    let alive = true;
-    const round = async () => {
-      if (!onlineManager.isOnline()) return;
-      const sent = await flushPendingNotes(who, queryClient);
-      if (alive && sent > 0) toast(`Отправил ${sent} ${pluralRu(sent, ["заметку", "заметки", "заметок"])}, что ждали связи`);
-    };
-    void round();
-    const offOnline = onlineManager.subscribe((online) => {
-      if (online) void round();
-    });
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void round();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    const beat = setInterval(() => void round(), RETRY_MS);
+  useReplayRounds(
+    async (alive) => {
+      if (!userId || !companyId) return;
+      // flushPendingNotes keeps its own lock: a round asked for while one runs makes it go again
+      const sent = await flushPendingNotes({ userId, companyId }, queryClient);
+      if (alive() && sent > 0) toast(`Отправил ${sent} ${pluralRu(sent, ["заметку", "заметки", "заметок"])}, что ждали связи`);
+    },
     // a sub-point waits for its point with the network up (D-121): both go now
-    const offAsk = onReplayRequest(() => void round());
-    return () => {
-      alive = false;
-      offOnline();
-      offAsk();
-      document.removeEventListener("visibilitychange", onVisible);
-      clearInterval(beat);
-    };
-  }, [userId, companyId, queryClient]);
+    { on: userId && companyId ? `${userId}/${companyId}` : null, extra: onReplayRequest },
+  );
 }
 
 export type PendingState = { creates: PendingCreate[]; edits: PendingEdit[]; boards: PendingBoard[] };

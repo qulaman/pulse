@@ -1,14 +1,8 @@
 /* ==========================================================================================
-   «Задачи», «Разобрать», the task's panel and the order's editor (D-174) — owned by the tasks
-   group of the desk polish wave. Drawn for «Графит» (`:root[…][data-graphite]`, one step of
-   specificity over the journal); under «Журнал» only what keeps the layout stays, decorative
-   icons hide. Keyframes at top level, `tasks-…`; motion off under «уменьшить движение».
+   «Задачи», «Разобрать», the task's panel and the order's editor (D-174). Drawn for «Графит»
+   (`:root[…][data-graphite]`, one step of specificity over journal.css). Keyframes at top level,
+   `tasks-…`; motion off under «уменьшить движение».
    ========================================================================================== */
-
-/* the journal is print: the screens' small icons are the graphite look's only */
-html[data-surface="desk"][data-journal]:not([data-graphite]) .tasks-ico {
-  display: none;
-}
 
 :root[data-surface="desk"][data-journal][data-graphite] {
   /* ---- a face in a list: no halo of the card's colour around it ------------------------- */
@@ -1394,7 +1388,7 @@ html[data-surface="desk"][data-journal]:not([data-graphite]) .tasks-ico {
   }
 }
 
-/* the task's steps in the journal: one stroke of its ink over each step's name (D-158) */
+/* what the task's panel and «Разобрать» need under «Графит»: the squeezed «Что», the walk's track */
 html[data-surface="desk"][data-journal] {
   /* «Что» squeezed by the panel: the thread's grey word leaves rather than shrink to a sliver */
   .tasks-what {
@@ -1405,24 +1399,11 @@ html[data-surface="desk"][data-journal] {
       display: none;
     }
   }
-  .tasks-step-bar {
-    background: var(--own);
-  }
-  .tasks-step-dot {
-    display: none;
-  }
   /* the walk through «Разобрать»: a hairline a task; the row keeps its height with or without words */
   .tasks-progress {
     min-height: 16px;
   }
   .tasks-progress-track {
-    gap: 3px;
-    height: 2px;
-
-    > i {
-      flex: 1;
-      background: var(--rule);
-    }
     > i[data-s="done"] {
       background: var(--ink-2);
     }

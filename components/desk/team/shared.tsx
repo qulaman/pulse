@@ -10,6 +10,7 @@ import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import type { Load } from "@/lib/people/loads";
 import type { Availability, Person, Role } from "@/lib/people/queries";
 import { ROLE_LABEL } from "@/lib/people/queries";
+import { textHas } from "@/lib/people/search";
 import { pluralRu } from "@/lib/tasks/status-text";
 
 /** Roles in the order of the role picker (TeamRoster), the wall last. */
@@ -18,16 +19,9 @@ export const ROLE_ORDER: Record<Role, number> = { director: 0, manager: 1, secre
 /** Absence is not an alarm and not the director's move: a quiet word (D-158). */
 export const AVAILABILITY_TONE: Record<Availability, Tone> = { active: "ok", vacation: "muted", sick: "muted" };
 
-function normalise(s: string): string {
-  return s.toLowerCase().replace(/ё/g, "е").trim();
-}
-
 /** Search by name, position, spoken alias or role — the phone roster's rule. */
 export function matchesPerson(person: Person, query: string, phone?: string | null): boolean {
-  const q = normalise(query);
-  if (!q) return true;
-  const hay = normalise([person.full_name, person.position ?? "", phone ?? "", ...person.aliases, ROLE_LABEL[person.role]].join(" "));
-  return q.split(/\s+/).every((word) => hay.includes(word));
+  return textHas([person.full_name, person.position, phone, ...person.aliases, ROLE_LABEL[person.role]], query);
 }
 
 /** «Сотрудник · Снабженец» — the role, and the position when it says more than the role. */

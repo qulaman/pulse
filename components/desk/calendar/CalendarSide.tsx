@@ -8,7 +8,7 @@ import { IconButton } from "@/components/desk/ui/IconButton";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { When } from "@/components/desk/ui/When";
-import { deskLayerUp } from "@/components/desk/voice/control";
+import { keysTaken } from "@/components/desk/ui/layers";
 import { DECLINE_REASONS } from "@/components/calendar/InviteAnswer";
 import { ruleLine, ruleState } from "@/components/recurrence/RecurrenceSection";
 import { AudioOriginal } from "@/components/tasks/AudioOriginal";
@@ -21,6 +21,7 @@ import type { CalendarEvent } from "@/lib/calendar/queries";
 import { meetingReceipts, useMeetingReceipts, type MeetingReceipt } from "@/lib/calendar/receipts";
 import { daysBetween, humanYmd, parseYmd, todayYmd, type Ymd } from "@/lib/datetime/calendar";
 import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
+import { wallOf } from "@/lib/desk/when";
 import { shortName } from "@/lib/people/names";
 import { useRecurrenceRules, useUpdateRule } from "@/lib/recurrence/queries";
 import { pluralRu } from "@/lib/tasks/status-text";
@@ -160,7 +161,7 @@ function DayPanel({
 
   if (status === "loading") {
     return (
-      <div className="cal-side-day flex flex-col gap-4" aria-busy="true">
+      <div className="flex flex-col gap-4" aria-busy="true">
         <Bone h={16} w="60%" />
         <Bone h={44} w="45%" />
         <Bone h={6} />
@@ -173,7 +174,7 @@ function DayPanel({
 
   if (status === "error") {
     return (
-      <div className="cal-side-day flex flex-col gap-3" data-testid="cal-side-error">
+      <div className="flex flex-col gap-3" data-testid="cal-side-error">
         <p className="text-[14px] font-semibold leading-5">Не удалось загрузить встречи</p>
         <p className="text-[13px] leading-[18px] text-muted">Встреч может быть больше, чем видно. Проверьте связь.</p>
         <div>
@@ -186,7 +187,7 @@ function DayPanel({
   }
 
   return (
-    <div className="cal-side-day flex flex-col gap-5">
+    <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-1.5">
         <p className="cal-side-eyebrow flex items-center gap-1.5 text-[12px] font-medium leading-4 text-muted">
           <CalendarClock aria-hidden size={13} strokeWidth={2} className="cal-side-icon" />
@@ -244,7 +245,7 @@ function DayPanel({
             ))}
           </div>
         ) : (
-          <p className="cal-side-quiet mt-1 px-1.5 text-[13px] leading-[18px] text-muted">
+          <p className="mt-1 px-1.5 text-[13px] leading-[18px] text-muted">
             {dayEvents.length === 0 ? "Встреч нет" : isToday && gone > 0 && !running ? `На сегодня всё — ${gone} ${pluralRu(gone, ["встреча позади", "встречи позади", "встреч позади"])}` : "Больше ничего"}
           </p>
         )}
@@ -270,7 +271,7 @@ function DayPanel({
         </section>
       ) : null}
 
-      <p className="cal-side-keys mt-auto flex flex-wrap items-center gap-1 pt-2 text-[12px] leading-4 text-muted">
+      <p className="mt-auto flex flex-wrap items-center gap-1 pt-2 text-[12px] leading-4 text-muted">
         Клик по дате — день крупно
         <span className="ml-1 inline-flex items-center gap-0.5">
           <Kbd>Shift</Kbd>
@@ -285,8 +286,8 @@ function DayPanel({
 /** The day as a strip 08–20 (wider when a meeting lies outside): a block a meeting, the hand of now. */
 function DayStrip({ events, meId, now, isToday }: { events: readonly CalendarEvent[]; meId: string; now: Date; isToday: boolean }) {
   const wallHours = (ms: number) => {
-    const wall = new Date(ms + 5 * 3_600_000);
-    return wall.getUTCHours() + wall.getUTCMinutes() / 60;
+    const wall = wallOf(new Date(ms));
+    return wall.h + wall.min / 60;
   };
   let from = 8;
   let to = 20;
@@ -300,7 +301,7 @@ function DayStrip({ events, meId, now, isToday }: { events: readonly CalendarEve
   const hand = isToday ? wallHours(now.getTime()) : null;
   const ticks = [from, ...[12, 16].filter((tick) => tick > from && tick < to), to];
   return (
-    <div className="cal-side-strip mt-2" aria-hidden>
+    <div className="mt-2" aria-hidden>
       <div className="cal-side-track">
         {events.map((event) => {
           const start = wallHours(new Date(event.starts_at).getTime());
@@ -478,7 +479,7 @@ function MeetingPanel({ open, now, meId, isDirector, onClose, onEdit }: { open: 
   });
   useEffect(() => {
     const onKey = (key: KeyboardEvent) => {
-      if (key.defaultPrevented || !isPlainKey(key) || key.shiftKey || isTypingTarget(key.target) || deskLayerUp()) return;
+      if (key.defaultPrevented || !isPlainKey(key) || key.shiftKey || isTypingTarget(key.target) || keysTaken()) return;
       if (document.documentElement.hasAttribute("data-desk-panel")) return;
       if (keys.current(key)) key.preventDefault();
     };
@@ -614,7 +615,7 @@ function Meeting({
       </p>
 
       {isDirector && running ? (
-        <div className="cal-side-extend mt-3 flex items-center gap-2" data-testid="desk-event-extend">
+        <div className="mt-3 flex items-center gap-2" data-testid="desk-event-extend">
           <span className="mr-auto text-[12px] leading-4 text-muted">Затянулась?</span>
           <Button size="sm" variant="secondary" onClick={() => longer(15)} disabled={extend.isPending} data-testid="desk-event-extend-15">
             +15 мин
@@ -666,7 +667,7 @@ function Meeting({
         </div>
       ) : null}
 
-      <section className="cal-side-people mt-4">
+      <section className="mt-4">
         <div className="flex items-baseline justify-between gap-3">
           <SectionLabel>Участники</SectionLabel>
           <span className="nums text-[12px] leading-4 text-muted">{rsvpSummary(event, RSVP_DESK)}</span>
@@ -739,7 +740,7 @@ function Meeting({
             )}
           </div>
         ) : null}
-        <p className="cal-side-keys mt-3 flex items-center gap-1 text-[12px] leading-4 text-muted">
+        <p className="mt-3 flex items-center gap-1 text-[12px] leading-4 text-muted">
           <Kbd>Esc</Kbd> к дню
           {isDirector ? (
             <>
@@ -816,7 +817,7 @@ function AnswersBar({ going, declined, waiting, total }: { going: number; declin
   );
 }
 
-/** A fact of the meeting: its icon in the margin (its word in «Журнал»), its value beside it. */
+/** A fact of the meeting: its icon in the margin, its value beside it. */
 function Fact({ word, icon, children }: { word: string; icon: ReactNode; children: ReactNode }) {
   return (
     <p className="cal-side-fact">

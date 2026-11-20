@@ -1,0 +1,908 @@
+/* «Очки и магазин» on the desk (components/desk/settings/points/*): the game's office and its two
+   dialogs, «Начислить» and a reward. Part of settings.css by its @import. Keyframes `pts-…`. */
+
+/* ---- «Очки и магазин»: the game's office (components/desk/settings/points/*) ------------------ */
+html[data-surface="desk"][data-journal] {
+  /* the economy in one card: the total, thirty days by day, the week's three, what waits */
+  .pts-hero {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .pts-hero-main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 18px 36px;
+  }
+  .pts-hero-total {
+    flex: 0 0 auto;
+    min-width: 200px;
+  }
+  .pts-hero-label {
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+  }
+  .pts-hero-figure {
+    margin: 4px 0 2px;
+    font-size: 44px;
+    line-height: 48px;
+  }
+  .pts-hero-days {
+    flex: 1 1 260px;
+    min-width: 220px;
+  }
+  .pts-chart {
+    margin-top: 10px;
+  }
+  .pts-chart-bars {
+    display: flex;
+    height: 64px;
+    align-items: flex-end;
+    gap: 3px;
+  }
+  .pts-chart-bar {
+    flex: 1 1 0;
+    min-width: 2px;
+
+    &[data-zero] {
+      opacity: 1;
+    }
+    &[data-today] {
+      opacity: 1;
+    }
+  }
+  .pts-chart-axis {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-size: 11px;
+    line-height: 14px;
+  }
+  .pts-leaders {
+    flex: 0 0 auto;
+  }
+  .pts-leaders-list {
+    display: flex;
+    gap: 18px;
+    margin-top: 10px;
+  }
+  .pts-leader {
+    display: flex;
+    min-width: 48px;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+  .pts-leader-face {
+    position: relative;
+    display: inline-flex;
+  }
+  .pts-leader-place {
+    position: absolute;
+    right: -5px;
+    bottom: -4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 9999px;
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+
+    &[data-place="1"] {
+      background: var(--gold);
+      color: #1a1205;
+    }
+  }
+  .pts-leader-name {
+    max-width: 72px;
+    overflow: hidden;
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pts-leader-points {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 16px;
+    color: var(--gold);
+  }
+  .pts-hero-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--rule-soft, var(--border));
+  }
+  .pts-fact {
+    display: flex;
+    min-width: 72px;
+    flex-direction: column;
+    padding: 0 16px;
+    border-left: 1px solid var(--rule-soft, var(--border));
+
+    &:first-child {
+      padding-left: 0;
+      border-left: 0;
+    }
+  }
+  .pts-fact-value {
+    font-size: 20px;
+    line-height: 24px;
+  }
+  .pts-fact-label {
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .pts-wait {
+    display: inline-flex;
+    height: 36px;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    line-height: 16px
+  }
+  .pts-wait-icon {
+    display: flex;
+    width: 24px;
+    height: 24px;
+    align-items: center;
+    justify-content: center;
+  }
+  .pts-wait-value {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .pts-wait[data-on] .pts-wait-value {
+    color: var(--warn);
+  }
+  .pts-wait:not([data-on]) .pts-wait-value {
+    color: color-mix(in srgb, var(--text-muted) 70%, transparent);
+  }
+
+  /* the balances: a bar of what each holds against the richest, the figure after it */
+  .pts-balance {
+    display: inline-flex;
+    width: 100%;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+  }
+  .pts-balance-track {
+    position: relative;
+    min-width: 40px;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+  .pts-balance-bar {
+    position: absolute;
+    inset: 0;
+    transform: scaleX(var(--share, 0));
+    transform-origin: left center;
+  }
+  .pts-balance-figure {
+    min-width: 76px;
+    text-align: right;
+  }
+  .pts-rank[data-top] {
+    color: var(--gold);
+    font-weight: 600;
+  }
+  .pts-ring {
+    rotate: -90deg;
+
+    circle {
+      fill: none;
+      stroke-width: 2.5;
+    }
+  }
+  .pts-ring-track {
+    stroke: var(--rule, var(--border));
+  }
+  .pts-ring-arc {
+    stroke: var(--ok);
+    stroke-linecap: round;
+    stroke-dasharray: var(--pct, 0) 100;
+  }
+
+  /* the ledger's plate of an amount, where a line came from */
+  .pts-amount {
+    display: inline-flex;
+    justify-content: flex-end;
+  }
+  .pts-source {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-muted);
+    white-space: nowrap;
+
+    svg {
+      flex-shrink: 0;
+      opacity: 0.8;
+    }
+  }
+
+  /* a dispute: the person's words as a quote over the director's moves */
+  .pts-dispute-quote {
+    position: relative;
+    margin: 4px 0 6px;
+  }
+  .pts-dispute-mark {
+    position: absolute;
+  }
+
+  /* the shop: the queue's status words, the rewards as a shelf of cards */
+  .pts-status {
+    color: var(--text-muted);
+
+    &[data-tone="warn"] {
+      color: var(--warn);
+    }
+    &[data-tone="accent"] {
+      color: var(--accent);
+    }
+  }
+  .pts-reward-icon {
+    display: inline-flex;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    line-height: 1;
+  }
+  .pts-shelf {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(208px, 1fr));
+    gap: 12px;
+  }
+  .pts-item {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 14px 16px 12px;
+    text-align: left;
+
+    &[data-hidden] {
+      opacity: 0.6;
+    }
+  }
+  .pts-item-top {
+    display: flex;
+    width: 100%;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .pts-item-icon {
+    display: flex;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    line-height: 1;
+  }
+  .pts-item-flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 16px;
+  }
+  .pts-item-edit {
+    margin-left: auto;
+    color: var(--text-muted);
+    opacity: 0;
+    transition: opacity 120ms linear;
+  }
+  .pts-item:hover .pts-item-edit,
+  .pts-item:focus-visible .pts-item-edit {
+    opacity: 1;
+  }
+  .pts-item-title {
+    width: 100%;
+    margin-top: 12px;
+    overflow: hidden;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 20px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pts-item-about {
+    display: -webkit-box;
+    width: 100%;
+    min-height: 32px;
+    margin-top: 2px;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--text-muted);
+  }
+  .pts-item-price {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 5px;
+    margin-top: 10px;
+
+    .nums {
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 24px;
+    }
+  }
+  .pts-item-unit {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+  .pts-item-facts {
+    display: flex;
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 2px 10px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--rule-soft, var(--border));
+    font-size: 12px;
+    line-height: 16px;
+
+    [data-tone="warn"] {
+      color: var(--warn);
+    }
+  }
+  .pts-item-add {
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 120px;
+    font-size: 13px;
+    font-weight: 500;
+
+    &:hover {
+      color: var(--text);
+    }
+  }
+  .pts-item-bone {
+    min-height: 180px;
+  }
+}
+
+:root[data-surface="desk"][data-journal][data-graphite] {
+  .pts-screen > .pts-view {
+    animation: settings-rise 300ms var(--ease-snap) both;
+  }
+  .pts-rules-link {
+    border-radius: 8px;
+    transition:
+      color 120ms linear,
+      background-color 120ms linear;
+
+    &:hover {
+      background: var(--hover);
+    }
+  }
+
+  /* the hero: a card lit from its corner by the gold of the reward, not the accent */
+  .pts-hero.desk-total {
+    gap: 16px;
+    padding: 20px 22px 16px;
+    background:
+      radial-gradient(110% 150% at 0% 0%, color-mix(in srgb, var(--gold-ink) 10%, transparent), transparent 55%),
+      var(--raise);
+  }
+  .pts-hero-label {
+    color: var(--ink-2);
+  }
+  .pts-hero-figure {
+    letter-spacing: -0.035em;
+    animation: settings-rise 420ms var(--ease-snap) both;
+  }
+  .pts-chart-bar {
+    border-radius: 3px 3px 1px 1px;
+    background: color-mix(in srgb, var(--gold-ink) 62%, transparent);
+    opacity: 1;
+    transform-origin: bottom center;
+    transition: background-color 120ms linear;
+    animation: pts-bar 560ms var(--ease-snap) both;
+
+    &[data-zero] {
+      background: color-mix(in srgb, var(--ink) 9%, transparent);
+    }
+    &[data-today] {
+      background: var(--gold-ink);
+      box-shadow: 0 0 12px color-mix(in srgb, var(--gold-ink) 45%, transparent);
+    }
+    &:hover {
+      background: var(--gold-ink);
+    }
+  }
+  .pts-chart-axis {
+    color: var(--ink-3);
+  }
+  .pts-leader {
+    animation: settings-pop 320ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  }
+  .pts-leader-place {
+    box-shadow: 0 0 0 2px var(--raise);
+
+    &[data-place="2"] {
+      background: #c9ced6;
+      color: #16181b;
+    }
+    &[data-place="3"] {
+      background: #c98b5a;
+      color: #1a1006;
+    }
+  }
+  .pts-hero-foot {
+    border-top-color: var(--rule-soft);
+  }
+  .pts-fact {
+    border-left-color: var(--rule);
+  }
+  .pts-wait {
+    padding: 0 10px 0 6px;
+    border-radius: 10px;
+    background: var(--surface-2);
+    box-shadow:
+      0 0 0 1px var(--rule-soft),
+      var(--lift);
+    color: var(--ink-2);
+    transition:
+      scale 240ms var(--ease-snap),
+      background-color 140ms linear,
+      box-shadow 160ms linear,
+      color 140ms linear;
+
+    &:hover {
+      background: color-mix(in srgb, var(--ink) 9%, var(--raise));
+      color: var(--ink);
+    }
+    &:active {
+      scale: 0.96;
+      transition-duration: 70ms;
+    }
+    &[data-on] {
+      background: color-mix(in srgb, var(--warn-ink) 13%, transparent);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--warn-ink) 38%, transparent);
+      color: var(--warn-ink);
+    }
+  }
+  .pts-wait-icon {
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+  }
+  .pts-wait[data-on] .pts-wait-icon {
+    background: color-mix(in srgb, var(--warn-ink) 18%, transparent);
+  }
+  .pts-wait-arrow {
+    opacity: 0.55;
+    transition: transform 180ms var(--ease-snap);
+  }
+  .pts-wait:hover .pts-wait-arrow {
+    transform: translateX(2px);
+  }
+
+  /* the balances */
+  .pts-balances .desk-row {
+    min-height: 52px;
+  }
+  .pts-balance-track {
+    height: 6px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--ink) 7%, transparent);
+  }
+  .pts-balance-bar {
+    border-radius: 9999px;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--gold-ink) 55%, transparent), var(--gold-ink));
+    animation: pts-fill 620ms var(--ease-snap) both;
+  }
+  .pts-row-award {
+    border-radius: 7px;
+
+    &:hover {
+      background: var(--hover);
+    }
+  }
+  .pts-ring-arc {
+    animation: pts-ring 640ms var(--ease-snap) 160ms both;
+  }
+
+  /* the ledger: the day as a title, the plate of each amount */
+  .pts-ledger .desk-grid-group {
+    padding-top: 14px;
+
+    > span:first-of-type {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0;
+      text-transform: none;
+      color: var(--ink);
+    }
+  }
+  .pts-amount {
+    min-width: 52px;
+    height: 24px;
+    align-items: center;
+    padding: 0 8px;
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+
+    &[data-sign="plus"] {
+      background: color-mix(in srgb, var(--gold-ink) 13%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold-ink) 26%, transparent);
+    }
+  }
+  .pts-source {
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--ink) 4%, transparent);
+    font-size: 12.5px;
+  }
+
+  /* the disputes: one card each */
+  .pts-disputes {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    border-top: 0;
+
+    > * {
+      border-bottom: 0;
+    }
+  }
+  .pts-dispute {
+    gap: 8px;
+    padding: 16px 18px;
+    border-radius: 14px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+    animation: settings-rise 320ms var(--ease-snap) both;
+  }
+  .pts-dispute-quote {
+    padding: 10px 12px 10px 34px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--ink) 4%, transparent);
+  }
+  .pts-dispute-mark {
+    top: 13px;
+    left: 12px;
+    color: var(--ink-3);
+  }
+  .pts-dispute .field {
+    border: 0;
+    border-radius: 8px;
+    padding-left: 12px;
+    background-color: color-mix(in srgb, var(--ink) 3.5%, var(--raise));
+    box-shadow: inset 0 0 0 1px var(--rule);
+
+    &:focus {
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--pen) 70%, transparent),
+        0 0 0 3px color-mix(in srgb, var(--pen) 16%, transparent);
+    }
+    &::placeholder {
+      color: var(--ink-3);
+      font-style: normal;
+      opacity: 1;
+    }
+  }
+
+  /* the shop */
+  #desk-main .pts-shop-head h2 {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 20px;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  .pts-status {
+    display: inline-flex;
+    height: 24px;
+    align-items: center;
+    padding: 0 8px;
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+    font-size: 12.5px;
+    font-weight: 500;
+
+    &[data-tone="warn"] {
+      background: color-mix(in srgb, var(--warn-ink) 14%, transparent);
+    }
+    &[data-tone="accent"] {
+      background: color-mix(in srgb, var(--pen) 13%, transparent);
+    }
+  }
+  .pts-reward-icon {
+    border-radius: 7px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+  }
+  .pts-item {
+    border: 0;
+    border-radius: 14px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+    cursor: pointer;
+    transition:
+      transform 220ms var(--ease-snap),
+      scale 220ms var(--ease-snap),
+      box-shadow 180ms linear,
+      background-color 160ms linear;
+    animation: settings-rise 340ms var(--ease-snap) both;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow:
+        0 0 0 1px var(--line),
+        var(--lift),
+        0 14px 30px -16px rgb(0 0 0 / 0.6);
+    }
+    &:active {
+      scale: 0.97;
+      transition-duration: 70ms;
+    }
+    &[data-chosen] {
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--pen) 60%, transparent),
+        var(--lift);
+    }
+    &:focus-visible {
+      outline: 2px solid var(--pen);
+      outline-offset: 2px;
+    }
+  }
+  &[data-desk-theme="light"] .pts-item:hover {
+    box-shadow:
+      0 0 0 1px var(--line),
+      0 14px 30px -16px rgb(15 17 22 / 0.28);
+  }
+  .pts-item-icon {
+    border-radius: 12px;
+    background:
+      radial-gradient(100% 100% at 30% 20%, color-mix(in srgb, var(--gold-ink) 16%, transparent), transparent 70%),
+      var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+    transition: scale 260ms cubic-bezier(0.34, 1.4, 0.64, 1);
+  }
+  .pts-item:hover .pts-item-icon {
+    scale: 1.06;
+  }
+  .pts-item-flag {
+    height: 20px;
+    padding: 0 7px;
+    border-radius: 9999px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule);
+    color: var(--ink-2);
+  }
+  .pts-item-price {
+    color: var(--gold-ink);
+  }
+  .pts-item-facts {
+    border-top-color: var(--rule-soft);
+    color: var(--ink-3);
+  }
+  .pts-item-add {
+    border: 1px dashed var(--line);
+    background: transparent;
+    box-shadow: none;
+    color: var(--ink-2);
+
+    &:hover {
+      background: var(--hover);
+      box-shadow: none;
+    }
+  }
+}
+
+:root[data-surface="desk"][data-journal][data-graphite] {
+  /* ---- the dialogs of the points: «Начислить» and a reward ---- */
+  .award-form .field,
+  .item-form .field {
+    border: 0;
+    border-radius: 8px;
+    padding-left: 12px;
+    background-color: color-mix(in srgb, var(--ink) 4%, var(--sheet));
+    box-shadow: inset 0 0 0 1px var(--rule);
+    transition:
+      box-shadow 140ms linear,
+      background-color 140ms linear;
+
+    &:focus,
+    &:focus-within {
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--pen) 70%, transparent),
+        0 0 0 3px color-mix(in srgb, var(--pen) 16%, transparent);
+    }
+    &::placeholder,
+    input::placeholder {
+      color: var(--ink-3);
+      font-style: normal;
+      opacity: 1;
+    }
+  }
+  .item-form .field + .field {
+    margin-top: 8px;
+  }
+  .award-form .desk-label,
+  .item-form .desk-label {
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-2);
+  }
+  .award-who {
+    padding-left: 8px;
+  }
+  .award-clear {
+    border-radius: 6px;
+  }
+  .award-list {
+    padding: 4px;
+    border: 0;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--sheet) 94%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(1.5);
+    backdrop-filter: blur(20px) saturate(1.5);
+    box-shadow: var(--shadow-pop) !important;
+    transform-origin: top center;
+    animation: graphite-pop 160ms var(--ease-snap) both;
+  }
+  .award-option {
+    height: 38px;
+    padding: 0 8px;
+    border-radius: 8px;
+    background: transparent;
+
+    &[data-active] {
+      background: var(--selected);
+    }
+  }
+  .award-chips {
+    gap: 6px;
+  }
+  .award-form .desk-choice,
+  .item-form .award-chip {
+    height: 30px;
+    padding: 0 10px;
+    border-radius: 8px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule);
+    color: var(--ink-2);
+    font-size: 13px;
+    font-weight: 500;
+    transition:
+      background-color 120ms linear,
+      box-shadow 140ms linear,
+      color 120ms linear,
+      scale 200ms var(--ease-snap);
+
+    &:hover {
+      color: var(--ink);
+      background: color-mix(in srgb, var(--ink) 8%, var(--sheet));
+    }
+    &:active {
+      scale: 0.95;
+      transition-duration: 70ms;
+    }
+    &[aria-pressed="true"] {
+      background: color-mix(in srgb, var(--pen) 14%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 55%, transparent);
+      color: var(--ink);
+      font-weight: 600;
+    }
+  }
+  .award-form .award-chip + .award-chip,
+  .item-form .award-chip + .award-chip {
+    margin-left: 0;
+  }
+  .award-public {
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--ink) 3.5%, transparent);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+  }
+  .item-icon-choice {
+    width: 38px !important;
+    height: 38px;
+    border-radius: 10px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+    transition:
+      background-color 120ms linear,
+      box-shadow 140ms linear,
+      scale 220ms cubic-bezier(0.34, 1.4, 0.64, 1);
+
+    &:hover {
+      scale: 1.08;
+    }
+    &[aria-checked="true"] {
+      background: color-mix(in srgb, var(--pen) 14%, transparent);
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--pen) 60%, transparent),
+        0 0 0 3px color-mix(in srgb, var(--pen) 14%, transparent);
+    }
+  }
+  .item-toggles {
+    padding: 0 14px;
+    border: 0;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--ink) 3%, transparent);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+
+    > * {
+      border-bottom: 1px solid var(--rule-soft);
+    }
+    > :last-child {
+      border-bottom: 0;
+    }
+  }
+  /* the employee's phone is dark in both faces of the desk: its card takes the phone's steps too */
+  .item-preview {
+    --raise: var(--phone-surface);
+    --lift: inset 0 1px 0 rgb(255 255 255 / 0.04);
+    --shadow-card: 0 0 0 1px rgb(255 255 255 / 0.07), inset 0 1px 0 rgb(255 255 255 / 0.04);
+    border-radius: 16px;
+    box-shadow: inset 0 0 0 1px var(--rule);
+  }
+}
+
+@keyframes pts-bar {
+  from {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+}
+@keyframes pts-fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+/* the arc is a dash of `--pct` (pathLength 100): an offset of the same length hides it, 0 shows it whole */
+@keyframes pts-ring {
+  from {
+    stroke-dashoffset: var(--pct, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-surface="desk"][data-journal] {
+    .pts-view,
+    .pts-hero-figure,
+    .pts-chart-bar,
+    .pts-leader,
+    .pts-balance-bar,
+    .pts-ring-arc,
+    .pts-dispute,
+    .pts-item,
+    .award-list {
+      animation: none !important;
+    }
+    .pts-item:hover {
+      transform: none;
+    }
+  }
+}

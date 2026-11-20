@@ -4,18 +4,18 @@ import { useMemo, useState } from "react";
 
 import { PeoplePicker } from "@/components/people/PeoplePicker";
 import { RepeatSheet } from "@/components/recurrence/RepeatSheet";
-import { Icon } from "@/components/tasks/desk/icons";
+import { Icon } from "@/components/tasks/icons";
 import { Button } from "@/components/ui/Button";
 import { Sheet, SHEET_CLOSE_MS } from "@/components/ui/Sheet";
 import { shortName } from "@/lib/people/names";
-import { hmOf, ruleOf, useDeleteRule, useRecurrenceRules, useUpdateRule, type Rule } from "@/lib/recurrence/queries";
+import { ruleOf, useDeleteRule, useRecurrenceRules, useUpdateRule, type Rule, sqlTimeToHm } from "@/lib/recurrence/queries";
 import { dayOfYmd, describeDay, describeRule } from "@/lib/recurrence/schedule";
 
 /** «каждый понедельник · к 18:00» for an order, «каждую среду · 10:00 · в офисе» for a meeting. */
 export function ruleLine(rule: Rule): string {
   const when = describeRule(ruleOf(rule));
-  if (rule.target === "event") return [when, hmOf(rule.at_time), rule.location].filter(Boolean).join(" · ");
-  return `${when} · к ${hmOf(rule.at_time)}`;
+  if (rule.target === "event") return [when, sqlTimeToHm(rule.at_time), rule.location].filter(Boolean).join(" · ");
+  return `${when} · к ${sqlTimeToHm(rule.at_time)}`;
 }
 
 /** What the rule is doing now: when the next one comes, or why nothing comes. */
@@ -178,7 +178,7 @@ export function RecurrenceSection({ personId, rules: given }: { personId: string
           open={step?.name === "schedule"}
           onClose={() => go({ name: "list" })}
           title={current.title}
-          value={{ ...ruleOf(current), due_time: hmOf(current.at_time) }}
+          value={{ ...ruleOf(current), due_time: sqlTimeToHm(current.at_time) }}
           onDone={(value) =>
             update.mutate({
               id: current.id,

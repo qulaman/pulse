@@ -107,7 +107,7 @@ function NameCheckBlock({ people, matching, lockedIds, onAdded }: { people: Rost
       ) : null}
       {result && result.kind !== "sure" && result.teach ? (
         <div className="flex items-center gap-2">
-          <Select aria-label={`Кого вы зовёте «${form}»`} value={target} onChange={(event) => setTo(event.target.value)} className="dict-teach w-[220px] text-[13px]">
+          <Select aria-label={`Кого вы зовёте «${form}»`} value={target} onChange={(event) => setTo(event.target.value)} className="w-[220px] text-[13px]">
             <option value="" disabled>
               Кого так зовёте?
             </option>

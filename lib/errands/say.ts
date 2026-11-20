@@ -4,17 +4,17 @@ import type { Phrase } from "@/lib/pulse/board";
 import type { Errand } from "./queries";
 
 /**
- * Что лицо думает о заявках — четвёртый источник новостей после доски, Эфира и
- * календаря, устроенный так же: разница двух лент, по фразе на изменение, факты без
- * восклицательных знаков (docs/DESIGN.md §4). Глаголы не соглашаются с человеком:
- * имя не даёт рода, поэтому «Айгуль · кофе принят», а не «приняла» (D-79 §9).
+ * What the face thinks of errands — the fourth source of news after the board, Эфир and the
+ * calendar, built the same way: the difference of two feeds, a phrase per change, facts without
+ * exclamation marks (docs/DESIGN.md §4). The verbs do not agree with the person:
+ * a name gives no gender, so «Айгуль · кофе принят», not «приняла» (D-79 §9).
  */
 
 function lower(label: string): string {
   return label.charAt(0).toLowerCase() + label.slice(1);
 }
 
-/** Директору: кто взял просьбу, кто её закрыл и кто не смог. */
+/** To the director: who took a request, who closed it and who could not. */
 export function describeErrandsForDirector(prev: readonly Errand[], next: readonly Errand[]): Phrase[] {
   const before = new Map(prev.map((row) => [row.id, row]));
   const phrases: Phrase[] = [];
@@ -37,7 +37,7 @@ export function describeErrandsForDirector(prev: readonly Errand[], next: readon
   return phrases;
 }
 
-/** Секретарю: пришла новая просьба, и её забрал кто-то другой. */
+/** To a secretary: a new request came, and somebody else took it. */
 export function describeErrandsForSecretary(
   prev: readonly Errand[],
   next: readonly Errand[],

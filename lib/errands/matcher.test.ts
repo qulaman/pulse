@@ -58,7 +58,7 @@ describe("matchErrand", () => {
 
   it("does not invent a button that is not in the catalogue", () => {
     expect(match("вода")).toBeNull();
-    // казахское «шай» работает, только если его добавили синонимом
+    // the Kazakh «шай» works only once it is added as a synonym
     expect(match("шай")).toBeNull();
     expect(
       matchErrand(

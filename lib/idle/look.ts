@@ -1,4 +1,5 @@
 import { humanAqtobe } from "@/lib/ai/time";
+import { ON_BOARD } from "@/lib/tasks/lifecycle";
 import type { TaskStatus } from "@/lib/tasks/status-text";
 import { TONE_VAR, toneOf } from "@/lib/tasks/tone";
 
@@ -53,8 +54,6 @@ export type Look = {
   accepted: boolean;
 };
 
-/** On the board and still the director's business: a refusal is his to settle. */
-export const OPEN_CREW: readonly TaskStatus[] = ["sent", "accepted", "in_progress", "rework", "pending_review", "declined"];
 /**
  * Given out, not sent yet — it waits for the morning (D-38). The person is on the screen with
  * work, quietly: the same grey and dashed mark the task has on «Задачи» (D-139).
@@ -91,7 +90,8 @@ export function toneFor(task: CrewTask): string {
  * passed in only for that moment — the screen decides how long the gold lasts.
  */
 export function lookOf(tasks: CrewTask[]): Look {
-  const open = tasks.filter((t) => OPEN_CREW.includes(t.status));
+  // on the board and still the director's business: a refusal is his to settle
+  const open = tasks.filter((t) => ON_BOARD.includes(t.status));
   const done = tasks.find((t) => t.status === "done") ?? null;
   const held = tasks.find((t) => t.status === HELD_CREW) ?? null;
   if (!open.length) {

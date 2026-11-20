@@ -2,26 +2,23 @@
 
 import { AlarmClock, Ban, ClipboardCheck, Hourglass, MessageCircleQuestion, type LucideIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useMemo, useRef, useState, type CSSProperties } from "react";
 
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
+import { Face, useAvatars } from "@/components/desk/ui/Face";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { Menu } from "@/components/desk/ui/Menu";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
-import { TileFace } from "@/components/desk/team/TeamGrid";
+import { useScreenKeys } from "@/components/desk/team/keys";
 import { TONE_VAR } from "@/components/desk/ui/tone";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
-import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
-import { useMinute } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { humanAqtobe } from "@/lib/ai/time";
 import { useDraftTasks } from "@/lib/desk/drafts";
-import { useDeskLook } from "@/lib/desk/theme";
-import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
 import { shortName, useNamesKey } from "@/lib/people/names";
 import { useTaskReactions } from "@/lib/points/game";
 import { isReactable, showsReactionBar } from "@/lib/points/reactions";
@@ -32,15 +29,14 @@ import { nearestDeadline } from "@/lib/tasks/grouping";
 import { useTaskActions, type TaskActions } from "@/lib/tasks/mutations";
 import { REASON_TONE, REASON_WORD } from "@/lib/tasks/overview";
 import { useMe, usePulseBoard, type Me, type TaskWithPeople } from "@/lib/tasks/queries";
-import { isOverdue } from "@/lib/tasks/status-text";
 import { useHydrated } from "@/lib/useHydrated";
+import { useNow } from "@/lib/useNow";
 
 import { enterMove, inPlaceOf, loadStateOf, reasonHeadline, stackMoves, withSkipped, type LoadState, type Move } from "@/lib/desk/tasks";
 import { DeskComposer, DeskThread } from "./DeskThread";
-import { useAvatars } from "./Face";
 import { FailedScreen, LoadFailure, LoadNote } from "./LoadState";
 import { DraftMark, MoveRow } from "./RowMoves";
-import { deskLayerOpen } from "./TaskPanel";
+import { pressTaskKey } from "./taskKeys";
 import { DeskReactions, focusReply, MORE_WORD, TaskFacts, TaskHead } from "./TaskParts";
 import { useDeskTask, type DeskTask } from "./useDeskTask";
 
@@ -54,7 +50,7 @@ const DONE_AT_ONCE: ReadonlySet<DeskAction> = new Set<DeskAction>(["approve", "g
 /** The task in hand and the queue beside it (D-154): the rules run the sheet's width, the queue stays in sight. */
 const LAYOUT = "grid grid-cols-[minmax(0,1fr)_288px] items-start gap-x-8";
 
-/** Why a task waits, as the mark of its card's first line («Графит»). */
+/** Why a task waits, as the mark of its card's first line. */
 const REASON_ICON: Record<DeskReason, LucideIcon> = {
   review: ClipboardCheck,
   time: Hourglass,
@@ -142,7 +138,7 @@ export function InboxScreen() {
 function InboxView({ me, board, load, onRetry }: { me: Me; board: readonly BoardTask[]; load: LoadState; onRetry: () => void }) {
   const router = useRouter();
   const actions = useTaskActions(me);
-  const now = useMinute();
+  const now = useNow();
   const queue = useMemo(() => queueOf(board, now), [board, now]);
   const [skipped, setSkipped] = useState<string[]>([]);
   const order = useMemo(() => withSkipped(queue, (item) => item.task.id, skipped), [queue, skipped]);
@@ -212,7 +208,7 @@ function InboxView({ me, board, load, onRetry }: { me: Me; board: readonly Board
     return (
       <DeskPage width="narrow">
         <PageTitle title="Разобрать" actions={staleMark} />
-        {/* the good kind of empty: in «Графит» its tick draws itself */}
+        {/* the good kind of empty: its tick draws itself */}
         <div className="tasks-done">
           <EmptyState
             tone="ok"
@@ -318,7 +314,7 @@ function InboxView({ me, board, load, onRetry }: { me: Me; board: readonly Board
           />
         </div>
 
-        <QueueAside order={order} current={shown} now={now} onPick={pick} drafts={drafts} />
+        <QueueAside order={order} current={shown} onPick={pick} drafts={drafts} />
       </div>
     </DeskPage>
   );
@@ -328,20 +324,17 @@ function InboxView({ me, board, load, onRetry }: { me: Me; board: readonly Board
 function QueueAside({
   order,
   current,
-  now,
   onPick,
   drafts,
 }: {
   order: readonly DeskItem[];
   current: string | null;
-  now: Date;
   onPick: (id: string) => void;
   drafts: ReadonlySet<string>;
 }) {
   const LIMIT = 12;
   const shown = order.slice(0, LIMIT);
-  // «Графит» shows who holds each one by their face; the journal keeps the stage's ring
-  const graphite = useDeskLook() === "graphite";
+  // who holds each one, by their face
   const avatars = useAvatars();
   return (
     <aside className="tasks-queue sticky top-4 flex flex-col gap-1" data-testid="desk-inbox-queue">
@@ -358,11 +351,7 @@ function QueueAside({
                 className="desk-row tasks-queue-item flex w-full items-start gap-2.5 py-1 text-left focus-visible:outline-none"
               >
                 <span className="mt-0.5 shrink-0">
-                  {graphite ? (
-                    <TileFace person={{ id: item.task.assignee_id, full_name: item.task.assignee?.full_name ?? "—", avatar_url: avatars.get(item.task.assignee_id) ?? null }} size={26} />
-                  ) : (
-                    <StatusGlyph status={item.task.status} overdue={isOverdue(item.task, now)} size={16} />
-                  )}
+                  <Face person={{ id: item.task.assignee_id, full_name: item.task.assignee?.full_name ?? "—", avatar_url: avatars.get(item.task.assignee_id) ?? null }} size={26} />
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className={`truncate text-[13px] leading-5 ${on ? "font-semibold" : ""}`}>{item.task.title}</span>
@@ -500,63 +489,41 @@ function InboxCard({
     if (!move.held) press(move.action, target);
   };
 
-  // the latest handlers for the window's listener, which is added once
-  const latest = useRef({ press, onPrev, onNext, onSkip, main: enterMove(moves), keys, desk, now });
-  useLayoutEffect(() => {
-    latest.current = { press, onPrev, onNext, onSkip, main: enterMove(moves), keys, desk, now };
+  // the card's keys are on the window: the stack has no table to hold the focus
+  useScreenKeys((event) => {
+    if (event.shiftKey) return false;
+    switch (event.code) {
+      case "ArrowLeft":
+      case "KeyK":
+        onPrev();
+        return true;
+      case "ArrowRight":
+      case "KeyJ":
+        onNext();
+        return true;
+      case "Enter":
+      case "NumpadEnter": {
+        // a focused button takes its own Enter
+        const main = enterMove(moves);
+        if ((event.target as HTMLElement | null)?.closest?.("button, a, [role=button]") || !main) return false;
+        press(main.action);
+        return true;
+      }
+      case "KeyS":
+        onSkip();
+        return true;
+    }
+    const current = desk.task;
+    if (!current) return false;
+    return pressTaskKey(event.code, current, {
+      root: card.current,
+      letters: keys,
+      question: desk.signals.question,
+      now,
+      onAnswer: (text, deadlineIso) => desk.acts.answer(current, text, deadlineIso),
+      onLetter: (action) => press(action),
+    });
   });
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || !isPlainKey(event) || event.shiftKey) return;
-      if (isTypingTarget(event.target) || deskLayerOpen()) return;
-      const k = latest.current;
-      const onControl = (event.target as HTMLElement | null)?.closest?.("button, a, [role=button]");
-      switch (event.code) {
-        case "ArrowLeft":
-        case "KeyK":
-          event.preventDefault();
-          k.onPrev();
-          return;
-        case "ArrowRight":
-        case "KeyJ":
-          event.preventDefault();
-          k.onNext();
-          return;
-        case "Enter":
-        case "NumpadEnter":
-          // a focused button takes its own Enter
-          if (onControl || !k.main) return;
-          event.preventDefault();
-          k.press(k.main.action);
-          return;
-        case "KeyS":
-          event.preventDefault();
-          k.onSkip();
-          return;
-        case "Period": {
-          const current = k.desk.task;
-          if (!current) return;
-          event.preventDefault();
-          card.current?.querySelector<HTMLElement>(`[data-desk-more="${CSS.escape(current.id)}"]`)?.click();
-          return;
-        }
-      }
-      const digit = /^Digit([1-9])$/.exec(event.code);
-      if (digit && k.desk.task && k.desk.signals.question) {
-        const answer = answersFor(k.desk.signals.question, k.desk.task.deadline, k.now)[Number(digit[1]) - 1];
-        if (!answer) return;
-        event.preventDefault();
-        k.desk.acts.answer(k.desk.task, answer.text, answer.deadlineIso);
-        return;
-      }
-      const key = k.keys.find((one) => one.code === event.code);
-      if (!key) return;
-      event.preventDefault();
-      k.press(key.action);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
 
   if (!task) {
     if (desk.failure) return <LoadFailure what="задачу" offline={desk.failure.offline} busy={desk.retrying} onRetry={desk.retry} />;

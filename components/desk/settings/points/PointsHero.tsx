@@ -4,7 +4,7 @@ import { ChevronRight, Gift, Scale } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { LEDGER_LIMIT } from "@/components/desk/settings/points/LedgerTable";
-import { TileFace } from "@/components/desk/team/TeamGrid";
+import { Face } from "@/components/desk/ui/Face";
 import { RollingNumber } from "@/components/ui/RollingNumber";
 import { Bone } from "@/components/ui/Skeleton";
 import { aqtobeDay, toAqtobeIso } from "@/lib/ai/time";
@@ -111,7 +111,7 @@ function Leaders() {
             return (
               <li key={row.user_id} className="pts-leader" title={`${row.display_name}: +${formatNum(row.points)} за неделю`} style={{ animationDelay: `${120 + index * 70}ms` }}>
                 <span className="pts-leader-face">
-                  <TileFace person={person ?? { id: row.user_id, full_name: row.display_name, avatar_url: null }} size={40} />
+                  <Face person={person ?? { id: row.user_id, full_name: row.display_name, avatar_url: null }} size={40} />
                   <span className="pts-leader-place nums" data-place={index + 1}>
                     {index + 1}
                   </span>

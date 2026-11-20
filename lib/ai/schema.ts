@@ -25,7 +25,6 @@ import { EVENT_REPEATS, REPEAT_EVERY } from "../recurrence/schedule";
  */
 
 export { AnnouncementEntitySchema, NoteEntitySchema, PrioritySchema, QueryEntitySchema };
-export type Priority = z.infer<typeof PrioritySchema>;
 
 /** App-side addition: set by postprocess from the match, what confirm and the UI use. */
 const assigneeId = { assignee_id: z.string().nullable() };
@@ -148,13 +147,11 @@ export type AnnouncementEntity = z.infer<typeof AnnouncementEntitySchema>;
 export type TaskEntity = z.infer<typeof TaskEntitySchema>;
 export type PointsEntity = z.infer<typeof PointsEntitySchema>;
 export type ReminderEntity = z.infer<typeof ReminderEntitySchema>;
-export type NoteEntity = z.infer<typeof NoteEntitySchema>;
 export type EventEntity = z.infer<typeof EventEntitySchema>;
 export type RecurrenceEntity = z.infer<typeof RecurrenceEntitySchema>;
 export type DelegationEntity = z.infer<typeof DelegationEntitySchema>;
 export type QueryEntity = z.infer<typeof QueryEntitySchema>;
 export type Entity = z.infer<typeof EntitySchema>;
-export type ParseResult = z.infer<typeof ParseResultSchema>;
 
 type JsonSchemaNode = Record<string, unknown>;
 

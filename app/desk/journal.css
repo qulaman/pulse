@@ -1,15 +1,12 @@
 /* ==========================================================================================
-   «Журнал» — the desk's visual language (D-158, D-159, docs/DESIGN.md §7). The desk is a ruled
-   sheet, not a dashboard of cards, on two faces: dark with bright inks (the default, «Табло»)
-   and light; `data-desk-theme` on <html> chooses, this file holds both.
-   - Structure is drawn with rules (hairlines and one heavy rule), never with boxes.
+   The desk's base layer (D-158, D-159, docs/DESIGN.md §7): the inks of both faces — dark (the
+   default) and light, `data-desk-theme` on <html> chooses — and the layout every screen shares.
+   «Графит» (graphite.css, D-171) is drawn over it: the desk always wears both `data-journal` and
+   `data-graphite` (DESK_SHEET_SCRIPT, DeskShell), so what stays here is what graphite.css does
+   not say again.
    - Every ink means one thing, the same on both faces: the pen — your move, your selection, the
      one main button; red — overdue, refused, a failure; green — at work and done; blue — sent,
      not taken yet; violet — a question; orange — points and rework.
-   - No glow, no gradient: a bright colour is flat on a neutral ground.
-   - A circle means one thing: the stage ring of a task. Nothing else on the sheet is round.
-   - Three voices of one family, IBM Plex: Sans for reading, Condensed for titles and totals,
-     Mono for time and numbers.
    `data-journal` is put on <html> by the desk alone: the developers' console shares the
    primitives and `data-surface`, and keeps the phone's dark tokens.
    ========================================================================================== */
@@ -33,213 +30,40 @@ html[data-surface="desk"][data-journal] {
   --gold-ink: #a85f00;
 
   /* ---- the app's tokens read from the inks: every screen follows without a code change ---- */
-  --bg: var(--page);
-  --surface: var(--sheet);
   --surface-2: #ebebe5;
-  --border: var(--rule);
-  --text: var(--ink);
-  --text-muted: var(--ink-2);
   /* over the client's accent on <html>: its contrast is checked against a dark screen, and the
      pen has one meaning here. A client's mark on the desk is the logo on the binding */
   --accent: var(--pen) !important;
-  --accent-2: var(--pen);
-  --ok: var(--ok-ink);
-  --warn: var(--pen);    /* «your move» — the pen, not a third colour */
-  --danger: var(--pencil);
-  --gold: var(--gold-ink);
+  --accent-2: var(--pen);    /* «your move» — the pen, not a third colour */
   --overlay: rgba(21, 23, 26, 0.32);
   --accent-glow: none;
   --shadow-card: none;
-  --shadow-raised: 0 10px 30px rgba(21, 23, 26, 0.16);
 
   /* ---- type ---- */
-  --font-body: var(--font-plex-sans), system-ui, sans-serif;
-  --font-display: var(--font-plex-sans), system-ui, sans-serif;
   /* Condensed has no Russian letters, so it must have no Arial fallback face either: that one
      would catch every letter and Russian titles would come out in Arial with a faked bold instead
      of falling through to Plex Sans (D-171). Its next/font/local face is declared without one
      (app/layout.tsx), and its own name there is generated — so only through the variable. */
-  --font-cond: var(--font-plex-cond), var(--font-plex-sans), sans-serif;
-  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 
   color-scheme: light;
-
-  /* the dark face: only the inks change, every rule below reads them */
-  &[data-desk-theme="dark"] {
-    --page: #0c0d0f;
-    --sheet: #17191c;
-    --ink: #f6f6f2;
-    --ink-2: #a9aeb6;
-    --rule: #34373d;
-    --rule-soft: #25272c;
-    --pen: #ffd60a;
-    --pencil: #ff4d3d;
-    --spine: #08090a;
-    --line: #5e636b;
-    --sky: #4aa8ff;
-    --violet: #b794ff;
-    --marker: rgba(255, 214, 10, 0.28);
-    --ok-ink: #2be37a;
-    --gold-ink: #ff9f2e;
-    --surface-2: #25272c;
-    --overlay: rgba(0, 0, 0, 0.62);
-    --shadow-raised: 0 12px 34px rgba(0, 0, 0, 0.6);
-    color-scheme: dark;
-  }
-
-  body {
-    font-family: var(--font-body);
-    font-size: 14px;
-    line-height: 20px;
-    -webkit-font-smoothing: auto;
-    -moz-osx-font-smoothing: auto;
-  }
-
-  /* the unlayered -0.02em of globals.css also eats every tracking utility */
-  h1,
-  h2,
-  h3 {
-    letter-spacing: 0;
-  }
-
-  /* ---- the voices ---------------------------------------------------------------------- */
-  .nums {
-    font-family: var(--font-mono);
-    font-variant-numeric: tabular-nums;
-    font-weight: 400;
-    letter-spacing: -0.02em;
-  }
-  /* a big figure is a total, not a typed cell */
-  .desk-figure,
-  .nums.desk-figure,
-  .nums[class*="text-[28px]"],
-  .nums[class*="text-[32px]"],
-  .nums[class*="text-[36px]"],
-  .nums[class*="text-[40px]"],
-  .nums[class*="text-[44px]"],
-  .nums[class*="text-[48px]"],
-  .nums[class*="text-[56px]"] {
-    font-family: var(--font-cond);
-    font-weight: 600;
-    letter-spacing: 0;
-  }
-  /* the one label: Condensed capitals — section heads, column heads and group heads alike */
-  .desk-label,
-  h2.uppercase,
-  [role="columnheader"],
-  [role="columnheader"] button,
-  #desk-main .uppercase {
-    font-family: var(--font-cond);
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 16px;
-    letter-spacing: 0.06em;
-    color: var(--ink-2);
-  }
-  kbd {
-    height: auto;
-    min-width: 0;
-    padding: 0;
-    background: none;
-    border: 0;
-    border-radius: 0;
-    font: 500 11px/16px var(--font-mono);
-    color: var(--ink-2);
-  }
-
-  /* ---- one radius, and it is almost none ------------------------------------------------- */
-  [class*="rounded-["],
-  .rounded-full,
-  .rounded-xl,
-  .rounded-lg,
-  .rounded-md,
-  .field,
-  .card {
-    border-radius: 2px;
-  }
-  /* a single choice stays a circle: the one exception to «a circle is a stage ring» */
-  input[type="radio"],
-  input[type="radio"] + span {
-    border-radius: 50%;
-  }
-
-  /* ---- no boxes -------------------------------------------------------------------------- */
-  .card {
-    background: var(--sheet);
-    box-shadow: none;
-  }
   /* no sky, no glow: a state is said in words and figures */
   .desk-light {
     display: none;
   }
 
-  /* ---- the frame ------------------------------------------------------------------------- */
-  [data-desk],
-  #desk-main {
-    background: var(--page);
-  }
-
   /* the binding: dark, so the client's logo (made for a dark ground) stands on it as it is */
   .desk-nav {
-    --text: #f1f0ea;
-    --text-muted: #a7a8a4;
-    --surface-2: #2b2d31;
-    --border: #303236;
-    --accent: #f1f0ea !important;
-    background: var(--spine);
     color: var(--text);
-    border-right: 0;
-    padding: 14px 0 10px 12px;
-
-    &[data-folded] {
-      padding: 14px 8px 10px;
-    }
-    .desk-nav-link {
-      height: 30px;
-      border-radius: 0;
-      font-size: 14px;
-      font-weight: 400;
-      background: transparent;
-      color: var(--text-muted);
-
-      &:hover {
-        color: #fff;
-        background: transparent;
-      }
-      /* the chosen section is a tab of the sheet itself, cut into the binding */
-      &[aria-current="page"] {
-        background: var(--page);
-        color: var(--ink);
-        font-weight: 600;
-        border-radius: 2px 0 0 2px;
-      }
-    }
     &[data-folded] .desk-nav-link[aria-current="page"] {
       border-radius: 2px;
     }
-    /* «Графит»'s plate and the icons beside the words are its own (D-171) */
-    .desk-nav-active {
-      display: none;
-    }
-    &:not([data-folded]) .desk-nav-icon {
-      display: none;
-    }
     [data-testid="nav-badge"] {
-      min-width: 0;
-      padding: 0;
-      font-size: 12px;
-      font-weight: 500;
-      line-height: 16px;
       letter-spacing: 0;
 
       &[data-tone="danger"] {
         padding: 0 5px;
         border-radius: 1px;
       }
-    }
-    .desk-nav-foot {
-      padding-right: 12px;
-      border-top-color: var(--border);
     }
     &[data-folded] .desk-nav-foot {
       padding-right: 0;
@@ -248,11 +72,6 @@ html[data-surface="desk"][data-journal] {
 
   /* the head of the sheet: the order line stands on the heavy rule like a line of a form */
   .desk-head {
-    height: 56px;
-    padding: 0 32px;
-    gap: 16px;
-    background: var(--page);
-    border-bottom: 2px solid var(--ink);
     transition: border-color 120ms linear;
 
     &:has(.desk-command:focus-within) {
@@ -260,44 +79,16 @@ html[data-surface="desk"][data-journal] {
     }
   }
   .desk-command.field {
-    height: 40px;
-    padding: 0;
-    gap: 12px;
-    background: none;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-
-    &:focus-within {
-      background: none;
-      border: 0;
-      box-shadow: none;
-    }
-    > svg {
-      display: none;
-    }
     &::before {
-      content: "Поручение";
       font: 600 12px/16px var(--font-cond);
       letter-spacing: 0.06em;
       text-transform: uppercase;
       color: var(--ink-2);
     }
-    input {
-      font-size: 15px;
-      caret-color: var(--pen);
-
-      &::placeholder {
-        color: var(--ink-2);
-        opacity: 0.8;
-      }
-    }
   }
 
   /* the screen's frame: the sheet is as wide as the window, a form keeps its measure */
   .desk-page {
-    gap: 14px;
-    padding: 16px 32px 48px;
 
     &:not(.desk-page-narrow) {
       max-width: none;
@@ -305,11 +96,6 @@ html[data-surface="desk"][data-journal] {
   }
   .desk-page-title {
     align-items: baseline;
-
-    h1 {
-      font: 600 30px/34px var(--font-cond);
-      letter-spacing: -0.005em;
-    }
     > div:first-of-type {
       display: flex;
       align-items: baseline;
@@ -327,73 +113,23 @@ html[data-surface="desk"][data-journal] {
 
   /* ---- the moment: a ledger's total, not a raised card --------------------------------------- */
   .desk-total {
-    background: none;
     border: 0;
-    box-shadow: none;
   }
 
   /* ---- the toolbar: words, not a row of boxes ------------------------------------------------ */
   [data-testid="desk-toolbar"] {
-    gap: 4px 12px;
     align-items: center;
 
     select.field {
       width: auto;
-      field-sizing: content;
-      padding-left: 0;
-      padding-right: 24px;
-      background-position: right 4px center;
-
-      &:hover {
-        background-color: transparent;
-        color: var(--pen);
-      }
-    }
-    .field {
-      height: 32px;
-      background-color: transparent;
-      border-color: transparent;
-      padding-left: 6px;
-      font-size: 14px;
-
-      &:hover {
-        background-color: var(--surface-2);
-      }
-    }
-    label.field {
-      box-shadow: inset 0 -1px 0 var(--rule);
+      field-sizing: content
     }
   }
   .seg {
-    height: 32px;
-    padding: 0;
-    gap: 16px;
-    background: none;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-    margin-right: 12px;
 
     button {
-      height: 32px;
-      padding: 0;
-      background: none;
-      border-radius: 0;
-      box-shadow: none;
-      font-family: var(--font-body);
-      font-size: 14px;
-      font-weight: 400;
-      color: var(--ink-2);
-
-      &:hover {
-        color: var(--ink);
-      }
       &[aria-selected="true"] {
-        background: none;
         border: 0;
-        box-shadow: inset 0 -2px 0 var(--ink);
-        color: var(--ink);
-        font-weight: 600;
       }
       .nums {
         color: inherit;
@@ -401,33 +137,10 @@ html[data-surface="desk"][data-journal] {
       }
     }
     .seg-thumb {
-      background: none;
       border: 0;
-    }
-    /* «Графит»'s gliding plate (D-171): the journal underlines the chosen word instead */
-    .seg-glider {
-      display: none;
-    }
-  }
-
-  /* ---- fields and buttons --------------------------------------------------------------------- */
-  .field {
-    background-color: var(--sheet);
-    border-color: var(--rule);
-
-    &:focus,
-    &:focus-within {
-      border-color: var(--pen);
-      box-shadow: none;
     }
   }
   .btn-primary {
-    background: var(--pen);
-    box-shadow: none;
-    color: var(--page);
-    border-radius: 2px;
-    letter-spacing: 0;
-    font-weight: 500;
 
     &:hover {
       background: color-mix(in srgb, var(--pen) 88%, black);
@@ -435,30 +148,14 @@ html[data-surface="desk"][data-journal] {
     }
   }
   .btn-secondary {
-    background: none;
-    border: 1px solid color-mix(in srgb, var(--ink) 32%, transparent);
-    box-shadow: none;
     letter-spacing: 0;
-    font-weight: 500;
 
     &:hover {
       background: var(--surface-2);
     }
   }
-  .btn-gold {
-    background: var(--ink);
-    box-shadow: none;
-    color: var(--page);
-  }
-  .font-display {
-    letter-spacing: 0;
-  }
   /* the row's own move: a word in the pen with a hairline; the fill is the screen's one main button */
   .desk-move {
-    background: none;
-    border-color: var(--pen);
-    color: var(--pen);
-    font-weight: 500;
 
     &:hover {
       background: color-mix(in srgb, var(--pen) 10%, transparent);
@@ -467,56 +164,21 @@ html[data-surface="desk"][data-journal] {
 
   /* ---- tables --------------------------------------------------------------------------------- */
   .desk-grid {
-    background: none;
-    border: 0;
-    border-top: 1px solid var(--line);
-    border-radius: 0;
-    box-shadow: none;
 
     &:focus-visible {
       --tw-ring-shadow: 0 0 #0000;
       border-top-color: var(--pen);
-    }
-    > [role="row"]:first-child {
-      background: var(--page);
-      border-radius: 0;
-      border-bottom: 1px solid var(--line);
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
-    }
-    .desk-grid-group {
-      background: none;
-      border-bottom: 1px solid var(--rule);
-      padding: 12px 10px 3px;
-    }
-    .desk-dot {
-      display: none;
     }
     /* inside a stage ring the pen means «your move»: a task merely sent has its own blue */
     .desk-row svg {
       --accent: var(--sky) !important;
     }
   }
-  [role="columnheader"] {
-    padding: 5px 10px;
-  }
   [role="gridcell"] {
-    padding: 6px 10px;
-    font-size: 14px;
     line-height: 20px;
   }
   .desk-row {
-    min-height: 34px;
     border-bottom: 1px solid var(--rule-soft);
-    transition: none;
-
-    &:hover {
-      background: color-mix(in srgb, var(--ink) 4%, transparent);
-    }
-    &[aria-selected="true"] {
-      background: color-mix(in srgb, var(--pen) 8%, transparent);
-      box-shadow: inset 2px 0 0 var(--pen);
-    }
     /* a change by Realtime: a stroke of a highlighter that dries, not a glow */
     &[data-glow] {
       animation: desk-marker 1200ms linear;
@@ -532,11 +194,6 @@ html[data-surface="desk"][data-journal] {
     }
   }
 
-  /* names are words: initials in a list say nothing the name does not */
-  #desk-main .desk-avatar[data-list] {
-    display: none;
-  }
-
   /* a date: mono; an overdue one gets the red pencil's stroke under it */
   .desk-when[data-overdue] {
     color: var(--pencil);
@@ -545,67 +202,7 @@ html[data-surface="desk"][data-journal] {
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 5' preserveAspectRatio='none'%3E%3Cpath d='M1 3.2c14-1.5 27-1.9 41-1.5 18 .5 33 1.3 48 .7 10-.4 19-1 29-.9' fill='none' stroke='%23c5261b' stroke-width='1.3' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
   }
 
-  /* ---- what lies on the sheet: a panel, a dialog, a menu ----------------------------------------- */
-  [data-testid="desk-panel"] {
-    background: var(--sheet);
-    border-left: 1px solid var(--line);
-  }
-  .desk-dialog,
-  .desk-pop,
-  [data-sheet]:not([data-testid="sketch-pad"]) {
-    border: 1px solid var(--line);
-    border-radius: 2px;
-    background: var(--sheet);
-    box-shadow: var(--shadow-raised);
-  }
-
-  /* ---- an empty state is a sentence on the sheet, no icon in a tinted circle ---------------------- */
-  [data-testid="desk-empty"] {
-    background: none;
-    border: 0;
-    border-top: 1px solid var(--rule);
-    border-radius: 0;
-    padding: 14px 0;
-
-    > span[aria-hidden] {
-      display: none;
-    }
-  }
-
   /* ---- planning and settings: what the calendar, the notes, the remote and the settings share ---- */
-
-  /* a switch is a small ruled box, not a pill: print when on, a hairline when off. Only the bare
-     track and knob: the phone's switches are whole rows with words inside, those keep their shape */
-  button[role="switch"]:has(> span[aria-hidden]:only-child) {
-    width: 30px;
-    height: 16px;
-    border-radius: 1px;
-    background: transparent !important;
-    box-shadow: inset 0 0 0 1px var(--ink-2) !important;
-
-    > span {
-      top: 3px;
-      left: 0 !important;
-      width: 10px;
-      height: 10px;
-      border-radius: 0;
-      background: var(--ink-2) !important;
-      transform: translateX(3px) !important;
-    }
-    &[aria-checked="true"] {
-      background: var(--ink) !important;
-      box-shadow: none !important;
-
-      > span {
-        background: var(--page) !important;
-        transform: translateX(17px) !important;
-      }
-    }
-    &:focus-visible {
-      outline: 2px solid var(--pen);
-      outline-offset: 2px;
-    }
-  }
 
   /* a choice among words: no box, the chosen one stands on the pen */
   .desk-choice {
@@ -697,78 +294,20 @@ html[data-surface="desk"][data-journal] {
   }
 
   /* ---- the work screens: Сегодня, Задачи, Разобрать, the task's panel, the order's editor --------- */
-  /* a list's row answers like the table's: a row open in the panel, a row under the cursor (J/K) */
-  .desk-row[aria-current="true"],
-  .desk-row[data-cursor] {
-    background: color-mix(in srgb, var(--pen) 8%, transparent);
-    box-shadow: inset 2px 0 0 var(--pen);
-  }
   .desk-list > li > .desk-row {
     border-bottom: 0;
-  }
-  /* the sheet's left edge is one vertical: the words stand on it, a row's tint reaches into the margin */
-  #desk-main .desk-list .desk-row,
-  [data-desk-tasks] .desk-row {
-    &:hover {
-      box-shadow:
-        -8px 0 0 color-mix(in srgb, var(--ink) 4%, transparent),
-        8px 0 0 color-mix(in srgb, var(--ink) 4%, transparent);
-    }
-    &[aria-selected="true"],
-    &[aria-current="true"],
-    &[data-cursor],
-    &:focus-visible {
-      background: color-mix(in srgb, var(--pen) 8%, var(--page));
-      /* solid, or the stroke of the pen under the tint would show through as a block */
-      box-shadow:
-        -8px 0 0 color-mix(in srgb, var(--pen) 8%, var(--page)),
-        -10px 0 0 var(--pen),
-        8px 0 0 color-mix(in srgb, var(--pen) 8%, var(--page));
-    }
-  }
-  /* the moves that come over a row's right end stand on a solid ground: no fade */
-  .desk-row-over,
-  .desk-row-moves {
-    background: color-mix(in srgb, var(--ink) 4%, var(--page));
-  }
-  .desk-row[aria-selected="true"] .desk-row-moves,
-  .desk-row[aria-current="true"] .desk-row-over,
-  .desk-row[data-cursor] .desk-row-over {
-    background: color-mix(in srgb, var(--pen) 8%, var(--page));
   }
 
   /* the tasks' table starts on the sheet's vertical: the mark and the fold hang in the margin */
   [data-desk-tasks] {
-    [role="columnheader"]:first-child,
-    [role="gridcell"]:first-child {
-      padding: 0;
-    }
-    [role="columnheader"]:nth-child(2),
-    [role="gridcell"]:nth-child(2) {
-      padding-left: 0;
-    }
-    [role="columnheader"]:last-child,
-    [role="gridcell"]:last-child {
-      padding-right: 0;
-    }
-    .desk-grid-group {
-      position: relative;
-      padding-inline: 0;
-    }
     [data-testid="desk-group-toggle"] {
       margin-left: 0;
       padding-left: 0;
 
       svg {
-        position: absolute;
         left: -16px;
       }
     }
-  }
-
-  /* the panel is a list of names too: the initials say nothing the name does not */
-  [data-testid="desk-panel"] .desk-avatar[data-list] {
-    display: none;
   }
 
   /* a title of a task: the voice of the sheet's titles */
@@ -780,10 +319,6 @@ html[data-surface="desk"][data-journal] {
 
   /* a reaction is print until the hand comes to it: seven colour faces would shout on the sheet */
   [data-testid="reaction-bar"] [data-reaction] {
-    > span {
-      filter: grayscale(1);
-      opacity: 0.85;
-    }
     &:hover > span,
     &[aria-pressed="true"] > span {
       filter: none;
@@ -872,38 +407,7 @@ html[data-surface="desk"][data-journal] {
     --accent: var(--sky) !important;
   }
 
-  /* ---- the people's sheets: Команда, Заявки, Отчёты, Профиль -------------------------------------- */
-  /* every table of a screen starts on the sheet's vertical; a row's tint and rail reach into the margin */
-  #desk-main .desk-grid {
-    /* first-of-type: a row's rail, when it has one, is the row's first child */
-    [role="columnheader"]:first-of-type,
-    [role="gridcell"]:first-of-type {
-      padding-left: 0;
-    }
-    [role="columnheader"]:last-child,
-    [role="gridcell"]:last-child {
-      padding-right: 0;
-    }
-    .desk-grid-group {
-      padding-inline: 0;
-    }
-    .desk-row {
-      &:hover {
-        box-shadow:
-          -8px 0 0 color-mix(in srgb, var(--ink) 4%, transparent),
-          8px 0 0 color-mix(in srgb, var(--ink) 4%, transparent);
-      }
-      &[aria-selected="true"] {
-        box-shadow:
-          -8px 0 0 color-mix(in srgb, var(--pen) 8%, var(--page)),
-          -10px 0 0 var(--pen),
-          8px 0 0 color-mix(in srgb, var(--pen) 8%, var(--page));
-      }
-      > span[aria-hidden]:first-child {
-        left: -8px;
-      }
-    }
-  }
+  /* ---- the people's sheets: «Команда», «Заявки», «Отчёты», «Профиль» -------------------------------------- */
 
   /* a form is a ruled sheet: a value and its field stand on the same spot, read or edited */
   .desk-form-row {
@@ -957,9 +461,6 @@ html[data-surface="desk"][data-journal] {
   }
   .desk-alias-add {
     border: 0;
-    padding: 0;
-    color: var(--ink);
-    box-shadow: 0 1px 0 var(--ink-2);
 
     &:hover {
       color: var(--pen);
@@ -977,31 +478,8 @@ html[data-surface="desk"][data-journal] {
     border-bottom: 0;
   }
 
-  /* the settings of the profile lie on the sheet like its other lists */
-  .desk-settings {
-    overflow: visible;
-    background: none;
-    border: 0;
-    border-top: 1px solid var(--line);
-    border-radius: 0;
-
-    > * {
-      padding: 6px 0;
-      border-top: 0;
-      border-bottom: 1px solid var(--rule-soft);
-    }
-    .desk-input {
-      background: none;
-      border: 0;
-      border-bottom: 1px solid var(--rule);
-      border-radius: 0;
-    }
-  }
-
   /* a word that is a move: a choice in a row of words, on a line of its own */
   .desk-word {
-    color: var(--ink);
-    box-shadow: 0 1px 0 var(--ink-2);
 
     &:hover {
       color: var(--pen);
@@ -1015,12 +493,6 @@ html[data-surface="desk"][data-journal] {
   /* inside a list too, a merely sent task's ring has its blue: the pen stays with the director's move */
   .desk-list svg {
     --accent: var(--sky) !important;
-  }
-
-  /* the alarm in the secretary's queue: the red pencil rules the line off, no tinted plate */
-  .desk-queue-alarm {
-    border-top: 2px solid var(--pencil);
-    border-bottom: 2px solid var(--pencil);
   }
 
   /* the phone's reception cards, read on «Заявки»: lines of the list, who on the left, what became of
@@ -1114,18 +586,6 @@ html[data-surface="desk"][data-journal] {
   }
 
   @media print {
-    &,
-    &[data-desk-theme="dark"] {
-      --page: #ffffff;
-      --sheet: #ffffff;
-      --ink: #000000;
-      --ink-2: #444444;
-      --rule: #999999;
-      --rule-soft: #cccccc;
-      --line: #000000;
-      --surface-2: #eeeeee;
-      color-scheme: light;
-    }
     /* the frame is one window scrolling inside itself: on paper it is as long as its content */
     &,
     body,
@@ -1149,7 +609,6 @@ html[data-surface="desk"][data-journal] {
     }
     .desk-page {
       max-width: none;
-      padding: 0;
     }
 
     .desk-page:has(> .desk-print) > :not(.desk-print) {
@@ -1235,17 +694,6 @@ html[data-surface="desk"][data-journal] {
 
   /* ---- the dark face's own moves: colour is flat and loud, the frame steps back ---------------------- */
   &[data-desk-theme="dark"] {
-    /* the chosen section is a bright tab; the binding keeps its hairline against the sheet */
-    .desk-nav {
-      border-right: 1px solid var(--rule-soft);
-      padding-right: 12px;
-
-      .desk-nav-link[aria-current="page"] {
-        background: var(--pen);
-        color: #0c0d0f;
-        border-radius: 2px;
-      }
-    }
     .desk-head {
       border-bottom-color: var(--pen);
 
@@ -1256,12 +704,6 @@ html[data-surface="desk"][data-journal] {
     .desk-when[data-overdue] {
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 5' preserveAspectRatio='none'%3E%3Cpath d='M1 3.2c14-1.5 27-1.9 41-1.5 18 .5 33 1.3 48 .7 10-.4 19-1 29-.9' fill='none' stroke='%23ff4d3d' stroke-width='1.3' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
     }
-  }
-
-  /* the calendar's two marks of today */
-  .desk-today {
-    background: var(--pen);
-    color: var(--page);
   }
   .desk-now {
     background: var(--pencil);
@@ -1320,9 +762,6 @@ html[data-surface="desk"][data-journal] {
   }
   .desk-crew-card {
     position: relative;
-    background: var(--sheet);
-    border-top: 2px solid var(--pen);
-    border-bottom: 1px solid var(--rule);
     padding: 14px 16px 8px;
     animation: desk-crew-card-in 220ms var(--ease-out) both;
   }
@@ -1340,9 +779,6 @@ html[data-surface="desk"][data-journal] {
     justify-content: center;
     width: 22px;
     height: 22px;
-    border-radius: 2px;
-    color: var(--tone);
-    background: color-mix(in srgb, var(--tone) 18%, transparent);
     animation: desk-tile-in 480ms cubic-bezier(0.34, 1.5, 0.64, 1) both;
 
     /* something happening now in the block: a dot beats on the tile's corner */
@@ -1355,7 +791,6 @@ html[data-surface="desk"][data-journal] {
       height: 7px;
       border-radius: 9999px;
       background: var(--tone);
-      box-shadow: 0 0 0 2px var(--page);
       animation: desk-beat 1.6s ease-in-out infinite;
     }
   }
@@ -1435,25 +870,25 @@ html[data-surface="desk"][data-journal] {
   [data-testid="wall-preview"],
   .desk-phone-look,
   &[data-sketch] {
-    --page: #0b0f14;
-    --sheet: #121a23;
-    --ink: #eef3f8;
-    --ink-2: #93a2b4;
-    --rule: #283548;
-    --rule-soft: #1b2533;
-    --pen: #2ed3b7;
-    --pencil: #ff5a52;
-    --bg: #0b0f14;
-    --surface: #121a23;
-    --surface-2: #1b2533;
-    --border: #283548;
-    --text: #eef3f8;
-    --text-muted: #93a2b4;
-    --accent: #2ed3b7 !important;
-    --ok: #34c759;
-    --warn: #ffb020;
-    --danger: #ff5a52;
-    --gold: #f0b24a;
+    --page: var(--phone-bg);
+    --sheet: var(--phone-surface);
+    --ink: var(--phone-text);
+    --ink-2: var(--phone-text-muted);
+    --rule: var(--phone-border);
+    --rule-soft: var(--phone-surface-2);
+    --pen: var(--phone-accent);
+    --pencil: var(--phone-danger);
+    --bg: var(--phone-bg);
+    --surface: var(--phone-surface);
+    --surface-2: var(--phone-surface-2);
+    --border: var(--phone-border);
+    --text: var(--phone-text);
+    --text-muted: var(--phone-text-muted);
+    --accent: var(--phone-accent) !important;
+    --ok: var(--phone-ok);
+    --warn: var(--phone-warn);
+    --danger: var(--phone-danger);
+    --gold: var(--phone-gold);
     color: var(--text);
     border-radius: 2px;
   }

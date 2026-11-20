@@ -10,6 +10,7 @@ import { AiPanel } from "@/components/desk/settings/panels/AiPanel";
 import { AppPanel } from "@/components/desk/settings/panels/AppPanel";
 import { CompanyPanel } from "@/components/desk/settings/panels/CompanyPanel";
 import { TeamPanel } from "@/components/desk/settings/panels/TeamPanel";
+import { useScreenKeys } from "@/components/desk/team/keys";
 import { goDesk } from "@/components/desk/ui/DeskLinks";
 import { useDeskPanel } from "@/components/desk/ui/DeskPanel";
 import { PageTitle } from "@/components/desk/ui/PageTitle";
@@ -18,7 +19,6 @@ import { useDraft, type SectionKey } from "@/components/settings/draft";
 import { SETTINGS_TAB_META } from "@/components/settings/SettingsTiles";
 import { toast } from "@/components/ui/Toast";
 import { Bone } from "@/components/ui/Skeleton";
-import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
 import { useCompanySettings } from "@/lib/dictionary-queries";
 import type { CompanySettings, SettingsPatch } from "@/lib/settings";
 import { withSecretaryCodes } from "@/lib/settings-plain";
@@ -255,22 +255,12 @@ export function SettingsPanels({ tab }: { tab: SettingsTab }) {
   }, [tab]);
 
   // 1–4 outside a field: the tabs, as the navigation numbers them
-  const panelOpen = useRef(panel.isOpen);
-  useLayoutEffect(() => {
-    panelOpen.current = panel.isOpen;
+  useScreenKeys((event) => {
+    const index = event.shiftKey || panel.isOpen ? -1 : ["Digit1", "Digit2", "Digit3", "Digit4"].indexOf(event.code);
+    if (index < 0) return false;
+    goDesk(router, `/desk/settings?tab=${SETTINGS_TABS[index]}`);
+    return true;
   });
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || !isPlainKey(event) || event.shiftKey || isTypingTarget(event.target)) return;
-      if (panelOpen.current || document.body.hasAttribute("data-dialog-open") || document.body.hasAttribute("data-sheet-open")) return;
-      const index = ["Digit1", "Digit2", "Digit3", "Digit4"].indexOf(event.code);
-      if (index < 0) return;
-      event.preventDefault();
-      goDesk(router, `/desk/settings?tab=${SETTINGS_TABS[index]}`);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [router]);
 
   // a search result: land on its row once the tab and the settings are drawn, then drop it from the address
   useEffect(() => {

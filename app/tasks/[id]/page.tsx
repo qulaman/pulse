@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 
 import { TaskDetail } from "@/components/tasks/detail/TaskDetail";
 import { TaskOnWall } from "@/components/tasks/TaskOnWall";
-import { useMinute } from "@/components/tasks/list/TaskList";
+
 import { PageHead } from "@/components/ui/PageHead";
 import { TaskPageSkeleton } from "@/components/ui/PageSkeletons";
 import { useNamesKey } from "@/lib/people/names";
@@ -13,6 +13,7 @@ import { clearTaskNotifications } from "@/lib/push/client";
 import { homeForRole } from "@/lib/routes";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { useMe, useTaskThread } from "@/lib/tasks/queries";
+import { useNow } from "@/lib/useNow";
 
 /**
  * One task on its own screen (D-87): the data, the read cursor and the way back; the screen
@@ -29,7 +30,7 @@ export default function TaskThreadPage() {
   const me = useMe();
   const { task, messages } = useTaskThread(taskId);
   const actions = useTaskActions(me.data);
-  const now = useMinute();
+  const now = useNow();
 
   // the thread on screen is a thread seen: the read cursor follows the newest message (D-61)
   const newestSeq = (messages.data ?? []).reduce((max, message) => Math.max(max, message.seq), 0);

@@ -267,7 +267,7 @@ export function useDeskActs({
     return items;
   };
 
-  /* ---- many rows at once: the table's bar (принцип 3 — nothing here accepts) ---- */
+  /* ---- many rows at once: the table's bar (principle 3 — nothing here accepts) ---- */
   const bulk = {
     nudge: (list: readonly TaskWithPeople[]) => {
       for (const task of list) actions.nudge({ taskId: task.id, name: shortName(task.assignee?.full_name) });

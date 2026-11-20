@@ -41,7 +41,7 @@ export function SkeletonGroup({ children, className = "", grow = false }: { chil
 /* -------------------------------------------------------------------------- */
 
 /** components/tasks/TaskCard: rail, status + deadline pill, title, who, actions row. */
-export function TaskCardBone({ variant = "employee" }: { variant?: "employee" | "director" }) {
+function TaskCardBone({ variant = "employee" }: { variant?: "employee" | "director" }) {
   return (
     <div className="card relative overflow-hidden p-4 pl-5">
       <span aria-hidden className="absolute inset-y-3 left-0 w-[3px] rounded-r-full bg-border" />
@@ -77,7 +77,7 @@ export function TaskListBone({ count = 3, variant = "employee" }: { count?: numb
 }
 
 /** A list row with an avatar and two lines (people list, thread history). */
-export function RowBone({ avatar = 44 }: { avatar?: number }) {
+function RowBone({ avatar = 44 }: { avatar?: number }) {
   return (
     <div className="flex items-center gap-3 card px-3 py-3">
       <Bone round w={avatar} h={avatar} className="shrink-0" />
@@ -173,7 +173,7 @@ export function SectionBone({ fields = 2 }: { fields?: number }) {
 }
 
 /** components/ui/Disclosure closed: the icon tile, the title, one line of summary. */
-export function SectionRowBone() {
+function SectionRowBone() {
   return (
     <div className="flex min-h-[64px] items-center gap-3 card px-4 py-3">
       <Bone w={32} h={32} className="shrink-0" />
@@ -193,35 +193,5 @@ export function SettingsSectionsBone({ count = 6 }: { count?: number }) {
         <SectionRowBone key={i} />
       ))}
     </SkeletonGroup>
-  );
-}
-
-/** A table body: rows of cells with plausible widths. */
-export function TableBone({ rows = 8, columns = 4 }: { rows?: number; columns?: number }) {
-  const widths = ["30%", "45%", "20%", "25%", "35%", "15%"];
-  return (
-    <div>
-      {Array.from({ length: rows }, (_, r) => (
-        <div key={r} className="flex items-center gap-3 border-t border-border px-3 py-2">
-          {Array.from({ length: columns }, (_, c) => (
-            <Bone key={c} h={16} w={widths[(r + c) % widths.length]} />
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** A chat bubble pair for the task page. */
-export function ChatBone() {
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex justify-start">
-        <Bone h={62} w="70%" className="rounded-[14px] rounded-bl-[4px]" />
-      </div>
-      <div className="flex justify-end">
-        <Bone h={62} w="60%" className="rounded-[14px] rounded-br-[4px]" />
-      </div>
-    </div>
   );
 }

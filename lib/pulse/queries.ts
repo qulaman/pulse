@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 const LAST_VISIT_KEY = "pulse.brief.seen_at";
 /** The «since» of the current tab session: coming back from another tab is the same visit. */
@@ -52,11 +52,5 @@ export function useLastVisit(): string {
  * The clock of the board: read on mount, then once a minute — a deadline that passes
  * while the screen is open moves its tile into the overdue lane without a reload.
  */
-export function useNow(tickMs = 60_000): Date {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), tickMs);
-    return () => clearInterval(timer);
-  }, [tickMs]);
-  return now;
-}
+/** @deprecated moved — import `useNow` from "@/lib/useNow". */
+export { useNow } from "@/lib/useNow";

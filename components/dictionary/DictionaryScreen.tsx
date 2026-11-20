@@ -1,20 +1,17 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 
 import { DictionaryBody } from "@/components/dictionary/DictionarySkeleton";
+import { useDictionaryLive, useHeard } from "@/components/dictionary/useDictionaryLive";
 import { Button } from "@/components/ui/Button";
 import { NamesPanel } from "@/components/dictionary/NamesPanel";
 import { WordsPanel } from "@/components/dictionary/WordsPanel";
 import { springs } from "@/lib/design/tokens";
-import type { RosterPerson } from "@/lib/dictionary";
-import { misheardQueryKey, useCompanySettings, useWaitingEdits, wordStatsKey } from "@/lib/dictionary-queries";
+import { useCompanySettings, useWaitingEdits } from "@/lib/dictionary-queries";
 import { DICTIONARY_TABS, type DictionaryTab } from "@/lib/dictionary-tabs";
-import { peopleKeys, usePeople } from "@/lib/people/queries";
-import { useRealtimeListener } from "@/lib/realtime/useRealtimeQuery";
-import { settingsKey } from "@/lib/settings-query";
+import { usePeople } from "@/lib/people/queries";
 import { pluralRu } from "@/lib/tasks/status-text";
 import { useMe } from "@/lib/tasks/queries";
 
@@ -35,43 +32,11 @@ export function DictionaryScreen({ initialTab }: { initialTab: DictionaryTab }) 
   const people = usePeople();
   const settings = useCompanySettings();
   const me = useMe();
-  const queryClient = useQueryClient();
   const waiting = useWaitingEdits();
 
-  // The director and the secretary may have the dictionary open at once: a name one of them
-  // adds shows up on the other's screen. While an own edit is in flight its settle reads the
-  // list anyway — a refetch in between would briefly show it undone.
-  useRealtimeListener(
-    { table: "profiles", filter: me.data ? `company_id=eq.${me.data.companyId}` : undefined },
-    () => {
-      if (queryClient.isMutating({ mutationKey: ["dictionary", "aliases"] }) === 0) {
-        void queryClient.invalidateQueries({ queryKey: peopleKeys.all });
-      }
-    },
-    () => void queryClient.invalidateQueries({ queryKey: peopleKeys.all }),
-    "dictionary-people",
-    Boolean(me.data),
-  );
+  useDictionaryLive(me.data?.companyId, "dictionary-people");
 
-  // Words live in company.settings, which Realtime does not carry: they are read again when
-  // the screen comes back to the front — the other editor's words land by then.
-  useEffect(() => {
-    const onVisible = () => {
-      if (document.visibilityState !== "visible") return;
-      void queryClient.invalidateQueries({ queryKey: settingsKey });
-      void queryClient.invalidateQueries({ queryKey: misheardQueryKey });
-      void queryClient.invalidateQueries({ queryKey: wordStatsKey });
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [queryClient]);
-
-  // who the pipeline can hear: the kiosk is a login, not a person, and the gone are gone (lib/roster.ts)
-  const heard = useMemo(() => (people.data ?? []).filter((p) => p.is_active && p.role !== "tv"), [people.data]);
-  const roster: RosterPerson[] = useMemo(
-    () => heard.map((p) => ({ id: p.id, full_name: p.full_name, aliases: p.aliases })),
-    [heard],
-  );
+  const { heard, roster } = useHeard(people.data);
 
   const counts: Record<DictionaryTab, number | null> = {
     names: people.data ? heard.reduce((sum, p) => sum + p.aliases.length, 0) : null,

@@ -30,7 +30,7 @@ const GENERIC_ERROR = "Не получилось. Попробую ещё раз
 /** Creates of boards and notes run in one line: a point never overtakes its board. */
 const SERIAL = { id: "notes" };
 
-/** One insert keyed by `client_request_id` (принцип 7): a replay reads the landed row back. */
+/** One insert keyed by `client_request_id` (principle 7): a replay reads the landed row back. */
 export async function insertBoard(me: Me, row: NewBoard): Promise<MindBoard> {
   const supabase = createBrowserSupabase();
   const { data, error } = await supabase
@@ -256,8 +256,6 @@ export function useMovePoint(me: { userId: string } | undefined) {
     },
   });
 }
-
-export { pointToThoughtRefusal, type ThoughtRestore } from "./thought";
 
 /** «В мысли» said no in words — on the screen as it is, never through the server's error map. */
 class Refusal extends Error {}

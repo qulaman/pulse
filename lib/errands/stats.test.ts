@@ -50,7 +50,7 @@ describe("the ball", () => {
     const now = new Date("2026-09-22T09:02:30Z");
     expect(waitedFor(errand(), now)).toBe("3 мин");
     expect(waitedFor(errand(), new Date("2026-09-22T09:00:10Z"))).toBe("только что");
-    // два с половиной часа — это «2 ч»: округление вверх обещало бы больше, чем прошло
+    // two and a half hours is «2 ч»: rounding up would promise more than has passed
     expect(waitedFor(errand(), new Date("2026-09-22T11:30:00Z"))).toBe("2 ч");
   });
 });

@@ -1,5 +1,5 @@
-/* «Графит» (D-171) per screen: owned by one lead/agent of the desk polish wave (D-174). Classes nested under
-   html[data-surface="desk"][data-journal]; keyframes at top level; motion off under reduced motion. */
+/* Classes nested under the desk's scope (the base, then «Графит»); keyframes at the top level; motion
+   off under reduced motion. */
 
 /* ==========================================================================================
    «Календарь», «Экран» (D-174, D-180) — the planning screens.
@@ -8,17 +8,8 @@
      and «Окна директора» in cal-month.css. «Заметки» and «Доски» are in notes.css and boards.css.
    - «Экран» is the monitor of the room: the live wall in a bezel with its diode, the scenes as
      cards with a sketch of what each puts up, the remote's settings as a settings card.
-   The journal («Журнал») keeps its print: the base rules lay the screens out there, the Graphite
-   block below gives them depth, colour and motion.
+   The base rules lay the screens out; the «Графит» block below gives them depth, colour and motion.
    ========================================================================================== */
-
-/* print says it in words: no faces, dots, icons or bars on the journal's sheet */
-html[data-surface="desk"][data-journal]:not([data-graphite]) {
-  .cal-chip-dot,
-  .cal-deadlines-icon {
-    display: none;
-  }
-}
 html[data-surface="desk"][data-journal] {
   /* a face in a stack: the circles overlap a little, each cut out of the one under it */
   .cal-faces {
@@ -157,14 +148,6 @@ html[data-surface="desk"][data-journal] {
       background: color-mix(in srgb, var(--pencil) 16%, transparent);
     }
   }
-  .cal-on-wall {
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--pen) 50%, transparent), var(--lift);
-    color: var(--ink);
-
-    svg {
-      color: var(--pen);
-    }
-  }
 
   /* ---- the week grid and its meetings live in cal-grid.css (D-180) -------------------------- */
 
@@ -173,13 +156,10 @@ html[data-surface="desk"][data-journal] {
   /* ---- the side beside the week (the day, the open meeting) and the quick card live in cal-side.css (D-180) */
 }
 
-/* ---- «Календарь»: the grid and the side beside it (D-180), both looks ---------------------- */
+/* ---- «Календарь»: the grid and the side beside it (D-180) ---------------------- */
 html[data-surface="desk"][data-journal] {
   .cal-layout {
     grid-template-columns: minmax(0, 1fr) clamp(300px, 23vw, 380px);
-  }
-  .cal-nav {
-    height: 36px;
   }
   /* the shell's right panel (a phrase to confirm) stands where the side was: the week keeps its width */
   &[data-desk-panel] .cal-layout {
@@ -190,18 +170,13 @@ html[data-surface="desk"][data-journal] {
   }
 }
 
-/* ---- «Экран» in both looks: the scenes are a row of words in the journal, cards in «Графит» ---- */
+/* ---- «Экран»: the scenes as cards ---- */
 html[data-surface="desk"][data-journal] {
   .screen-scenes {
-    display: flex;
     flex-wrap: wrap;
-    gap: 2px 14px;
   }
   .screen-scene {
-    display: inline-flex;
-    height: 32px;
     align-items: center;
-    color: var(--text-muted);
     font-size: 14px;
 
     &:hover {
@@ -209,27 +184,7 @@ html[data-surface="desk"][data-journal] {
     }
     &[aria-selected="true"] {
       color: var(--text);
-      font-weight: 600;
-      box-shadow: inset 0 -2px 0 var(--accent);
     }
-  }
-  .screen-scene-name {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .screen-scene-key {
-    font-size: 10px;
-  }
-}
-html[data-surface="desk"][data-journal]:not([data-graphite]) {
-  .screen-scene-shot,
-  .screen-now-dot,
-  .screen-diode,
-  .screen-ring,
-  .screen-pick-face,
-  .screen-presenter-steps {
-    display: none;
   }
 }
 
@@ -281,18 +236,18 @@ html[data-surface="desk"][data-journal]:not([data-graphite]) {
     height: 8px;
     flex-shrink: 0;
     border-radius: 9999px;
-    background: #93a2b4;
+    background: var(--phone-text-muted);
     opacity: 0.55;
   }
   .screen-chin[data-tone="ok"] .screen-diode {
-    background: #34c759;
+    background: var(--phone-ok);
     opacity: 1;
-    box-shadow: 0 0 8px rgb(52 199 89 / 0.7);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--phone-ok) 70%, transparent);
   }
   .screen-chin[data-tone="warn"] .screen-diode {
-    background: #ff5a52;
+    background: var(--phone-danger);
     opacity: 1;
-    box-shadow: 0 0 8px rgb(255 90 82 / 0.65);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--phone-danger) 65%, transparent);
   }
 
   /* what is on the wall now: a card with the live line, the scenes as small screens under it */
@@ -384,7 +339,7 @@ html[data-surface="desk"][data-journal]:not([data-graphite]) {
     aspect-ratio: 16 / 9;
     overflow: hidden;
     border-radius: 7px;
-    background: #0b0f14;
+    background: var(--phone-bg);
     box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.07);
   }
   /* the office sees it this minute: a tag on the card's top edge */
@@ -410,13 +365,9 @@ html[data-surface="desk"][data-journal]:not([data-graphite]) {
     transform: translateX(-50%);
     animation: cal-pop 220ms var(--ease-snap) backwards;
   }
-  &[data-desk-theme="dark"] .screen-scene[data-live]::before {
-    background: radial-gradient(circle at 8px 50%, #04130f 2.5px, transparent 3px), var(--pen);
-    color: #04130f;
-  }
-  &[data-desk-theme="light"] .screen-scene[data-live]::before {
-    background: radial-gradient(circle at 8px 50%, #fff 2.5px, transparent 3px), var(--pen);
-    color: #fff;
+  &[data-desk-theme] .screen-scene[data-live]::before {
+    background: radial-gradient(circle at 8px 50%, var(--on-pen) 2.5px, transparent 3px), var(--pen);
+    color: var(--on-pen);
   }
   .screen-scene-name {
     display: flex;
@@ -542,34 +493,42 @@ html[data-surface="desk"][data-journal]:not([data-graphite]) {
     }
   }
   /* the guest's switch: a pill whose knob slides */
-  button.screen-switch[role="switch"]:has(> span[aria-hidden]:only-child) {
+  button.screen-switch[role="switch"] {
     width: 36px;
     height: 20px;
     border-radius: 9999px;
-    background: var(--surface-2) !important;
-    box-shadow: inset 0 0 0 1px var(--line) !important;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--line);
     transition:
       background-color 160ms linear,
       box-shadow 160ms linear;
 
     > span {
       top: 2px;
+      left: 0;
       width: 16px;
       height: 16px;
       border-radius: 9999px;
-      background: #fff !important;
+      background: #fff;
       box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
-      transform: translateX(2px) !important;
+      transform: translateX(2px);
       transition: transform 200ms var(--ease-snap);
     }
     &[aria-checked="true"] {
-      background: var(--pen) !important;
-      box-shadow: none !important;
+      background: var(--pen);
+      box-shadow: none;
 
       > span {
-        background: #fff !important;
-        transform: translateX(18px) !important;
+        transform: translateX(18px);
       }
+    }
+    &:active:not(:disabled) {
+      scale: 0.94;
+      transition-duration: 70ms;
+    }
+    &:focus-visible {
+      outline: 2px solid var(--pen);
+      outline-offset: 2px;
     }
   }
   [data-testid="desk-screen-pick"] {
@@ -626,7 +585,6 @@ html[data-surface="desk"][data-journal]:not([data-graphite]) {
   }
 }
 
-/* the journal keeps its list of lines: no canvases, meters or chips there */
 /* ---- motion of the planning screens --------------------------------------------------------- */
 @keyframes cal-event-in {
   from {
@@ -634,21 +592,10 @@ html[data-surface="desk"][data-journal]:not([data-graphite]) {
     transform: translateY(4px) scale(0.97);
   }
 }
-@keyframes cal-rise {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-}
 @keyframes cal-pop {
   from {
     opacity: 0;
     transform: scale(0.94);
-  }
-}
-@keyframes cal-bar {
-  from {
-    transform: scaleX(0);
   }
 }
 @keyframes screen-rise {
@@ -662,18 +609,9 @@ html[data-surface="desk"][data-journal]:not([data-graphite]) {
     stroke-dashoffset: 100;
   }
 }
-/* a live dot breathes: what is on now, never a blink */
-@keyframes cal-breathe {
-  50% {
-    opacity: 0.35;
-  }
-}
 
 @media (prefers-reduced-motion: reduce) {
   :root[data-surface="desk"][data-journal][data-graphite] {
-    .cal-event,
-    .cal-ghost,
-    .cal-chip,
     .screen-bezel,
     .screen-now,
     .screen-cartridge,
@@ -689,17 +627,6 @@ html[data-surface="desk"][data-journal]:not([data-graphite]) {
     .screen-ring-left,
     button.screen-switch[role="switch"] > span {
       transition: none;
-    }
-    .cal-now,
-    .cal-now-week,
-    .cal-now-time,
-    .cal-gone {
-      transition: none;
-    }
-    .cal-event:hover,
-    .cal-event[data-open],
-    .cal-mark:hover {
-      transform: none;
     }
   }
 }

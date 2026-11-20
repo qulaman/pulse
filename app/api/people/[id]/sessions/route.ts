@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { userSupabase, withAuth } from "@/lib/api/handler";
+import { PERSON_ID, userSupabase, withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
 
 const BodySchema = z.strictObject({
@@ -23,12 +23,9 @@ const ERRORS: Record<string, [number, string]> = {
 export const POST = withAuth<z.infer<typeof BodySchema>>(
   "any",
   async ({ req, body, params }) => {
-    const id = z.guid().safeParse(params.id); // guid: seed ids are not RFC-4122
-    if (!id.success) return apiError(404, "not_found", "Сотрудник не найден");
-
     const supabase = await userSupabase(req);
     const { data, error } = await supabase.rpc("revoke_sessions", {
-      p_user_id: id.data,
+      p_user_id: params.id,
       p_keep_current: body?.keep_current ?? false,
       p_keep_endpoint: body?.keep_endpoint,
     });
@@ -41,4 +38,5 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     return apiOk(data as { sessions: number; devices: number });
   },
   BodySchema,
+  { id: PERSON_ID },
 );

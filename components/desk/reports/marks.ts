@@ -15,50 +15,22 @@ export type PeriodMarks = ReadonlyMap<string, ReadonlyMap<string, TabelMark>>;
 /** PostgREST hands out at most this many rows an answer: a long period is read page by page. */
 const PAGE = 1000;
 
-const COLUMNS = "user_id, report_date, status, arrived_at, left_at";
-/** D-183's columns: the director's excuse of a missed day. */
-const EXCUSE = "excused_at, excused_reason";
-
-/**
- * The database said it has no excuse columns yet (D-183's migration waits for the owner's word):
- * the табель keeps reading without them for this session rather than failing whole.
- */
-let excuseColumns = true;
-
-type MarkRow = {
-  user_id: string;
-  report_date: string;
-  status: string;
-  arrived_at: string | null;
-  left_at: string | null;
-  excused_at?: string | null;
-  excused_reason?: string | null;
-};
-
-const missingColumn = (error: { code?: string; message: string }) => error.code === "42703" || /excused_/.test(error.message);
-
 async function readMarks(from: Ymd, to: Ymd): Promise<PeriodMarks> {
   const supabase = createBrowserSupabase();
   const marks = new Map<string, Map<string, TabelMark>>();
   for (let start = 0; ; start += PAGE) {
-    const withExcuse = excuseColumns;
-    // the director reads the company's reports under RLS (daily_reports_select); nobody else's
+    // the director reads the company's reports under RLS (daily_reports_select); nobody else's;
+    // `excused_*` — the director's excuse of a missed day (D-183)
     const { data, error } = await supabase
       .from("daily_reports")
-      .select(withExcuse ? `${COLUMNS}, ${EXCUSE}` : COLUMNS)
+      .select("user_id, report_date, status, arrived_at, left_at, excused_at, excused_reason")
       .gte("report_date", from)
       .lte("report_date", to)
       .order("report_date")
       .order("user_id")
       .range(start, start + PAGE - 1);
-    if (error) {
-      if (withExcuse && missingColumn(error)) {
-        excuseColumns = false;
-        return readMarks(from, to);
-      }
-      throw new Error(error.message);
-    }
-    const rows = (data ?? []) as unknown as MarkRow[];
+    if (error) throw new Error(error.message);
+    const rows = data ?? [];
     for (const row of rows) {
       let days = marks.get(row.user_id);
       if (!days) marks.set(row.user_id, (days = new Map()));
@@ -66,8 +38,8 @@ async function readMarks(from: Ymd, to: Ymd): Promise<PeriodMarks> {
         status: row.status as DailyReportStatus,
         arrived_at: row.arrived_at,
         left_at: row.left_at,
-        excused_at: row.excused_at ?? null,
-        excused_reason: row.excused_reason ?? null,
+        excused_at: row.excused_at,
+        excused_reason: row.excused_reason,
       });
     }
     if (rows.length < PAGE) return marks;

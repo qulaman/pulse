@@ -20,12 +20,12 @@ import { cancelAsked, usePendingErrands, type PendingErrand } from "@/lib/errand
 import { useErrandReceipt, useErrands, useSecretaries, useSecretaryActions, waitedFor, type Errand, type SecretaryPerson } from "@/lib/errands/queries";
 import { absenceLine, atLine, etaLeftMin, etaLine, isAway, isYesNo, sceneOfAction, untilLine } from "@/lib/errands/scene";
 import { shortName } from "@/lib/people/names";
-import { useNow } from "@/lib/pulse/queries";
 import type { SecretaryAction } from "@/lib/settings";
 import type { Me } from "@/lib/tasks/queries";
 import { receiptLine } from "@/lib/tasks/receipts";
 
 import { SCENE_ICON, SCENE_INK } from "@/components/desk/errands/look";
+import { useNow } from "@/lib/useNow";
 
 import { INK, Live, Mark, Titled } from "./look";
 import { Aside, BlockLink, BlockNote, DAY_ROW_END, Quiet, RowsBone } from "./parts";

@@ -5,9 +5,8 @@
  * which is ours. Everything here is the Aqtobe wall clock — the only clock the product
  * shows (CLAUDE.md §6) — and needs no date library, because +05:00 holds all year.
  */
-import { AQTOBE_OFFSET } from "@/lib/ai/time";
+import { AQTOBE_OFFSET, aqtobeWall } from "@/lib/ai/time";
 
-const OFFSET_MS = 5 * 60 * 60 * 1000;
 const DAY_MS = 86_400_000;
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -34,22 +33,28 @@ export const WEEKDAYS_SHORT_RU = ["пн", "вт", "ср", "чт", "пт", "сб"
 export type YmdParts = { year: number; month: number; day: number };
 export type Month = { year: number; month: number };
 
-function wall(date: Date): Date {
-  return new Date(date.getTime() + OFFSET_MS);
-}
-
 export function ymdOf(year: number, month: number, day: number): Ymd {
   return `${year}-${pad(month)}-${pad(day)}`;
 }
 
-export function todayYmd(now: Date = new Date()): Ymd {
-  const w = wall(now);
+/** The wall-clock day of an instant: the Aqtobe date it happened on. */
+export function ymdAt(at: Date): Ymd {
+  const w = aqtobeWall(at);
   return ymdOf(w.getUTCFullYear(), w.getUTCMonth() + 1, w.getUTCDate());
 }
 
-export function nowHm(now: Date = new Date()): Hm {
-  const w = wall(now);
+/** The wall-clock time of an instant: «14:05» in Aqtobe. */
+export function hmAt(at: Date): Hm {
+  const w = aqtobeWall(at);
   return `${pad(w.getUTCHours())}:${pad(w.getUTCMinutes())}`;
+}
+
+export function todayYmd(now: Date = new Date()): Ymd {
+  return ymdAt(now);
+}
+
+export function nowHm(now: Date = new Date()): Hm {
+  return hmAt(now);
 }
 
 /** Parses a day, and refuses one that does not exist — "2026-02-31" is not a date. */
@@ -67,9 +72,13 @@ export function parseHm(value: string | null | undefined): { hours: number; minu
   return { hours, minutes };
 }
 
-export function hmOf(hours: number, minutes: number): Hm {
+/** «09:05» of 9 hours and 5 minutes. */
+export function hmFrom(hours: number, minutes: number): Hm {
   return `${pad(hours)}:${pad(minutes)}`;
 }
+
+/** @deprecated use `hmFrom` — three `hmOf` meant three different things */
+export const hmOf = hmFrom;
 
 export function daysInMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -134,6 +143,31 @@ export function daysBetween(a: Ymd, b: Ymd): number {
   return Math.round(ms / DAY_MS);
 }
 
+/** Days from one to the other with both ends counted: the same day is 1, a Monday–Sunday week is 7. */
+export function daysInclusive(from: Ymd, to: Ymd): number {
+  return daysBetween(from, to) + 1;
+}
+
+/** A day moved by whole days: tomorrow is `addDays(today, 1)`. */
+export function addDays(ymd: Ymd, days: number): Ymd {
+  const parts = parseYmd(ymd);
+  if (!parts) return ymd;
+  const moved = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + days));
+  return ymdOf(moved.getUTCFullYear(), moved.getUTCMonth() + 1, moved.getUTCDate());
+}
+
+/** Monday 0 … Sunday 6. */
+export function weekdayOf(ymd: Ymd): number {
+  const parts = parseYmd(ymd);
+  if (!parts) return 0;
+  return (new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay() + 6) % 7;
+}
+
+/** The Monday of a day's week. */
+export function mondayOf(ymd: Ymd): Ymd {
+  return addDays(ymd, -weekdayOf(ymd));
+}
+
 /** What a person would say: «сегодня», «завтра», «чт, 17 сентября», year only when it differs. */
 export function humanYmd(ymd: Ymd, now: Date = new Date()): string {
   const parts = parseYmd(ymd);
@@ -171,9 +205,5 @@ export function aqtobeIsoToYmdHm(iso: string | null): { ymd: Ymd; hm: Hm } | nul
   if (!iso) return null;
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
-  const w = wall(date);
-  return {
-    ymd: ymdOf(w.getUTCFullYear(), w.getUTCMonth() + 1, w.getUTCDate()),
-    hm: `${pad(w.getUTCHours())}:${pad(w.getUTCMinutes())}`,
-  };
+  return { ymd: ymdAt(date), hm: hmAt(date) };
 }

@@ -4,9 +4,9 @@ import { Plus, Users } from "lucide-react";
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 
 import { OfferPill, Pill } from "@/components/desk/settings/dictionary/parts";
-import { TileFace } from "@/components/desk/team/TeamGrid";
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
+import { Face } from "@/components/desk/ui/Face";
 import { useContextMenu, type MenuItem } from "@/components/desk/ui/Menu";
 import { toast } from "@/components/ui/Toast";
 import { ALIAS_MAX, byRussian, entryKey, nameReport, planAliases, type NameReport, type RosterPerson } from "@/lib/dictionary";
@@ -26,7 +26,7 @@ function Who({ person }: { person: Person }) {
   useNamesKey();
   return (
     <span className="flex min-w-0 items-center gap-3">
-      <TileFace person={person} size={30} />
+      <Face person={person} size={30} />
       <span className="flex min-w-0 flex-col">
         <span className="truncate text-[14px] font-medium leading-5" title={person.full_name}>
           {shortName(person.full_name)}
@@ -81,7 +81,7 @@ function AddField({ line, people, onDone, onAdded }: { line: Line; people: Roste
         }}
         placeholder="Жаке, главбух — Enter добавит, Esc закроет"
         aria-label={`Как ещё зовут: ${line.person.full_name}`}
-        className="dict-add-field field h-8 w-full max-w-[420px] px-2 text-[13px] leading-5 outline-none"
+        className="field h-8 w-full max-w-[420px] px-2 text-[13px] leading-5 outline-none"
       />
       {notes.map((note) => (
         <span key={note} className="dict-note text-[12px] leading-4 text-warn">

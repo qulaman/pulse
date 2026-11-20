@@ -7,6 +7,9 @@ import { Num } from "@/components/desk/ui/Num";
 import { TONE_VAR } from "@/components/desk/ui/tone";
 import type { StatusScreen } from "@/lib/tasks/overview";
 
+/** The calm moment's quiet line on the desk: a new order is a line away, not the phone's voice (D-154). */
+export const DESK_NEW_TASK = "Новую задачу — строкой сверху · Ctrl K";
+
 /** A second number of the moment, as words that filter: «В работе 5». `active` — its filter is on. */
 export type MomentCounter = { key: string; label: string; value: number; active?: boolean; onClick?: () => void; href?: string };
 

@@ -6,7 +6,7 @@ import type { Note } from "@/lib/notes/queries";
  * line (`lib/notes/assign.ts`): one task, the first line its title, the rest its body, the
  * recording with it, `note_id` marking what the point became. Kept here for the outbox copy of
  * the 5-second «Отменить» window (`holdForUndo`): a page closed inside the window still sends the
- * same request on the next start, and the same `client_request_id` lands once (принцип 7).
+ * same request on the next start, and the same `client_request_id` lands once (principle 7).
  */
 export const CONFIRM_PATH = "/api/voice/confirm";
 

@@ -8,8 +8,14 @@ const css = readFileSync(new URL("../../app/globals.css", import.meta.url), "utf
 const compact = css.replace(/\s/g, "").toLowerCase();
 
 describe("design tokens ↔ globals.css", () => {
-  it.each(Object.entries(colors))("--%s is declared with the same hex", (name, hex) => {
-    expect(compact).toContain(`--${name}:${hex}`.toLowerCase() + ";");
+  // the phone palette is declared once as --phone-* primaries; the working names point at them,
+  // so the desk can copy a phone colour (var(--phone-bg)) while it redefines --bg for itself
+  it.each(Object.entries(colors))("--phone-%s is declared with the same hex", (name, hex) => {
+    expect(compact).toContain(`--phone-${name}:${hex}`.toLowerCase() + ";");
+  });
+
+  it.each(Object.keys(colors))("--%s points at --phone-%s", (name) => {
+    expect(compact).toContain(`--${name}:var(--phone-${name});`.toLowerCase());
   });
 
   it("declares --overlay", () => {

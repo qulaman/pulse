@@ -14,8 +14,8 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { PHONE, readOnly, signIn } from "./lib/login";
+import { APP_URL, finish, record, recordError, skip } from "./lib/smoke";
 
-const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui");
 const EMPLOYEE = process.env.EMPLOYEE ?? "erlan.b@demo.local";
 /** Cumulative shift allowed per interaction; 0.05 is well under the "good" CLS bar of 0.1. */
@@ -24,15 +24,7 @@ const SETTLE_MS = 1_500;
 
 mkdirSync(SHOTS, { recursive: true });
 
-type Check = { name: string; ok: boolean; detail: string };
-const checks: Check[] = [];
 let lastPage: Page | null = null;
-const record = (name: string, ok: boolean, detail = "") => {
-  checks.push({ name, ok, detail });
-  console.log(`${ok ? "ok  " : "FAIL"}  ${name}${detail ? `  ${detail}` : ""}`);
-};
-/** A step the data of dev does not allow today (nothing to open): said, not failed — the smoke writes nothing to make it. */
-const skip = (name: string, why: string) => console.log(`skip  ${name}  ${why}`);
 
 type Shift = { value: number; at: number; sources: string[] };
 
@@ -99,7 +91,8 @@ async function findPile(page: Page): Promise<Pile | null> {
     await page.getByTestId("tab-closed").click();
     if (await firstCard(page, 10_000)) pile = "closed";
   }
-  record("на dev есть задача для открытия", pile !== null, pile === "closed" ? "открытых нет — берём «Закрытые»" : pile ? "" : "отправьте задачу руками: смоук ничего не пишет");
+  const why = pile === "closed" ? "открытых нет — берём «Закрытые»" : pile ? "" : "отправьте задачу руками: смоук ничего не пишет";
+  record("на dev есть задача для открытия", pile !== null, why);
   return pile;
 }
 
@@ -124,7 +117,7 @@ async function main() {
   const browser = await chromium.launch({ channel: "chrome", headless: true });
   const blocked: string[] = [];
 
-  // ---- director: Пульс → Задачи → карточка → назад → вкладки ------------------------
+  // ---- director: «Пульс» → «Задачи» → a card → back → the tabs ----------------------
   const director = await browser.newContext(PHONE);
   await readOnly(director, APP_URL, blocked);
   await director.addInitScript(COLLECTOR);
@@ -173,7 +166,8 @@ async function main() {
     const composerBox = await composer.boundingBox();
     const tabBox = await tabBar.boundingBox();
     const above = Boolean(composerBox && tabBox && composerBox.y + composerBox.height <= tabBox.y + 1);
-    record("карточка: композер чата над таб-баром", above, `composer.bottom=${composerBox ? Math.round(composerBox.y + composerBox.height) : "?"} tab.top=${tabBox ? Math.round(tabBox.y) : "?"}`);
+    const composerBottom = composerBox ? Math.round(composerBox.y + composerBox.height) : "?";
+    record("карточка: композер чата над таб-баром", above, `composer.bottom=${composerBottom} tab.top=${tabBox ? Math.round(tabBox.y) : "?"}`);
 
     await measure(page, "директор: карточка → назад", async () => {
       await page.getByRole("button", { name: "Назад" }).click();
@@ -209,7 +203,7 @@ async function main() {
   });
   await page.screenshot({ path: join(SHOTS, "j3-pulse.png") });
 
-  // ---- employee: Дела → шторка «Уточнить» → закрыть → карточка → назад ----------------
+  // ---- employee: «Дела» → the «Уточнить» sheet → close → a card → back ---------------
   const employee = await browser.newContext(PHONE);
   await readOnly(employee, APP_URL, blocked);
   await employee.addInitScript(COLLECTOR);
@@ -265,6 +259,6 @@ async function main() {
 main()
   .catch(async (error: unknown) => {
     await lastPage?.screenshot({ path: join(SHOTS, "j99-fail.png"), fullPage: true }).catch(() => undefined);
-    record("smoke:jank", false, error instanceof Error ? error.message : String(error));
+    recordError("smoke:jank", error);
   })
-  .finally(() => process.exit(checks.some((c) => !c.ok) ? 1 : 0));
+  .finally(() => finish());

@@ -1,21 +1,22 @@
 "use client";
 
 import { ArrowUpRight } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
-import { SelectInput, SettingRow, SettingsGroup, Switch } from "@/components/desk/settings/form";
+import { SelectInput, SettingRow, SettingsGroup } from "@/components/desk/settings/form";
+import { useScreenKeys } from "@/components/desk/team/keys";
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { InPanel } from "@/components/desk/ui/DeskPanel";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { PageTitle } from "@/components/desk/ui/PageTitle";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
+import { Switch } from "@/components/desk/ui/Switch";
 import { SegmentTabs } from "@/components/desk/ui/Toolbar";
 import { CostReport } from "@/components/lab/CostReport";
 import { KeepChip, useRecordings } from "@/components/lab/KeepChip";
 import { ParserPanel } from "@/components/lab/ParserPanel";
 import { Button } from "@/components/ui/Button";
 import { Bone } from "@/components/ui/Skeleton";
-import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
 import { useApplyLabModels, useLabBench, useLabForAll, type LabSettings } from "@/lib/desk/settings-queries";
 import { usd, whenAqtobe } from "@/lib/lab/format";
 import type { LabCall, LabRow } from "@/lib/lab/rows";
@@ -328,29 +329,19 @@ export function LabDesk({ initialTab }: { initialTab: LabTab }) {
     setVisited((seen) => (seen.has(next) ? seen : new Set(seen).add(next)));
     window.history.replaceState(null, "", `?tab=${next}`);
   };
-  const latest = useRef(select);
-  useEffect(() => {
-    latest.current = select;
+  useScreenKeys((event) => {
+    const index = event.shiftKey ? -1 : ["Digit1", "Digit2", "Digit3"].indexOf(event.code);
+    if (index < 0) return false;
+    select(LAB_TABS[index]);
+    return true;
   });
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || !isPlainKey(event) || event.shiftKey || isTypingTarget(event.target)) return;
-      if (document.body.hasAttribute("data-dialog-open") || document.body.hasAttribute("data-sheet-open")) return;
-      const index = ["Digit1", "Digit2", "Digit3"].indexOf(event.code);
-      if (index < 0) return;
-      event.preventDefault();
-      latest.current(LAB_TABS[index]);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
   useShortcuts("Лаборатория", [
     { keys: ["1", "2", "3"], label: "Модели, Парсер, Себестоимость" },
     { keys: ["↑ ↓", "Enter"], label: "Распознавание — счёт целиком справа" },
   ]);
 
   return (
-    <div className="lab-screen flex w-full min-w-0 flex-col gap-4">
+    <div className="flex w-full min-w-0 flex-col gap-4">
       <PageTitle
         title="Лаборатория"
         state={{ text: "модели, разбор и себестоимость" }}

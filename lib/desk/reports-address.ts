@@ -4,8 +4,8 @@
  * link open the same thing. Pure: the page reads and writes through these, the tests pin them.
  * Days are Aqtobe wall-clock days ("YYYY-MM-DD").
  */
-import { MONTHS_RU, parseYmd, ymdOf, type Ymd } from "@/lib/datetime/calendar";
-import { addDaysYmd, isoWeekday, PERIOD_MAX_DAYS } from "@/lib/daily-report/format";
+import { addDays, daysInclusive, mondayOf, MONTHS_RU, parseYmd, ymdOf, type Ymd } from "@/lib/datetime/calendar";
+import { PERIOD_MAX_DAYS } from "@/lib/daily-report/format";
 import { isWorkday, type ReportRules } from "@/lib/people/stats";
 
 export type ReportsTab = "day" | "tabel";
@@ -28,28 +28,15 @@ const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 const validDay = (value: string | null): Ymd | null => (value && YMD.test(value) && parseYmd(value) ? (value as Ymd) : null);
 
-/** Days from one to the other, both counted. */
-export function daysBetween(from: Ymd, to: Ymd): number {
-  const a = parseYmd(from);
-  const b = parseYmd(to);
-  if (!a || !b) return 0;
-  return Math.round((Date.UTC(b.year, b.month - 1, b.day) - Date.UTC(a.year, a.month - 1, a.day)) / 86_400_000) + 1;
-}
-
-/** The Monday of a day's week. */
-export function mondayOf(day: Ymd): Ymd {
-  return addDaysYmd(day, 1 - isoWeekday(day));
-}
-
-/** "YYYY-MM" of a day. */
-export function monthOf(day: Ymd): string {
+/** "YYYY-MM" of a day: the month of the address. */
+function monthKey(day: Ymd): string {
   return day.slice(0, 7);
 }
 
 /** The first and the last day of a period. */
 export function periodRange(period: TabelPeriod): { from: Ymd; to: Ymd } {
   if (period.kind === "custom") return { from: period.from, to: period.to };
-  if (period.kind === "week") return { from: period.monday, to: addDaysYmd(period.monday, 6) };
+  if (period.kind === "week") return { from: period.monday, to: addDays(period.monday, 6) };
   const [year, month] = period.month.split("-").map(Number);
   const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
   return { from: ymdOf(year, month, 1), to: ymdOf(year, month, last) };
@@ -57,7 +44,7 @@ export function periodRange(period: TabelPeriod): { from: Ymd; to: Ymd } {
 
 /** The period one step back or forward: a month, a week; «Свой» does not step. */
 export function stepPeriod(period: TabelPeriod, dir: -1 | 1): TabelPeriod {
-  if (period.kind === "week") return { kind: "week", monday: addDaysYmd(period.monday, dir * 7) };
+  if (period.kind === "week") return { kind: "week", monday: addDays(period.monday, dir * 7) };
   if (period.kind === "month") {
     const [year, month] = period.month.split("-").map(Number);
     const next = new Date(Date.UTC(year, month - 1 + dir, 1));
@@ -69,8 +56,8 @@ export function stepPeriod(period: TabelPeriod, dir: -1 | 1): TabelPeriod {
 /** The period of the same kind that holds today. */
 export function currentPeriod(kind: TabelPeriod["kind"], today: Ymd, custom?: { from: Ymd; to: Ymd }): TabelPeriod {
   if (kind === "week") return { kind: "week", monday: mondayOf(today) };
-  if (kind === "custom") return { kind: "custom", ...(custom ?? { from: addDaysYmd(today, -29), to: today }) };
-  return { kind: "month", month: monthOf(today) };
+  if (kind === "custom") return { kind: "custom", ...(custom ?? { from: addDays(today, -29), to: today }) };
+  return { kind: "month", month: monthKey(today) };
 }
 
 /** Whether the period holds today — «Сегодня» is then pressed already. */
@@ -82,7 +69,7 @@ export function holdsToday(period: TabelPeriod, today: Ymd): boolean {
 /** «Свой» clamped to what the database answers: the order put right, at most 92 days. */
 export function clampCustom(from: Ymd, to: Ymd): { from: Ymd; to: Ymd } {
   const [a, b] = from <= to ? [from, to] : [to, from];
-  return daysBetween(a, b) > PERIOD_MAX_DAYS ? { from: addDaysYmd(b, 1 - PERIOD_MAX_DAYS), to: b } : { from: a, to: b };
+  return daysInclusive(a, b) > PERIOD_MAX_DAYS ? { from: addDays(b, 1 - PERIOD_MAX_DAYS), to: b } : { from: a, to: b };
 }
 
 /** The address as the page reads it; anything broken reads as «not given». */
@@ -136,7 +123,7 @@ export function isWorkdayOf(rules: ReportRulesLite, day: Ymd): boolean {
 /** The last working day before `day` (Monday → Friday, holidays skipped); null within two weeks — none. */
 export function lastWorkdayBefore(rules: ReportRulesLite, day: Ymd): Ymd | null {
   for (let back = 1; back <= 14; back++) {
-    const candidate = addDaysYmd(day, -back);
+    const candidate = addDays(day, -back);
     if (isWorkdayOf(rules, candidate)) return candidate;
   }
   return null;

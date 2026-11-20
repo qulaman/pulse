@@ -2,10 +2,11 @@ import { after } from "next/server";
 import { z } from "zod";
 
 import { userSupabase, withAuth } from "@/lib/api/handler";
-import { apiError, apiOk } from "@/lib/api/respond";
+import { apiError, apiOk, rpcFailure } from "@/lib/api/respond";
 import { DAILY_REPORT_RPC, type RemindDailyReportResult } from "@/lib/daily-report/types";
 import { todayYmd } from "@/lib/datetime/calendar";
 import { kickDeliveries } from "@/lib/push/send";
+import { rpcJson } from "@/lib/supabase/rpc";
 
 const BodySchema = z.strictObject({
   user_ids: z.array(z.uuid()).min(1).max(100),
@@ -29,21 +30,21 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       return apiError(409, "stale_day", "Тот день уже прошёл — напоминание не отправил");
     }
     const supabase = await userSupabase(req);
-    const { data, error } = await supabase.rpc(DAILY_REPORT_RPC.remind, {
-      p_user_ids: body.user_ids,
-      client_request_id: body.client_request_id,
-    });
+    const { data: result, error } = await rpcJson<(RemindDailyReportResult & { duplicate?: boolean }) | null>(
+      supabase.rpc(DAILY_REPORT_RPC.remind, { p_user_ids: body.user_ids, client_request_id: body.client_request_id }),
+    );
 
     if (error) {
-      if (error.message.includes("forbidden")) return apiError(403, "forbidden", "Напоминать может только директор");
-      if (error.message.includes("bad_request")) return apiError(400, "bad_request", "Выберите от одного до ста человек");
-      throw new Error(`remind_daily_report failed: ${error.message}`);
+      const refusals = {
+        forbidden: [403, "Напоминать может только директор"],
+        bad_request: [400, "Выберите от одного до ста человек"],
+      } as const;
+      return rpcFailure(error, refusals, "remind_daily_report");
     }
 
-    const result = (data ?? {}) as unknown as RemindDailyReportResult & { duplicate?: boolean };
     // a replay queued nothing new; a held push (night) waits for the window in the queue anyway
-    if (!result.duplicate && result.reminded?.length) after(() => kickDeliveries());
-    return apiOk(result);
+    if (!result?.duplicate && result?.reminded?.length) after(() => kickDeliveries());
+    return apiOk(result ?? {});
   },
   BodySchema,
 );

@@ -1,4 +1,6 @@
-import { HELD_CREW, OPEN_CREW, urgencyOf, type CrewTask } from "@/lib/idle/look";
+import { HELD_CREW, urgencyOf, type CrewTask } from "@/lib/idle/look";
+import { ON_BOARD } from "@/lib/tasks/lifecycle";
+import { firstNameOf } from "@/lib/text/normalize";
 import { isOverdue, type TaskStatus } from "@/lib/tasks/status-text";
 
 /**
@@ -55,7 +57,7 @@ export function tasksOf(rows: BoardRow[], now: number): Record<string, CrewTask[
   const at = new Date(now);
   for (const row of rows) {
     if (!row.assignee_id) continue;
-    if (!OPEN_CREW.includes(row.status) && row.status !== "done" && row.status !== HELD_CREW) continue;
+    if (!ON_BOARD.includes(row.status) && row.status !== "done" && row.status !== HELD_CREW) continue;
     (byPerson[row.assignee_id] ??= []).push({
       id: row.id,
       title: row.title,
@@ -73,14 +75,8 @@ export function tasksOf(rows: BoardRow[], now: number): Record<string, CrewTask[
   return byPerson;
 }
 
-export function initialsOf(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/).filter(Boolean);
-  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "•";
-}
-
-export function firstNameOf(fullName: string): string {
-  return fullName.trim().split(/\s+/)[0] ?? fullName;
-}
+/** @deprecated import `initialsOf` from lib/people/names.ts */
+export { initialsOf } from "@/lib/people/names";
 
 /** What goes in front of the phrase when the director picks him: the name he is called by. */
 export function addressOf(person: Person): string {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { restoreOne } from "./mutations";
+import { restoreOne } from "./task-cache";
 
 const row = (id: string, status: string) => ({ id, status });
 

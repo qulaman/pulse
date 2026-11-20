@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { withAuth } from "@/lib/api/handler";
+import { PERSON_ID, withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
 import { canResetLogin } from "@/lib/people/access";
 import { createServiceSupabase } from "@/lib/supabase/service";
@@ -18,14 +18,11 @@ const BodySchema = z.strictObject({
 export const POST = withAuth<z.infer<typeof BodySchema>>(
   ["director", "secretary"],
   async ({ profile, body, params }) => {
-    const id = z.guid().safeParse(params.id); // guid: seed ids are not RFC-4122
-    if (!id.success) return apiError(404, "not_found", "Сотрудник не найден");
-
     const service = createServiceSupabase();
     const { data: target } = await service
       .from("profiles")
       .select("id, role, company_id")
-      .eq("id", id.data)
+      .eq("id", params.id)
       .maybeSingle();
 
     if (!target || target.company_id !== profile.companyId) {
@@ -44,4 +41,5 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     return apiOk({ id: target.id });
   },
   BodySchema,
+  { id: PERSON_ID },
 );

@@ -1,14 +1,15 @@
 "use client";
 
 import { humanAqtobe } from "@/lib/ai/time";
-import { initialsOf } from "@/lib/people/queries";
+
 import { recentDeliveries } from "@/lib/shop/format";
 import type { Order } from "@/lib/shop/queries";
+import { initialsOf } from "@/lib/people/names";
 
 /**
- * «Кому что досталось» — три последние выдачи. Это единственное место, где магазин виден
- * как событие, а не как склад: директор открывает экран и сразу знает, чем закончилась
- * прошлая неделя. Пустая лента ничего не рисует — пустых карточек на пульте нет.
+ * «Кому что досталось» — the last three hand-outs. The one place where the shop shows as an event,
+ * not a warehouse: the director opens the screen and knows at once how last week ended. An empty
+ * feed draws nothing — the console has no empty cards.
  */
 export function RecentDeliveries({ orders }: { orders: Order[] }) {
   const rows = recentDeliveries(orders, 3);

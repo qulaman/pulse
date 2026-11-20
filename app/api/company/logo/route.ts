@@ -1,4 +1,4 @@
-import { AuthError, authErrorMessageRu, getSessionProfile, requireRole } from "@/lib/auth";
+import { withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
 import { loadCompanySettings } from "@/lib/roster";
 import { parseCompanySettings } from "@/lib/settings";
@@ -16,18 +16,9 @@ const EXT: Record<string, string> = {
 /**
  * Director or secretary (D-104) uploads the company logo (multipart, ≤ 2 MB). The file lands in the public
  * `brand` bucket under the company folder; the public URL goes to settings.brand.logo_url.
- * Not wrapped in withAuth: the body is a form, not JSON.
+ * The body is a form: withAuth without a schema leaves it unread.
  */
-export async function POST(req: Request) {
-  let profile;
-  try {
-    profile = await getSessionProfile(req);
-    requireRole(profile, "director", "secretary");
-  } catch (error) {
-    if (error instanceof AuthError) return apiError(error.status, error.code, authErrorMessageRu(error.code));
-    throw error;
-  }
-
+export const POST = withAuth(["director", "secretary"], async ({ req, profile }) => {
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
   if (!(file instanceof File)) return apiError(400, "validation_error", "Нет файла");
@@ -61,4 +52,4 @@ export async function POST(req: Request) {
   if (oldPath && oldPath !== path) await service.storage.from("brand").remove([oldPath]).catch(() => undefined);
 
   return apiOk({ logo_url: pub.publicUrl });
-}
+});

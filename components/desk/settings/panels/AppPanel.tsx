@@ -3,9 +3,10 @@
 import { ChevronDown, ChevronUp, Plus, X } from "lucide-react";
 import type { KeyboardEvent } from "react";
 
-import { GroupLink, NumberInput, SettingRow, SettingsGroup, Switch, TextInput } from "@/components/desk/settings/form";
-import { TileFace } from "@/components/desk/team/TeamGrid";
+import { GroupLink, NumberInput, SettingRow, SettingsGroup, TextInput } from "@/components/desk/settings/form";
+import { Face } from "@/components/desk/ui/Face";
 import { Kbd } from "@/components/desk/ui/Kbd";
+import { Switch } from "@/components/desk/ui/Switch";
 import { Select } from "@/components/desk/ui/Toolbar";
 import { useDraft } from "@/components/settings/draft";
 import { Button } from "@/components/ui/Button";
@@ -65,7 +66,7 @@ function ActionsTable({ actions, onChange }: { actions: Action[]; onChange: (act
 
   return (
     <div className="set-actions desk-cells flex flex-col gap-3" data-testid="secretary-actions">
-      <div className="set-actions-table">
+      <div>
         <div className="set-actions-head desk-label grid grid-cols-[48px_minmax(0,1fr)_280px_88px] items-center gap-4 border-b border-text pb-1 uppercase">
           <span>Знак</span>
           <span>Надпись на кнопке</span>
@@ -162,7 +163,7 @@ function ActionsTable({ actions, onChange }: { actions: Action[]; onChange: (act
       </div>
       {/* the buttons as the director will see them, in this order — empty rows are not buttons yet */}
       {actions.some((row) => row.label.trim()) ? (
-        <div className="set-actions-preview flex flex-wrap items-center gap-2" aria-label="Так увидит директор">
+        <div className="flex flex-wrap items-center gap-2" aria-label="Так увидит директор">
           <span className="text-[12px] leading-4 text-muted">Так увидит директор:</span>
           {actions
             .filter((row) => row.label.trim())
@@ -203,7 +204,7 @@ export function AppPanel() {
             <span className="flex flex-wrap items-center justify-end gap-3">
               {secretaries.map((person) => (
                 <span key={person.id} className="flex items-center gap-2 text-[14px] leading-5">
-                  <TileFace person={person} size={26} />
+                  <Face person={person} size={26} />
                   {person.full_name.split(" ")[0]}
                 </span>
               ))}

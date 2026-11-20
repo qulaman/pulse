@@ -3,8 +3,9 @@
 import { BookText, FlaskConical } from "lucide-react";
 import Link from "next/link";
 
-import { CheckLine, Segmented, SelectInput, SettingRow, SettingsGroup, Switch, TextInput, TimeInput } from "@/components/desk/settings/form";
+import { CheckLine, Segmented, SelectInput, SettingRow, SettingsGroup, TextInput, TimeInput } from "@/components/desk/settings/form";
 import { useDevTools } from "@/components/desk/settings/SettingsFrame";
+import { Switch } from "@/components/desk/ui/Switch";
 import { Select } from "@/components/desk/ui/Toolbar";
 import { useDraft } from "@/components/settings/draft";
 import { PARSER_KIND_LABEL, PARSER_KINDS, REQUIRED_KIND, type ParserKind } from "@/lib/ai/kinds/names";

@@ -134,8 +134,11 @@ export function DraftMark() {
   );
 }
 
-/** «⋯» — every move the task allows, as the desk's menu under the button (the same list as a right click). */
-export function MoreButton({ items, testId = "desk-row-more", label = "Все действия" }: { items: () => MenuItem[]; testId?: string; label?: string }) {
+/**
+ * «⋯» — every move the task allows, as the desk's menu under the button (the same list as a right
+ * click). `taskId` — «.» finds it (`openMoreOf`).
+ */
+export function MoreButton({ items, taskId, testId = "desk-row-more", label = "Все действия" }: { items: () => MenuItem[]; taskId?: string; testId?: string; label?: string }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   return (
     <>
@@ -146,6 +149,7 @@ export function MoreButton({ items, testId = "desk-row-more", label = "Все д
         aria-haspopup="menu"
         aria-expanded={Boolean(anchor)}
         data-testid={testId}
+        data-desk-more={taskId}
         onClick={(event) => {
           event.stopPropagation();
           setAnchor(anchor ? null : event.currentTarget);

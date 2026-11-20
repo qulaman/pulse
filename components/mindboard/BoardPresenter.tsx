@@ -54,10 +54,11 @@ export function usePresenterBusy(): boolean {
 }
 
 /**
- * Ведущий (D-121): пока доска на стене, ◀ ▶ ведут совещание по пунктам — стена подсвечивает
- * обсуждаемый, остальные приглушает; «Отметить» гасит пункт с галочкой прямо со стены. Один
- * компонент в двух местах: капсулой над таб-баром на экране доски и блоком под дисплеем
- * пульта. Команда — `tv_board_control`, без очереди (D-76 §3): без сети — честное «нет связи».
+ * The presenter (D-121): while the board is on the wall, ◀ ▶ lead the meeting point by point —
+ * the wall lights the one being discussed and dims the rest; «Отметить» ticks the point off right
+ * from the wall. One component in two places: a capsule over the tab bar on the board screen and a
+ * block under the remote's display. The command is `tv_board_control`, not queued (D-76 §3):
+ * without network it honestly says «нет связи».
  */
 export function BoardPresenter({ boardId, points, now, variant }: Props) {
   return variant === "board" ? (

@@ -3,37 +3,23 @@
  * for everybody else, and carries status updates back to the director.
  * Talks to the dev Supabase project directly (RPC), no dev server needed.
  */
-import { createClient, type RealtimeChannel, type SupabaseClient } from "@supabase/supabase-js";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 
-process.loadEnvFile(".env.local");
+import { apiSession, finish, record, recordError, type ApiSession } from "./lib/smoke";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const PASSWORD = "demo1234";
 const EVENT_TIMEOUT_MS = 10_000;
 const SILENCE_MS = 3_000;
 const SETTLE_MS = 2_000;
 
-if (!SUPABASE_URL || !ANON_KEY) {
-  console.error("NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY are missing in .env.local");
-  process.exit(1);
-}
+type Session = ApiSession;
 
-type Check = { name: string; ok: boolean; detail: string };
-const checks: Check[] = [];
-const record = (name: string, ok: boolean, detail: string) => checks.push({ name, ok, detail });
-
-type Session = { supabase: SupabaseClient; userId: string };
-
+/** A session whose Realtime channel speaks as the person: RLS decides what reaches them. */
 async function signIn(email: string): Promise<Session> {
-  const supabase = createClient(SUPABASE_URL!, ANON_KEY!, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password: PASSWORD });
-  if (error || !data.session) throw new Error(`sign-in failed for ${email}: ${error?.message}`);
-  await supabase.realtime.setAuth(data.session.access_token);
-  return { supabase, userId: data.session.user.id };
+  const session = await apiSession(email, PASSWORD);
+  await session.supabase.realtime.setAuth(session.token);
+  return session;
 }
 
 type TaskEvent = { eventType: string; new: Record<string, unknown> };
@@ -118,7 +104,8 @@ async function main() {
   if (!taskId) throw new Error("no task — cannot continue");
 
   const insert = await waitFor(maratEvents, (e) => e.eventType === "INSERT" && e.new.id === taskId, EVENT_TIMEOUT_MS);
-  record("marat получил INSERT без F5", insert !== null, insert ? `status=${String(insert.new.status)}` : `timeout; events=${JSON.stringify(maratEvents.map((e) => e.eventType))}`);
+  const heard = insert ? `status=${String(insert.new.status)}` : `timeout; events=${JSON.stringify(maratEvents.map((e) => e.eventType))}`;
+  record("marat получил INSERT без F5", insert !== null, heard);
 
   await sleep(SILENCE_MS);
   const leaked = erlanEvents.some((e) => e.new.id === taskId);
@@ -147,9 +134,5 @@ async function main() {
 }
 
 main()
-  .catch((error: unknown) => record("smoke", false, error instanceof Error ? error.message : String(error)))
-  .finally(() => {
-    const width = Math.max(...checks.map((c) => c.name.length));
-    for (const c of checks) console.log(`${c.ok ? "ok  " : "FAIL"}  ${c.name.padEnd(width)}  ${c.detail}`);
-    process.exit(checks.some((c) => !c.ok) ? 1 : 0);
-  });
+  .catch((error: unknown) => recordError("smoke", error))
+  .finally(() => finish());

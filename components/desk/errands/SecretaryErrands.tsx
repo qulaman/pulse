@@ -11,8 +11,8 @@ import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { isActive, useErrands, useSecretaries, useSecretaryActions, waitedFor, type Errand } from "@/lib/errands/queries";
 import { etaLeftMin, etaLine, sceneOf } from "@/lib/errands/scene";
 import { shortName } from "@/lib/people/names";
-import { useNow } from "@/lib/pulse/queries";
 import type { SecretaryAction } from "@/lib/settings";
+import { useNow } from "@/lib/useNow";
 import { useVisits } from "@/lib/visits/queries";
 
 import { DoorCard } from "./Door";
@@ -29,7 +29,7 @@ import { AwayBand, StoikaHead, useThanksToast } from "./StoikaHead";
 /** One colleague's work, seen and never touched (owner Q7): her face, what she has, no buttons. */
 function Colleague({ id, name, rows, now, catalogue, onOpen }: { id: string; name: string; rows: readonly Errand[]; now: Date; catalogue: readonly SecretaryAction[]; onOpen: (id: string) => void }) {
   return (
-    <section className="stoika-section stoika-colleague" aria-label={`В работе у коллеги: ${shortName(name)}`} data-testid="stoika-colleague">
+    <section className="stoika-section" aria-label={`В работе у коллеги: ${shortName(name)}`} data-testid="stoika-colleague">
       <StoikaLabel count={rows.length} face={<PersonFace id={id} name={name} size={20} />}>
         {shortName(name)} · в работе
       </StoikaLabel>
@@ -168,7 +168,7 @@ export function SecretaryErrands({ meId, openId, onOpen, history }: { meId: stri
                 <Colleague key={person.id} id={person.id} name={person.full_name} rows={theirs} now={now} catalogue={actions} onOpen={onOpen} />
               ))}
               {loading || failed ? null : (
-                <motion.div layout={still ? false : "position"} className="stoika-today-slot">
+                <motion.div layout={still ? false : "position"}>
                   {busy ? <DayTally day={day} /> : <DayJournal day={day} now={now} catalogue={actions} openId={openId} onOpen={onOpen} />}
                 </motion.div>
               )}

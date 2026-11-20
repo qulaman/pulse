@@ -1,9 +1,9 @@
 /**
- * Что говорят о визите телефоны директора и секретаря (D-96) — чистыми функциями, с
- * тестами: формулировки — часть продукта. Род не угадываем (docs/DESIGN.md): «Директор
- * просит подождать», а не «попросил»; «Посетитель ждёт» согласуется со словом, а не с
- * человеком. Визит бывает двух видов: посетитель у стола и сообщение секретаря на экран
- * (D-116) — у сообщения один ответ, «Понятно».
+ * What the director's and the secretary's phones say about a visit (D-96) — as pure functions, with
+ * tests: the wording is part of the product. Gender is never guessed (docs/DESIGN.md): «Директор
+ * просит подождать», not «попросил»; «Посетитель ждёт» agrees with the word, not with the
+ * person. A visit is of two kinds: a visitor at the desk and the secretary's message on the screen
+ * (D-116) — a message has one answer, «Понятно».
  */
 
 export type VisitLike = {
@@ -23,7 +23,7 @@ const oldestFirst = (a: VisitLike, b: VisitLike) => a.created_at.localeCompare(b
 
 export const isMessage = (visit: Pick<VisitLike, "kind">) => visit.kind === "message";
 
-/** Кого директору ещё предстоит принять или отпустить: сначала без ответа, раньше пришедшие первыми. */
+/** Whom the director still has to let in or send away: the unanswered first, the earlier arrivals first. */
 export function awaitingDirector<T extends VisitLike>(visits: readonly T[]): T[] {
   const open = visits.filter((v) => !isMessage(v) && !v.closed_at && (v.status === "waiting" || v.status === "wait"));
   return [
@@ -32,12 +32,12 @@ export function awaitingDirector<T extends VisitLike>(visits: readonly T[]): T[]
   ];
 }
 
-/** Сообщения секретаря, которые директор ещё не отметил «Понятно»: по порядку, как писались. */
+/** The secretary's messages the director has not marked «Понятно» yet: in order, as they were written. */
 export function unreadMessages<T extends VisitLike>(visits: readonly T[]): T[] {
   return visits.filter((v) => isMessage(v) && !v.closed_at && v.status === "waiting").sort(oldestFirst);
 }
 
-/** Живые карточки секретаря — всё, что ещё не убрано, свежие сверху. */
+/** The secretary's live cards — everything not put away yet, the fresh ones on top. */
 export function reception<T extends VisitLike>(visits: readonly T[]): T[] {
   return visits.filter((v) => !v.closed_at).sort(newestFirst);
 }
@@ -70,15 +70,15 @@ export function statusTone(visit: VisitLike): VisitTone {
   return "muted";
 }
 
-/** Квитанция стены (принцип 8): надпись появилась на экране в кабинете — или ещё нет. */
+/** The wall's receipt (principle 8): the words appeared on the screen in the office — or not yet. */
 export function wallLine(visit: VisitLike): string | null {
   if (visit.status !== "waiting" && visit.status !== "wait") return null;
   return visit.shown_at ? "На экране у директора" : "Отправлено, экран ещё не показал";
 }
 
 /**
- * Одна кнопка карточки: отменить, пока не решено (сообщение — пока не прочитано, и со стены
- * оно уходит тоже); «Готово», когда вошёл; «Понятно» — иначе.
+ * The card's one button: cancel while undecided (a message — while unread, and it leaves the wall
+ * too); «Готово» once the visitor is in; «Понятно» otherwise.
  */
 export function closeLabel(visit: VisitLike): string {
   if (visit.status === "waiting" || visit.status === "wait") return "Отменить";
@@ -87,8 +87,8 @@ export function closeLabel(visit: VisitLike): string {
 }
 
 /**
- * Недавние слова секретаря — чипами в шторке: тот же поставщик приходит не раз, то же
- * «Звонил Ахметов» пишется не раз. Посетители и сообщения — каждый своим списком.
+ * The secretary's recent words — as chips in the sheet: the same supplier comes more than once, the same
+ * «Звонил Ахметов» is written more than once. Visitors and messages — each in its own list.
  */
 export function recentNotes(visits: readonly VisitLike[], kind: "visitor" | "message" = "visitor", limit = 5): string[] {
   const seen = new Set<string>();

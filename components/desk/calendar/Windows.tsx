@@ -10,14 +10,13 @@ import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { Button } from "@/components/ui/Button";
 import { Bone } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
-import { hhmm, isOver, shiftDay, timeRange, ymdOfEvent } from "@/lib/calendar/agenda";
+import { hhmm, isOver, timeRange, ymdOfEvent } from "@/lib/calendar/agenda";
 import type { CalendarEvent } from "@/lib/calendar/queries";
-import { daysBetween, humanYmd, parseYmd, todayYmd, WEEKDAYS_SHORT_RU, type Ymd } from "@/lib/datetime/calendar";
+import { addDays, daysBetween, humanYmd, parseYmd, todayYmd, weekdayOf, WEEKDAYS_SHORT_RU, type Ymd } from "@/lib/datetime/calendar";
 import { useCompanySettings } from "@/lib/dictionary-queries";
 import {
   dayWindows,
   holdBlock,
-  isoWeekday,
   lengthWords,
   minuteHm,
   nearestWindows,
@@ -198,11 +197,11 @@ export function DirectorWindows({
               to: hours.to,
               nowMinute: isToday ? nowMinute : null,
               hold: isToday ? closed : null,
-              night: busy.blocks.get(shiftDay(ymd, 1)) ?? [],
+              night: busy.blocks.get(addDays(ymd, 1)) ?? [],
             });
             const words = ready ? dayWords(kind, day, isToday ? closed : null) : null;
             const parts = parseYmd(ymd)!;
-            const weekday = WEEKDAYS_SHORT_RU[isoWeekday(ymd) - 1];
+            const weekday = WEEKDAYS_SHORT_RU[weekdayOf(ymd)];
             const own = kind === "past" ? [] : (mine.get(ymd) ?? []);
             const lines = pillLines(own, at, laneWidth);
             return (
@@ -357,7 +356,7 @@ const DOOR_TITLE: Record<Door["state"], string> = {
 function whenOf(event: CalendarEvent, now: Date): string {
   const ymd = ymdOfEvent(event);
   const ahead = daysBetween(todayYmd(now), ymd);
-  const day = ahead === 0 ? "" : ahead === 1 ? "завтра " : `${WEEKDAYS_SHORT_RU[isoWeekday(ymd) - 1]} `;
+  const day = ahead === 0 ? "" : ahead === 1 ? "завтра " : `${WEEKDAYS_SHORT_RU[weekdayOf(ymd)]} `;
   return `${day}${hhmm(event.starts_at)}`;
 }
 
@@ -385,14 +384,14 @@ export function WindowsSide({
   const queryClient = useQueryClient();
   const { door, pending, hold } = useDirectorDoor(settled, now);
   const today = todayYmd(now);
-  const ahead = useDirectorBusy(today, shiftDay(today, 8), settled);
+  const ahead = useDirectorBusy(today, addDays(today, 8), settled);
   const hours = useWorkHours();
   const settings = useCompanySettings();
   const workdays = settings.data?.daily_report.workdays ?? WORKDAYS_DEFAULT;
   const people = usePeople(settled);
   const directors = (people.data ?? []).filter((person) => person.role === "director" && person.is_active).length;
   const days: Ymd[] = [];
-  for (let index = 0; index < 8; index += 1) days.push(shiftDay(today, index));
+  for (let index = 0; index < 8; index += 1) days.push(addDays(today, index));
   const windows = ahead.status === "ready" ? nearestWindows({ blocks: ahead.blocks, days, now, workdays, from: hours.from, to: hours.to, hold: holdBlock(hold, now) }) : [];
   const meetings = mine.filter((event) => !isOver(event, now)).slice(0, 6);
   const retryDoor = () => void queryClient.refetchQueries({ queryKey: ["director-busy"] });

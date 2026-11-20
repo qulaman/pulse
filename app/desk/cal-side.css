@@ -1,10 +1,9 @@
-/* «Календарь» of the desk (D-180): cal-side. One builder a file.
+/* «Календарь» of the desk (D-180): cal-side.
    The column beside the week — the day, or the meeting opened on it (CalendarSide.tsx) — and the
    quick card of a new meeting (QuickCreate.tsx), the people field of both forms (PeopleField.tsx).
-   Base rules lay it out in both looks; «Журнал» says it in words, «Графит» gives it a sheet,
-   colour and motion. Words on a tinted plate use the `--*-deep` inks (D-175): 4.5:1 on the light. */
+   Base rules lay it out; «Графит» gives it a sheet, colour and motion. Words on a tinted plate use the `--*-deep` inks (D-175): 4.5:1 on the light. */
 
-/* ---- both looks ------------------------------------------------------------------------------ */
+/* ---- the base ------------------------------------------------------------------------------- */
 html[data-surface="desk"][data-journal] {
   .cal-side {
     position: sticky;
@@ -22,27 +21,10 @@ html[data-surface="desk"][data-journal] {
   .cal-side-row,
   .cal-side-reply,
   .cal-side-deadline {
-    border-radius: 6px;
-    transition: background-color 100ms linear;
-
-    &:hover {
-      background: var(--surface-2);
-    }
+    transition: background-color 100ms linear
   }
   .cal-side-row {
-    --tone: var(--sky);
-
-    &[data-state="running"] {
-      --tone: var(--accent);
-    }
-    &[data-state="owes"] {
-      --tone: var(--warn);
-    }
-    &[data-state="over"],
-    &[data-state="declined"] {
-      --tone: var(--border);
-      color: var(--text-muted);
-    }
+    --tone: var(--sky)
   }
   .cal-side-dot {
     width: 6px;
@@ -51,39 +33,19 @@ html[data-surface="desk"][data-journal] {
     border-radius: 9999px;
     background: var(--tone);
   }
-  .cal-side-no {
-    color: var(--danger);
-  }
-  .cal-side-deadline {
-    &[data-tone="danger"] {
-      color: var(--danger);
-    }
-  }
 
   /* the day as a strip: a block a meeting, the hand of now in the red pencil */
   .cal-side-track {
     position: relative;
     height: 6px;
     border-radius: 3px;
-    background: color-mix(in srgb, var(--text-muted) 16%, transparent);
 
     i {
       position: absolute;
       top: 0;
       bottom: 0;
       border-radius: 3px;
-      background: var(--sky);
-      opacity: 0.55;
-
-      &[data-mine] {
-        opacity: 1;
-      }
-      &[data-state="over"] {
-        background: color-mix(in srgb, var(--text-muted) 45%, transparent);
-      }
-      &[data-state="running"] {
-        background: var(--accent);
-      }
+      background: var(--sky)
     }
     b {
       position: absolute;
@@ -92,14 +54,12 @@ html[data-surface="desk"][data-journal] {
       width: 2px;
       margin-left: -1px;
       border-radius: 1px;
-      background: var(--danger);
     }
   }
   .cal-side-ticks {
     position: relative;
     height: 16px;
     margin-top: 4px;
-    color: var(--text-muted);
     font-size: 11px;
     line-height: 16px;
 
@@ -115,39 +75,20 @@ html[data-surface="desk"][data-journal] {
       transform: translateX(-100%);
     }
   }
-
-  .cal-side-running {
-    padding: 10px 0;
-    border-top: 2px solid var(--accent);
-  }
-  .cal-side-live {
-    color: var(--accent);
-  }
   .cal-side-progress {
     display: block;
-    height: 3px;
-    margin-top: 6px;
     overflow: hidden;
-    background: color-mix(in srgb, var(--accent) 18%, transparent);
 
     i {
       display: block;
       height: 100%;
-      background: var(--accent);
     }
-  }
-
-  .cal-side-ask {
-    padding: 10px 0 10px 12px;
-    border-left: 3px solid var(--warn);
   }
 
   /* the open meeting */
   .cal-side-chip {
-    color: var(--accent);
     font-size: 12px;
     font-weight: 600;
-    line-height: 16px;
 
     &[data-state="owes"] {
       color: var(--warn);
@@ -159,75 +100,18 @@ html[data-surface="desk"][data-journal] {
   }
   .cal-side-fact {
     display: grid;
-    grid-template-columns: 76px minmax(0, 1fr);
-    align-items: baseline;
-    gap: 8px;
-  }
-  .cal-side-fact-icon {
-    display: none;
   }
   .cal-side-name:hover {
     text-decoration: underline;
     text-underline-offset: 2px;
   }
-  .cal-side-answer {
-    color: var(--text-muted);
-
-    &[data-tone="ok"] {
-      color: var(--ok);
-    }
-    &[data-tone="danger"] {
-      color: var(--danger);
-    }
-    &[data-tone="warn"] {
-      color: var(--warn);
-    }
-  }
-  .cal-side-receipt {
-    color: var(--text-muted);
-
-    &[data-tone="warn"] {
-      color: var(--warn);
-    }
-    &[data-tone="ok"] {
-      color: var(--ok);
-    }
-  }
   .cal-side-foot {
     padding-top: 12px;
     border-top: 1px solid var(--border);
   }
-  .cal-side-confirm {
-    padding: 12px 0 0;
-    border-top: 2px solid var(--danger);
-  }
-
-  /* the quick card and the form: the journal's ruled fields keep no padding, Graphite's boxes need it */
-  .cal-clash {
-    color: var(--warn);
-  }
-  .cal-away {
-    color: var(--warn);
-  }
   .cal-quick input[aria-invalid="true"],
   .cal-form input[aria-invalid="true"] {
     border-color: var(--danger);
-  }
-}
-
-/* «Журнал»: print — a hairline beside the week, no faces, bars or icons */
-html[data-surface="desk"][data-journal]:not([data-graphite]) {
-  .cal-side {
-    padding-left: 20px;
-    border-left: 1px solid var(--border);
-  }
-  .cal-side-icon,
-  .cal-side-faces,
-  .cal-side-answers,
-  .cal-side-dot,
-  .cal-side-diamond,
-  .cal-side-person .cal-face {
-    display: none;
   }
 }
 

@@ -1,7 +1,7 @@
 import { hmOf, parseHm, ymdHmToAqtobeIso, type Hm, type Ymd } from "@/lib/datetime/calendar";
 import { endOf } from "@/lib/calendar/overview";
 
-import { HOUR_PX, wallOf } from "./week";
+import { HOUR_PX, dayMinuteOf } from "./week";
 
 /**
  * The mouse on the desk's week of hours (wave 3, D-180): a click or a drag over an empty stretch
@@ -42,7 +42,7 @@ export function slotOf(ymd: Ymd, down: number, up: number, dragged: boolean): Sl
 
 /** The earliest minute of `ymd` a meeting may start at: today — the next quarter, a past day — never (null). */
 export function earliest(ymd: Ymd, now: Date): number | null {
-  const clock = wallOf(now.getTime());
+  const clock = dayMinuteOf(now.getTime());
   if (ymd < clock.ymd) return null;
   if (ymd > clock.ymd) return 0;
   return Math.ceil(clock.minutes / SNAP_MIN) * SNAP_MIN;
@@ -120,22 +120,4 @@ export function endTimes(start: Hm): { hm: Hm; label: string }[] {
 export function withOwn(list: readonly Hm[], own: Hm | null): Hm[] {
   if (!own || list.includes(own)) return [...list];
   return [...list, own].sort((a, b) => minutesOfHm(a) - minutesOfHm(b));
-}
-
-/**
- * Where a floating card stands beside a block (Google Calendar's way): to its right when there is
- * room, else to its left; its top a little above the block's — and high enough for `height`, what
- * the card may grow to, to fit the window. A point for `Popover`'s anchor.
- */
-export function besideAnchor(
-  rect: { left: number; right: number; top: number },
-  width: number,
-  viewport: { width: number; height: number },
-  height = 0,
-): { x: number; y: number } {
-  const gap = 10;
-  const right = rect.right + gap;
-  const x = right + width <= viewport.width - 8 ? right : Math.max(8, rect.left - gap - width);
-  // Popover hangs its panel a 6 px gap below the point
-  return { x, y: Math.max(8, Math.min(rect.top - 18, viewport.height - height - 14)) };
 }

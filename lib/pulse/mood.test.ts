@@ -19,7 +19,7 @@ function row(status: TaskStatus, extra: Partial<BoardTask> = {}): BoardTask {
     closed_at: null,
     completed_at: null,
     accepted_at: null,
-    created_at: "2026-09-11T04:25:00Z", // пять минут назад
+    created_at: "2026-09-11T04:25:00Z", // five minutes ago
     deadline: null,
     group_id: null,
     parent_task_id: null,

@@ -1,7 +1,9 @@
-import { WORK_STATUSES, hasMessage, type BoardTask } from "./board";
+import { isWorking } from "@/lib/tasks/lifecycle";
+
+import { hasMessage, type BoardTask } from "./board";
 
 /**
- * What the board is uneasy about (владелец, 2026-09-17), in this order of weight:
+ * What the board is uneasy about (the owner, 2026-09-17), in this order of weight:
  *   deadline    a deadline is upon it — within the hour, or already past
  *   unaccepted  an order has been lying unaccepted for half an hour
  *   unread      somebody has written and the reader has not opened it
@@ -11,9 +13,9 @@ import { WORK_STATUSES, hasMessage, type BoardTask } from "./board";
  * of the board's reasoning: the same rows, the same clock.
  */
 
-/** Half an hour without «Принял» is no longer «he just has not seen it» (владелец). */
+/** Half an hour without «Принял» is no longer «he just has not seen it» (the owner). */
 export const ACCEPT_GRACE_MS = 30 * 60 * 1000;
-/** «Срок подходит» — час до дедлайна; всё, что после него, тем более. */
+/** «Срок подходит» — an hour before the deadline; anything past it all the more. */
 export const DEADLINE_SOON_MS = 60 * 60 * 1000;
 
 export type BoardAlarm = "deadline" | "unaccepted" | "unread";
@@ -28,7 +30,7 @@ export function alarmOf(tasks: readonly BoardTask[], now: Date, meId: string): B
   let unaccepted = false;
   let unread = false;
   for (const task of tasks) {
-    const working = WORK_STATUSES.includes(task.status);
+    const working = isWorking(task.status);
     // the deadline outranks everything: it is the only thing that cannot be moved by talking
     if (working && task.deadline && new Date(task.deadline).getTime() - at <= DEADLINE_SOON_MS) return "deadline";
     if (task.status === "sent" && at - sentAt(task) >= ACCEPT_GRACE_MS) unaccepted = true;

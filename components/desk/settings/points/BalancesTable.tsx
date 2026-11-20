@@ -3,9 +3,9 @@
 import { Plus, TrendingDown, TrendingUp } from "lucide-react";
 import { useMemo, useState, type CSSProperties } from "react";
 
-import { TileFace } from "@/components/desk/team/TeamGrid";
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
+import { Face } from "@/components/desk/ui/Face";
 import { useContextMenu } from "@/components/desk/ui/Menu";
 import { Num } from "@/components/desk/ui/Num";
 import { PointsSheet } from "@/components/rating/PointsSheet";
@@ -40,7 +40,7 @@ function Who({ line }: { line: Line }) {
   const person = line.person ?? { id: line.row.user_id, full_name: line.row.display_name, avatar_url: null };
   return (
     <span className="flex min-w-0 items-center gap-3">
-      <TileFace person={person} size={32} />
+      <Face person={person} size={32} />
       <span className="flex min-w-0 flex-col">
         <span className="truncate text-[14px] font-medium leading-5" title={line.row.display_name}>
           {shortName(line.row.display_name)}

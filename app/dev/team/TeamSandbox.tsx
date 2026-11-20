@@ -7,11 +7,12 @@ import { CrewCircle, IdleCircle } from "@/components/pulse/CrewCircle";
 import { DREAMS } from "@/components/pulse/DreamOrbit";
 import { IdleScene } from "@/components/pulse/IdleScene";
 import { lookOf, type CrewTask } from "@/lib/idle/look";
-import { initialsOf, type Member, type Pick } from "@/lib/idle/people";
+import { type Member, type Pick } from "@/lib/idle/people";
 import { rng } from "@/lib/idle/random";
 import type { TaskStatus } from "@/lib/tasks/status-text";
 
 import { build } from "../tasks/fixtures";
+import { initialsOf } from "@/lib/people/names";
 
 const NAMES = [
   "Асхат Нурланов", "Динара Касымова", "Марат Оспанов", "Айгуль Сейтказиева", "Ерлан Бекмуханов", "Дана Жумабаева",

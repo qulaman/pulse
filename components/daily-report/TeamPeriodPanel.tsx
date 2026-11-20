@@ -9,18 +9,9 @@ import { Chip } from "@/components/ui/Chip";
 import { Calendar } from "@/components/ui/datetime/Calendar";
 import { CalendarIcon, PickerPanel, PickerTrigger, useDismiss } from "@/components/ui/datetime/PickerShell";
 import { useGlidingState } from "@/components/ui/motion";
-import {
-  addDaysYmd,
-  hoursText,
-  PERIOD_MAX_DAYS,
-  percentText,
-  pointsText,
-  rangeText,
-  shortHm,
-  type PeriodKind,
-} from "@/lib/daily-report/format";
+import { hoursText, PERIOD_MAX_DAYS, percentText, pointsText, rangeText, shortHm, type PeriodKind } from "@/lib/daily-report/format";
 import type { TeamPeriod, TeamPeriodRow } from "@/lib/daily-report/types";
-import { compactYmd, daysBetween, type Ymd } from "@/lib/datetime/calendar";
+import { compactYmd, daysBetween, type Ymd, addDays } from "@/lib/datetime/calendar";
 import { shortName } from "@/lib/people/names";
 import { TONE_VAR } from "@/lib/tasks/tone";
 
@@ -314,11 +305,11 @@ function RangeField({ range, today, onChange, now }: { range: { from: Ymd; to: Y
     if (which === "from") {
       from = day;
       if (to < from) to = from;
-      if (daysBetween(from, to) >= PERIOD_MAX_DAYS) to = addDaysYmd(from, PERIOD_MAX_DAYS - 1);
+      if (daysBetween(from, to) >= PERIOD_MAX_DAYS) to = addDays(from, PERIOD_MAX_DAYS - 1);
     } else {
       to = day;
       if (from > to) from = to;
-      if (daysBetween(from, to) >= PERIOD_MAX_DAYS) from = addDaysYmd(to, -(PERIOD_MAX_DAYS - 1));
+      if (daysBetween(from, to) >= PERIOD_MAX_DAYS) from = addDays(to, -(PERIOD_MAX_DAYS - 1));
     }
     onChange({ from, to });
     setOpen(which === "from" ? "to" : null);

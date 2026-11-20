@@ -23,9 +23,9 @@ import { spokenTime, TimeRefSchema } from "../timeref";
  */
 export const ModelEventEntitySchema = z.strictObject({
   kind: z.literal("event"),
-  title: z.string(), // «Планёрка», «Встреча с Альфой» — без даты и имён
-  location: z.string(), // «в офисе», «у Альфы»; "" — не сказано
-  starts_at: TimeRefSchema.nullable(), // null — ни даты, ни времени
+  title: z.string(), // «Планёрка», «Встреча с Альфой» — no date and no names
+  location: z.string(), // «в офисе», «у Альфы»; "" — not said
+  starts_at: TimeRefSchema.nullable(), // null — neither a date nor a time
   participant_names: z.array(z.string()), // roster full_name copied verbatim (D-56)
   everyone: z.boolean(), // «всем», «вся команда»
   repeat: z.enum(EVENT_REPEATS), // «каждый понедельник планёрка» — "week" (D-148); once — "none"
@@ -58,7 +58,7 @@ export const eventKind: KindModule = {
   section,
   modelSchema: ModelEventEntitySchema,
   examples: [
-    // П12. Мероприятие с участниками по именам, местом и явным напоминанием (D-78).
+    // П12. An event with participants by name, a place and an explicit reminder (D-78).
     {
       n: 12,
       user: "Встреча с Альфой в четверг в три у них в офисе, идут Марат и Айгуль. Напомни за час",

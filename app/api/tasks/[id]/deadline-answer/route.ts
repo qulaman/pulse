@@ -1,8 +1,8 @@
 import { after } from "next/server";
 import { z } from "zod";
 
-import { userSupabase, withAuth } from "@/lib/api/handler";
-import { apiError, apiOk } from "@/lib/api/respond";
+import { TASK_ID, userSupabase, withAuth } from "@/lib/api/handler";
+import { apiOk, NO_ACCESS, NO_TASK, rpcFailure, rpcResult } from "@/lib/api/respond";
 import { kickDeliveries } from "@/lib/push/send";
 
 const BodySchema = z.strictObject({
@@ -19,10 +19,6 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
   ["director"],
   async ({ req, body, params }) => {
     const taskId = params.id;
-    if (!z.guid().safeParse(taskId).success) {
-      return apiError(404, "task_not_found", "Задача не найдена");
-    }
-
     const supabase = await userSupabase(req);
     const { data, error } = await supabase.rpc("answer_deadline_request", {
       task_id: taskId,
@@ -31,21 +27,22 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     });
 
     if (error) {
-      if (error.message.includes("task_not_found")) return apiError(404, "task_not_found", "Задача не найдена");
-      if (error.message.includes("forbidden")) return apiError(403, "forbidden", "Нет доступа");
-      if (error.message.includes("no_request")) {
-        return apiError(409, "no_request", "Просьбы уже нет — задачу сдали или срок уже решён");
-      }
-      if (error.message.includes("invalid_transition")) {
-        return apiError(409, "invalid_transition", "Задача уже не в работе");
-      }
-      throw new Error(`answer_deadline_request failed: ${error.message}`);
+      return rpcFailure(
+        error,
+        {
+          task_not_found: NO_TASK,
+          forbidden: NO_ACCESS,
+          no_request: [409, "Просьбы уже нет — задачу сдали или срок уже решён"],
+          invalid_transition: [409, "Задача уже не в работе"],
+        },
+        "answer_deadline_request",
+      );
     }
 
     after(() => kickDeliveries());
 
-    const { duplicate = false, ...result } = (data ?? {}) as Record<string, unknown>;
-    return apiOk({ result, duplicate });
+    return apiOk(rpcResult(data));
   },
   BodySchema,
+  { id: TASK_ID },
 );

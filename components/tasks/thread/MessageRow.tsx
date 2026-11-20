@@ -2,10 +2,9 @@
 
 import { humanAqtobe } from "@/lib/ai/time";
 import { PhotoMessage } from "@/components/tasks/PhotoMessage";
-import { messageFlags } from "@/components/tasks/TaskThread";
 import type { TaskMessage } from "@/lib/tasks/queries";
 import { TIME_ANSWER_WORD } from "@/lib/tasks/lifecycle";
-import { messageState } from "@/lib/tasks/thread";
+import { messageFlags, messageState } from "@/lib/tasks/thread";
 import { TEXT } from "@/lib/tasks/status-text";
 import { VoiceMessage } from "./VoiceMessage";
 

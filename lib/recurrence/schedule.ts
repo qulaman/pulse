@@ -1,4 +1,4 @@
-import { aqtobeDay } from "../ai/time";
+import { aqtobeDay, fromAqtobeWall } from "../ai/time";
 
 /**
  * A repeating order as data (D-148): how often, on which days, by what time. The parser names
@@ -125,7 +125,7 @@ const minutesOf = (clock: Clock) => clock.hours * 60 + clock.minutes;
 
 /** The instant of a day number at a wall-clock time in Aqtobe. */
 export function instantOf(day: number, clock: Clock): Date {
-  return new Date(day * DAY_MS + minutesOf(clock) * 60_000 - 5 * 3_600_000);
+  return fromAqtobeWall(new Date(day * DAY_MS + minutesOf(clock) * 60_000));
 }
 
 /**

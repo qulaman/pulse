@@ -1,32 +1,16 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-
 import { Chip } from "@/components/ui/Chip";
-import { aqtobeDay } from "@/lib/ai/time";
-import { AVAILABILITY_LABEL, ROLE_LABEL, initialsOf, type Availability, type Role } from "@/lib/people/queries";
-import { createBrowserSupabase } from "@/lib/supabase/client";
+import { aqtobeIsoToYmdHm, parseYmd } from "@/lib/datetime/calendar";
+import { AVAILABILITY_LABEL, ROLE_LABEL, type Role } from "@/lib/people/queries";
+import { STRIP_DAYS, useProfileStats } from "@/lib/profile/stats";
 import { pluralRu } from "@/lib/tasks/status-text";
+import { initialsOf } from "@/lib/people/names";
 
 type Props =
   | { userId: string; fullName: string; role: Role; pending?: false }
   /** The card before the page knows who this is (the route skeleton, D-122): same boxes, grey. */
   | { pending: true; role: Role; userId?: undefined; fullName?: undefined };
-
-/** Fourteen day-buckets, oldest first — the strip inside the identity card. */
-const STRIP_DAYS = 14;
-
-type Stats = {
-  done30: number;
-  onTimePct: number | null;
-  open: number;
-  position: string | null;
-  availability: Availability;
-  since: string | null;
-  strip: number[];
-  people?: number;
-  sent30?: number;
-};
 
 const MONTHS_GENITIVE = [
   "января",
@@ -44,75 +28,11 @@ const MONTHS_GENITIVE = [
 ];
 
 function sinceLabel(iso: string | null): string | null {
-  if (!iso) return null;
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return null;
-  const wall = new Date(date.getTime() + 5 * 3_600_000);
-  return `с ${MONTHS_GENITIVE[wall.getUTCMonth()]} ${wall.getUTCFullYear()}`;
-}
-
-/** Counts instants into the last fourteen Aqtobe days, oldest bucket first. */
-function stripOf(dates: (string | null)[], now = Date.now()): number[] {
-  const today = aqtobeDay(new Date(now));
-  const buckets = new Array<number>(STRIP_DAYS).fill(0);
-  for (const iso of dates) {
-    if (!iso) continue;
-    const index = STRIP_DAYS - 1 - (today - aqtobeDay(new Date(iso)));
-    if (index >= 0 && index < STRIP_DAYS) buckets[index] += 1;
-  }
-  return buckets;
+  const day = parseYmd(aqtobeIsoToYmdHm(iso)?.ymd);
+  return day ? `с ${MONTHS_GENITIVE[day.month - 1]} ${day.year}` : null;
 }
 
 const sum = (values: number[]) => values.reduce((total, n) => total + n, 0);
-
-function useProfileStats(userId: string | undefined, role: Role) {
-  return useQuery({
-    enabled: Boolean(userId),
-    queryKey: ["profile-stats", userId],
-    queryFn: async (): Promise<Stats> => {
-      const supabase = createBrowserSupabase();
-      const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
-      const me = await supabase.from("profiles").select("position, availability, created_at").eq("id", userId!).single();
-      const common = {
-        position: me.data?.position ?? null,
-        availability: me.data?.availability ?? ("active" as Availability),
-        since: me.data?.created_at ?? null,
-      };
-
-      if (role === "director") {
-        const [people, sent, openAll] = await Promise.all([
-          supabase.from("profiles").select("id", { count: "exact", head: true }).eq("is_active", true).not("role", "in", "(tv,director)"),
-          supabase.from("tasks").select("created_at").gte("created_at", since),
-          supabase.from("tasks").select("id", { count: "exact", head: true }).in("status", ["sent", "accepted", "rework", "pending_review"]),
-        ]);
-        const created = sent.data ?? [];
-        return {
-          ...common,
-          done30: 0,
-          onTimePct: null,
-          open: openAll.count ?? 0,
-          strip: stripOf(created.map((task) => task.created_at)),
-          people: people.count ?? 0,
-          sent30: created.length,
-        };
-      }
-
-      const [done, open] = await Promise.all([
-        supabase.from("tasks").select("deadline, closed_at").eq("assignee_id", userId!).eq("status", "done").gte("closed_at", since),
-        supabase.from("tasks").select("id", { count: "exact", head: true }).eq("assignee_id", userId!).in("status", ["sent", "accepted", "rework", "pending_review"]),
-      ]);
-      const rows = done.data ?? [];
-      const onTime = rows.filter((task) => !task.deadline || (task.closed_at && task.closed_at <= task.deadline)).length;
-      return {
-        ...common,
-        done30: rows.length,
-        onTimePct: rows.length ? Math.round((100 * onTime) / rows.length) : null,
-        open: open.count ?? 0,
-        strip: stripOf(rows.map((task) => task.closed_at)),
-      };
-    },
-  });
-}
 
 /** A number that has not arrived yet: a bar of the border colour, pulsing (DESIGN §2). */
 function NumBone({ w, h }: { w: number; h: number }) {

@@ -3,16 +3,15 @@
 import { Hand, Heart, RotateCcw, ShoppingBag, Workflow, type LucideIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { TileFace } from "@/components/desk/team/TeamGrid";
 import { DataGrid, type Column, type Group } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
+import { Face, useAvatars } from "@/components/desk/ui/Face";
 import { Num } from "@/components/desk/ui/Num";
 import { When } from "@/components/desk/ui/When";
 import { Button } from "@/components/ui/Button";
 import { aqtobeDay, toAqtobeIso } from "@/lib/ai/time";
 import { pointsTone } from "@/lib/desk/format";
 import { shortName, useNamesKey } from "@/lib/people/names";
-import { usePeople } from "@/lib/people/queries";
 import { useCompanyLedger, type LedgerRow } from "@/lib/shop/queries";
 
 /**
@@ -57,7 +56,7 @@ function Person({ row, avatar }: { row: LedgerRow; avatar: string | null }) {
   const name = row.user?.full_name ?? "—";
   return (
     <span className="flex min-w-0 items-center gap-2.5">
-      <TileFace person={{ id: row.user_id, full_name: name, avatar_url: avatar }} size={26} />
+      <Face person={{ id: row.user_id, full_name: name, avatar_url: avatar }} size={26} />
       <span className="truncate" title={name}>
         {shortName(name)}
       </span>
@@ -74,8 +73,7 @@ function Person({ row, avatar }: { row: LedgerRow; avatar: string | null }) {
 export function LedgerTable({ who, search }: { who: string; search: string }) {
   const [limit, setLimit] = useState(LEDGER_LIMIT);
   const ledger = useCompanyLedger(true, limit);
-  const people = usePeople();
-  const avatars = useMemo(() => new Map((people.data ?? []).map((p) => [p.id, p.avatar_url])), [people.data]);
+  const avatars = useAvatars();
   const rows = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return (ledger.data ?? []).filter(

@@ -7,7 +7,7 @@ import { useErrandActions } from "@/lib/errands/mutations";
 import { useErrands, useSecretaryActions, useSecretarySetup } from "@/lib/errands/queries";
 import { sceneOf } from "@/lib/errands/scene";
 import { shortName } from "@/lib/people/names";
-import { useNow } from "@/lib/pulse/queries";
+import { useNow } from "@/lib/useNow";
 
 const VIBRATED_KEY = "pulse.alarm.vibrated";
 

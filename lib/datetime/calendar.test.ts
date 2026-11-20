@@ -55,7 +55,7 @@ describe("the month grid", () => {
   });
 
   it("puts the first day under its own weekday", () => {
-    // 1 сентября 2026 — вторник
+    // 1 September 2026 is a Tuesday
     const grid = monthMatrix({ year: 2026, month: 9 });
     expect(grid[0][0]).toBeNull();
     expect(grid[0][1]).toBe("2026-09-01");

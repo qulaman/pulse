@@ -18,6 +18,8 @@ export type RosterEntry = {
   position: string | null;
   avatar_url: string | null;
   role: Database["public"]["Enums"]["user_role"];
+  /** Nicknames: every picker on the roster finds a person by them too (lib/people/search.ts). */
+  aliases?: string[];
 };
 
 export const rosterKey = ["roster"] as const;
@@ -30,7 +32,7 @@ export function useRoster() {
       const supabase = createBrowserSupabase();
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, position, avatar_url, role")
+        .select("id, full_name, position, avatar_url, role, aliases")
         .eq("is_active", true)
         // a task goes to a person, never to the TV kiosk
         .neq("role", "tv")
@@ -41,31 +43,8 @@ export function useRoster() {
   });
 }
 
-/** Lower case, «ё» as «е»: «Семён» is found by «семен». */
-export function foldRu(text: string): string {
-  return text.toLowerCase().replace(/ё/g, "е");
-}
+/** @deprecated import `foldRu` and `searchPeople` from lib/people/search.ts */
+export { foldRu, searchPeople } from "./search";
 
-/**
- * The search of a picker: every typed word must start a word of the name or the position —
- * «ер б» finds «Ерлан Бекмуханов», «бух» finds the accountant. An empty query keeps all.
- */
-export function searchPeople<T extends Pick<RosterEntry, "full_name" | "position">>(people: readonly T[], query: string): T[] {
-  const needles = foldRu(query).split(/\s+/).filter(Boolean);
-  if (needles.length === 0) return [...people];
-  return people.filter((person) => {
-    const words = foldRu(`${person.full_name} ${person.position ?? ""}`).split(/[\s\-—,.()]+/).filter(Boolean);
-    return needles.every((needle) => words.some((word) => word.startsWith(needle)));
-  });
-}
-
-/** Two letters of a name for the round face: «Марат Оспанов» → «МО». */
-export function initialsOf(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/).filter(Boolean);
-  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "•";
-}
-
-/** «Марат» — the first word, what a chip or a toast says. */
-export function firstNameOf(fullName: string): string {
-  return fullName.trim().split(/\s+/)[0] ?? fullName;
-}
+/** @deprecated import `initialsOf` from lib/people/names.ts */
+export { initialsOf } from "@/lib/people/names";

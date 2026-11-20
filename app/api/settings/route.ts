@@ -1,8 +1,9 @@
 import { userSupabase, withAuth } from "@/lib/api/handler";
-import { apiError, apiOk } from "@/lib/api/respond";
+import { apiOk, NO_ACCESS, rpcFailure } from "@/lib/api/respond";
 import { todayYmd } from "@/lib/datetime/calendar";
 import { loadCompanySettings } from "@/lib/roster";
-import { mergeDailyReport, parseCompanySettings, SettingsPatchSchema, type SettingsPatch } from "@/lib/settings";
+import { mergeSettingsPatch } from "@/lib/ops/settings";
+import { parseCompanySettings, SettingsPatchSchema, type SettingsPatch } from "@/lib/settings";
 import type { Json } from "@/lib/supabase/types";
 
 /** Director or secretary (D-104) reads the effective settings (defaults applied). */
@@ -18,33 +19,14 @@ export const GET = withAuth(["director", "secretary"], async ({ profile }) => {
 export const PATCH = withAuth<SettingsPatch>(
   ["director", "secretary"],
   async ({ req, profile, body }) => {
+    // partial sections are completed from the current values, so a stored section stays whole
     const current = parseCompanySettings(await loadCompanySettings(profile.companyId));
-    // Fill partial sections from the current values so the stored section stays complete.
-    const patch: Record<string, unknown> = {};
-    if (body.stt) patch.stt = { ...current.stt, ...body.stt };
-    if (body.parser) patch.parser = { ...current.parser, ...body.parser };
-    if (body.delivery_window) patch.delivery_window = { ...current.delivery_window, ...body.delivery_window };
-    if (body.brand) patch.brand = { ...current.brand, ...body.brand };
-    if (body.vocabulary) patch.vocabulary = [...new Set(body.vocabulary.map((v) => v.trim()).filter(Boolean))];
-    // One row per fixed key, completed from the defaults by the schema (task 026).
-    if (body.conventions) patch.conventions = body.conventions;
-    if (body.matching) patch.matching = { ...current.matching, ...body.matching };
-    if (body.secretary) patch.secretary = { ...current.secretary, ...body.secretary };
-    if (body.points_enabled !== undefined) patch.points_enabled = body.points_enabled;
-    if (body.rating_mode) patch.rating_mode = body.rating_mode;
-    if (body.mascot_seasons !== undefined) patch.mascot_seasons = body.mascot_seasons;
-    if (body.mascot_telegraph !== undefined) patch.mascot_telegraph = body.mascot_telegraph;
-    if (body.lab_for_all !== undefined) patch.lab_for_all = body.lab_for_all;
-    if (body.points_rules) patch.points_rules = body.points_rules;
-    if (body.ether_events) patch.ether_events = body.ether_events;
-    // D-152: `started_on` / `checked_on` are the server's — switching the module on starts the fines today
-    if (body.daily_report) patch.daily_report = mergeDailyReport(current.daily_report, body.daily_report, todayYmd());
+    const patch = mergeSettingsPatch(current, body, todayYmd());
 
     const supabase = await userSupabase(req);
     const { data, error } = await supabase.rpc("update_company_settings", { patch: patch as Json });
     if (error) {
-      if (error.message.includes("forbidden")) return apiError(403, "forbidden", "Нет доступа");
-      throw new Error(`update_company_settings failed: ${error.message}`);
+      return rpcFailure(error, { forbidden: NO_ACCESS }, "update_company_settings");
     }
     return apiOk({ settings: parseCompanySettings(data) });
   },

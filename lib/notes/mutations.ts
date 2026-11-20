@@ -1,6 +1,7 @@
 "use client";
 
 import { onlineManager, useMutation, useMutationState, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 
 import { toast } from "@/components/ui/Toast";
 import { revertEdit, valuesBefore } from "@/lib/mindboard/offline";
@@ -61,7 +62,7 @@ type NewNote = {
 };
 
 /**
- * One insert under RLS, keyed by `client_request_id` (принцип 7). A replay after a lost
+ * One insert under RLS, keyed by `client_request_id` (principle 7). A replay after a lost
  * response hits the unique index — the row is already there, so it is read back
  * instead of failing the tap that created it.
  */
@@ -449,6 +450,31 @@ export function useRestoreNote(me: { userId: string } | undefined) {
       fail(error);
     },
   });
+}
+
+/**
+ * Several notes to the bin as one write, not one per note (the desk's «В корзину · N», a note laid
+ * out on a board): the cache shows it at once, a failed write takes the server's word back.
+ * Returns their way back — «Отменить» of the toast, the same rows again.
+ */
+export function useBinNotes(me: { userId: string } | undefined): (ids: ReadonlySet<string>) => () => void {
+  const queryClient = useQueryClient();
+  const userId = me?.userId;
+  return useCallback(
+    (ids: ReadonlySet<string>) => {
+      if (!userId || ids.size === 0) return () => {};
+      const key = keyOf(userId);
+      const mark = (deleted_at: string | null) => queryClient.setQueryData<Note[]>(key, (rows) => (rows ?? []).map((note) => (ids.has(note.id) ? { ...note, deleted_at } : note)));
+      const refetch = () => queryClient.invalidateQueries({ queryKey: key });
+      mark(new Date().toISOString());
+      void softDeleteNotes([...ids]).catch(refetch);
+      return () => {
+        mark(null);
+        void restoreNotes([...ids]).catch(refetch);
+      };
+    },
+    [userId, queryClient],
+  );
 }
 
 /**

@@ -19,7 +19,8 @@ import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { When } from "@/components/desk/ui/When";
 import { hhmm, ymdOfEvent } from "@/lib/calendar/agenda";
 import type { CalendarEvent } from "@/lib/calendar/queries";
-import { humanYmd, parseYmd, WEEKDAYS_SHORT_RU, type Ymd } from "@/lib/datetime/calendar";
+import { humanYmd, parseYmd, weekdayOf, WEEKDAYS_SHORT_RU, type Ymd } from "@/lib/datetime/calendar";
+import { isoWeekday } from "@/lib/desk/busy";
 import { shortName } from "@/lib/people/names";
 import { pluralRu } from "@/lib/tasks/status-text";
 
@@ -37,10 +38,9 @@ import {
   fitMarks,
   HOUR_PX,
   hourPxFor,
-  isoWeekday,
   layoutDay,
   spanOf,
-  wallOf,
+  dayMinuteOf,
   yOf,
   type Placed,
 } from "./week";
@@ -185,7 +185,7 @@ export function WeekHours({ days, byDay, today, now, meId, focusDay, workdays, o
   const shareSum = shares.reduce((sum, share) => sum + share, 0);
   const work = new Set(workdays);
 
-  const clock = wallOf(now.getTime());
+  const clock = dayMinuteOf(now.getTime());
   const nowShown = days.includes(clock.ymd) && clock.minutes >= DAY_FROM * 60 && clock.minutes <= DAY_TO * 60;
   const nowY = nowShown ? yOf(clock.minutes, DAY_FROM, hourPx) : null;
 
@@ -410,7 +410,7 @@ export function WeekHours({ days, byDay, today, now, meId, focusDay, workdays, o
 
       <OffRow band="early" columns={columns} parts={parts} work={work} {...cell} />
 
-      <div ref={body} className="cal-week-body cal-cols relative grid" style={{ gridTemplateColumns: columns, height }} data-testid="desk-week-hours">
+      <div ref={body} className="cal-cols relative grid" style={{ gridTemplateColumns: columns, height }} data-testid="desk-week-hours">
         <div aria-hidden className="cal-gutter relative">
           {HOURS.map((hour) => {
             if (nowY !== null && Math.abs(clock.minutes - hour * 60) < NOW_LABEL_ROOM_MIN) return null;
@@ -500,7 +500,7 @@ function DayHead({
 }) {
   const isToday = ymd === today;
   const past = ymd < today;
-  const weekday = WEEKDAYS_SHORT_RU[isoWeekday(ymd) - 1];
+  const weekday = WEEKDAYS_SHORT_RU[weekdayOf(ymd)];
   const meetings = count > 0 ? `${count} ${pluralRu(count, ["встреча", "встречи", "встреч"])}` : "встреч нет";
   // the focused day says it in words; the others give their count, a day off only its date
   const words = focused ? (isToday ? `сегодня · ${meetings}` : meetings) : null;
@@ -622,7 +622,7 @@ function DayColumn({
           + {hmAt(hover)}
         </span>
       ) : null}
-      <div className="cal-lanes absolute inset-y-0 left-0" style={{ right: rail }}>
+      <div className="absolute inset-y-0 left-0" style={{ right: rail }}>
         {placed.map((item) => (
           <HourEvent
             key={item.event.id}
@@ -782,7 +782,7 @@ function HourEvent({
         >
           {tier === "bar" ? null : tier === "line" ? (
             // one line: the title, its hour after it only when both fit — what does not fit wraps out of sight
-            <span className="cal-event-line flex h-4 w-full flex-wrap items-baseline gap-x-1.5 overflow-hidden">
+            <span className="flex h-4 w-full flex-wrap items-baseline gap-x-1.5 overflow-hidden">
               <span className="cal-event-title max-w-full truncate text-[12px] font-semibold leading-4">{event.title}</span>
               <When className="cal-event-time shrink-0 text-[11px] leading-4">{hhmm(event.starts_at)}</When>
             </span>
@@ -798,7 +798,7 @@ function HourEvent({
                 </span>
               )}
               {foot ? (
-                <span className="cal-event-foot mt-auto flex min-h-[20px] w-full items-center gap-1.5">
+                <span className="mt-auto flex min-h-[20px] w-full items-center gap-1.5">
                   {faces ? <Faces event={event} size={18} max={4} className="cal-event-faces" /> : null}
                   {faces ? <Who event={event} /> : null}
                   {tag ? (
@@ -844,7 +844,7 @@ function MovePreview({ move, column, right, hourPx, now }: { move: MoveState; co
   const target = movedTo(move.event, move.ymd, move.minutes, now);
   const same = move.ymd === ymdOfEvent(move.event) && move.minutes === spanOf(move.event).start;
   const past = !target && !same;
-  const weekday = WEEKDAYS_SHORT_RU[isoWeekday(move.ymd) - 1];
+  const weekday = WEEKDAYS_SHORT_RU[weekdayOf(move.ymd)];
   return (
     <div
       aria-hidden
@@ -1027,7 +1027,7 @@ function Rail({ marks, ymd, now, wide, width, hourPx, height }: { marks: Deadlin
               aria-label={markWords(mark)}
               className={`cal-mark flex h-full w-full items-center ${wide ? "gap-1 px-1" : "flex-col justify-start gap-0.5 pt-px"}`}
             >
-              <span aria-hidden className="cal-mark-diamond h-[7px] w-[7px] shrink-0 rotate-45" style={{ background: MARK_INK[mark.tone] }} />
+              <span aria-hidden className="h-[7px] w-[7px] shrink-0 rotate-45" style={{ background: MARK_INK[mark.tone] }} />
               <When overdue={mark.tone === "danger"} className="cal-mark-time text-[11px] leading-[13px]">
                 {wide ? mark.time : mark.time.slice(0, 2)}
               </When>
@@ -1049,7 +1049,7 @@ function OffMark({ mark }: { mark: DeadlineMark }) {
   return (
     <Tooltip label={markWords(mark)}>
       <Link href={`/desk/tasks?id=${mark.id}`} data-testid="desk-deadline" data-tone={mark.tone} aria-label={markWords(mark)} className="cal-mark flex h-[22px] items-center gap-1 px-1">
-        <span aria-hidden className="cal-mark-diamond h-[7px] w-[7px] shrink-0 rotate-45" style={{ background: MARK_INK[mark.tone] }} />
+        <span aria-hidden className="h-[7px] w-[7px] shrink-0 rotate-45" style={{ background: MARK_INK[mark.tone] }} />
         <When overdue={mark.tone === "danger"} className="cal-mark-time text-[11px] leading-[13px]">
           {mark.time}
         </When>
@@ -1081,7 +1081,7 @@ function DeadlinesMore({ marks, ymd, now, inline = false }: { marks: DeadlineMar
           data-tone={loudest(marks)}
           className={`cal-mark cal-mark-more flex items-center justify-center gap-1 text-[11px] leading-[13px] ${inline ? "h-[22px] px-1" : "h-full w-full"}`}
         >
-          <span aria-hidden className="cal-mark-diamond h-[6px] w-[6px] shrink-0 rotate-45" style={{ background: ink }} />
+          <span aria-hidden className="h-[6px] w-[6px] shrink-0 rotate-45" style={{ background: ink }} />
           <span className="nums" style={{ color: ink }}>
             {inline ? marks.length : `+${marks.length}`}
           </span>

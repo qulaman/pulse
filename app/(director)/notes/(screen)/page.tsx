@@ -1,65 +1,51 @@
 "use client";
 
-import { onlineManager, useIsMutating } from "@tanstack/react-query";
+import { useIsMutating } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
 import { BoardCard, BoardTrashCard, FinishedBoards, NewBoardCard } from "@/components/mindboard/BoardCards";
-import { BoardPicker } from "@/components/mindboard/BoardPicker";
-import { AssignSheet } from "@/components/notes/AssignSheet";
 import { ConvertedCard, NoteCard, PendingCard, TrashCard } from "@/components/notes/NoteCard";
 import { NoteIcon } from "@/components/notes/icons";
 import { NotesRecorder } from "@/components/notes/NotesRecorder";
-import { RemindSheet } from "@/components/notes/RemindSheet";
+import { NotesSheets, type BoardTarget, type Purge } from "@/components/notes/NotesSheets";
 import { Tabs } from "@/components/tasks/list/Tabs";
-import { TaskColumn, useAccordion, useMinute, useRevealOpen } from "@/components/tasks/list/TaskList";
+import { TaskColumn, useAccordion, useRevealOpen } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
 import { HeadButton } from "@/components/ui/HeadButton";
 import { PageHead } from "@/components/ui/PageHead";
 import { NotesSkeleton } from "@/components/ui/PageSkeletons";
-import { Sheet } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
-import { humanAqtobe } from "@/lib/ai/time";
+import { dateLineRu, humanAqtobe } from "@/lib/ai/time";
 import { binCards } from "@/lib/mindboard/branch";
 import { boardOnWall, defaultTitle, previewOf, splitBoards, summariesOf } from "@/lib/mindboard/list";
 import { useCreateBoard, useMovePoint, usePurgeBoards, useRestoreBoard } from "@/lib/mindboard/mutations";
 import { nextPlaceIn } from "@/lib/mindboard/tree";
 import { useBoards, type MindBoard } from "@/lib/mindboard/queries";
 import { useDictation, type Receipt } from "@/lib/notes/dictation";
-import { filterNotes, firstLine, groupNotes, notesHero, phoneRow, splitNotes, TRASH_DAYS, type NoteFilter, type NoteGroupKey } from "@/lib/notes/list";
+import { filterNotes, firstLine, groupNotes, notesHero, splitNotes, TRASH_DAYS, type NoteFilter, type NoteGroupKey } from "@/lib/notes/list";
 import { useCreateNote, useDeleteNote, usePurgeNotes, useRestoreNote, useUpdateNote } from "@/lib/notes/mutations";
-import { dropCreate, type PendingCreate } from "@/lib/notes/pending";
+import { dropCreate } from "@/lib/notes/pending";
 import { useNoteCounts, useNotes, useNoteSearch, useOlderNotes, type Note } from "@/lib/notes/queries";
 import { usePendingNotes, useReplayHearing } from "@/lib/notes/replay";
+import { usePendingOverlay } from "@/lib/notes/usePendingOverlay";
 import { useIngestStore } from "@/lib/store/ingest";
 import type { Section } from "@/lib/tasks/overview";
 import { useMe, useSentTasks } from "@/lib/tasks/queries";
-import { pluralRu } from "@/lib/tasks/status-text";
 import { useTvState } from "@/lib/tv/queries";
 import { boardLive } from "@/lib/tv/state";
 import { useSearchHold } from "@/lib/ui/searchHold";
+import { useFlash } from "@/lib/useFlash";
+import { useNow } from "@/lib/useNow";
 
 /** A receipt stays on the screen long enough to be read over the shoulder of a thought. */
 const RECEIPT_MS = 4_000;
 
 const EMPTY: Note[] = [];
 
-/** An edit younger than this is simply on its way; older, with the network up, it is stuck. */
-const STUCK_MS = 20_000;
-
-const subscribeOnline = (onChange: () => void) => onlineManager.subscribe(onChange);
-const isOnline = () => onlineManager.isOnline();
-
-const DATE_LINE = new Intl.DateTimeFormat("ru-RU", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Aqtobe" });
 
 const TABS: readonly NoteFilter[] = ["active", "boards", "converted", "trash"];
-
-/**
- * What waits to be removed for good: notes of the bin, and boards with their points (D-102);
- * `branch` — one point of a board with the sub-points that rode with it (D-121).
- */
-type Purge = { notes: string[]; boards: string[]; branch?: boolean };
 
 /**
  * «Заметки» — the director's own thoughts (D-75), in the language of «Задачи» (D-83, D-93):
@@ -88,7 +74,7 @@ export default function NotesPage() {
   const router = useRouter();
   const startFromNote = useIngestStore((state) => state.startFromNote);
   const writing = useIsMutating({ mutationKey: ["notes"] }) > 0;
-  const now = useMinute();
+  const now = useNow();
 
   const params = useSearchParams();
   // «‹ Заметки · доски» from a board comes back to the boards (/notes?tab=boards)
@@ -104,22 +90,10 @@ export default function NotesPage() {
   const [assigning, setAssigning] = useState<Note | null>(null);
   // «На доску» (D-140): the thought becomes a point of the board picked in the sheet
   const [boarding, setBoarding] = useState<Note | null>(null);
-  const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [receipt, flash] = useFlash<Receipt>(RECEIPT_MS);
   const searchField = useRef<HTMLInputElement>(null);
   const holdSearch = useSearchHold(searchField, query);
 
-  const receiptTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const flash = useCallback((next: Receipt) => {
-    if (receiptTimer.current) clearTimeout(receiptTimer.current);
-    setReceipt(next);
-    receiptTimer.current = setTimeout(() => setReceipt(null), RECEIPT_MS);
-  }, []);
-  useEffect(
-    () => () => {
-      if (receiptTimer.current) clearTimeout(receiptTimer.current);
-    },
-    [],
-  );
   useEffect(() => {
     if (searchOpen) searchField.current?.focus({ preventScroll: true });
   }, [searchOpen]);
@@ -135,35 +109,10 @@ export default function NotesPage() {
   const search = useNoteSearch(me.data?.userId, query, hasOlder);
   const pending = usePendingNotes(me.data?.userId);
   const hearing = useReplayHearing();
-  const online = useSyncExternalStore(subscribeOnline, isOnline, () => true);
 
   // the feed as the director should see it: the cache, older hits of the search, edits still
   // on the phone laid over their rows, and notes that exist only on the phone so far (D-95)
-  const { rows, phoneOnly, waiting } = useMemo(() => {
-    const byId = new Map(cached.map((note) => [note.id, note]));
-    for (const hit of search.data ?? []) if (!byId.has(hit.id)) byId.set(hit.id, hit);
-    for (const edit of pending.edits) {
-      const row = byId.get(edit.id);
-      if (row) byId.set(edit.id, { ...row, ...edit.fields, ...("remind_at" in edit.fields ? { reminded_at: null } : {}) });
-    }
-    const phone = new Map<string, PendingCreate>();
-    for (const entry of pending.creates) {
-      if (byId.has(entry.id)) continue;
-      phone.set(entry.id, entry);
-      byId.set(entry.id, phoneRow(entry));
-    }
-    // «ждёт связи» on a card: with no network, or when a write has been stuck for a while —
-    // not for the second an ordinary autosave is on its way
-    const late = (at: number) => !online || now.getTime() - at > STUCK_MS;
-    return {
-      rows: [...byId.values()],
-      phoneOnly: phone,
-      waiting: new Set([
-        ...pending.creates.filter((entry) => late(Date.parse(entry.createdAt))).map((entry) => entry.id),
-        ...pending.edits.filter((edit) => late(edit.at)).map((edit) => edit.id),
-      ]),
-    };
-  }, [cached, search.data, pending, online, now]);
+  const { rows, phone: phoneOnly, waiting } = usePendingOverlay(pending, cached, { extra: search.data ?? EMPTY });
 
   // the boards (D-102, D-140): the live ones for their tab (the one on the wall first, then the
   // pinned), the finished ones folded under them, the deleted ones for the bin
@@ -366,7 +315,7 @@ export default function NotesPage() {
   };
 
   // the thought goes to the bottom of the board as a point; a new board is made first
-  const toBoard = (target: { id: string; title: string; fresh: boolean }) => {
+  const toBoard = (target: BoardTarget) => {
     const note = boarding;
     setBoarding(null);
     if (!note) return;
@@ -404,7 +353,7 @@ export default function NotesPage() {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28">
       <PageHead
-        eyebrow={DATE_LINE.format(now)}
+        eyebrow={dateLineRu(now)}
         title="Заметки"
         actions={
           <HeadButton
@@ -503,73 +452,30 @@ export default function NotesPage() {
         )
       ) : null}
 
-      <AssignSheet note={assigning} onClose={() => setAssigning(null)} me={me.data} />
-
-      <BoardPicker
-        open={boarding !== null}
-        onClose={() => setBoarding(null)}
-        subject={boarding ? firstLine(boarding.text) : null}
+      <NotesSheets
+        me={me.data}
+        assigning={assigning}
+        onAssignClose={() => setAssigning(null)}
+        boarding={boarding}
+        onBoardClose={() => setBoarding(null)}
         boards={boardPiles.live}
         summaries={summaries}
-        onPick={(board) => toBoard({ id: board.id, title: board.title, fresh: false })}
-        onNew={() => {
-          // a move needs the network; a board made «for later» would wait with nothing on it
-          if (!navigator.onLine) {
-            setBoarding(null);
-            toast("Нет связи — мысль осталась в «Мыслях»");
-            return;
-          }
+        onBoard={toBoard}
+        onNewBoard={() => {
           const id = crypto.randomUUID();
           const title = defaultTitle(new Date());
           createBoard.mutate({ id, title, client_request_id: crypto.randomUUID() }, { onSuccess: () => toBoard({ id, title, fresh: true }) });
         }}
-      />
-
-      <RemindSheet
-        open={reminding !== null}
-        onClose={() => setReminding(null)}
-        currentIso={reminding?.remind_at ?? null}
-        onPick={(iso) => {
-          if (reminding) remind(reminding, iso);
+        reminding={reminding}
+        onRemindClose={() => setReminding(null)}
+        onRemind={remind}
+        purging={purging}
+        onPurgeClose={() => setPurging(null)}
+        onPurge={(what) => {
+          if (what.notes.length) purge.mutate({ ids: what.notes });
+          if (what.boards.length) purgeBoards.mutate({ ids: what.boards });
         }}
       />
-
-      <Sheet open={purging !== null} onClose={() => setPurging(null)} title={purging && !purging.branch && purging.notes.length + purging.boards.length > 1 ? "Очистить корзину" : "Удалить навсегда"}>
-        <p className="text-[16px] leading-[22px] text-muted">{purgeText(purging)}</p>
-        <div className="mt-4 flex gap-2">
-          <Button
-            variant="danger"
-            block
-            data-testid="notes-purge-confirm"
-            onClick={() => {
-              if (purging?.notes.length) purge.mutate({ ids: purging.notes });
-              if (purging?.boards.length) purgeBoards.mutate({ ids: purging.boards });
-              setPurging(null);
-            }}
-          >
-            Удалить
-          </Button>
-          <Button variant="secondary" block onClick={() => setPurging(null)}>
-            Не сейчас
-          </Button>
-        </div>
-      </Sheet>
     </main>
   );
-}
-
-/** What «Удалить навсегда» and «Очистить» say: notes, boards with their points, or both. */
-function purgeText(purging: Purge | null): string {
-  if (!purging) return "";
-  const notes = purging.notes.length;
-  const boards = purging.boards.length;
-  if (purging.branch) return "Пункт исчезнет вместе с подпунктами. Вернуть будет нельзя.";
-  if (boards === 0) {
-    return notes > 1
-      ? `${notes} ${pluralRu(notes, ["заметка исчезнет", "заметки исчезнут", "заметок исчезнут"])} вместе с текстом. Вернуть будет нельзя.`
-      : "Заметка исчезнет вместе с текстом. Вернуть будет нельзя.";
-  }
-  const boardWords = boards === 1 ? "Доска исчезнет вместе с пунктами" : `${boards} ${pluralRu(boards, ["доска исчезнет", "доски исчезнут", "досок исчезнут"])} вместе с пунктами`;
-  const noteWords = notes > 0 ? `, и ${notes} ${pluralRu(notes, ["заметка", "заметки", "заметок"])}` : "";
-  return `${boardWords}${noteWords}. Вернуть будет нельзя.`;
 }

@@ -7,10 +7,9 @@ import { usePointsEnabled } from "@/lib/points/queries";
 import { useMe } from "@/lib/tasks/queries";
 
 /**
- * Магазин поощрений (D-71). Один маршрут, две роли-читателя: директор получает пульт
- * управления (очередь выдачи, ассортимент, очки компании), все остальные — витрину со
- * своим балансом. Кто именно смотрит, решается здесь, чтобы ни один экран не рисовал
- * чужих кнопок.
+ * The rewards shop (D-71). One route, two kinds of reader: the director gets the console (the
+ * hand-out queue, the range, the company's points), everyone else the shop window with their own
+ * balance. Who is looking is decided here, so no screen draws somebody else's buttons.
  */
 export default function ShopPage() {
   const me = useMe();

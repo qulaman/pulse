@@ -1,3 +1,4 @@
+import { aqtobeDay } from "@/lib/ai/time";
 import { entryKey, nearSpelling } from "@/lib/dictionary";
 import { pluralRu } from "@/lib/tasks/status-text";
 import { stem, stems } from "@/lib/text/normalize";
@@ -194,17 +195,12 @@ function isNamelike(token: string, sentenceStart: boolean): boolean {
   return !sentenceStart && /^\p{Lu}/u.test(token) && letters.length >= 3;
 }
 
-const DAY_MS = 86_400_000;
-const AQTOBE_MS = 5 * 3_600_000;
-
 /** The calendar day in Aqtobe of an instant, as a day number. */
-function aqtobeDay(ms: number): number {
-  return Math.floor((ms + AQTOBE_MS) / DAY_MS);
-}
+const dayNumber = (ms: number) => aqtobeDay(new Date(ms));
 
 /** «сегодня», «вчера», «5 дней назад» — by the calendar day in Aqtobe, not by 24-hour spans. */
 export function whenLine(iso: string, now = Date.now()): string {
-  const days = aqtobeDay(now) - aqtobeDay(new Date(iso).getTime());
+  const days = dayNumber(now) - dayNumber(new Date(iso).getTime());
   if (days <= 0) return "сегодня";
   if (days === 1) return "вчера";
   return `${days} ${pluralRu(days, ["день", "дня", "дней"])} назад`;
@@ -217,5 +213,5 @@ export function dayMonth(iso: string): string {
 
 /** Days since an instant, by Aqtobe calendar days. */
 export function daysSince(iso: string, now = Date.now()): number {
-  return aqtobeDay(now) - aqtobeDay(new Date(iso).getTime());
+  return dayNumber(now) - dayNumber(new Date(iso).getTime());
 }

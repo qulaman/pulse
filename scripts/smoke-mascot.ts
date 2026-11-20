@@ -15,7 +15,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium, type Page } from "playwright";
 
-const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
+import { APP_URL } from "./lib/smoke";
+
 const UPDATE = process.env.UPDATE === "1";
 const REDUCED = process.env.REDUCED === "1";
 const SETS = (process.env.SETS ?? "drop-states,drop-acts,sec,desk,transitions,jobs,job-acts").split(",");

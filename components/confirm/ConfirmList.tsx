@@ -6,6 +6,7 @@ import { DeadlineSheet } from "@/components/confirm/DeadlineSheet";
 import { EntityCard } from "@/components/confirm/EntityCard";
 import { useRememberOffer } from "@/components/dictionary/useRememberOffer";
 import { PeoplePicker } from "@/components/people/PeoplePicker";
+import { namesById } from "@/lib/confirm/entities";
 import { useRoster } from "@/lib/people/roster";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { useIngestStore } from "@/lib/store/ingest";
@@ -68,16 +69,7 @@ export function ConfirmList({
     });
   };
 
-  const nameOf = useMemo(() => {
-    const byId = new Map<string, string>();
-    for (const user of roster.data ?? []) byId.set(user.id, user.full_name);
-    for (const entity of entities) {
-      for (const candidate of entity.assignee?.candidates ?? []) {
-        if (!byId.has(candidate.user_id)) byId.set(candidate.user_id, candidate.full_name);
-      }
-    }
-    return (id: string) => byId.get(id);
-  }, [roster.data, entities]);
+  const nameOf = useMemo(() => namesById(roster.data, entities), [roster.data, entities]);
 
   const compact = entities.length >= COMPACT_FROM;
   const toggle = (index: number) =>

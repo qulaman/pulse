@@ -61,6 +61,12 @@ export function shortName(fullName: string | null | undefined): string {
   return shortNameIn(fullName, useNamesStore.getState().index);
 }
 
+/** Two letters of a name for the round face: «Марат Оспанов» → «МО», nothing — «•». */
+export function initialsOf(fullName: string): string {
+  const parts = wordsOf(fullName);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "•";
+}
+
 /**
  * Changes when the company's names do: a screen that builds names into memoised lines keeps
  * it among the memo's inputs, so «Ерлан» becomes «Ерлан Б.» once the roster has come.

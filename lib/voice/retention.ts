@@ -8,8 +8,6 @@ const BATCH = 100;
 /** Files per sweep: on Hobby the sweep runs once a day, a backlog drains over a few days. */
 const LIMIT = 500;
 
-type Due = { company_id: string; path: string };
-
 /**
  * The sweep step of D-155 §3 (D-18): the voice files whose term ran out (`voice_purge_due` —
  * `closed_days` after all their rows are closed, `orphan_days` for a recording nothing came of,
@@ -28,13 +26,12 @@ export async function purgeVoice(
   const batch = options.batch ?? BATCH;
   let paths: string[];
   try {
-    // the functions come with migration 20261103121000 — not in the generated types yet
-    const due = await service.rpc("voice_purge_due" as never, { p_limit: options.limit ?? LIMIT } as never);
+    const due = await service.rpc("voice_purge_due", { p_limit: options.limit ?? LIMIT });
     if (due.error) {
       console.error("voice_purge_due failed:", due.error.message);
       return 0;
     }
-    paths = ((due.data ?? []) as unknown as Due[]).map((row) => row.path);
+    paths = (due.data ?? []).map((row) => row.path);
   } catch (err) {
     console.error("voice_purge_due failed:", err instanceof Error ? err.message : err);
     return 0;
@@ -50,7 +47,7 @@ export async function purgeVoice(
         continue;
       }
       purged += chunk.length;
-      const marked = await service.rpc("voice_mark_purged" as never, { p_paths: chunk } as never);
+      const marked = await service.rpc("voice_mark_purged", { p_paths: chunk });
       if (marked.error) console.error("voice_mark_purged failed:", marked.error.message);
     } catch (err) {
       console.error("voice purge batch failed:", err instanceof Error ? err.message : err);

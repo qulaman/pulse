@@ -1,7 +1,7 @@
 /**
- * Подпись клавиши человека на клавиатуре людей: имя, а при тёзках — имя и первая буква
- * фамилии («Ерлан Б.», «Ерлан Д.»). Порядок людей не меняется — клавиатура должна
- * запоминаться пальцами, поэтому горящая клавиша не переезжает наверх.
+ * The label of a person's key on the people keyboard: the first name, and with namesakes the first name and the
+ * surname's initial («Ерлан Б.», «Ерлан Д.»). The order of people does not change — the keyboard is
+ * remembered by the fingers, so a lit key does not move to the top.
  */
 export function keyLabels(people: { id: string; full_name: string }[]): Map<string, string> {
   const parts = people.map((p) => {

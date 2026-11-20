@@ -4,12 +4,10 @@
  * loading.tsx and by the page while its query runs — so the picture never changes between the
  * tap and the data. Server-safe: no hooks, no function props, no values from client modules.
  */
-import { Icon } from "@/components/tasks/desk/icons";
 import { PageHead } from "@/components/ui/PageHead";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 
 import { DayStepper } from "./DayStepper";
-import { ReportIcon } from "./icons";
 import { Segments } from "./Segments";
 
 const MAIN = "mx-auto w-full max-w-lg flex-1 px-4 pb-36";
@@ -71,27 +69,6 @@ export function HistoryBone() {
         </div>
       ))}
     </SkeletonGroup>
-  );
-}
-
-/** The «Отчёт за день» row of «Дела», its state still grey — the same box as `ReportEntryRow`. */
-export function ReportEntryRowBone() {
-  return (
-    <div className="card mt-2 flex min-h-[56px] items-center gap-3 px-3.5" aria-hidden>
-      <span
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]"
-        style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)", color: "var(--accent)" }}
-      >
-        <ReportIcon />
-      </span>
-      <span className="min-w-0 flex-1 font-display text-[16px] font-semibold leading-[22px] tracking-[-0.01em]">Отчёт за день</span>
-      <SkeletonGroup>
-        <Bone h={16} w={72} />
-      </SkeletonGroup>
-      <span className="shrink-0 text-muted">
-        <Icon name="open" size={14} />
-      </span>
-    </div>
   );
 }
 

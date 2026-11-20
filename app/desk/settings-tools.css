@@ -1,0 +1,451 @@
+/* «Словарь», «Лаборатория», «Данные» on the desk (components/desk/settings/{dictionary,lab,data}): the
+   data tools of the settings. Part of settings.css by its @import. */
+
+/* ---- «Словарь», «Лаборатория», «Данные» -------------------------- */
+html[data-surface="desk"][data-journal] {
+  /* the dictionary's icons show only where the «Графит» rules below place them */
+  .dict-verdict-icon,
+  .dict-check-icon {
+    display: none;
+  }
+}
+
+:root[data-surface="desk"][data-journal][data-graphite] {
+  /* ---- the dictionary: strips as cards over the table they feed ---- */
+  .dict-strip,
+  .dict-addbar {
+    padding: 14px 18px 16px;
+    border-radius: 14px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+    animation: settings-rise 320ms var(--ease-snap) both;
+  }
+  .dict-strip-head {
+    margin-bottom: 8px;
+  }
+  #desk-main .dict-strip-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .dict-strip-count {
+    display: inline-flex;
+    height: 18px;
+    align-items: center;
+    padding: 0 6px;
+    border-radius: 9999px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+  .dict-table-head {
+    margin-bottom: -6px;
+    padding: 0 2px;
+  }
+  #desk-main .dict-table-head .dict-strip-title {
+    font-size: 15px;
+    letter-spacing: -0.01em;
+  }
+  .dict-strip .field,
+  .dict-addbar .field,
+  .dict-grid .field {
+    border: 0;
+    border-radius: 8px;
+    padding-left: 12px;
+    background-color: color-mix(in srgb, var(--ink) 3.5%, var(--raise));
+    box-shadow: inset 0 0 0 1px var(--rule);
+    transition:
+      box-shadow 140ms linear,
+      background-color 140ms linear;
+
+    &:hover {
+      box-shadow: inset 0 0 0 1px var(--line);
+    }
+    &:focus,
+    &:focus-within {
+      background-color: var(--raise);
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--pen) 70%, transparent),
+        0 0 0 3px color-mix(in srgb, var(--pen) 16%, transparent);
+    }
+    &::placeholder {
+      color: var(--ink-3);
+      font-style: normal;
+      opacity: 1;
+    }
+  }
+  .dict-check-field {
+    .dict-check-icon {
+      display: block;
+      z-index: 1;
+      color: var(--ink-3);
+    }
+    .field {
+      padding-left: 34px;
+    }
+  }
+  .dict-verdict-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    color: var(--ink-3);
+    animation: settings-pop 220ms var(--ease-snap) both;
+  }
+  .dict-verdict[data-kind="sure"] .dict-verdict-icon {
+    color: var(--ok-ink);
+  }
+  .dict-verdict[data-kind="check"] .dict-verdict-icon,
+  .dict-verdict[data-kind="ask"] .dict-verdict-icon {
+    color: var(--warn-ink);
+  }
+  .dict-misheard {
+    gap: 4px 24px;
+    border-top: 0;
+
+    > * {
+      border-bottom: 0;
+    }
+  }
+  .dict-misheard-item {
+    padding: 6px 8px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--ink) 3%, transparent);
+  }
+  .dict-x {
+    border-radius: 6px;
+    transition:
+      background-color 100ms linear,
+      color 100ms linear;
+  }
+
+  /* the budget: the list's length is the recognition prompt's length */
+  .dict-budget-track {
+    width: 112px;
+    height: 6px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--ink) 8%, transparent);
+  }
+  .dict-budget-fill {
+    border-radius: 9999px;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--pen) 60%, transparent), var(--pen)) !important;
+    transform-origin: left center;
+    animation: pts-fill 620ms var(--ease-snap) both;
+  }
+  .dict-budget[data-long] .dict-budget-fill {
+    background: var(--warn-ink) !important;
+  }
+
+  /* what the speech keeps using: chips with their facts */
+  .dict-suggest {
+    gap: 8px;
+  }
+  .dict-suggest-item {
+    height: 34px;
+    padding: 0 4px 0 12px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--ink) 3%, transparent);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+    animation: settings-pop 240ms var(--ease-snap) both;
+  }
+
+  /* the tables: faces, names as chips, offers in the accent */
+  .dict-grid .desk-row {
+    min-height: 50px;
+  }
+  .dict-pills {
+    gap: 6px;
+  }
+  .dict-pill {
+    height: 26px;
+    padding: 0 9px;
+    border-radius: 7px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+    font-size: 13px;
+    transition:
+      background-color 140ms linear,
+      box-shadow 140ms linear,
+      padding 140ms var(--ease-snap);
+
+    &:has(.dict-pill-x) {
+      padding-right: 4px;
+    }
+    &[data-fresh] {
+      background: color-mix(in srgb, var(--pen) 12%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 40%, transparent);
+      animation: settings-pop 260ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+    }
+    &[data-waiting] {
+      background: transparent;
+      box-shadow: inset 0 0 0 1px var(--line);
+      border: 0;
+    }
+  }
+  .dict-pill-x {
+    width: 18px;
+    height: 18px;
+    margin-left: 2px;
+    border-radius: 5px;
+    transition:
+      opacity 120ms linear,
+      background-color 100ms linear;
+
+    &:hover {
+      background: color-mix(in srgb, var(--pencil) 16%, transparent);
+    }
+  }
+  .dict-add {
+    height: 26px;
+    padding: 0 9px 0 7px;
+    border-radius: 7px;
+    box-shadow: inset 0 0 0 1px var(--line);
+    border: 0;
+    transition:
+      opacity 120ms linear,
+      background-color 100ms linear,
+      color 100ms linear;
+
+    &:hover {
+      background: var(--hover);
+    }
+  }
+  .dict-offers {
+    gap: 6px;
+  }
+  .dict-offer {
+    height: 26px;
+    padding: 0 9px 0 7px;
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--pen) 9%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 34%, transparent);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--pen);
+    transition:
+      background-color 120ms linear,
+      scale 200ms var(--ease-snap);
+
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--pen) 16%, transparent);
+      text-decoration: none;
+    }
+    &:active:not(:disabled) {
+      scale: 0.95;
+      transition-duration: 70ms;
+    }
+  }
+  .dict-shared {
+    margin-top: 6px;
+    color: var(--warn-ink);
+  }
+  .dict-note {
+    color: var(--warn-ink);
+  }
+  .dict-word {
+    font-size: 14px;
+  }
+  .dict-kind {
+    height: 26px;
+    padding: 0 7px 0 9px;
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--ink) 5%, transparent);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+    color: var(--ink-2);
+
+    &:hover {
+      background: var(--hover);
+      color: var(--ink);
+    }
+  }
+  .dict-heard-bar {
+    position: relative;
+    display: block;
+    width: 44px;
+    height: 4px;
+    flex-shrink: 0;
+    overflow: hidden;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--ink) 8%, transparent);
+
+    &::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: color-mix(in srgb, var(--pen) 80%, transparent);
+      transform: scaleX(var(--share, 0));
+      transform-origin: left center;
+      animation: pts-fill 560ms var(--ease-snap) both;
+    }
+  }
+  .dict-guide {
+    height: 34px;
+    padding: 0 10px;
+    border-radius: 8px;
+    transition:
+      color 120ms linear,
+      background-color 120ms linear;
+
+    &:hover {
+      background: var(--hover);
+    }
+  }
+  .dict-step {
+    display: inline-flex;
+    width: 20px;
+    height: 20px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 20px;
+  }
+  .dict-foot {
+    padding: 0 4px;
+    color: var(--ink-3);
+  }
+
+  /* ---- the lab: the strip as a card, the shelf as links with their arrow ---- */
+  .lab-tab:not([hidden]) {
+    animation: settings-rise 300ms var(--ease-snap) both;
+  }
+  .lab-strip {
+    padding: 12px 16px;
+    border: 0;
+    border-radius: 14px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+  }
+  .lab-shelf-link {
+    height: 30px;
+    border-radius: 8px;
+    transition:
+      color 120ms linear,
+      background-color 120ms linear;
+
+    &:hover {
+      background: var(--hover);
+    }
+  }
+  /* the phone's benches (the parser's rules, the cost): their cards are «Графит»'s cards again */
+  .lab-tab.desk-bench .card {
+    padding: 16px 20px 18px;
+    border-top: 0;
+  }
+  .lab-tab.desk-bench .card + .card {
+    margin-top: 4px;
+  }
+  .lab-tab.desk-bench [class*="rounded-[12px]"].bg-surface-2 {
+    padding-inline: 12px;
+    border-top: 0;
+    border-radius: 10px;
+    background: var(--surface-2);
+  }
+  #desk-main .lab-head {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  .lab-prices {
+    padding: 0 4px;
+    color: var(--ink-3);
+  }
+
+  /* ---- the data: tabs with a gliding line, the sheet as a card ---- */
+  .data-tabs {
+    gap: 2px;
+    padding: 2px 2px 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .data-tab {
+    height: 36px;
+    padding: 0 10px;
+    border-radius: 8px 8px 0 0;
+    box-shadow: none !important;
+    font-weight: 500;
+    transition:
+      color 120ms linear,
+      background-color 120ms linear;
+
+    &:hover {
+      background: var(--hover);
+    }
+    &[aria-selected="true"] {
+      font-weight: 600;
+    }
+  }
+  .data-tab-line {
+    position: absolute;
+    display: block;
+    right: 8px;
+    bottom: 0;
+    left: 8px;
+    height: 2px;
+    border-radius: 2px 2px 0 0;
+    background: var(--pen);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--pen) 60%, transparent);
+  }
+  .data-sheet {
+    border: 0;
+    border-radius: 12px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+    animation: settings-rise 280ms var(--ease-snap) both;
+
+    &:focus-visible {
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--pen) 60%, transparent),
+        0 0 0 4px color-mix(in srgb, var(--pen) 14%, transparent);
+    }
+    th {
+      border-bottom-color: var(--rule) !important;
+      border-right-color: var(--rule-soft) !important;
+      background: color-mix(in srgb, var(--raise) 88%, transparent);
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+    }
+    td {
+      border-color: var(--rule-soft);
+    }
+    tbody tr {
+      transition: background-color 80ms linear;
+    }
+    tbody tr:hover {
+      background: var(--hover);
+    }
+    td.outline {
+      border-radius: 4px;
+      outline-color: var(--pen);
+      background: color-mix(in srgb, var(--pen) 8%, transparent);
+    }
+  }
+  #desk-main .data-sheet th {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-3);
+  }
+  .data-bone {
+    border-top: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-surface="desk"][data-journal] {
+    .dict-strip,
+    .dict-addbar,
+    .dict-verdict-icon,
+    .dict-budget-fill,
+    .dict-suggest-item,
+    .dict-pill,
+    .dict-heard-bar::after,
+    .lab-tab,
+    .data-sheet {
+      animation: none !important;
+    }
+  }
+}

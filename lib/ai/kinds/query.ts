@@ -24,7 +24,7 @@ export const queryKind: KindModule = {
   section,
   modelSchema: QueryEntitySchema,
   examples: [
-    // П6. Вопрос к системе.
+    // П6. A question to the system.
     {
       n: 6,
       user: "Что там по Альфе и кто сегодня не отчитался?",

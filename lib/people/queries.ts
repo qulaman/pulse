@@ -94,7 +94,7 @@ export function usePersonMessages(id: string) {
         .order("created_at", { ascending: false })
         .limit(20);
       if (error) throw new Error(error.message);
-      return (data ?? []) as unknown as PersonMessage[];
+      return data ?? [];
     },
   });
 }
@@ -306,7 +306,5 @@ export function useChangeLoginEmail() {
   });
 }
 
-export function initialsOf(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/).filter(Boolean);
-  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "•";
-}
+/** @deprecated import `initialsOf` from lib/people/names.ts */
+export { initialsOf } from "@/lib/people/names";

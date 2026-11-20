@@ -1,5 +1,6 @@
 "use client";
 
+import { keysTaken } from "@/components/desk/ui/layers";
 import { CAN_START } from "@/lib/desk/voice";
 import { useIngestStore, type Pin } from "@/lib/store/ingest";
 
@@ -56,7 +57,5 @@ export async function cancelDeskVoice(): Promise<void> {
 }
 
 /** Something of the desk holds the keys right now: a dialog, a sheet, a popover or a menu. */
-export function deskLayerUp(): boolean {
-  const body = document.body;
-  return body.hasAttribute("data-dialog-open") || body.hasAttribute("data-sheet-open") || document.querySelector(".desk-pop") !== null;
-}
+/** @deprecated the same rule — use `keysTaken` from "@/components/desk/ui/layers". */
+export const deskLayerUp = keysTaken;

@@ -1,12 +1,12 @@
-/* «Отчёты → Табель» of the desk (D-183): reports-tabel. One builder a file.
+/* «Отчёты → Табель» of the desk (D-183): reports-tabel.
    The period as people × days (components/desk/reports/TabelView.tsx) and its paper
    (PrintSheet.tsx, kind «tabel»: landscape A4).
    - One sheet with hairlines inside it, no boxes in boxes: the head row and the names stay while the
      days scroll under them, the totals hold the right edge, the misses of each day the bottom.
    - A day is a mark while it has 26 px, colour only below that (a quarter) — never hours, never points.
    - Inks: green handed in, red missed, grey away and excused, teal only for the choice and today;
-     a weekend dimmed, a holiday hatched (DESIGN §8). Both looks: the graphite-only inks fall back
-     to the journal's. Motion: the stale fade only, off under «уменьшить движение». */
+     a weekend dimmed, a holiday hatched (DESIGN §8). The graphite-only inks fall back to the base
+     inks of journal.css. Motion: the stale fade only, off under «уменьшить движение». */
 
 html[data-surface="desk"][data-journal] {
   .rep-tabel {
@@ -321,12 +321,6 @@ html[data-surface="desk"][data-journal] {
   .rep-tabel-dhead-button:disabled .rep-tabel-dnum {
     color: var(--rt-ink-3);
     font-weight: 500;
-  }
-  .rep-tabel-dhead[data-today] {
-    box-shadow:
-      inset 1px 0 0 var(--rt-today),
-      inset -1px 0 0 var(--rt-today),
-      inset 0 -2px 0 var(--pen);
   }
   .rep-tabel-dhead[data-today] .rep-tabel-dnum {
     color: var(--rt-pen-deep);
@@ -662,7 +656,7 @@ html[data-surface="desk"][data-journal] {
     table {
       table-layout: fixed;
     }
-    /* Сотрудник, Должность, Состояние, Время, Сдан в, Задачи — the rest is «Что сделано» */
+    /* «Сотрудник», «Должность», «Состояние», «Время», «Сдан в», «Задачи» — the rest is «Что сделано» */
     col:nth-child(1) {
       width: 27mm;
     }

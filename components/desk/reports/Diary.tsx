@@ -9,12 +9,12 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { AwardDialog, type AwardFor } from "@/components/desk/settings/points/AwardDialog";
 import { PanelHeader } from "@/components/desk/ui/DeskPanel";
+import { Face } from "@/components/desk/ui/Face";
 import { IconButton, MoreMenu } from "@/components/desk/ui/IconButton";
 import type { MenuItem } from "@/components/desk/ui/Menu";
 import { Popover } from "@/components/desk/ui/Popover";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
-import { useMinute } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { useExcuseDailyReport, usePersonDailyReports } from "@/lib/daily-report/actions";
@@ -50,9 +50,9 @@ import { useCompanySettings } from "@/lib/dictionary-queries";
 import { isTeamMember, usePeople, useUpdatePerson, type Availability, type Person } from "@/lib/people/queries";
 import { useResolveDispute } from "@/lib/points/game";
 import { useComposeStore } from "@/lib/store/compose";
+import { useNow } from "@/lib/useNow";
 
 import { addressOf } from "../team/shared";
-import { TileFace } from "../team/TeamGrid";
 
 /** What the page mounts it with, in the shell's right-hand panel, for «День» and «Табель» alike. */
 export type DiaryProps = {
@@ -87,7 +87,7 @@ export function Diary({ userId, focus, today, onDay }: DiaryProps) {
   const settings = useCompanySettings();
   const rules = settings.data?.daily_report;
   const person = people.data?.find((row) => row.id === userId) ?? null;
-  const now = useMinute();
+  const now = useNow();
 
   // the month on screen and the ringed day follow the page whenever it moves the focus or the person
   const [seen, setSeen] = useState({ userId, focus });
@@ -263,9 +263,9 @@ function DiaryHead({ person, pointsOn }: { person: Person; pointsOn: boolean }) 
   const items: MenuItem[] = [...away, { key: "card", label: "Карточка", icon: <UserRound size={15} strokeWidth={2} />, onSelect: () => router.push(`/desk/team?p=${person.id}`) }];
 
   return (
-    <PanelHeader className="rep-diary-head">
+    <PanelHeader>
       <div className="flex items-center gap-3.5">
-        <TileFace person={person} size={52} />
+        <Face person={person} size={52} />
         <div className="min-w-0">
           <h2 className="rep-diary-name truncate">{person.full_name}</h2>
           <p className="rep-diary-sub truncate">
@@ -556,7 +556,7 @@ function Excuse({ report, pointsOn }: { report: PersonDailyReport; pointsOn: boo
 
 function EntriesBone() {
   return (
-    <SkeletonGroup grow className="rep-diary-bones">
+    <SkeletonGroup grow>
       {[0, 1, 2].map((i) => (
         <div key={i} className="flex flex-col gap-2 py-3">
           <div className="flex justify-between">

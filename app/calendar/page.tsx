@@ -8,8 +8,8 @@ import { CalendarView } from "@/components/calendar/CalendarView";
 import { useCalendarNav } from "@/components/calendar/useCalendarNav";
 import { useCalendar, useCalendarMonth, useEvent } from "@/lib/calendar/queries";
 import { useNamesKey } from "@/lib/people/names";
-import { useNow } from "@/lib/pulse/queries";
 import { useMe } from "@/lib/tasks/queries";
+import { useNow } from "@/lib/useNow";
 
 /**
  * «Календарь» (D-78, D-94): the data behind `CalendarView` — the month on screen, the days

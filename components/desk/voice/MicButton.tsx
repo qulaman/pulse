@@ -5,7 +5,8 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { useVoiceClaim, voiceClaimed } from "@/components/desk/voice/claim";
-import { cancelDeskVoice, deskLayerUp, finishDeskVoice, startDeskVoice, type VoicePin } from "@/components/desk/voice/control";
+import { keysTaken } from "@/components/desk/ui/layers";
+import { cancelDeskVoice, finishDeskVoice, startDeskVoice, type VoicePin } from "@/components/desk/voice/control";
 import { toast } from "@/components/ui/Toast";
 import { isTypingTarget } from "@/lib/desk/keys";
 import { CAN_START, IN_FLIGHT, isVoiceKey, VOICE_KEY } from "@/lib/desk/voice";
@@ -144,7 +145,7 @@ function useVoiceKeys(pin: VoicePin | null) {
       }
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || !isVoiceKey(event) || isTypingTarget(event.target) || deskLayerUp()) return;
+      if (event.defaultPrevented || !isVoiceKey(event) || isTypingTarget(event.target) || keysTaken()) return;
       const stage = useIngestStore.getState().stage;
       // «Заметки», «Доски», the quick thought hold the voice (D-177): «V» is their dictaphone's
       if (voiceClaimed()) return;

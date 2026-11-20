@@ -2,9 +2,9 @@ import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { PageHead } from "@/components/ui/PageHead";
 
 /**
- * Скелет магазина: заголовок и подпись настоящие, пульсирует только то, что придёт
- * из базы, — карточка баланса и четыре места под товары (docs/FRONTEND.md).
- * Server-safe: тем же скелетом живёт loading.tsx маршрута.
+ * The shop's skeleton: the title and the subtitle are real, only what comes from the database
+ * pulses — the balance card and four places for the items (docs/FRONTEND.md). Server-safe: the
+ * route's loading.tsx lives on the same skeleton.
  */
 export function ShopSkeleton() {
   return (

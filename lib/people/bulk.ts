@@ -1,6 +1,7 @@
-import { fold } from "@/lib/desk/suggest";
+
 
 import { cleanPhone, phoneLooksRight } from "./phone";
+import { foldRu } from "@/lib/people/search";
 
 /**
  * «Списком» on the desk's new person (D-153, the launch of a company): lines pasted from Excel or
@@ -181,7 +182,7 @@ export function parseBulk(text: string): BulkRow[] {
   return rows;
 }
 
-const nameWords = (name: string) => fold(name).split(/[\s-]+/).filter(Boolean);
+const nameWords = (name: string) => foldRu(name).split(/[\s-]+/).filter(Boolean);
 
 /** A name whatever the order of its words and the case: «Иванов Иван» is «иван иванов». */
 export function nameKey(name: string): string {

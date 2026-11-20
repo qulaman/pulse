@@ -1,12 +1,13 @@
 import type { Errand } from "@/lib/errands/queries";
 import { shortName } from "@/lib/people/names";
+import { median } from "@/lib/stats";
 
 export type ErrandTally = { name: string; taken: number; done: number; declined: number };
 
 /**
- * Кто сколько заявок взял за период (экран /secretary у директора). Считаем по тому,
- * кто нажал «Принял»: заявка, которую никто не взял, в таблицу людей не попадает —
- * она видна в общем счётчике «не взяли».
+ * Who took how many errands over a period (the director's /secretary screen). Counted by
+ * who tapped «Принял»: an errand nobody took is not in the people table —
+ * it shows in the total «не взяли».
  */
 export function tallyByPerson(rows: readonly Errand[]): ErrandTally[] {
   const map = new Map<string, ErrandTally>();
@@ -23,8 +24,8 @@ export function tallyByPerson(rows: readonly Errand[]): ErrandTally[] {
 }
 
 /**
- * Среднее «попросил → готово», в минутах. Только закрытые заявки: у брошенной нет
- * второго конца, и включать её означало бы хвалить за то, чего не сделали.
+ * The average «попросил → готово», in minutes. Only closed errands: an abandoned one has no
+ * second end, and counting it would praise what was not done.
  */
 export function averageDoneMinutes(rows: readonly Errand[]): number | null {
   const spans = rows
@@ -35,7 +36,7 @@ export function averageDoneMinutes(rows: readonly Errand[]): number | null {
   return Math.round(spans.reduce((sum, m) => sum + m, 0) / spans.length);
 }
 
-/** «3 мин» / «1 ч 5 мин» — время, а не число. */
+/** «3 мин» / «1 ч 5 мин» — a time, not a number. */
 export function humanMinutes(minutes: number | null): string {
   if (minutes === null) return "—";
   if (minutes < 60) return `${minutes} мин`;
@@ -44,7 +45,7 @@ export function humanMinutes(minutes: number | null): string {
   return rest ? `${hours} ч ${rest} мин` : `${hours} ч`;
 }
 
-/** Сколько просьб так и остались без ответа: единственная цифра, которую стоит чинить. */
+/** How many requests stayed without an answer: the one figure worth fixing. */
 export function unclaimedCount(rows: readonly Errand[]): number {
   return rows.filter((row) => !row.claimed_by && (row.status === "cancelled" || row.status === "sent")).length;
 }
@@ -65,13 +66,8 @@ export function medianDoneMinutes(rows: readonly Errand[]): number | null {
   return median(spans);
 }
 
-/** The middle value; null for nothing. */
-export function median(values: readonly number[]): number | null {
-  if (values.length === 0) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
-}
+/** @deprecated import `median` from lib/stats.ts */
+export { median };
 
 /** A span said honestly: «< 1 мин» under a minute (never «0 мин»), «—» without data, else `humanMinutes`. */
 export function spanWords(minutes: number | null): string {

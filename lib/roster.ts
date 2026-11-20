@@ -40,8 +40,8 @@ export type CompanySettings = Record<string, unknown> | null;
 
 /** Everything client-specific lives here, never in code (V-02, docs/BACKEND.md §0.5). */
 /**
- * Есть ли кому отвечать на заявки (D-79 §4): матчер «кофе» и шарик «Секретарь»
- * включены ровно тогда, когда в компании есть активный секретарь.
+ * Whether anybody answers errands (D-79 §4): the «кофе» matcher and the «Секретарь» ball
+ * are on exactly when the company has an active secretary.
  */
 export async function hasActiveSecretary(companyId: string): Promise<boolean> {
   const supabase = createServiceSupabase();

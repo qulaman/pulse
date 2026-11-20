@@ -7,10 +7,10 @@ import type { Visit } from "@/lib/visits/queries";
 import { unreadMessages, waitedSince } from "@/lib/visits/text";
 
 /**
- * Сообщение секретаря на Пульсе директора (D-116): те же слова, что сейчас во всю стену в
- * кабинете, и одна кнопка — «Понятно». Нажал — надпись уходит со стены, секретарь видит
- * «Директор прочитал». Карточка висит под лицом, пока не прочитано: как посетитель (D-96),
- * только ответ один.
+ * The secretary's message on the director's Пульс (D-116): the same words that are across the
+ * office wall right now, and one button — «Понятно». Pressed — the words leave the wall, the
+ * secretary sees «Директор прочитал». The card hangs under the face until it is read: like a
+ * visitor (D-96), only with one answer.
  */
 export function MessageAsk({ visits, now }: { visits: readonly Visit[]; now: Date }) {
   const answer = useAnswerVisit();

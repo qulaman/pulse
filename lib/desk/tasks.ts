@@ -1,10 +1,11 @@
 import { aqtobeDay, humanAqtobe } from "@/lib/ai/time";
+import { addDays, hmFrom, todayYmd, weekdayOf } from "@/lib/datetime/calendar";
 import { ARCHIVE_STATUSES, type ArchiveStatus } from "@/lib/desk/archive";
 import { formatNum } from "@/lib/desk/format";
 import type { BoardTask } from "@/lib/pulse/board";
 import { isWaiting, receiptText, type DeskAction, type DeskReason } from "@/lib/tasks/desk";
 import { compareTasks, groupTasks } from "@/lib/tasks/grouping";
-import { canNudgeAgain, isWorking, untilWords } from "@/lib/tasks/lifecycle";
+import { canNudgeAgain, isWorking, untilWords, WORKING } from "@/lib/tasks/lifecycle";
 import {
   closedAtOf,
   closedSections,
@@ -19,14 +20,14 @@ import {
   type Section,
 } from "@/lib/tasks/overview";
 import { receiptLine, type DeliveryRow } from "@/lib/tasks/receipts";
-import { isOverdue, pluralRu, type TaskStatus } from "@/lib/tasks/status-text";
+import { isOverdue, pluralRu, wordText, type TaskStatus } from "@/lib/tasks/status-text";
 import { toneOf, type Tone } from "@/lib/tasks/tone";
 
 /**
  * What the desk's task table says about a row (D-153, tasks/022 A; moved to lib/desk so the suite runs its test): the filters of its tool
  * bar, the stage in a word, «доставка» and «последнее». Pure — the clock comes in — so the
  * words are tested here and the screen only renders them; every word itself comes from
- * lib/tasks (принцип 8 included: «не открывал с 9:14», never «не получил»).
+ * lib/tasks (principle 8 included: «не открывал с 9:14», never «не получил»).
  */
 
 export const TABS: readonly DirectorTab[] = ["yours", "working", "closed"];
@@ -190,7 +191,7 @@ function at(iso: string, now: Date): string {
 const TAKEN: readonly TaskStatus[] = ["accepted", "in_progress", "rework", "pending_review", "done"];
 
 /**
- * «Доставка» (принцип 8): until the task is taken — the push receipt in the thread's words
+ * «Доставка» (principle 8): until the task is taken — the push receipt in the thread's words
  * («не открывал с 9:14», «увидел 9:20», «отправлю в 08:00»), else what the receipt cannot say
  * yet; once taken — «принял 9:22». Nothing to say honestly — null.
  */
@@ -240,14 +241,6 @@ export function verdictRank(verdict: HandIn | null): number {
   return !verdict ? 0 : verdict.late ? 2 : 1;
 }
 
-/** What the employee's newest word says, short: «фото · готово», «голосовое». */
-export function lastWordText(last: BoardTask["last_message"]): string {
-  if (!last) return "";
-  if (last.type === "photo") return `фото${last.content ? ` · ${last.content}` : ""}`;
-  if (last.type === "voice") return `голосовое${last.content ? ` · ${last.content}` : ""}`;
-  return last.content ?? "";
-}
-
 /**
  * «Последнее» — what waits in the task's words: the open question, a request for time, the
  * refusal's reason, or the handed-in work («сдано с фото · не всё»). Null when none of that.
@@ -283,7 +276,7 @@ export function underTitle(
   now: Date = new Date(),
 ): string | null {
   if (!row?.last_message || latestLine(task, row, now)) return null;
-  const text = lastWordText(row.last_message);
+  const text = wordText(row.last_message);
   if (!text) return null;
   return row.last_message.sender_id === meId ? `Вы: ${text}` : text;
 }
@@ -499,8 +492,6 @@ export type MoveFlags = {
   nudgedAt?: string | null;
 };
 
-const IN_HAND: readonly TaskStatus[] = ["sent", "accepted", "in_progress", "rework"];
-
 function nudgeMove(nudgedAt: string | null | undefined, main: boolean, now: Date): Move {
   if (nudgedAt && !canNudgeAgain(nudgedAt, now)) {
     return { action: "nudge", label: `Напомнили ${at(nudgedAt, now)}`, main: false, held: true, title: "Снова напомнить можно через полчаса после прошлого раза" };
@@ -512,8 +503,8 @@ const EXTEND: Move = { action: "extend", label: "Срок", main: false, key: "K
 
 /**
  * The two buttons a row offers under the hand (hovered or chosen), the reason's own move first —
- * приёмка «Принять · Доработать», просрочка «Напомнить · Срок», отказ «Передать · Настоять»,
- * вопрос «Ответить», просьба о сроке «Да · Нет». The actions are the phone card's (`cardKeysFor`):
+ * a hand-in «Принять · Доработать», a late one «Напомнить · Срок», a refusal «Передать · Настоять»,
+ * a question «Ответить», a request for time «Да · Нет». The actions are the phone card's (`cardKeysFor`):
  * the same transitions, the same sheets. A row with no reason offers the card's quiet keys; a
  * closed one — none, its «⋯» holds the rest.
  */
@@ -552,7 +543,7 @@ export function rowMoves(
       return [nudgeMove(flags.nudgedAt, true, now), EXTEND];
   }
   if (task.status === "scheduled") return [{ action: "sendNow", label: "Отправить сейчас", main: false }, EXTEND];
-  if (!IN_HAND.includes(task.status)) return [];
+  if (!WORKING.includes(task.status)) return [];
   if (isWaiting(task, now)) return [nudgeMove(flags.nudgedAt, false, now), EXTEND];
   return [EXTEND, { action: "reassign", label: "Передать", main: false, key: "KeyT" }];
 }
@@ -611,7 +602,7 @@ export type RowKey = { code: MoveKey; action: DeskAction | "reply"; label: strin
  */
 export function rowKeys(task: { status: TaskStatus }, flags: { request?: boolean } = {}): RowKey[] {
   const keys: RowKey[] = [];
-  const inHand = IN_HAND.includes(task.status);
+  const inHand = WORKING.includes(task.status);
   if (task.status === "pending_review") {
     keys.push({ code: "KeyA", action: "approve", label: "принять" }, { code: "KeyR", action: "rework", label: "на доработку" });
   }
@@ -657,10 +648,11 @@ export function reasonHeadline(reason: DeskReason, task: Waiting & { closed_at: 
 }
 
 /**
- * The grey line of a decision on «Сегодня», part by part: what exactly waits — «сдано 40 мин назад
- * · позже на 3 ч · фото · «всё во вложении»», ««какой адрес?» · 14 мин без ответа», «не может:
- * «нет доступа»». Nominal, so it never guesses the person's gender. A part with a tone is the one
- * thing of the line worth a colour: a hand-in after the deadline.
+ * The grey line of a decision on «Сегодня», part by part: what exactly waits —
+ * «сдано 40 мин назад · позже на 3 ч · фото · «всё во вложении»»,
+ * ««какой адрес?» · 14 мин без ответа», «не может: «нет доступа»». Nominal, so it never guesses
+ * the person's gender. A part with a tone is the one thing of the line worth a colour: a hand-in
+ * after the deadline.
  */
 export function decisionParts(reason: DeskReason, task: Waiting, now: Date = new Date()): Line[] {
   const words = (parts: (string | Line | null | false | undefined)[]): Line[] =>
@@ -837,7 +829,7 @@ export function isDangerAction(action: DeskAction): boolean {
 
 type Bulky = { id: string; status: TaskStatus; nudged_at?: string | null; time_request?: unknown };
 
-/** What the bar over many marked rows can do to each of them (принцип 3: «Принять» is never in bulk). */
+/** What the bar over many marked rows can do to each of them (principle 3: «Принять» is never in bulk). */
 export type BulkPlan<T> = { nudge: T[]; extend: T[]; revoke: T[] };
 
 /**
@@ -848,8 +840,8 @@ export type BulkPlan<T> = { nudge: T[]; extend: T[]; revoke: T[] };
  */
 export function bulkPlan<T extends Bulky>(tasks: readonly T[], now: Date = new Date()): BulkPlan<T> {
   return {
-    nudge: tasks.filter((task) => IN_HAND.includes(task.status) && !task.time_request && canNudgeAgain(task.nudged_at ?? null, now)),
-    extend: tasks.filter((task) => IN_HAND.includes(task.status) || task.status === "scheduled"),
+    nudge: tasks.filter((task) => WORKING.includes(task.status) && !task.time_request && canNudgeAgain(task.nudged_at ?? null, now)),
+    extend: tasks.filter((task) => WORKING.includes(task.status) || task.status === "scheduled"),
     revoke: tasks.filter((task) => task.status !== "done" && task.status !== "revoked"),
   };
 }
@@ -918,29 +910,7 @@ export function cursorStep(ids: readonly string[], current: string | null, delta
   return ids[Math.min(ids.length - 1, Math.max(0, at + delta))];
 }
 
-/* ---- dates of the deadline picker (Aqtobe wall clock, +05:00) ---- */
-
-const AQTOBE_MS = 5 * 3_600_000;
-const pad2 = (n: number) => String(n).padStart(2, "0");
-
-/** «2026-11-03» moved by whole days. */
-export function shiftYmd(ymd: string, days: number): string {
-  const [y, m, d] = ymd.split("-").map(Number);
-  const moved = new Date(Date.UTC(y, m - 1, d + days));
-  return `${moved.getUTCFullYear()}-${pad2(moved.getUTCMonth() + 1)}-${pad2(moved.getUTCDate())}`;
-}
-
-/** Today on the Aqtobe wall clock. */
-export function wallYmd(now: Date = new Date()): string {
-  const wall = new Date(now.getTime() + AQTOBE_MS);
-  return `${wall.getUTCFullYear()}-${pad2(wall.getUTCMonth() + 1)}-${pad2(wall.getUTCDate())}`;
-}
-
-/** Monday 0 … Sunday 6 of a day. */
-export function weekdayOf(ymd: string): number {
-  const [y, m, d] = ymd.split("-").map(Number);
-  return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7;
-}
+/* ---- dates of the deadline picker (Aqtobe wall clock, +05:00; the days are lib/datetime/calendar's) ---- */
 
 /** The instant a wall day and time name, with the offset written out — what the deadline routes take. */
 export function wallIso(ymd: string, hm: string): string {
@@ -955,16 +925,16 @@ export type DeadlinePreset = { label: string; iso: string | null };
  * or Monday 9:00 from Friday on), a week ahead, and «без срока».
  */
 export function deadlinePresets(now: Date = new Date(), { none = true }: { none?: boolean } = {}): DeadlinePreset[] {
-  const today = wallYmd(now);
+  const today = todayYmd(now);
   const presets: DeadlinePreset[] = [];
   const evening = wallIso(today, "18:00");
   if (new Date(evening).getTime() - now.getTime() > 60 * 60_000) presets.push({ label: "Сегодня 18:00", iso: evening });
-  presets.push({ label: "Завтра 9:00", iso: wallIso(shiftYmd(today, 1), "09:00") });
-  presets.push({ label: "Завтра 13:00", iso: wallIso(shiftYmd(today, 1), "13:00") });
+  presets.push({ label: "Завтра 9:00", iso: wallIso(addDays(today, 1), "09:00") });
+  presets.push({ label: "Завтра 13:00", iso: wallIso(addDays(today, 1), "13:00") });
   const weekday = weekdayOf(today);
-  if (weekday <= 3) presets.push({ label: "В пятницу 18:00", iso: wallIso(shiftYmd(today, 4 - weekday), "18:00") });
-  else presets.push({ label: "В понедельник 9:00", iso: wallIso(shiftYmd(today, 7 - weekday), "09:00") });
-  presets.push({ label: "Через неделю", iso: wallIso(shiftYmd(today, 7), "18:00") });
+  if (weekday <= 3) presets.push({ label: "В пятницу 18:00", iso: wallIso(addDays(today, 4 - weekday), "18:00") });
+  else presets.push({ label: "В понедельник 9:00", iso: wallIso(addDays(today, 7 - weekday), "09:00") });
+  presets.push({ label: "Через неделю", iso: wallIso(addDays(today, 7), "18:00") });
   if (none) presets.push({ label: "Без срока", iso: null });
   return presets;
 }
@@ -988,14 +958,14 @@ export function parseTimeInput(text: string): string | null {
     return null;
   }
   if (hours > 23 || minutes > 59) return null;
-  return `${pad2(hours)}:${pad2(minutes)}`;
+  return hmFrom(hours, minutes);
 }
 
 /** The time box's ↑/↓: a quarter of an hour, around the clock. */
 export function stepHm(hm: string, minutes: number): string {
   const [h, m] = hm.split(":").map(Number);
   const total = (((h * 60 + m + minutes) % 1440) + 1440) % 1440;
-  return `${pad2(Math.floor(total / 60))}:${pad2(total % 60)}`;
+  return hmFrom(Math.floor(total / 60), total % 60);
 }
 
 /* ---- the thread at the desk's density ---- */

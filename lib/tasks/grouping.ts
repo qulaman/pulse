@@ -5,8 +5,8 @@ import { isOverdue, type TaskStatus } from "./status-text";
 /**
  * How «Задачи» orders what the director handed out. A planner's list is not a feed:
  * the first question is «что горит», not «что последнее». So the page groups by the
- * deadline — просрочено → срочно → на приёмке → сегодня → завтра → на неделе → позже →
- * без срока — and closed work sinks to its own group at the bottom. Two piles answer «чей
+ * deadline — «просрочено» → «срочно» → «на приёмке» → «сегодня» → «завтра» → «на неделе» →
+ * «позже» → «без срока» — and closed work sinks to its own group at the bottom. Two piles answer «чей
  * ход» instead of «когда»: «Срочно» is what the director called urgent without naming a
  * time (it means «сейчас», so it never hides in «Без срока»), and «На приёмке» is work
  * already handed in — nobody can move it, so it stands by the director's hand in their
@@ -63,9 +63,9 @@ export function bucketOf(task: Groupable, now: Date = new Date()): Bucket {
   // handed in and waiting for the director: nobody can work on it, so it is neither
   // «срочно» nor a date — it is a pile of its own (D-05: приёмка is a lane)
   if (task.status === "pending_review") return "review";
-  // «Срочно» без срока — это «сейчас», а не «когда-нибудь»: место такой задачи сразу
-  // под просроченными, а не в подвале списка (директор сказал «срочно», парсер времени
-  // не услышал — docs/AI.md §10)
+  // «срочно» without a deadline means «now», not «some day»: such a task stands right under
+  // the overdue ones, not at the bottom of the list (the director said «срочно», the time
+  // parser heard no time — docs/AI.md §10)
   if (!task.deadline) return task.priority === "high" ? "urgent" : "none";
   if (isOverdue(task, now)) return "overdue";
   const days = aqtobeDay(new Date(task.deadline)) - aqtobeDay(now);

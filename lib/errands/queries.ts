@@ -33,16 +33,14 @@ export const errandKeys = {
 const SELECT =
   "*, claimed:profiles!errands_claimed_by_fkey(full_name), author:profiles!errands_author_id_fkey(full_name)";
 
-/** Живая заявка: ещё не закрыта и не отозвана. */
-export const ACTIVE: ErrandStatus[] = ["sent", "accepted"];
-
+/** A live errand: not closed and not taken back yet. */
 export function isActive(errand: Pick<Errand, "status">): boolean {
   return errand.status === "sent" || errand.status === "accepted";
 }
 
 /**
- * Заявка живёт минуты (D-79): сутки назад — уже история, её показывает /secretary.
- * Одно окно и у директора, и у секретаря — счётчик шарика и панель считают по нему.
+ * An errand lives minutes (D-79): a day ago is history already, /secretary shows it.
+ * One window for the director and the secretary alike — the ball's count and the panel count by it.
  */
 const WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -58,7 +56,7 @@ async function fetchErrands(sinceMs: number): Promise<Errand[]> {
   return (data ?? []) as Errand[];
 }
 
-/** Последние сутки заявок, живьём: карточка у секретаря гаснет по Realtime. */
+/** The last day of errands, live: a card at the secretary's goes out by Realtime. */
 export function useErrands(enabled = true) {
   return useRealtimeQuery<Errand[], ErrandRow>({
     queryKey: errandKeys.list(),
@@ -68,7 +66,7 @@ export function useErrands(enabled = true) {
   });
 }
 
-/** История для /secretary у директора: тридцать дней, без сокета. */
+/** The history for the director's /secretary: thirty days, no socket. */
 export function useErrandHistory(days = 30, enabled = true) {
   return useRealtimeQuery<Errand[], ErrandRow>({
     queryKey: errandKeys.history(days),
@@ -140,7 +138,7 @@ async function fetchErrandPage(
   if (signal) ordered = ordered.abortSignal(signal);
   const { data, count, error } = await ordered;
   if (error) throw new Error(error.message);
-  return { rows: (data ?? []) as unknown as Errand[], total: count ?? 0 };
+  return { rows: data ?? [], total: count ?? 0 };
 }
 
 /**
@@ -232,8 +230,8 @@ export function useErrand(id: string | null, enabled = true) {
 }
 
 /**
- * Каталог кнопок компании (V-02: конфигурация, а не код). Спрашивают его только директор и
- * секретарь — им /api/settings отдаёт настройки уже разобранными.
+ * The company's catalogue of buttons (V-02: configuration, not code). Only the director and the
+ * secretary ask for it — /api/settings gives them the settings already parsed.
  */
 type SecretarySetup = { escalateAfterMin: number; window: { from: string; to: string }; securityPhone: string };
 
@@ -252,8 +250,8 @@ export function useSecretaryActions(enabled = true) {
 }
 
 /**
- * Что нужно лицу секретаря кроме каталога (D-97): когда уходит повторный пуш — с этого
- * момента лицо бежит на месте, — и окно доставки компании: вне его за столом ночь.
+ * What the secretary's face needs besides the catalogue (D-97): when the repeat push leaves — from that
+ * moment the face runs on the spot — and the company's delivery window: outside it, night at the desk.
  */
 export function useSecretarySetup(enabled = true) {
   return useQuery({ queryKey: settingsKey, queryFn: fetchSettings, enabled, staleTime: 5 * 60_000, select: setupOf });
@@ -264,9 +262,9 @@ export type SecretaryPerson = { id: string; full_name: string; away_until: strin
 export const secretaryKeys = { all: ["secretaries"] as const };
 
 /**
- * Секретари компании и кто из них отошёл (D-99): стол директора показывает пустой стул,
- * карточка — кто на месте. Живьём: «не на месте» / «на месте» приходит по Realtime на
- * строки профилей секретарей (миграция 20260923235500), без перезагрузки экрана.
+ * The company's secretaries and which of them stepped away (D-99): the director's desk shows an empty chair,
+ * the card — who is there. Live: «не на месте» / «на месте» comes by Realtime on the
+ * secretaries' profile rows (migration 20260923235500), without reloading the screen.
  */
 export function useSecretaries(enabled = true) {
   return useRealtimeQuery<SecretaryPerson[], Database["public"]["Tables"]["profiles"]["Row"]>({
@@ -287,7 +285,7 @@ export function useSecretaries(enabled = true) {
   });
 }
 
-/** Состояние заявки одним словом — `/secretary` и десктоп (D-153) говорят одинаково. */
+/** An errand's state in one word — `/secretary` and the desk (D-153) say it alike. */
 export const ERRAND_STATUS_WORD: Record<ErrandStatus, string> = {
   sent: "ждёт",
   accepted: "в работе",
@@ -296,12 +294,12 @@ export const ERRAND_STATUS_WORD: Record<ErrandStatus, string> = {
   cancelled: "отменена",
 };
 
-/** Сколько заявок ждут ответа: столько и стоит в шарике. */
+/** How many errands wait for an answer: that is the number in the ball. */
 export function activeCount(rows: readonly Errand[] | undefined): number {
   return (rows ?? []).filter(isActive).length;
 }
 
-/** Тон шарика: серый пока никто не взялся, «ок» — когда взялись (D-79). */
+/** The ball's tone: grey while nobody took it, «ок» once somebody did (D-79). */
 export function ballTone(rows: readonly Errand[] | undefined): string {
   const active = (rows ?? []).filter(isActive);
   if (active.length === 0) return "var(--text-muted)";
@@ -309,10 +307,10 @@ export function ballTone(rows: readonly Errand[] | undefined): string {
 }
 
 /**
- * Квитанция заявки (принцип 8, D-32): строка outbox, которую триггер поставил в
- * очередь секретарю. Фильтр по jsonb — только в запросе (фильтра по meta у Realtime нет);
- * сокет слушает только строки заявок, а не каждую доставку компании (D-126), и он один
- * на все открытые квитанции.
+ * An errand's receipt (principle 8, D-32): the outbox row the trigger queued for the
+ * secretary. The jsonb filter is in the query only (Realtime has no filter on meta);
+ * the socket listens to the errands' rows only, not to every delivery of the company (D-126), and it is one
+ * for all the open receipts.
  */
 export function useErrandReceipt(errandId: string | null, enabled = true) {
   return useRealtimeQuery<DeliveryRow | null, DeliveryRow>({
@@ -334,7 +332,7 @@ export function useErrandReceipt(errandId: string | null, enabled = true) {
   });
 }
 
-/** «2 мин» — сколько заявка уже ждёт; секунды директору не нужны. */
+/** «2 мин» — how long the errand has waited; the director needs no seconds. */
 export function waitedFor(errand: Pick<Errand, "created_at">, now: Date): string {
   const minutes = Math.max(0, Math.round((now.getTime() - new Date(errand.created_at).getTime()) / 60_000));
   if (minutes < 1) return "только что";

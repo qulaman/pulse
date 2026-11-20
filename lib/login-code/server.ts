@@ -2,6 +2,12 @@ import "server-only";
 
 import { createHmac } from "node:crypto";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+import type { Database } from "@/lib/supabase/types";
+
+import { CODE_TTL_SECONDS, generateCode } from "./code";
+
 /**
  * The key the code and address hashes are made with: `LOGIN_CODE_SECRET` when set, otherwise
  * derived from the service-role key — server-only already, so a fresh deployment works without
@@ -44,6 +50,37 @@ export function sameOrigin(req: Request): boolean {
   } catch {
     return false;
   }
+}
+
+/** A code that was issued — the digits leave once, the base keeps only their hash — or the base's refusal. */
+export type IssueOutcome =
+  | { ok: true; code: string; expires_at: string }
+  | { ok: false; message: string; sqlstate: string | null };
+
+/**
+ * A new sign-in code (D-135) under the service role. Eight digits from 10^8: a clash with an open
+ * code is rare, a further draw settles it — five draws at most, then `issue_failed`. `issuedBy`
+ * null — the console issued it, its journal says who (D-157). A refusal is the base's word.
+ */
+export async function issueLoginCode(
+  service: SupabaseClient<Database>,
+  input: { userId: string; issuedBy: string | null; requestId?: string },
+): Promise<IssueOutcome> {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = generateCode();
+    const { data, error } = await service.rpc("issue_login_code", {
+      p_user_id: input.userId,
+      // null for the console: the generated Args cannot say a SQL argument may be null
+      p_issued_by: input.issuedBy as string,
+      p_code_hash: hashCode(code),
+      p_ttl_seconds: CODE_TTL_SECONDS,
+      p_request_id: input.requestId,
+    });
+    if (!error) return { ok: true, code, expires_at: (data as { expires_at: string }).expires_at };
+    if (error.message !== "collision") return { ok: false, message: error.message, sqlstate: error.code ?? null };
+  }
+  console.error("issue_login_code: five collisions in a row");
+  return { ok: false, message: "issue_failed", sqlstate: null };
 }
 
 /** The address a QR and a message point to: the company's sign-in screen when it has a slug. */

@@ -2,12 +2,14 @@
 
 import { ArrowRight, Bell, LogOut, MonitorSmartphone, PanelLeft, Smartphone, Volume2, VolumeX } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import { useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 
 import { NotifyRules } from "@/app/desk/profile/NotifyRules";
 import { PulseMark } from "@/components/brand/PulseMark";
 import { CopyButton } from "@/components/desk/team/fields";
-import { TileFace } from "@/components/desk/team/TeamGrid";
+import { Face, useAvatars } from "@/components/desk/ui/Face";
+import { usePushSwitch } from "@/components/profile/usePushSwitch";
+import { useSignOutOthers } from "@/components/profile/useSignOutOthers";
 import { usePushTest } from "@/components/push/usePushTest";
 import { Dialog } from "@/components/desk/ui/Dialog";
 import { Kbd } from "@/components/desk/ui/Kbd";
@@ -21,9 +23,9 @@ import { goPhoneView } from "@/lib/desk/device";
 import { readNavFolded, subscribeFrame, writeNavFolded } from "@/lib/desk/frame";
 import { useChangePassword } from "@/lib/desk/shell-queries";
 import { dropMedia, listMedia } from "@/lib/media/pending";
-import { ROLE_LABEL, usePeople, useRevokeSessions } from "@/lib/people/queries";
-import { enablePush, forgetThisDevice, pushPlatform, pushState, thisDeviceEndpoint, type PushState } from "@/lib/push/client";
-import { pushBlocker, pushEnabledToast } from "@/lib/push/words";
+import { ROLE_LABEL } from "@/lib/people/queries";
+import { forgetThisDevice, pushPlatform, type PushState } from "@/lib/push/client";
+import { pushBlocker } from "@/lib/push/words";
 import { homeForRole, type Role } from "@/lib/routes";
 import { pluralRu } from "@/lib/tasks/status-text";
 import { BUILD, versionLabel } from "@/lib/version";
@@ -156,29 +158,8 @@ function PasswordSetting() {
 
 /** This browser's push (D-114): where it stands, one click to switch it on, «Проверить» — a real push and its fate. */
 function PushSetting({ director }: { director: boolean }) {
-  const [state, setState] = useState<PushState | null>(null);
-  const [busy, setBusy] = useState(false);
+  const { state, busy, enable } = usePushSwitch();
   const test = usePushTest();
-  useEffect(() => {
-    const timer = setTimeout(() => setState(pushState()), 0);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const enable = async () => {
-    setBusy(true);
-    try {
-      const next = await enablePush();
-      setState(next);
-      if (next === "granted") {
-        const done = pushEnabledToast(pushPlatform());
-        toast(done.text, { lifetimeMs: done.lifetimeMs });
-      } else if (next === "denied") toast("Уведомления запрещены в настройках браузера");
-    } catch {
-      toast("Не получилось включить уведомления");
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const words = state ? PUSH_WORDS[state] : null;
   const blocker = state && state !== "granted" && state !== "default" ? pushBlocker(state, pushPlatform()) : null;
@@ -264,27 +245,10 @@ function SoundSetting({ director }: { director: boolean }) {
 
 /** «Выйти на других устройствах» (D-135): this computer stays signed in and keeps its pushes. */
 function OthersSetting({ userId }: { userId: string }) {
-  const [open, setOpen] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const revoke = useRevokeSessions();
-  const close = () => !revoke.isPending && setOpen(false);
-  const submit = async () => {
-    setError(null);
-    const keepEndpoint = await thisDeviceEndpoint();
-    revoke.mutate(
-      { id: userId, keepCurrent: true, keepEndpoint },
-      {
-        onSuccess: ({ sessions }) => {
-          toast(sessions > 0 ? `Вход закрыт на других устройствах · ${sessions}` : "Других входов не было");
-          setOpen(false);
-        },
-        onError: (failure) => setError(failure.message),
-      },
-    );
-  };
+  const { open, error, pending, ask, close, submit } = useSignOutOthers(userId);
   return (
     <ProfileRow label="Другие устройства" hint="Телефон забыт дома, планшет отдан — вход закроется везде, кроме этого компьютера" testId="desk-profile-others">
-      <Button size="sm" variant="secondary" icon={<MonitorSmartphone size={15} strokeWidth={2} aria-hidden />} onClick={() => setOpen(true)}>
+      <Button size="sm" variant="secondary" icon={<MonitorSmartphone size={15} strokeWidth={2} aria-hidden />} onClick={ask}>
         Выйти на других устройствах
       </Button>
       <Dialog open={open} onClose={close} title="Выйти на других устройствах?" width="sm">
@@ -295,10 +259,10 @@ function OthersSetting({ userId }: { userId: string }) {
           </p>
         ) : null}
         <div className="mt-5 flex justify-end gap-2">
-          <Button size="sm" variant="ghost" disabled={revoke.isPending} onClick={close}>
+          <Button size="sm" variant="ghost" disabled={pending} onClick={close}>
             Отмена
           </Button>
-          <Button size="sm" variant="danger" loading={revoke.isPending} onClick={() => void submit()} data-testid="revoke-others">
+          <Button size="sm" variant="danger" loading={pending} onClick={() => void submit()} data-testid="revoke-others">
             Выйти на других
           </Button>
         </div>
@@ -463,8 +427,7 @@ export function ProfileDesk({
   signOut: () => Promise<void>;
 }) {
   const director = role === "director";
-  const people = usePeople();
-  const avatar = people.data?.find((person) => person.id === userId)?.avatar_url ?? null;
+  const avatar = useAvatars().get(userId) ?? null;
   const sections: ProfileSection[] = [
     { id: "profile-account", label: "Аккаунт" },
     { id: "profile-password", label: "Пароль" },
@@ -500,7 +463,7 @@ export function ProfileDesk({
             }
           >
             <div className="profile-identity">
-              <TileFace person={{ id: userId, full_name: fullName, avatar_url: avatar }} size={64} />
+              <Face person={{ id: userId, full_name: fullName, avatar_url: avatar }} size={64} />
               <div className="min-w-0 flex-1">
                 <p className="profile-identity-name">{fullName}</p>
                 <p className="profile-identity-line">

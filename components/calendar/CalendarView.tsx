@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, LayoutGroup, motion, MotionConfig } from "motion/react";
-import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { EventCard } from "@/components/calendar/EventCard";
 import { EventEditor } from "@/components/calendar/EventEditor";
@@ -16,16 +16,15 @@ import { awaitingAnswer, calendarScreen } from "@/lib/calendar/overview";
 import type { CalendarEvent } from "@/lib/calendar/queries";
 import { compareYmd, daysBetween, parseYmd, todayYmd, type Ymd } from "@/lib/datetime/calendar";
 import { haptic } from "@/lib/haptics";
+import { useHydrated } from "@/lib/useHydrated";
 
 import { CalendarStatus } from "./CalendarStatus";
 import type { CalendarNav } from "./useCalendarNav";
-
-const noSubscribe = () => () => {};
+import { dateLineRu } from "@/lib/ai/time";
 
 /** Cards drawn at once: a busy month must not become a hundred animated nodes on a Redmi. */
 const PAGE = 40;
 
-const DATE_LINE = new Intl.DateTimeFormat("ru-RU", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Aqtobe" });
 const DAY_TITLE = new Intl.DateTimeFormat("ru-RU", { weekday: "short", day: "numeric", month: "long", timeZone: "UTC" });
 
 /** «Сегодня · чт, 24 сентября», «Завтра · пт, 25 сентября», «пн, 28 сентября». */
@@ -139,13 +138,13 @@ export function CalendarView({ nav, now, meId, isDirector, upcoming, events, loa
   // the screen is made of «now» (the hand on the strip, the line through today, «через 12
   // мин»): the server's second is not the phone's, so the server draws the bones and the
   // phone draws the rest — the data arrives on the phone anyway
-  const hydrated = useSyncExternalStore(noSubscribe, () => true, () => false);
+  const hydrated = useHydrated();
   if (!hydrated) return <CalendarSkeleton month={nav.month} />;
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28">
       <PageHead
-        eyebrow={DATE_LINE.format(now)}
+        eyebrow={dateLineRu(now)}
         title="Календарь"
         tone={screen.tone}
         actions={

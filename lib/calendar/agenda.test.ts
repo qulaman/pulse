@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { addDays } from "@/lib/datetime/calendar";
+
 import {
   agendaFrom,
   clashesWith,
@@ -18,7 +20,6 @@ import {
   RSVP_DESK,
   rsvpSummary,
   runningEvent,
-  shiftDay,
   shiftEnd,
   spanOf,
   startsSoon,
@@ -229,9 +230,9 @@ describe("agenda", () => {
   });
 
   it("steps whole days across months and years", () => {
-    expect(shiftDay("2026-09-28", 7)).toBe("2026-10-05");
-    expect(shiftDay("2026-01-03", -7)).toBe("2025-12-27");
-    expect(shiftDay("2028-02-28", 1)).toBe("2028-02-29");
+    expect(addDays("2026-09-28", 7)).toBe("2026-10-05");
+    expect(addDays("2026-01-03", -7)).toBe("2025-12-27");
+    expect(addDays("2028-02-28", 1)).toBe("2028-02-29");
   });
 
   it("says what a saved change sends: a new start «Перенос», a new place «Новое место», else nothing", () => {

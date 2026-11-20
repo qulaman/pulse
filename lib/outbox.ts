@@ -9,6 +9,8 @@
  * Nothing leaves it silently (D-130): a tap the server refused on the replay, and one that
  * waited too long to still mean anything, are told to the person who made it.
  */
+import type { MessageRow } from "@/lib/media/message";
+
 const KEY = "pulse.outbox.v1";
 /** Older than this the intent is stale: a task may have moved on, the person may have acted. */
 export const MAX_AGE_MS = 24 * 3_600_000;
@@ -23,7 +25,7 @@ export type OutboxEntry = {
 };
 
 /** How a `message` entry is written on replay — supabase-js lives in the browser bundle, not here. */
-export type MessageWriter = (row: unknown) => Promise<{ error: { message: string } | null }>;
+export type MessageWriter = (row: MessageRow) => Promise<{ error: { message: string } | null }>;
 
 /** Entries dropped for age since the replay last asked — the replay says so once (D-130). */
 let stale = 0;
@@ -193,7 +195,8 @@ export async function replayOutbox(writeMessage?: MessageWriter): Promise<Replay
     if (isHeld(entry.id)) continue;
     if (entry.kind === "message") {
       if (!writeMessage) continue;
-      const { error } = await writeMessage(entry.payload);
+      // a `message` entry holds the row useSendMessage wrote (lib/tasks/thread-mutations.ts)
+      const { error } = await writeMessage(entry.payload as MessageRow);
       if (error && DEAD_NETWORK.test(error.message)) break;
       dequeue(entry.id);
       // a duplicate id is the row that did land — its answer was what got lost

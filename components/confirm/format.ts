@@ -1,42 +1,23 @@
 import type { PostprocessedEntity } from "@/lib/ai/postprocess";
 import type { Entity } from "@/lib/ai/schema";
+import { atAqtobe, toAqtobeIso } from "@/lib/ai/time";
+import { aqtobeIsoToYmdHm } from "@/lib/datetime/calendar";
+import { pluralRu } from "@/lib/tasks/status-text";
 
-/** Aqtobe is +05:00 all year (docs/AI.md §2) — wall clock is plain arithmetic. */
-const OFFSET_MS = 5 * 60 * 60 * 1000;
+/** @deprecated moved — import `pluralRu` from "@/lib/tasks/status-text". */
+export { pluralRu };
 
-const pad = (n: number) => String(n).padStart(2, "0");
-
-function wall(date: Date): Date {
-  return new Date(date.getTime() + OFFSET_MS);
-}
-
-/** "14.08 13:00" — the year is noise on a deadline chip. */
+/** "14.08 13:00" on the Aqtobe clock — the year is noise on a deadline chip. */
 export function formatDeadline(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  const w = wall(date);
-  return `${pad(w.getUTCDate())}.${pad(w.getUTCMonth() + 1)} ${pad(w.getUTCHours())}:${pad(w.getUTCMinutes())}`;
+  const at = aqtobeIsoToYmdHm(iso);
+  if (!at) return iso;
+  const [, month, day] = at.ymd.split("-");
+  return `${day}.${month} ${at.hm}`;
 }
 
 /** Aqtobe wall-clock fields as an ISO string with the explicit offset the parser uses. */
 export function aqtobeIsoAt(dayShift: number, hours: number, minutes: number, now = new Date()): string {
-  const w = wall(now);
-  const at = new Date(
-    Date.UTC(w.getUTCFullYear(), w.getUTCMonth(), w.getUTCDate() + dayShift, hours, minutes, 0, 0),
-  );
-  return (
-    `${at.getUTCFullYear()}-${pad(at.getUTCMonth() + 1)}-${pad(at.getUTCDate())}` +
-    `T${pad(at.getUTCHours())}:${pad(at.getUTCMinutes())}:00+05:00`
-  );
-}
-
-export function pluralRu(count: number, forms: [string, string, string]): string {
-  const mod100 = count % 100;
-  if (mod100 >= 11 && mod100 <= 14) return forms[2];
-  const mod10 = count % 10;
-  if (mod10 === 1) return forms[0];
-  if (mod10 >= 2 && mod10 <= 4) return forms[1];
-  return forms[2];
+  return toAqtobeIso(atAqtobe(now, dayShift, hours, minutes));
 }
 
 const KIND_FORMS: Record<Entity["kind"], [string, string, string]> = {

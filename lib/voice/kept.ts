@@ -12,6 +12,8 @@
  * in-memory path it had before.
  */
 
+import { idbStore } from "@/lib/offline/idb";
+
 import type { PostprocessedEntity } from "../ai/postprocess";
 import type { ConfirmRequest, IngestSource, ParseResponse } from "./api";
 
@@ -74,73 +76,22 @@ function fromStored(entry: StoredPhrase): KeptPhrase {
   return { ...entry, audio: { blob: new Blob([bytes], { type: mime }), mime, durationMs } };
 }
 
-const DB_NAME = "pulse-voice";
-const DB_VERSION = 1;
 const PHRASES = "phrases";
+/** The phones' database — its name, version and store never change (lib/offline/idb.ts). */
+const db = idbStore("pulse-voice", 1, [PHRASES]);
 
-let opening: Promise<IDBDatabase | null> | null = null;
-
-function database(): Promise<IDBDatabase | null> {
-  if (typeof indexedDB === "undefined") return Promise.resolve(null);
-  opening ??= new Promise((resolve) => {
-    try {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
-      request.onupgradeneeded = () => {
-        const db = request.result;
-        if (!db.objectStoreNames.contains(PHRASES)) db.createObjectStore(PHRASES, { keyPath: "id" });
-      };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => resolve(null);
-      request.onblocked = () => resolve(null);
-    } catch {
-      resolve(null);
-    }
-  });
-  return opening;
-}
-
-/** One request in its own transaction; resolves when the transaction is durable. */
-async function run<T>(mode: IDBTransactionMode, make: (target: IDBObjectStore) => IDBRequest<T>): Promise<{ ok: boolean; value?: T }> {
-  const db = await database();
-  if (!db) return { ok: false };
-  return new Promise((resolve) => {
-    try {
-      const tx = db.transaction(PHRASES, mode);
-      const request = make(tx.objectStore(PHRASES));
-      tx.oncomplete = () => resolve({ ok: true, value: request.result });
-      tx.onerror = () => resolve({ ok: false });
-      tx.onabort = () => resolve({ ok: false });
-    } catch {
-      resolve({ ok: false });
-    }
-  });
+function run<T>(mode: IDBTransactionMode, make: (target: IDBObjectStore) => IDBRequest<T>): Promise<{ ok: boolean; value?: T }> {
+  return db.run(PHRASES, mode, make);
 }
 
 /**
- * Every read and write goes through one line: a patch is read-modify-write, and the store
- * patches a phrase several times a second (upload → words → cards → an edit). In a line the
- * last word always wins and a reader never sees a step before the one written ahead of it.
+ * Every read and write goes through one line: the store patches a phrase several times a
+ * second (upload → words → cards → an edit).
  */
-let line: Promise<unknown> = Promise.resolve();
-function queued<T>(step: () => Promise<T>): Promise<T> {
-  const next = line.then(step, step);
-  line = next.catch(() => undefined);
-  return next;
-}
-
-const listeners = new Set<() => void>();
+const { queued, changed } = db;
 
 /** The pill and the replay redraw when the phone's list changes. */
-export function subscribeKept(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-}
-
-function changed() {
-  for (const listener of listeners) listener();
-}
+export const subscribeKept: (listener: () => void) => () => void = db.subscribe;
 
 /** Keep a new phrase on the phone. False — nothing was kept (no IndexedDB here). */
 export async function keepPhrase(entry: KeptPhrase): Promise<boolean> {
@@ -195,7 +146,7 @@ export function listPhrases(userId: string): Promise<KeptPhrase[]> {
 export function countOnTheirWay(): Promise<number> {
   return queued(async () => {
     const { value } = await run<StoredPhrase[]>("readonly", (store) => store.getAll());
-    return (value ?? []).filter((entry) => !isReady(fromStored(entry)) && !claimed.has(entry.id)).length;
+    return (value ?? []).filter((entry) => !isReady(fromStored(entry)) && !db.isClaimed(entry.id)).length;
   });
 }
 
@@ -206,16 +157,12 @@ export function countOnTheirWay(): Promise<number> {
  * and the replay must not both upload, hear or send it — the server would dedupe the batch by
  * its key, but STT and the parser would be paid twice.
  */
-const claimed = new Set<string>();
-
 export function claimPhrase(id: string): boolean {
-  if (claimed.has(id)) return false;
-  claimed.add(id);
-  return true;
+  return db.claim(id);
 }
 
 export function releasePhrase(id: string): void {
-  claimed.delete(id);
+  db.release(id);
 }
 
 /**

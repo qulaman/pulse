@@ -1,11 +1,12 @@
 "use client";
 
-import { onlineManager, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { usePathname, useSearchParams } from "next/navigation";
 import { CalendarRange, ChevronLeft, ChevronRight, Diamond, MonitorUp, Plus } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { useDeskScope } from "@/components/desk/DeskScope";
+import { useScreenKeys } from "@/components/desk/team/keys";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { IconButton } from "@/components/desk/ui/IconButton";
 import { Kbd } from "@/components/desk/ui/Kbd";
@@ -14,25 +15,24 @@ import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SegmentTabs } from "@/components/desk/ui/Toolbar";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import type { Tone } from "@/components/desk/ui/tone";
-import { deskLayerUp } from "@/components/desk/voice/control";
 import { Button } from "@/components/ui/Button";
 import { Bone } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
-import { noticeOfEdit, shiftDay, ymdOfEvent } from "@/lib/calendar/agenda";
+import { noticeOfEdit, ymdOfEvent } from "@/lib/calendar/agenda";
 import { canMove, MOVE_HOLD_MS, moveDraft } from "@/lib/calendar/move";
 import { DESK_WORDS, useEditEvent } from "@/lib/calendar/mutations";
 import { calendarScreen, isRunning, type CalendarScreen } from "@/lib/calendar/overview";
 import { useCalendar, useCalendarMonth, useEvent, warmCalendarMonth, type CalendarEvent } from "@/lib/calendar/queries";
-import { addMonths, compareYmd, monthOf, parseYmd, todayYmd, ymdOf, type Ymd } from "@/lib/datetime/calendar";
-import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
+import { addDays, addMonths, compareYmd, monthOf, parseYmd, todayYmd, ymdOf, type Ymd } from "@/lib/datetime/calendar";
 import { useCompanySettings } from "@/lib/dictionary-queries";
 import { useNamesKey } from "@/lib/people/names";
 import { usePointsEnabled } from "@/lib/points/queries";
-import { useNow } from "@/lib/pulse/queries";
 import { useMe, useSentTasks } from "@/lib/tasks/queries";
 import { useTvControl } from "@/lib/tv/mutations";
 import { useTvState } from "@/lib/tv/queries";
 import { sceneOf } from "@/lib/tv/state";
+import { useNow } from "@/lib/useNow";
+import { useOnline } from "@/lib/useOnline";
 
 import { MonthGrid } from "./CalendarGrids";
 import { CalendarSide } from "./CalendarSide";
@@ -78,9 +78,6 @@ function stateLine(screen: CalendarScreen, running: boolean): { text: string; to
   return { text: meetingWords(join(`${screen.value} ${screen.label}`, screen.focusId ? screen.detail : detail)), tone };
 }
 
-const subscribeOnline = (onChange: () => void) => onlineManager.subscribe(onChange);
-const isOnline = () => onlineManager.isOnline();
-
 /**
  * «Календарь» of the desk (D-153, D-154, D-180). The director's week is the main form: the day he
  * looks at (`?day`, a click on its date or Shift+←/→; today by default) is wider inside the week,
@@ -102,7 +99,7 @@ export function DeskCalendar() {
   const now = useNow();
   const today = todayYmd(now);
   const queryClient = useQueryClient();
-  const online = useSyncExternalStore(subscribeOnline, isOnline, () => true);
+  const online = useOnline();
   const settings = useCompanySettings();
   // the company's working days live with the daily report (D-155 §7): one list for the whole product
   const workdays = settings.data?.daily_report.workdays ?? WORKDAYS;
@@ -173,7 +170,7 @@ export function DeskCalendar() {
 
   // the secretary sees the director's time, and only that (owner, 2026-11-04; D-158 §5)
   const isSecretary = role === "secretary";
-  const busy = useDirectorBusy(first, shiftDay(last, 1), isSecretary);
+  const busy = useDirectorBusy(first, addDays(last, 1), isSecretary);
   // already laid by day and cut to the days on screen; `to` is exclusive, long ranges are read in parts
   const busyState = { status: busy.status, blocks: busy.blocks, onRetry: () => void busy.refetch() };
 
@@ -280,7 +277,7 @@ export function DeskCalendar() {
 
   const step = (delta: -1 | 1) => {
     setQuick(null);
-    if (view === "week") return go({ d: shiftDay(anchor, delta * 7), day: null, e: null });
+    if (view === "week") return go({ d: addDays(anchor, delta * 7), day: null, e: null });
     const next = addMonths(month, delta);
     const todayParts = parseYmd(today)!;
     // today when the month has it, its first day otherwise — as the phone's arrows do
@@ -289,8 +286,8 @@ export function DeskCalendar() {
   /** Shift+←/→: the day looked at moves along the week (the grid widens it). */
   const stepDay = (delta: -1 | 1) => {
     if (view !== "week") return;
-    const from = focusDay ?? (delta > 0 ? shiftDay(first, -1) : shiftDay(last, 1));
-    const next = shiftDay(from, delta);
+    const from = focusDay ?? (delta > 0 ? addDays(first, -1) : addDays(last, 1));
+    const next = addDays(from, delta);
     if (days.includes(next)) go({ day: next });
   };
 
@@ -301,39 +298,27 @@ export function DeskCalendar() {
 
   // the keys of the screen, by the physical key so a Russian layout works. The secretary's M stays
   // «Сообщение» of the top bar (D-175): her W turns «Окна директора» and the month in turn.
-  const keys = useRef<(event: KeyboardEvent) => boolean>(() => false);
-  useEffect(() => {
-    keys.current = (event) => {
-      const code = event.code;
-      const arrow = code === "ArrowLeft" || code === "ArrowRight";
-      if (event.shiftKey) {
-        if (arrow && isDirector) {
-          stepDay(code === "ArrowLeft" ? -1 : 1);
-          return true;
-        }
-        return false;
+  useScreenKeys((event) => {
+    const code = event.code;
+    const arrow = code === "ArrowLeft" || code === "ArrowRight";
+    if (event.shiftKey) {
+      if (arrow && isDirector) {
+        stepDay(code === "ArrowLeft" ? -1 : 1);
+        return true;
       }
-      if (arrow) step(code === "ArrowLeft" ? -1 : 1);
-      else if (code === "KeyT") go({ d: today, day: null });
-      else if (code === "KeyW") setView(isSecretary && view === "week" ? "month" : "week");
-      else if (code === "KeyM" && isDirector) setView("month");
-      else if (code === "KeyD" && isDirector) toggleDeadlines();
-      else if (code === "KeyN" && isDirector) newMeeting();
-      else if (code === "KeyE" && isDirector && openId && opened.data) editOpen();
-      else if (code === "Escape" && openId) close();
-      else return false;
-      return true;
-    };
+      return false;
+    }
+    if (arrow) step(code === "ArrowLeft" ? -1 : 1);
+    else if (code === "KeyT") go({ d: today, day: null });
+    else if (code === "KeyW") setView(isSecretary && view === "week" ? "month" : "week");
+    else if (code === "KeyM" && isDirector) setView("month");
+    else if (code === "KeyD" && isDirector) toggleDeadlines();
+    else if (code === "KeyN" && isDirector) newMeeting();
+    else if (code === "KeyE" && isDirector && openId && opened.data) editOpen();
+    else if (code === "Escape" && openId) close();
+    else return false;
+    return true;
   });
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || !isPlainKey(event) || isTypingTarget(event.target) || deskLayerUp()) return;
-      if (document.body.hasAttribute("data-sheet-open") || document.body.hasAttribute("data-dialog-open")) return;
-      if (keys.current(event)) event.preventDefault();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
 
   useShortcuts("Календарь", [
     { keys: ["←", "→"], label: view === "week" ? "Прошлая и следующая неделя" : "Прошлый и следующий месяц" },
@@ -465,7 +450,7 @@ export function DeskCalendar() {
         state={upcoming.data ? stateLine(screen, running) : null}
         actions={
           <>
-            <h2 className="cal-title desk-figure min-w-[150px] text-[20px] leading-6" data-testid="desk-calendar-title">
+            <h2 className="desk-figure min-w-[150px] text-[20px] leading-6" data-testid="desk-calendar-title">
               {title}
             </h2>
             <div className="cal-nav flex items-center">
@@ -510,7 +495,7 @@ export function DeskCalendar() {
 
       {/* the grid and, beside it, the day or the open meeting; the shell's own panel takes the side's place */}
       <div className="cal-layout grid items-start gap-6">
-        <div ref={stage} className="cal-stage min-w-0">
+        <div ref={stage} className="min-w-0">
           {grid}
         </div>
         <div className="cal-side-slot min-w-0">

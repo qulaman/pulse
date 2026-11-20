@@ -12,16 +12,15 @@ import { humanAqtobe } from "@/lib/ai/time";
 import { ERRAND_STATUS_WORD, isActive, useErrandHistory, waitedFor, type Errand } from "@/lib/errands/queries";
 import { averageDoneMinutes, humanMinutes, tallyByPerson, unclaimedCount } from "@/lib/errands/stats";
 import { shortName, useNamesKey } from "@/lib/people/names";
-import { useNow } from "@/lib/pulse/queries";
 import { useMe } from "@/lib/tasks/queries";
+import { useNow } from "@/lib/useNow";
 
 const STATUS_WORD: Record<string, string> = ERRAND_STATUS_WORD;
 
 /**
- * /secretary — заявки одним списком. Директору: что происходит сейчас и что было за
- * тридцать дней, кто сколько взял и за сколько закрывает. Секретарю: живые заявки и
- * свои закрытые за сегодня. Пуш ведёт сюда со ссылкой `?e=<id>` — карточка открывается
- * шторкой поверх списка.
+ * /secretary — the requests in one list. For the director: what is going on now and what there was
+ * over thirty days, who took how many and how fast they close. For the secretary: the live requests
+ * and her own closed today. A push leads here with `?e=<id>` — the card opens as a sheet over the list.
  */
 export default function SecretaryPage() {
   // a namesake on screen gets the surname's initial once the roster has come (D-146)

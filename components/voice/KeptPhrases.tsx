@@ -1,25 +1,24 @@
 "use client";
 
-import { onlineManager, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 
-import { useOnline } from "@/components/OfflineBanner";
 import { Mascot } from "@/components/brand/Mascot";
-import { entitiesSummary, pluralRu } from "@/components/confirm/format";
+import { entitiesSummary } from "@/components/confirm/format";
 import { useDockSpace } from "@/components/ui/dock";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
+import { useReplayRounds } from "@/lib/offline/rounds";
 import { bindIngestOwner, useIngestStore } from "@/lib/store/ingest";
 import { useMe } from "@/lib/tasks/queries";
+import { useKeyboardDock } from "@/lib/ui/keyboard";
+import { useOnline } from "@/lib/useOnline";
 import { voiceApi } from "@/lib/voice/api";
 import { dropPhrase, keepPhrase, keptView, listPhrases, patchPhrase, subscribeKept, wasParkedHere, type KeptPhrase } from "@/lib/voice/kept";
-import { useKeyboardDock } from "@/lib/ui/keyboard";
 import { replayRound, withPhraseLock } from "@/lib/voice/keptReplay";
-
-/** While something waits on the phone, a quiet retry on this beat — `online` events lie on a captive network. */
-const RETRY_MS = 30_000;
+import { pluralRu } from "@/lib/tasks/status-text";
 
 /** Whether the pill is up: Пульс keeps its gesture hint out of the pill's place. */
 export const useKeptPill = create<{ shown: boolean }>(() => ({ shown: false }));
@@ -71,50 +70,26 @@ function useKeptReplay(userId: string | undefined, pathname: string) {
     at.current = pathname;
   }, [pathname]);
 
-  useEffect(() => {
-    if (!userId) return;
-    let alive = true;
-    let running = false;
-    const round = async () => {
-      if (running || !onlineManager.isOnline()) return;
-      running = true;
-      try {
-        const { sent, ready } = await replayRound(userId, { api: voiceApi, patch: patchPhrase, drop: dropPhrase }, { lock: withPhraseLock });
-        if (!alive) return;
-        if (sent > 0) {
-          toast(sent === 1 ? "Отправил то, что ждало сети" : `Отправил ${sent} ${pluralRu(sent, ["пачку", "пачки", "пачек"])}, что ждали сети`);
-          void queryClient.invalidateQueries({ queryKey: ["tasks"] });
-          void queryClient.invalidateQueries({ queryKey: ["notes"] });
-          void queryClient.invalidateQueries({ queryKey: ["ether"] });
-          void queryClient.invalidateQueries({ queryKey: ["calendar"] });
-        }
-        const back = ready.find((phrase) => wasParkedHere(phrase.id));
-        if (back && at.current === "/pulse" && faceFree() && document.visibilityState === "visible") {
-          useIngestStore.getState().restore(back);
-        }
-      } finally {
-        running = false;
+  useReplayRounds(
+    async (alive) => {
+      if (!userId) return;
+      const { sent, ready } = await replayRound(userId, { api: voiceApi, patch: patchPhrase, drop: dropPhrase }, { lock: withPhraseLock });
+      if (!alive()) return;
+      if (sent > 0) {
+        toast(sent === 1 ? "Отправил то, что ждало связи" : `Отправил ${sent} ${pluralRu(sent, ["пачку", "пачки", "пачек"])}, что ждали связи`);
+        void queryClient.invalidateQueries({ queryKey: ["tasks"] });
+        void queryClient.invalidateQueries({ queryKey: ["notes"] });
+        void queryClient.invalidateQueries({ queryKey: ["ether"] });
+        void queryClient.invalidateQueries({ queryKey: ["calendar"] });
       }
-    };
-    void round();
-    const offOnline = onlineManager.subscribe((online) => {
-      if (online) void round();
-    });
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void round();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    const beat = setInterval(() => void round(), RETRY_MS);
+      const back = ready.find((phrase) => wasParkedHere(phrase.id));
+      if (back && at.current === "/pulse" && faceFree() && document.visibilityState === "visible") {
+        useIngestStore.getState().restore(back);
+      }
+    },
     // the face parked a phrase just now: a network that is back already takes it at once
-    const offKept = subscribeKept(() => void round());
-    return () => {
-      alive = false;
-      offOnline();
-      offKept();
-      document.removeEventListener("visibilitychange", onVisible);
-      clearInterval(beat);
-    };
-  }, [userId, queryClient]);
+    { on: userId, exclusive: true, extra: subscribeKept },
+  );
 }
 
 /** «Запись 14:05», «Текст вчера 18:20» — today goes without the word, the pill is narrow */

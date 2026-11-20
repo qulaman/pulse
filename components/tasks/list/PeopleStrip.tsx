@@ -1,7 +1,7 @@
 "use client";
 
-import { shortName } from "@/lib/people/names";
-import { initialsOf } from "@/lib/people/queries";
+import { shortName, initialsOf } from "@/lib/people/names";
+
 import type { PersonLoad } from "@/lib/tasks/overview";
 
 /**

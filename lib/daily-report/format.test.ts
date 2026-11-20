@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { addDays } from "@/lib/datetime/calendar";
+
 import {
   activityLine,
-  addDaysYmd,
   dayState,
   dayTitle,
   durationText,
@@ -87,8 +88,8 @@ describe("days", () => {
   });
 
   it("walks across a month and knows the weekday", () => {
-    expect(addDaysYmd("2026-10-28", 6)).toBe("2026-11-03");
-    expect(addDaysYmd("2026-03-01", -1)).toBe("2026-02-28");
+    expect(addDays("2026-10-28", 6)).toBe("2026-11-03");
+    expect(addDays("2026-03-01", -1)).toBe("2026-02-28");
     expect(isoWeekday("2026-10-26")).toBe(1);
     expect(isoWeekday("2026-11-01")).toBe(7);
   });

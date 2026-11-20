@@ -100,10 +100,3 @@ export function dropPlace(rows: readonly Placed[], row: Placed, index: number): 
   if (was === index) return null;
   return positionBetween(before ? (before.position ?? 0) : null, after ? (after.position ?? 0) : null);
 }
-
-/** The line a caret goes to from `id`: the one above or below in the order on screen. */
-export function neighbourLine(order: readonly string[], id: string, direction: -1 | 1): string | null {
-  const at = order.indexOf(id);
-  if (at < 0) return null;
-  return order[at + direction] ?? null;
-}

@@ -3,13 +3,13 @@
 import { ChevronDown } from "lucide-react";
 import { useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 
+import { Face } from "@/components/desk/ui/Face";
 import { useRemindDailyReport } from "@/lib/daily-report/actions";
 import { pointsText, shortHm, timeOf } from "@/lib/daily-report/format";
 import type { DailyReportReminder, TeamDay, TeamDayRow } from "@/lib/daily-report/types";
 import { nowHm } from "@/lib/datetime/calendar";
 import { useCompanySettings } from "@/lib/dictionary-queries";
 
-import { TileFace } from "../team/TeamGrid";
 
 /** The company's delivery window (`settings.delivery_window`, principle 8): a push queued outside it waits. */
 export type Window = { from: string; to: string };
@@ -98,7 +98,7 @@ function Person({ row, note, end, select }: { row: TeamDayRow; note?: ReactNode;
         if (!fromControl(event)) select.onOpen(row.user_id);
       }}
     >
-      <TileFace person={{ id: row.user_id, full_name: row.full_name, avatar_url: row.avatar_url }} size={24} />
+      <Face person={{ id: row.user_id, full_name: row.full_name, avatar_url: row.avatar_url }} size={24} />
       <span className="min-w-0 flex-1">
         <span className="rep-day-person-name" title={row.position ? `${row.full_name} · ${row.position}` : row.full_name}>
           {row.full_name}
@@ -216,7 +216,7 @@ export function RollCall({
     waiting.length > (wide ? 1 : 0) ? (
       <button
         type="button"
-        className="rep-day-remind rep-day-remind-all desk-focus"
+        className="rep-day-remind desk-focus"
         data-testid="desk-remind-all"
         title={
           late
@@ -336,7 +336,7 @@ export function RollCall({
   if (wide) {
     return (
       <aside className="rep-day-roll" data-mode="rail" data-testid="desk-rollcall" aria-label="Перекличка">
-        <div className="rep-day-roll-head">
+        <div>
           <p className="rep-day-roll-count" data-testid="desk-rollcall-count">
             {figure}
           </p>

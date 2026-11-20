@@ -4,11 +4,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 
 import { userSupabase, withAuth } from "@/lib/api/handler";
-import { apiError, apiOk } from "@/lib/api/respond";
+import { apiError, apiOk, NO_ACCESS, rpcFailure } from "@/lib/api/respond";
 import { casesForKinds, loadCorpus } from "@/lib/ai/evals/corpus";
 import { passesGates } from "@/lib/ai/evals/score";
 import { collectRun, evalSecret, runFingerprint } from "@/lib/ai/evals/stamp";
 import { fewShotMessages } from "@/lib/ai/examples";
+import { parseOptionsOf } from "@/lib/ai/parse";
 import { isDeepSeekModel } from "@/lib/ai/deepseek";
 import { buildSystemBlocks, buildUserMessage, parserSystemPrompt, rosterJson } from "@/lib/ai/prompt";
 import { normalizeRules, PARSER_GATES, PARSER_RULES_HISTORY_MAX, PARSER_RULES_MAX } from "@/lib/ai/rules";
@@ -141,11 +142,8 @@ export const PUT = withAuth<z.infer<typeof SaveSchema>>(
       const corpus = loadCorpus();
       const fingerprint = runFingerprint({
         rules: text,
-        model: settings.parser.model,
-        escalate: settings.parser.escalate,
-        escalationModel: settings.parser.escalation_model,
+        ...parseOptionsOf(settings),
         matching: settings.matching,
-        kinds: settings.parser.kinds,
         corpusHash: corpus.hash,
       });
       const run = collectRun(
@@ -191,8 +189,7 @@ export const PUT = withAuth<z.infer<typeof SaveSchema>>(
     const supabase = await userSupabase(req);
     const { data, error } = await supabase.rpc("update_company_settings", { patch: { parser_rules: next } as unknown as Json });
     if (error) {
-      if (error.message.includes("forbidden")) return apiError(403, "forbidden", "Нет доступа");
-      throw new Error(`parser rules save failed: ${error.message}`);
+      return rpcFailure(error, { forbidden: NO_ACCESS }, "parser rules save");
     }
     return apiOk({ versions: parseCompanySettings(data).parser_rules.versions });
   },

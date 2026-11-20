@@ -4,18 +4,8 @@ import { motion, useReducedMotion } from "motion/react";
 import { useRef } from "react";
 
 import { useGlideOn } from "@/components/ui/motion";
-import { shiftDay } from "@/lib/calendar/agenda";
-import {
-  compareYmd,
-  humanYmd,
-  monthTitleRu,
-  parseYmd,
-  WEEKDAYS_SHORT_RU,
-  weeksInMonth,
-  ymdOf,
-  type Month,
-  type Ymd,
-} from "@/lib/datetime/calendar";
+
+import { compareYmd, humanYmd, monthTitleRu, parseYmd, WEEKDAYS_SHORT_RU, weeksInMonth, ymdOf, type Month, type Ymd, addDays } from "@/lib/datetime/calendar";
 
 import type { CalendarNav } from "./useCalendarNav";
 
@@ -43,10 +33,10 @@ const weekdayOf = (ymd: Ymd) => {
 function monthCells(month: Month): Cell[][] {
   const weeks = weeksInMonth(month);
   const first = ymdOf(month.year, month.month, 1);
-  const start = shiftDay(first, -weekdayOf(first));
+  const start = addDays(first, -weekdayOf(first));
   return Array.from({ length: weeks }, (_, week) =>
     Array.from({ length: 7 }, (_, day) => {
-      const ymd = shiftDay(start, week * 7 + day);
+      const ymd = addDays(start, week * 7 + day);
       const parts = parseYmd(ymd)!;
       return { ymd, outside: parts.year !== month.year || parts.month !== month.month };
     }),
@@ -55,8 +45,8 @@ function monthCells(month: Month): Cell[][] {
 
 /** The week the chosen day lives in — the folded grid. */
 function weekCells(selected: Ymd): Cell[][] {
-  const start = shiftDay(selected, -weekdayOf(selected));
-  return [Array.from({ length: 7 }, (_, day) => ({ ymd: shiftDay(start, day), outside: false }))];
+  const start = addDays(selected, -weekdayOf(selected));
+  return [Array.from({ length: 7 }, (_, day) => ({ ymd: addDays(start, day), outside: false }))];
 }
 
 /**

@@ -1,7 +1,7 @@
 "use client";
 
 import { Send, X } from "lucide-react";
-import { useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
+import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { Button } from "@/components/ui/Button";
@@ -13,12 +13,10 @@ import { firstLine } from "@/lib/notes/list";
 import type { Note } from "@/lib/notes/queries";
 import { shortName } from "@/lib/people/names";
 import { usePeople, type Person } from "@/lib/people/queries";
-import { useDeliveryWindow } from "@/lib/points/queries";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { pluralRu, SHORT_STATUS } from "@/lib/tasks/status-text";
-import { isWithinDeliveryWindow, WINDOW_OPEN_HOUR } from "@/lib/voice/quietHours";
+import { useQuietHours } from "@/lib/voice/quietHours";
 
-const noop = () => () => {};
 
 type Chosen = { person: Who; crid: string };
 type Who = { id: string; full_name: string };
@@ -28,7 +26,7 @@ type Who = { id: string; full_name: string };
  * every line with words and no task yet gets a «Кому» field; a name typed in it (two letters, the
  * desk's `suggestPeople`) and Enter pick the person and go on to the next line; one «Отправить N»
  * sends them all through `useAssignNotes`, one task per line. The `client_request_id` is born with
- * the pick (принцип 7): a second press after a lost answer lands on the same tasks. After hours the
+ * the pick (principle 7): a second press after a lost answer lands on the same tasks. After hours the
  * people get them in the morning unless «сразу» is pressed — the same choice as `AssignSheet`.
  * Esc leaves the mode; what was not sent keeps its pick until then.
  */
@@ -47,10 +45,8 @@ export function HandOut({
 }) {
   const people = usePeople();
   const assign = useAssignNotes(me);
-  const window = useDeliveryWindow().data;
-  const hydrated = useSyncExternalStore(noop, () => true, () => false);
-  const quiet = hydrated && !isWithinDeliveryWindow(new Date(), window);
-  const opensAt = window?.from ?? `0${WINDOW_OPEN_HOUR}:00`;
+  // tasks handed out after hours wait for the morning (D-38) — unless «сразу»
+  const { quiet, opensAt } = useQuietHours();
   const [now, setNow] = useState(false);
   const [picks, setPicks] = useState<Map<string, Chosen>>(() => new Map());
   const box = useRef<HTMLDivElement>(null);

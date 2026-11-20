@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { userSupabase, withAuth } from "@/lib/api/handler";
-import { apiError, apiOk } from "@/lib/api/respond";
+import { apiOk, NO_ACCESS, rpcFailure } from "@/lib/api/respond";
 import { suggestWords, usageOf } from "@/lib/dictionary-usage";
 import { loadCompanySettings, loadRoster } from "@/lib/roster";
 import { DICTIONARY_DISMISSED_MAX, parseCompanySettings } from "@/lib/settings";
@@ -65,8 +65,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       patch: { dictionary: { ...current.dictionary, dismissed_words } } as Json,
     });
     if (error) {
-      if (error.message.includes("forbidden")) return apiError(403, "forbidden", "Нет доступа");
-      throw new Error(`update_company_settings failed: ${error.message}`);
+      return rpcFailure(error, { forbidden: NO_ACCESS }, "update_company_settings");
     }
     return apiOk({ dismissed_words });
   },

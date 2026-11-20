@@ -8,8 +8,8 @@ import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import type { LoadState } from "@/lib/desk/tasks";
 
 /*
- * The pattern of the right column of «Сегодня» (TodayParts: Aside, Quiet, DAY_ROW, BlockLink),
- * repeated here for the home's blocks (D-164): a label with its way on, rows under a rule of ink.
+ * The pattern of the right column of «Сегодня» — its own blocks (TodayParts) and the home's
+ * (D-164): a label with its way on, rows under a rule of ink.
  */
 
 /** A line of the right column: the time or the figure in the margin, the words on one vertical. */

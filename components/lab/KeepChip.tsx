@@ -1,6 +1,5 @@
 "use client";
 
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Chip } from "@/components/ui/Chip";
@@ -13,15 +12,8 @@ export type Recordings = Map<string, Recording>;
 
 const keyOf = (crids: readonly string[]) => ["lab", "voice-kept", crids] as const;
 
-/** voice_keep comes with migration 20261103121000 — not in the generated types yet. */
-function untyped(): SupabaseClient {
-  return createBrowserSupabase() as unknown as SupabaseClient;
-}
-
 /**
- * The recordings behind the lab's rows (D-155 §3), read by `/api/lab/recordings` — on the server,
- * so a missing `voice_kept` (before the migration) is no 404 in the browser's console.
- * `null` — «в корпус» is not there yet: no switch.
+ * The recordings behind the lab's rows (D-155 §3), read by `/api/lab/recordings` on the server.
  */
 export function useRecordings(crids: readonly string[], enabled: boolean) {
   return useQuery({
@@ -53,7 +45,7 @@ export function KeepChip({ crids, crid, recording }: { crids: readonly string[];
   const key = keyOf(crids);
   const keep = useMutation({
     mutationFn: async (next: boolean) => {
-      const { error } = await untyped().rpc("voice_keep", { p_path: recording.path, p_keep: next });
+      const { error } = await createBrowserSupabase().rpc("voice_keep", { p_path: recording.path, p_keep: next });
       if (error) throw new Error(error.message);
     },
     onMutate: async (next) => {

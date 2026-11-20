@@ -1,9 +1,10 @@
 import type { Database } from "@/lib/supabase/types";
+import { WORKING } from "@/lib/tasks/lifecycle";
 
 type TaskStatus = Database["public"]["Enums"]["task_status"];
 
 /** What `reassign_task` takes (`declined` too, but that is the director's decision, not open work). */
-export const MOVABLE: readonly TaskStatus[] = ["sent", "accepted", "in_progress", "rework"];
+export const MOVABLE: readonly TaskStatus[] = WORKING;
 /** Open work the person's card counts: on top of the movable, what waits for «Принято» and what is not sent yet. */
 export const OPEN: readonly TaskStatus[] = [...MOVABLE, "pending_review", "scheduled"];
 

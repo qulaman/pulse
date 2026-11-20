@@ -19,11 +19,11 @@ const ETAS = [
 ];
 
 /**
- * Заявки глазами секретаря (D-79): стопка карточек, у каждой две кнопки — «Принял»
- * и «Не могу» (причины чипами), после принятия одна — «Готово». Чужая принятая
- * заявка гаснет по Realtime сама, поэтому список не прячет ничего руками.
- * Второй слой (D-99): «Уточнить» — вопрос директору чипами, после «Принял» — «через 5 мин»,
- * ответ директора — прямо на карточке; тревога («Охрана») — красная, «Вызываю охрану».
+ * The requests as the secretary sees them (D-79): a stack of cards, each with two buttons —
+ * «Принял» and «Не могу» (reasons as chips), after accepting one — «Готово». A request somebody
+ * else accepted goes out by Realtime by itself, so the list hides nothing by hand. The second
+ * layer (D-99): «Уточнить» — a question to the director as chips, after «Принял» — «через 5 мин»,
+ * the director's answer right on the card; the alarm («Охрана») is red, «Вызываю охрану».
  */
 export function ErrandCards({
   errands,

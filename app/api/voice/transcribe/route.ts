@@ -2,12 +2,14 @@ import { z } from "zod";
 
 import { withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
+import { logStt } from "@/lib/ai/log";
 import { guardTranscript, isOpus, isSilentOpus } from "@/lib/ai/stt-guard";
 import { getSttProviders, SttError, transcribe } from "@/lib/ai/stt";
 import { HINT_MAX_PEOPLE } from "@/lib/ai/hint-roster";
 import { loadAssigneeCounts, loadCompanySettings, loadRoster, vocabularyHintsFor } from "@/lib/roster";
 import { parseCompanySettings } from "@/lib/settings";
 import { createServiceSupabase } from "@/lib/supabase/service";
+import { writeNoteTranscript } from "@/lib/voice/noteText";
 
 export const maxDuration = 60;
 
@@ -35,18 +37,6 @@ const MIME_BY_EXT: Record<string, string> = {
   mp3: "audio/mpeg",
 };
 
-/** ai_logs.model is not null; the STT interface reports a provider, not a model. */
-const MODEL_BY_PROVIDER: Record<string, string> = {
-  "openai-4o": "gpt-4o-transcribe",
-  whisper1: "whisper-1",
-  deepgram: "nova-3",
-  elevenlabs: "scribe_v2",
-};
-
-function modelOf(provider: string | undefined): string {
-  return (provider && MODEL_BY_PROVIDER[provider]) ?? "unknown";
-}
-
 // Only the director's own input is transcribed at all (docs/BACKEND.md §1 table).
 export const POST = withAuth<z.infer<typeof BodySchema>>(
   ["director"],
@@ -58,12 +48,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     }
 
     const supabase = createServiceSupabase();
-    const logRow = {
-      company_id: profile.companyId,
-      user_id: profile.userId,
-      kind: "stt" as const,
-      client_request_id: body.client_request_id,
-    };
+    const who = { company_id: profile.companyId, user_id: profile.userId, client_request_id: body.client_request_id };
 
     // three independent reads side by side — the director is waiting on this route (D-126)
     const [file, roster, rawSettings] = await Promise.all([
@@ -84,14 +69,12 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
 
     // a dead microphone: nothing to hear, and the recogniser would make a phrase up (AI.md §1 (з))
     if (body.duration_ms && isSilentOpus({ bytes: buffer.length, durationMs: body.duration_ms, opus: isOpus(buffer) })) {
-      await supabase.from("ai_logs").insert({
-        ...logRow,
+      await logStt(supabase, who, {
         provider: "none",
         model: "none",
         status: "error:stt_guard:silent",
         raw_response: { duration_ms: body.duration_ms, bytes: buffer.length },
-        stt_ms: 0,
-        latency_ms: 0,
+        ms: 0,
       });
       return apiOk({ transcript: null, code: "empty_transcript", guard: "silent" });
     }
@@ -118,13 +101,10 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       );
     } catch (error) {
       const stt = error instanceof SttError ? error : undefined;
-      await supabase.from("ai_logs").insert({
-        ...logRow,
+      await logStt(supabase, who, {
         provider: stt?.provider ?? "unknown",
-        model: modelOf(stt?.provider),
         status: `error:${stt?.code ?? "stt_failed"}`,
-        stt_ms: Date.now() - startedAt,
-        latency_ms: Date.now() - startedAt,
+        ms: Date.now() - startedAt,
       });
       if (!stt) throw error;
       return apiError(502, "stt_failed", "Не расслышал. Распознаю позже", {
@@ -140,27 +120,21 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     });
 
     if (!guard.ok) {
-      await supabase.from("ai_logs").insert({
-        ...logRow,
+      await logStt(supabase, who, {
         provider: result.provider,
-        model: modelOf(result.provider),
         transcript: result.text,
         status: `error:stt_guard:${guard.code}`,
-        stt_ms: sttMs,
-        latency_ms: sttMs,
+        ms: sttMs,
       });
       // Claude is not called on garbage — otherwise noise becomes an announcement (AI.md §1).
       return apiOk({ transcript: null, code: "empty_transcript", guard: guard.code });
     }
 
-    await supabase.from("ai_logs").insert({
-      ...logRow,
+    await logStt(supabase, who, {
       provider: result.provider,
-      model: modelOf(result.provider),
       transcript: result.text,
       status: "ok",
-      stt_ms: sttMs,
-      latency_ms: sttMs,
+      ms: sttMs,
       // STT is billed per minute of audio; the lab prices the row from this (D-63).
       raw_response: { duration_ms: body.duration_ms ?? null },
     });
@@ -171,30 +145,9 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       .eq("company_id", profile.companyId)
       .eq("client_request_id", body.client_request_id);
 
-    // The same for a note dictated on «Заметки» (D-81): the row with the recording is
-    // born before STT, so a closed tab or a lost response cannot leave the thought
-    // without its words. Narrowed to the caller's note and this very recording; the
-    // text is filled only while it is still empty — the director may have typed into
-    // it meanwhile — and the raw transcript is kept either way.
-    if (body.context === "director_input" && body.note_id) {
-      const filled = await supabase
-        .from("notes")
-        .update({ text: result.text, raw_transcript: result.text })
-        .eq("id", body.note_id)
-        .eq("user_id", profile.userId)
-        .eq("audio_path", body.audio_path)
-        .eq("text", "")
-        .select("id");
-      if (filled.error) console.error("note transcript write failed:", filled.error.message);
-      else if (filled.data.length === 0) {
-        const raw = await supabase
-          .from("notes")
-          .update({ raw_transcript: result.text })
-          .eq("id", body.note_id)
-          .eq("user_id", profile.userId)
-          .eq("audio_path", body.audio_path);
-        if (raw.error) console.error("note raw transcript write failed:", raw.error.message);
-      }
+    // the same for a note dictated on «Заметки» (D-81)
+    if (body.note_id) {
+      await writeNoteTranscript(supabase, { id: body.note_id, userId: profile.userId, audioPath: body.audio_path }, result.text);
     }
 
     return apiOk({

@@ -2,11 +2,11 @@ import { z } from "zod";
 
 import { withAuth } from "@/lib/api/handler";
 import { apiOk } from "@/lib/api/respond";
-import { parseTranscript } from "@/lib/ai/parse";
+import { parseOptionsOf, parseTranscript } from "@/lib/ai/parse";
 import { postprocess } from "@/lib/ai/postprocess";
 import { normalizeRules, PARSER_RULES_MAX } from "@/lib/ai/rules";
 import type { TryResponse, TrySide } from "@/lib/lab/parser";
-import { callsCost, parseErrorText, runModel, RunModelSchema } from "@/lib/lab/parser-run";
+import { callsCost, parseErrorText, RunModelSchema } from "@/lib/lab/parser-run";
 import { loadCompanySettings, loadRoster } from "@/lib/roster";
 import { activeParserRules, parseCompanySettings } from "@/lib/settings";
 
@@ -31,7 +31,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
   async ({ profile, body }) => {
     const [rawSettings, roster] = await Promise.all([loadCompanySettings(profile.companyId), loadRoster(profile.companyId)]);
     const settings = parseCompanySettings(rawSettings);
-    const model = runModel(settings, body.run);
+    const options = parseOptionsOf(settings, body.run);
     const draft = normalizeRules(body.rules).slice(0, PARSER_RULES_MAX);
     const current = activeParserRules(settings.parser_rules).text;
     const now = new Date();
@@ -43,12 +43,9 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
           source: "typed",
           now,
           roster,
-          model: model.model,
-          escalate: model.escalate,
-          escalationModel: model.escalation_model,
+          ...options,
           conventions: settings.conventions,
           rules,
-          kinds: settings.parser.kinds,
         });
         return {
           ok: true,

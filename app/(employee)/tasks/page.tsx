@@ -2,11 +2,12 @@
 
 import { ReportEntryRow } from "@/components/daily-report/ReportEntryRow";
 import { EmployeeTasksView } from "@/components/tasks/list/EmployeeTasksView";
-import { useMinute } from "@/components/tasks/list/TaskList";
+
 import { TasksSkeleton } from "@/components/ui/PageSkeletons";
 import { useNamesKey } from "@/lib/people/names";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { useMe, useMyTasks, usePulseBoard } from "@/lib/tasks/queries";
+import { useNow } from "@/lib/useNow";
 
 /**
  * «Мои дела» (D-83): the data and the actions; the screen itself is `EmployeeTasksView` —
@@ -19,7 +20,7 @@ export default function TasksPage() {
   const tasks = useMyTasks(me.data?.userId);
   const board = usePulseBoard(me.data);
   const actions = useTaskActions(me.data);
-  const now = useMinute();
+  const now = useNow();
 
   // the board only adds the director's last word: the list does not wait for it
   if (me.isPending || tasks.isPending || !me.data) return <TasksSkeleton />;

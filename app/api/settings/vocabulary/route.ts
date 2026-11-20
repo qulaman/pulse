@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { userSupabase, withAuth } from "@/lib/api/handler";
-import { apiError, apiOk } from "@/lib/api/respond";
+import { apiError, apiOk, NO_ACCESS, rpcFailure } from "@/lib/api/respond";
 import { ENTRY_MAX_LENGTH, VOCABULARY_MAX, applyVocabularyEdit } from "@/lib/dictionary";
 import { loadCompanySettings } from "@/lib/roster";
 import { parseCompanySettings } from "@/lib/settings";
@@ -50,8 +50,7 @@ export const POST = withAuth<Body>(
       patch: { vocabulary: out.vocabulary, vocabulary_meta: out.meta } as Json,
     });
     if (error) {
-      if (error.message.includes("forbidden")) return apiError(403, "forbidden", "Нет доступа");
-      throw new Error(`update_company_settings failed: ${error.message}`);
+      return rpcFailure(error, { forbidden: NO_ACCESS }, "update_company_settings");
     }
     return apiOk({ settings: parseCompanySettings(data) });
   },

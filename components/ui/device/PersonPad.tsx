@@ -3,9 +3,10 @@
 import { useMemo, useState } from "react";
 
 import { keyLabels } from "@/lib/people/labels";
-import { ROLE_LABEL, initialsOf, type Person } from "@/lib/people/queries";
+import { ROLE_LABEL, type Person } from "@/lib/people/queries";
 
 import { Avatar, Dot, Key, PersonName, Slot, padClass, personKeyClass } from "./Device";
+import { initialsOf } from "@/lib/people/names";
 
 /**
  * The people keypad: one rubber key per person, on the body of a device. Tap a key —

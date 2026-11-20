@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ArrowUp, Ban, Check, CheckCheck, CircleDot, Clock, Inbox, Paperclip, RotateCcw, Send, Undo2, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState, type ClipboardEvent, type CSSProperties, type DragEvent } from "react";
 
-import { TileFace } from "@/components/desk/team/TeamGrid";
+import { Face, useAvatars } from "@/components/desk/ui/Face";
 
 import { messageFlags } from "@/components/tasks/TaskThread";
 import { PhotoMessage } from "@/components/tasks/PhotoMessage";
@@ -26,7 +26,6 @@ import { dayLabel, messageState, startsNewDay, withoutPassedRevoke } from "@/lib
 import { fitHeight } from "@/lib/ui/fitHeight";
 import { useUpdateHold } from "@/lib/update/client";
 
-import { useAvatars } from "./Face";
 import { LoadNote } from "./LoadState";
 
 /** Eight lines of the field, then the words scroll. */
@@ -46,7 +45,7 @@ function tagOf(message: TaskMessage): { text: string; tone: "warn" | "danger" | 
 
 const TAG_COLOR = { warn: "var(--warn)", danger: "var(--danger)", muted: "var(--text-muted)" } as const;
 
-/** The mark of a line of the order's history on the thread's rail («Графит»). */
+/** The mark of a line of the order's history on the thread's rail. */
 const EVENT_ICON: Partial<Record<TaskStatus, LucideIcon>> = {
   sent: Send,
   scheduled: Clock,
@@ -89,7 +88,7 @@ function HistoryLine({ message }: { message: TaskMessage }) {
  * The thread at the desk's density (D-154 wave 3): one column of words, not bubbles left and right —
  * a name and a time open a run of one person's words, the next ones within five minutes hang under
  * it; the order's history as quiet lines; photos and voices in place; what is on its way with a
- * clock, what failed with «повторить»; under the director's last word, how far it got (принцип 8).
+ * clock, what failed with «повторить»; under the director's last word, how far it got (principle 8).
  * The panel or the page scrolls it — the thread has no scroller of its own. A thread that did not
  * load says so: «Переписки пока нет» is said only of one that came back empty.
  */
@@ -139,8 +138,8 @@ export function DeskThread({
   if (rows.length === 0) return <p className="py-2 text-[13px] leading-5 text-muted">Переписки пока нет — вопрос, отчёт или фото появятся здесь</p>;
 
   return (
-    // «Графит» draws the thread as a timeline: a rail down the left, a face where a person's run
-    // opens, the order's history as marks on the rail (D-174); the journal keeps one column of words
+    // the thread as a timeline: a rail down the left, a face where a person's run opens, the
+    // order's history as marks on the rail (D-174)
     <div className="tasks-thread flex flex-col" data-testid="thread">
       <LoadNote state={load} failed="Новые сообщения не загрузились" onRetry={onRetry} className="pb-1" />
       {rows.length >= THREAD_PAGE && hasMore ? (
@@ -176,7 +175,7 @@ export function DeskThread({
               >
                 {head ? (
                   <span aria-hidden className="tasks-ico tasks-msg-face">
-                    <TileFace person={{ id: message.sender_id, full_name: name || "—", avatar_url: avatars.get(message.sender_id) ?? null }} size={24} />
+                    <Face person={{ id: message.sender_id, full_name: name || "—", avatar_url: avatars.get(message.sender_id) ?? null }} size={24} />
                   </span>
                 ) : null}
                 <div className="min-w-0">
@@ -241,7 +240,7 @@ export function DeskThread({
 /**
  * The answer field of the desk (D-154 wave 3): Enter sends, Shift+Enter breaks the line, a picture
  * pasted (Ctrl+V), dropped or attached goes as a photo with the words as its caption. The photo is
- * kept in the browser before it is sent (принцип 5, D-130): with no network it waits in the thread
+ * kept in the browser before it is sent (principle 5, D-130): with no network it waits in the thread
  * and goes later under the same id. A voice is the phone's — the desk writes. What is typed lives
  * by the task (`lib/desk/drafts.ts`): another row, a closed panel or a reload take none of it; it
  * is let go when it is handed to the thread, which holds the words from there — with a clock, in

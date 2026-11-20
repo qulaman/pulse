@@ -1,5 +1,7 @@
 import { aqtobeDay } from "@/lib/ai/time";
-import type { TaskMessage, TaskMessageRow } from "./queries";
+
+import { timeAnswerOf, type TimeAnswer } from "./lifecycle";
+import type { TaskMessage, TaskMessageRow } from "./query-core";
 
 /**
  * Pure patches of a cached thread. The socket delivers a whole `task_messages` row,
@@ -112,4 +114,65 @@ export function dayLabel(iso: string, now: Date = new Date()): string {
 export function startsNewDay(previous: TaskMessage | undefined, current: TaskMessage): boolean {
   if (!previous) return true;
   return aqtobeDay(new Date(previous.created_at)) !== aqtobeDay(new Date(current.created_at));
+}
+
+/* -------------------------------------------------------------------------- */
+/* What the meta of a message means — the thread and the cards read the same   */
+/* -------------------------------------------------------------------------- */
+
+export type MessageFlags = {
+  isQuestion: boolean;
+  answered: boolean;
+  declineReason: boolean;
+  reworkComment: boolean;
+  /** The words of a handover: they arrive inside transition_task (D-64 §3). */
+  report: boolean;
+  /** D-128: the handover was «сделано не всё» */
+  partial: boolean;
+  /** D-128: «Прошу срок до …» and how it was answered (null while it waits) */
+  timeRequest: boolean;
+  timeAnswer: TimeAnswer | null;
+  /** D-128: the director's word to the new person of a reassigned task */
+  handoffNote: boolean;
+  newStatus: string | null;
+};
+
+export function messageFlags(message: TaskMessage): MessageFlags {
+  const meta = message.meta;
+  const record =
+    meta && typeof meta === "object" && !Array.isArray(meta)
+      ? (meta as Record<string, unknown>)
+      : {};
+
+  return {
+    isQuestion: record.is_question === true,
+    answered: Boolean(record.answered_at),
+    declineReason: record.decline_reason === true,
+    reworkComment: record.rework_comment === true,
+    report: record.report === true,
+    partial: record.report === true && record.partial === true,
+    timeRequest: record.time_request === true,
+    timeAnswer: timeAnswerOf(message.meta),
+    handoffNote: record.handoff_note === true,
+    newStatus: typeof record.new_status === "string" ? record.new_status : null,
+  };
+}
+
+/** The newest decline reason of the thread — the card shows it next to «Отказ». */
+export function latestDeclineReason(messages: readonly TaskMessage[] | undefined): string | null {
+  for (let index = (messages?.length ?? 0) - 1; index >= 0; index -= 1) {
+    const message = messages![index]!;
+    if (messageFlags(message).declineReason && message.content) return message.content;
+  }
+  return null;
+}
+
+/** The newest question still waiting for the director — the card offers quick answers. */
+export function latestOpenQuestion(messages: readonly TaskMessage[] | undefined): string | null {
+  for (let index = (messages?.length ?? 0) - 1; index >= 0; index -= 1) {
+    const message = messages![index]!;
+    const flags = messageFlags(message);
+    if (flags.isQuestion && !flags.answered && message.content) return message.content;
+  }
+  return null;
 }

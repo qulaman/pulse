@@ -4,9 +4,6 @@ import { isOverdue, type TaskStatus } from "./status-text";
  * One colour per state, shared by everything that draws a task: the rail on the left of
  * a card, its faint tint and the pill around the deadline (docs/DESIGN.md §1.3 — green,
  * yellow and red belong to task status and nothing else).
- *
- * components/tasks/TaskCard.tsx still carries its own copy of this map; it is being
- * edited in another session, so unifying it is a separate, one-import change.
  */
 
 export type Tone = "accent" | "ok" | "warn" | "danger" | "muted" | "gold";

@@ -5,6 +5,7 @@ import { useRef, useState, type ReactNode } from "react";
 
 import { PasswordField } from "@/components/people/PasswordField";
 import { RolePicker } from "@/components/people/RolePicker";
+import { SwitchPill } from "@/components/people/SwitchPill";
 import { Button } from "@/components/ui/Button";
 import { initialAlias, suggestAliases } from "@/lib/people/aliases";
 import { generatePassword } from "@/lib/people/password";
@@ -16,6 +17,7 @@ import {
   type Role,
 } from "@/lib/people/queries";
 import { springs } from "@/lib/design/tokens";
+import { personProblems } from "@/lib/people/validate";
 import { useKeyboardDock } from "@/lib/ui/keyboard";
 
 const FIELD =
@@ -131,9 +133,7 @@ function Switch({ on, onToggle, title, hint }: { on: boolean; onToggle: () => vo
         <span className="block text-[16px] leading-[22px]">{title}</span>
         <span className="block text-[13px] leading-4 text-muted">{hint}</span>
       </span>
-      <span aria-hidden className="relative h-7 w-12 shrink-0 rounded-full transition-colors duration-[120ms]" style={{ background: on ? "var(--accent)" : "var(--border)" }}>
-        <span className="absolute top-1 h-5 w-5 rounded-full bg-bg transition-transform duration-[120ms]" style={{ transform: on ? "translateX(24px)" : "translateX(4px)" }} />
-      </span>
+      <SwitchPill on={on} />
     </button>
   );
 }
@@ -190,9 +190,8 @@ export function PersonForm({
   // a password login — a computer, a habit — and open on request.
   const [withEmail, setWithEmail] = useState(false);
   const typedEmail = (draft.email ?? "").trim();
-  const valid =
-    draft.full_name.trim().length >= 2 &&
-    (mode === "edit" || !typedEmail || (typedEmail.includes("@") && (draft.password ?? "").length >= 6));
+  // a password login only when an email is typed — the code needs none (lib/people/validate.ts)
+  const valid = Object.keys(personProblems(draft, mode === "create" && typedEmail !== "")).length === 0;
 
   const submit = async () => {
     try {

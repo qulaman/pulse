@@ -4,9 +4,8 @@ import { useState, type KeyboardEvent } from "react";
 
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { Popover } from "@/components/desk/ui/Popover";
-import { addMonths, isWithin, monthOf, type Month, type Ymd } from "@/lib/datetime/calendar";
+import { addDays, addMonths, isWithin, monthOf, todayYmd, type Month, type Ymd } from "@/lib/datetime/calendar";
 import { daysWords, rangePresets, rangeWords, type DayRange } from "@/lib/desk/archive";
-import { shiftYmd, wallYmd } from "@/lib/desk/tasks";
 
 import { MonthGrid, PickerHead, useOwnFocus } from "./Pickers";
 
@@ -18,7 +17,7 @@ const STEP: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7
  * days and Enter presses the one they stand on. History has no future: the days ahead are off.
  */
 function RangePicker({ value, now, onPick }: { value: DayRange | null; now: Date; onPick: (range: DayRange | null) => void }) {
-  const today = wallYmd(now);
+  const today = todayYmd(now);
   const [start, setStart] = useState<Ymd | null>(null);
   const [hovered, setHovered] = useState<Ymd | null>(null);
   const [cursor, setCursor] = useState<Ymd | null>(null);
@@ -52,7 +51,7 @@ function RangePicker({ value, now, onPick }: { value: DayRange | null; now: Date
     }
     if (event.code in STEP) {
       event.preventDefault();
-      const next = shiftYmd(cursor ?? start ?? today, cursor || start ? STEP[event.code] : 0);
+      const next = addDays(cursor ?? start ?? today, cursor || start ? STEP[event.code] : 0);
       const held = next > today ? today : next;
       setCursor(held);
       setMonth(monthOf(held, now));

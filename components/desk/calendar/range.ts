@@ -1,5 +1,4 @@
-import { shiftDay } from "@/lib/calendar/agenda";
-import { monthTitleRu, parseYmd, weeksInMonth, ymdOf, type Month, type Ymd } from "@/lib/datetime/calendar";
+import { addDays, mondayOf, monthTitleRu, parseYmd, weeksInMonth, ymdOf, type Month, type Ymd } from "@/lib/datetime/calendar";
 
 /**
  * What the desk's calendar draws (D-153): a week of seven columns or a month of weeks, Monday
@@ -8,24 +7,14 @@ import { monthTitleRu, parseYmd, weeksInMonth, ymdOf, type Month, type Ymd } fro
 
 export type CalendarView = "week" | "month";
 
-/** 0 = Monday … 6 = Sunday. */
-export function weekdayOf(ymd: Ymd): number {
-  const { year, month, day } = parseYmd(ymd)!;
-  return (new Date(Date.UTC(year, month - 1, day)).getUTCDay() + 6) % 7;
-}
-
-export function mondayOf(ymd: Ymd): Ymd {
-  return shiftDay(ymd, -weekdayOf(ymd));
-}
-
 /** The days on screen: the chosen day's week, or every week the month touches. */
 export function daysOf(view: CalendarView, day: Ymd, month: Month): Ymd[] {
   if (view === "week") {
     const start = mondayOf(day);
-    return Array.from({ length: 7 }, (_, index) => shiftDay(start, index));
+    return Array.from({ length: 7 }, (_, index) => addDays(start, index));
   }
   const start = mondayOf(ymdOf(month.year, month.month, 1));
-  return Array.from({ length: weeksInMonth(month) * 7 }, (_, index) => shiftDay(start, index));
+  return Array.from({ length: weeksInMonth(month) * 7 }, (_, index) => addDays(start, index));
 }
 
 const DAY_MONTH = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", timeZone: "UTC" });

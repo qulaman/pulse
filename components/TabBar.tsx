@@ -73,12 +73,6 @@ const ICONS = {
       <path d="M12 14v3M8.5 20h7M10 17h4" />
     </svg>
   ),
-  settings: (
-    <svg width="24" height="24" viewBox="0 0 24 24" {...stroke} aria-hidden>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" />
-    </svg>
-  ),
   notes: (
     <svg width="24" height="24" viewBox="0 0 24 24" {...stroke} aria-hidden>
       <path d="M6 3.5h7.5L19 9v11.5H6z" />
@@ -102,8 +96,8 @@ const ICONS = {
 };
 
 /**
- * The lab (D-63): the model bench and the unit costs — the director's and the secretary's live on
- * the desk now (D-153, `ADMIN_TABS_ON_PHONE`); on the team's bar while the company tests the
+ * The lab (D-63): the model bench and the unit costs. The director and the secretary open it on
+ * the computer (D-153) and from «Профиль»; it is on the team's bar while the company tests the
  * product (D-150, `tabsOf`).
  */
 const LAB_TAB: Tab = { href: "/lab", label: "Лаб", icon: ICONS.lab };
@@ -120,46 +114,35 @@ const EMPLOYEE_TABS: Tab[] = [
 ];
 
 /**
- * «Настройки» and «Лаб» on the director's and the secretary's phone bars. Their work moved to the
- * computer (D-153 §11): the pages stay and open from «Профиль». `true` brings both tabs back.
+ * The admin screens — «Настройки», «Лаб», the team, the shop's orders — are the computer's work
+ * (D-153 §11): on the phone they open from «Профиль» and light its tab.
  */
-const ADMIN_TABS_ON_PHONE = false;
-
-const SETTINGS_TAB: Tab = { href: "/settings", label: "Настройки", icon: ICONS.settings };
-
-/** The admin screens a phone bar leaves to the desk light the tab they open from — «Профиль» (D-153). */
-const ADMIN_HOME = ADMIN_TABS_ON_PHONE ? "/settings" : "/profile";
+const ADMIN_HOME = "/profile";
 
 const TABS: Record<TabRole, Tab[]> = {
-  // D-59: four tabs each — the announcements live inside Пульс and Лента, the team inside Настройки
+  // the announcements live inside Пульс and Лента (D-59), the team inside «Профиль»
   director: [
     { href: "/pulse", label: "Пульс", icon: ICONS.pulse },
     { href: "/sent", label: "Задачи", icon: ICONS.tasks },
     CALENDAR_TAB,
     { href: "/notes", label: "Заметки", icon: ICONS.notes },
     { href: "/screen", label: "Экран", icon: ICONS.screen },
-    ...(ADMIN_TABS_ON_PHONE ? [SETTINGS_TAB] : []),
     { href: "/profile", label: "Профиль", icon: ICONS.profile },
-    ...(ADMIN_TABS_ON_PHONE ? [LAB_TAB] : []),
   ],
   employee: EMPLOYEE_TABS,
-  // D-104: the secretary runs the settings and the roster — on the computer now (D-153), her bar is the employee's
-  secretary: [
-    ...EMPLOYEE_TABS.slice(0, 4),
-    ...(ADMIN_TABS_ON_PHONE ? [SETTINGS_TAB] : []),
-    ...EMPLOYEE_TABS.slice(4),
-    ...(ADMIN_TABS_ON_PHONE ? [LAB_TAB] : []),
-  ],
+  // D-104: the secretary runs the settings and the roster — on the computer (D-153); her bar is the employee's
+  secretary: EMPLOYEE_TABS,
 };
 
 /**
  * A screen without a tab of its own lights the tab it is entered from, so the bar always
- * says where one is (D-112): a task opens from «Задачи», «Команда» lives in «Настройки»
- * (in «Профиль» while «Настройки» is the desk's, D-153), the announcements in Пульс and Лента,
- * the shop behind «Рейтинг» (D-59, docs/FRONTEND.md).
+ * says where one is (D-112): a task opens from «Задачи», «Команда» lives in «Профиль»
+ * (D-153), the announcements in Пульс and Лента, the shop behind «Рейтинг» (D-59,
+ * docs/FRONTEND.md).
  */
 const SECTIONS: Record<TabRole, Record<string, string>> = {
-  // «Данные», «Рейтинг», «Заявки» open from the director's «Настройки» rows too (D-113: «Назад» leads there)
+  // «Данные», «Рейтинг», «Заявки» open from the director's «Настройки» rows, which live in «Профиль»
+  // (D-113: «Назад» leads there)
   director: {
     "/tasks": "/sent",
     "/people": ADMIN_HOME,
@@ -497,7 +480,7 @@ function useWarmTabData(role: TabRole) {
  * Bottom navigation (D-112): a floating glass capsule over the screen. A raised accent
  * thumb slides to the chosen tab the moment it is tapped (the route catches up), the
  * chosen icon rises and says its name; the others are icons with their names for
- * assistive tech — eight tabs never truncate to «Кале…». Scrolling down folds the capsule.
+ * assistive tech — six tabs never truncate to «Кале…». Scrolling down folds the capsule.
  * Everything that docks above the bar sits at `--tabbar-space` and wears `.above-tabbar`.
  */
 export function TabBar({ role, lab = false }: { role: TabRole; lab?: boolean }) {

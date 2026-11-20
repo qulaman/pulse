@@ -12,12 +12,13 @@ import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
 import { haptic } from "@/lib/haptics";
 import { Composer } from "@/components/tasks/thread/Composer";
-import { QuickAnswers, sendQuickAnswer } from "@/components/tasks/desk/QuickAnswers";
+
 import { ThreadTail } from "@/components/tasks/thread/ThreadTail";
 import { hasUnread, LANE_WORD, messageOf, whoOf, type BoardTask, type Lane } from "@/lib/pulse/board";
 import { untilWords } from "@/lib/tasks/lifecycle";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import { BUTTON, TEXT } from "@/lib/tasks/status-text";
+import { QuickAnswers, sendQuickAnswer } from "@/components/tasks/director/QuickAnswers";
 
 type Tone = "danger" | "warn" | "ok" | "accent" | "gold" | "muted";
 
@@ -38,7 +39,6 @@ const LANE_TONE: Record<Lane, Tone> = {
   review: "ok",
   work: "accent",
 };
-
 
 export type TaskTileProps = {
   task: BoardTask;
@@ -67,7 +67,7 @@ export type TaskTileProps = {
 };
 
 function contextOf(task: BoardTask, lane: Lane, now: Date, meId: string): string {
-  // «срочно» без срока — это тоже ответ на «когда», и громче, чем «без срока» (docs/AI.md §10)
+  // «срочно» without a deadline is an answer to «когда» too, and louder than «без срока» (docs/AI.md §10)
   const due = task.deadline
     ? `до ${humanAqtobe(new Date(task.deadline), now)}`
     : task.priority === "high"

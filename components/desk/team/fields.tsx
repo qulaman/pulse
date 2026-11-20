@@ -6,6 +6,7 @@ import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { copyText } from "@/components/people/copy";
 import { toast } from "@/components/ui/Toast";
 import { generatePassword } from "@/lib/people/password";
+import { foldRu } from "@/lib/people/search";
 
 /** A desk field: 36 px, the field recipe, 14/20 — as high as the toolbar's controls. */
 export const INPUT = "field h-9 w-full px-3 text-[14px] leading-5 text-text outline-none";
@@ -67,7 +68,7 @@ export function splitAliases(text: string): string[] {
     .filter(Boolean);
 }
 
-const same = (a: string, b: string) => a.trim().toLowerCase().replace(/ё/g, "е") === b.trim().toLowerCase().replace(/ё/g, "е");
+const same = (a: string, b: string) => foldRu(a.trim()) === foldRu(b.trim());
 
 /**
  * The spoken forms of a name as chips (D-54): typed and Enter (or a comma) adds one, Backspace in

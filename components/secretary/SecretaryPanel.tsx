@@ -16,27 +16,26 @@ import { receiptLine } from "@/lib/tasks/receipts";
 import type { SecretaryAction } from "@/lib/settings";
 
 /**
- * Кнопку держат две секунды — и просьба уходит сразу (D-101): случайное касание ничего не
- * отправляет, пяти секунд «Отменить» после тапа больше нет. Короткий тап — второй слой:
- * примечание («без сахара»), «как обычно», срок «не беспокоить».
+ * A button is held for two seconds — and the request goes at once (D-101): a stray touch sends
+ * nothing. A short tap is the second layer: a note («без сахара»), «как обычно», a «не беспокоить» span.
  */
 const HOLD_SEND_MS = 2_000;
 /** Shorter than this is a tap: it opens the sheet. */
 const TAP_MS = 350;
-/** Закрытое свежее — четверть часа: результат и «спасибо» ещё к месту. */
+/** Closed and fresh — a quarter of an hour: the result and «спасибо» still fit. */
 const RECENT_MS = 15 * 60_000;
-/** Никто не взял две минуты — у директора появляется «Напомнить ещё раз». */
+/** Nobody took it for two minutes — the director gets «Напомнить ещё раз». */
 const STALE_MS = 2 * 60_000;
 const NOTES_KEY = "pulse.errand.notes.";
 
-/** «Не беспокоить» со сроком (D-99): режим снимется сам. */
+/** «Не беспокоить» with a span (D-99): the mode lifts itself. */
 const DND_SPANS = [
   { label: "30 мин", min: 30 },
   { label: "1 час", min: 60 },
   { label: "2 часа", min: 120 },
 ];
 
-/** Последние примечания кнопки — «как обычно» одним тапом; хранятся в этом браузере. */
+/** The button's last notes — «как обычно» in one tap; kept in this browser. */
 function savedNotes(code: string): string[] {
   try {
     const raw = window.localStorage.getItem(NOTES_KEY + code);
@@ -55,11 +54,11 @@ function rememberNote(code: string, note: string): void {
 }
 
 /**
- * Кнопки секретаря у директора (D-79, D-86): держать две секунды — просьба ушла сразу; тап —
- * шторка с примечанием и сроком (D-101). Под кнопками — что сейчас в работе:
- * квитанция «увидел / не открывал», обещание «будет через 4 мин», вопрос секретаря с ответом
- * одним тапом, «Напомнить ещё раз»; закрытое — с тем, что секретарь передал (D-99).
- * «Охрана» — тревога: та же кнопка в красном, снимается «Ложной тревогой».
+ * The secretary's buttons on the director's side (D-79, D-86): held for two seconds — the request
+ * is gone at once; a tap — the sheet with a note and a time (D-101). Under the buttons, what is in
+ * work now: the receipt «увидел / не открывал», the promise «будет через 4 мин», the secretary's
+ * question with a one-tap answer, «Напомнить ещё раз»; a closed one — with what the secretary
+ * passed back (D-99). «Охрана» is the alarm: the same button in red, lifted by «Ложная тревога».
  */
 export function SecretaryPanel({
   actions,
@@ -228,7 +227,7 @@ export function SecretaryPanel({
 
       <Sheet open={Boolean(noteFor)} onClose={() => setNoteFor(null)} title={noteFor?.label ?? ""}>
         {noteScene === "dnd" && noteFor ? (
-          // «не беспокоить» со сроком: режим снимется сам (D-99)
+          // «не беспокоить» with a span: the mode lifts itself (D-99)
           <div className="mb-3 flex flex-wrap gap-2" data-testid="dnd-spans">
             {DND_SPANS.map((span) => (
               <Chip
@@ -287,7 +286,7 @@ export function SecretaryPanel({
           </div>
         ) : null}
         {recentNotes.length > 0 && noteFor ? (
-          // «как обычно»: прошлые примечания этой кнопки одним тапом
+          // «как обычно»: this button's past notes in one tap
           <div className="mb-3 flex flex-wrap gap-2" data-testid="recent-notes">
             {recentNotes.map((text) => (
               <Chip
@@ -326,9 +325,9 @@ export function SecretaryPanel({
 }
 
 /**
- * Кнопка каталога (D-101): держать две секунды — полоса заполняется слева направо, дойдя до
- * конца, просьба уходит сразу; отпустил раньше — ничего не ушло, короткий тап — `onTap`.
- * «Охрана» (D-99) — та же кнопка в красном.
+ * A catalogue button (D-101): held for two seconds — a bar fills from left to right and, at the
+ * end, the request goes at once; let go earlier — nothing went, a short tap is `onTap`. «Охрана»
+ * (D-99) is the same button in red.
  */
 function HoldButton({
   action,
@@ -446,14 +445,14 @@ function HoldButton({
 }
 
 /**
- * Одна живая заявка: что просили, кто взял, когда обещано, сколько ждёт и видел ли секретарь
- * пуш; вопрос секретаря — с ответом одним тапом (D-99).
+ * One live request: what was asked, who took it, when it is promised, how long it has waited and
+ * whether the secretary saw the push; the secretary's question — with a one-tap answer (D-99).
  */
 function ActiveErrand({ errand, now, compact = false }: { errand: Errand; now: Date; compact?: boolean }) {
   const transition = useErrandActions();
   const link = useErrandLink();
   const [reply, setReply] = useState("");
-  // квитанция нужна, только пока никто не взялся: «принято» честнее любой галочки
+  // the receipt matters only while nobody has taken it: «принято» says more than any tick
   const receipt = useErrandReceipt(errand.id, errand.status === "sent");
   const line = errand.status === "sent" ? receiptLine(receipt.data, now) : null;
   const who = shortName(errand.claimed?.full_name ?? "");
@@ -479,7 +478,7 @@ function ActiveErrand({ errand, now, compact = false }: { errand: Errand; now: D
           {errand.note ? <span className="text-muted"> · {errand.note}</span> : null}
           {errand.due_at ? <span className="font-semibold"> · {atLine(errand.due_at)}</span> : null}
           {errand.status === "accepted" ? (
-            // без рода: «Принято · Айгуль», а не «приняла» (docs/DESIGN.md)
+            // no gender: «Принято · Айгуль», not «приняла» (docs/DESIGN.md)
             <span style={{ color: "var(--ok)" }}> · Принято{who ? ` · ${who}` : ""}</span>
           ) : null}
           {eta ? <span style={{ color: eta.startsWith("опаздывает") ? "var(--warn)" : "var(--text)" }}> · {eta}</span> : null}
@@ -553,8 +552,8 @@ function ActiveErrand({ errand, now, compact = false }: { errand: Errand; now: D
 }
 
 /**
- * Только что закрытое (D-97, D-99): что секретарь передал вместе с «Готово» и, после гейта
- * адаптации, «Спасибо ♥» — у секретаря над головой поднимаются сердечки.
+ * Just closed (D-97, D-99): what the secretary passed back with «Готово» and, after the adaptation
+ * gate, «Спасибо ♥» — hearts rise over the secretary's head.
  */
 function RecentRow({ errand, compact, thanks }: { errand: Errand; compact: boolean; thanks: boolean }) {
   const thank = useThankErrand();

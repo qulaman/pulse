@@ -1,79 +1,80 @@
 "use client";
 
-import { LayoutGroup, motion, MotionConfig } from "motion/react";
-import Link from "next/link";
-import { memo, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { motion } from "motion/react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
-import { InstallHint } from "@/components/InstallHint";
-import { CalendarList } from "@/components/calendar/CalendarList";
-import { EventSheet } from "@/components/calendar/EventSheet";
-import { EtherSection } from "@/components/ether/EtherSection";
-import { RatingPanel } from "@/components/rating/RatingPanel";
 import { ACT_MS, type MascotAct, type MascotState } from "@/components/brand/Mascot";
-import type { AssistantLine } from "@/components/pulse/Assistant";
-import { CardDeck } from "@/components/pulse/CardDeck";
-import { IdleScene } from "@/components/pulse/IdleScene";
-import { LocalPresence } from "@/components/pulse/LocalPresence";
-import { tasksOf, type Pick } from "@/lib/idle/people";
+import { CalendarList } from "@/components/calendar/CalendarList";
 import { ConfirmInline, type ConfirmHandle } from "@/components/confirm/ConfirmInline";
 import { entitiesSummary } from "@/components/confirm/format";
+import { EtherSection } from "@/components/ether/EtherSection";
+import type { AssistantLine } from "@/components/pulse/Assistant";
+import { CardDeck } from "@/components/pulse/CardDeck";
+import { HomeStage } from "@/components/pulse/home/HomeStage";
+import { ExchangeButtons, ServiceLines, UnparsedButtons } from "@/components/pulse/home/PulseLines";
+import {
+  BAND_SPRING,
+  ballsShowOf,
+  FACE,
+  FACE_SMALL,
+  faceBox,
+  PANEL_FACE,
+  QuietEventSheet,
+  QuietThreadSheet,
+  RING_RADIUS,
+  ROW_GAP,
+  SWAP_IN,
+  SWAP_OUT,
+  useThought,
+  type Mode,
+} from "@/components/pulse/home/stage";
+import { useDeskState } from "@/components/pulse/home/useDeskState";
+import { usePhraseThrow } from "@/components/pulse/home/usePhraseThrow";
+import { useQuestionExchange } from "@/components/pulse/home/useQuestionExchange";
+import { IdleScene } from "@/components/pulse/IdleScene";
+import { LocalPresence } from "@/components/pulse/LocalPresence";
 import { MascotLever, useLeverHint } from "@/components/pulse/MascotLever";
-import { BALL_H, OrbitBalls, type BallsShow, type OrbitBall, type OrbitId } from "@/components/pulse/OrbitBalls";
-import { AFTER_CARD, PANEL_GROW, PanelCard, recede } from "@/components/pulse/PanelCard";
+import { OrbitBalls, type OrbitBall, type OrbitId } from "@/components/pulse/OrbitBalls";
+import { AFTER_CARD, recede } from "@/components/pulse/PanelCard";
 import { PickCard, type Picked } from "@/components/pulse/PickCard";
-import { directorMascot } from "@/lib/pulse/scene-face";
 import { SaidBand } from "@/components/pulse/SaidBand";
+import { SecretaryCard } from "@/components/pulse/SecretaryCard";
+import { DESK_FACE, DESK_H, DESK_W, SecretaryDesk } from "@/components/pulse/SecretaryDesk";
 import { useStableActions, useStableCallback } from "@/components/pulse/stable";
-import { ThoughtBubble } from "@/components/pulse/ThoughtBubble";
 import { thoughtAct } from "@/components/pulse/thoughtActs";
 import { useMascotActs } from "@/components/pulse/useMascotActs";
 import { useSpeech } from "@/components/pulse/useSpeech";
-import { PushCard } from "@/components/push/PushCard";
+import { RatingPanel } from "@/components/rating/RatingPanel";
 import { useDirectorControls } from "@/components/tasks/list/useDirectorControls";
-import { ThreadSheet } from "@/components/tasks/thread/ThreadSheet";
+import { MessageAsk } from "@/components/visits/MessageAsk";
+import { VisitAsk } from "@/components/visits/VisitAsk";
 import { useKeptPill } from "@/components/voice/KeptPhrases";
-import { Button } from "@/components/ui/Button";
-import { shortName, useNamesKey } from "@/lib/people/names";
-import { springs } from "@/lib/design/tokens";
-import { useComposeStore } from "@/lib/store/compose";
-import { useHydrated } from "@/lib/useHydrated";
 import { nextEvent, startsSoon, todayCount } from "@/lib/calendar/agenda";
 import { useCalendar, type CalendarEvent } from "@/lib/calendar/queries";
 import { nextEventLine } from "@/lib/calendar/say";
-import { SecretaryCard } from "@/components/pulse/SecretaryCard";
-import { MessageAsk } from "@/components/visits/MessageAsk";
-import { VisitAsk } from "@/components/visits/VisitAsk";
-import { DESK_FACE, DESK_H, DESK_W, SecretaryDesk } from "@/components/pulse/SecretaryDesk";
+import { isCountable, isSendable, whyNothingToSend } from "@/lib/confirm/entities";
+import { springs } from "@/lib/design/tokens";
+import { askSecretary } from "@/lib/errands/pending";
+import { activeCount, isActive } from "@/lib/errands/queries";
+import { etaLeftMin, sceneOfAction, untilLine, urgencyOf } from "@/lib/errands/scene";
 import { useEther } from "@/lib/ether/queries";
-import { useDeskFocus } from "@/components/secretary/useDeskFocus";
-import {
-  activeCount,
-  isActive,
-  useErrandReceipt,
-  useErrands,
-  useSecretaries,
-  useSecretaryActions,
-  useSecretarySetup,
-} from "@/lib/errands/queries";
-import { askSecretary, setDeskAbsence, usePendingErrands } from "@/lib/errands/pending";
-import { absenceLine, etaLeftMin, isAway, sceneOfAction, untilLine, urgencyOf } from "@/lib/errands/scene";
-import type { SecretaryAction } from "@/lib/settings";
-import { useVisits } from "@/lib/visits/queries";
-import { awaitingDirector, unreadMessages } from "@/lib/visits/text";
+import { tasksOf, type Pick } from "@/lib/idle/people";
+import { shortName, useNamesKey } from "@/lib/people/names";
 import { usePeople } from "@/lib/people/queries";
 import { useOpenDisputes } from "@/lib/points/game";
 import { usePointsEnabled } from "@/lib/points/queries";
-import { answer } from "@/lib/pulse/answers";
-import { countsOf, emptyLanes, hasMessage, hasUnread, HELD_STATUS, isOnBoard, lanesOf, toBriefTask, WORK_STATUSES, type BoardTask, type Lanes } from "@/lib/pulse/board";
+import { countsOf, emptyLanes, hasMessage, hasUnread, HELD_STATUS, isOnBoard, lanesOf, type BoardTask, type Lanes } from "@/lib/pulse/board";
 import { alarmOf } from "@/lib/pulse/mood";
-import { useLastVisit, useNow } from "@/lib/pulse/queries";
-import { isCountable, isSendable, useIngestStore, whyNothingToSend, type IngestError } from "@/lib/store/ingest";
-import { ERROR_ACT } from "@/lib/voice/stages";
+import { useLastVisit } from "@/lib/pulse/queries";
+import { directorMascot } from "@/lib/pulse/scene-face";
+import { useComposeStore } from "@/lib/store/compose";
+import { useIngestStore, type IngestError } from "@/lib/store/ingest";
 import { useTaskActions } from "@/lib/tasks/mutations";
-import { useMe, usePulseBoard, useSentTasks } from "@/lib/tasks/queries";
+import { useMe, usePulseBoard } from "@/lib/tasks/queries";
 import { firstNameOf } from "@/lib/text/normalize";
-
-type Exchange = { key: string; said: string; lines: string[]; understood: boolean };
+import { useHydrated } from "@/lib/useHydrated";
+import { useNow } from "@/lib/useNow";
+import { ERROR_ACT } from "@/lib/voice/stages";
 
 /**
  * The face's look at a point, px from its middle, as a direction it can hold: mostly
@@ -83,9 +84,6 @@ function lookAt(x: number, y: number): { x: number; y: number } {
   const length = Math.hypot(x, y) || 1;
   return { x: x / length, y: Math.max(-0.6, y / length) };
 }
-
-/** idle — the face asleep in the middle; ring — awake, the balls orbit it; panel — one ball opened under the row of balls. */
-type Mode = "idle" | "ring" | "panel";
 
 /**
  * The scene in one state (D-178): the mode, the open ball, what the screen shows (`view` — a card
@@ -103,56 +101,8 @@ function moveScene(scene: Scene, move: SceneMove): Scene {
 }
 const AT_REST: Scene = { mode: "idle", panel: null, view: "idle", cameFrom: "idle" };
 
-/** One full swing of `mascot-throw`: the face keeps throwing even if the server was faster. */
-const THROW_MS = 1200;
-const FACE = 128;
-const FACE_SMALL = 88;
 /** The cards band against the words' band while a phrase of several things waits (D-146). */
 const CROWDED_GROW = 8;
-/** Distance from the face's centre to the balls' centres. */
-const RING_RADIUS = 124;
-/** Over the ring a thought floats above the orbit: its trail clear of the top ball (D-178). */
-const OVER_RING = RING_RADIUS + 60;
-/** From the face's box down to the row of balls under it. */
-const ROW_GAP = 4;
-/** How long a thought hangs above the head before the face dozes off again. */
-const THOUGHT_MS = 9_000;
-/** The batch has landed: the face jumps for joy this long after the throw (D-82). */
-const CHEER_MS = 1_800;
-/**
- * The spring the face rides when the mode changes; the words above it and the cards under it ride
- * the same one, so the three bands move together instead of the outer two jumping (D-60). A
- * thing's spring: it lands without a bounce (D-166).
- */
-const BAND_SPRING = springs.object;
-/**
- * Another ball's content in the same card: the old is gone in a blink, the new shows right after it
- * (it rises on the band's spring from the first frame) — they never stand one over the other.
- */
-const SWAP_OUT = { duration: 0.05, ease: "easeOut" } as const;
-const SWAP_IN = { duration: 0.16, delay: 0.05, ease: "easeOut" } as const;
-/**
- * What a tap does not change renders only when what it is given changes (D-178): every tap drew
- * the whole screen again — the sheets and the thread too.
- */
-const QuietEventSheet = memo(EventSheet);
-const QuietThreadSheet = memo(ThreadSheet);
-
-/**
- * An open ball is a job the face does by hand while the panel is open (D-82): it ticks off
- * the tasks on a clipboard, answers a message, shouts into Эфир through a megaphone, tears a
- * page off the calendar. (The coffee is brought for the secretary's desk since D-85.)
- */
-const PANEL_FACE: Record<OrbitId, MascotState> = {
-  tasks: "checking",
-  messages: "chatting",
-  ether: "announcing",
-  calendar: "scheduling",
-  // the director has no «Секретарь» ball since D-85 (the secretary's own Лента keeps one)
-  secretary: "serving",
-  // the week's first five: the face is glad for them (D-123)
-  rating: "happy",
-};
 
 /**
  * The secretary's desk on the waiting screen (D-85): right of the face, level with it, clear
@@ -160,7 +110,6 @@ const PANEL_FACE: Record<OrbitId, MascotState> = {
  * middle of the face to the desk's top-left corner.
  */
 const DESK_AT = { x: 80, y: -14 };
-const NO_ACTIONS: SecretaryAction[] = [];
 /** The finishes the small secretary brings over as a cup — the big face takes it (D-97). */
 const DRINKS = new Set(["coffee", "tea", "water"]);
 
@@ -234,33 +183,8 @@ export default function PulsePage() {
   const confirming = (stage === "confirm" || stage === "sending") && entities.length > 0;
   const sendableCount = entities.filter((entity) => isSendable(entity, pointsEnabled)).length;
   const confirmRef = useRef<ConfirmHandle>(null);
-  // The send answers in ~0.5 s, the throw takes 1.2 s: without this the face froze mid
-  // wind-up and the card never left the hand. The swing is held to its end (D-60, sixth).
-  const [throwing, setThrowing] = useState(false);
-  const throwTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const throwEndsAt = useRef(0);
-  // The batch has landed (the store went from «sending» to done): the face celebrates — after
-  // the swing, never over it. A failed send goes to «error» and gets no confetti.
-  const [cheering, setCheering] = useState(false);
-  const cheerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    const unsubscribe = useIngestStore.subscribe((current, previous) => {
-      if (previous.stage !== "sending" || (current.stage !== "done" && current.stage !== "idle")) return;
-      if (cheerTimer.current) clearTimeout(cheerTimer.current);
-      cheerTimer.current = setTimeout(
-        () => {
-          setCheering(true);
-          cheerTimer.current = setTimeout(() => setCheering(false), CHEER_MS);
-        },
-        Math.max(0, throwEndsAt.current - Date.now()),
-      );
-    });
-    return () => {
-      unsubscribe();
-      if (throwTimer.current) clearTimeout(throwTimer.current);
-      if (cheerTimer.current) clearTimeout(cheerTimer.current);
-    };
-  }, []);
+  // the swing held to its end, and the jump for joy after it once the batch has landed (D-60, D-82)
+  const { throwing, cheering, startThrow } = usePhraseThrow();
   /** the phrase owns the screen from the parse until the swing after the tap is over */
   const phraseInHand = confirming || throwing;
 
@@ -296,70 +220,18 @@ export default function PulsePage() {
   const ether = useEther();
   const calendar = useCalendar();
   const events = useMemo(() => calendar.data ?? [], [calendar.data]);
-  // the fifth ball, its socket and the catalogue exist only when the company has
-  // somebody to ask (D-79 §4)
   const people = usePeople();
   const peopleRows = hydrated ? people.data : undefined;
-  const hasSecretary = (peopleRows ?? []).some((p) => p.role === "secretary" && p.is_active);
-  const errands = useErrands(hasSecretary);
-  const errandsData = hydrated ? errands.data : undefined;
-  const errandRows = useMemo(() => errandsData ?? [], [errandsData]);
-  const catalogue = useSecretaryActions(hasSecretary);
-  // what the secretaries are doing about the requests, for the small secretary at the desk:
-  // the job in its hands, the picture on its monitor, the cup brought over after «Готово» (D-97)
-  const deskStage = useDeskFocus(errandRows, null, catalogue.data ?? NO_ACTIONS, now);
-  // the request nobody has taken yet: has the secretary opened it? The desk nods (D-106 §8)
-  const askedErrand = deskStage.phase === "asked" ? deskStage.errand : null;
-  const askedReceipt = useErrandReceipt(askedErrand?.id ?? null, askedErrand !== null);
-  // null while the receipt of this request is still loading: a screen opened after «увидел» does not nod
-  const deskSeen =
-    askedErrand === null ? false : askedReceipt.isSuccess ? Boolean(askedReceipt.data?.seen_at || askedReceipt.data?.acted_at) : null;
-  const secretarySetup = useSecretarySetup(hasSecretary);
-  // who of the secretaries is at the desk (D-99): all away — an empty chair and «до 14:00»
-  const secretaryPeople = useSecretaries(hasSecretary);
-  const awayUntil = useMemo(() => {
-    const list = secretaryPeople.data ?? [];
-    if (list.length === 0 || !list.every((p) => isAway(p, now))) return null;
-    return list.map((p) => p.away_until as string).sort()[0] ?? null;
-  }, [secretaryPeople.data, now]);
-  // the toast of a request that went says who is away — the request waits for them (D-106)
-  const absence = useMemo(() => absenceLine(secretaryPeople.data ?? [], now), [secretaryPeople.data, now]);
-  useEffect(() => {
-    setDeskAbsence(absence);
-    return () => setDeskAbsence(null);
-  }, [absence]);
-  // requests kept on the phone without network (D-106): the desk says they wait
-  const waitingErrands = usePendingErrands((state) => state.pending.filter((p) => p.waiting).length);
-  // the director is in a meeting right now: «не беспокоить до конца встречи?» (D-99)
-  const meetingNow = useMemo(() => {
-    const at = now.getTime();
-    return (
-      events.find((e) => {
-        const start = new Date(e.starts_at).getTime();
-        const end = e.ends_at ? new Date(e.ends_at).getTime() : start + 60 * 60_000;
-        return !e.cancelled_at && start <= at && at < end;
-      }) ?? null
-    );
-  }, [events, now]);
-  const meetingEndsAt = meetingNow ? (meetingNow.ends_at ?? new Date(new Date(meetingNow.starts_at).getTime() + 60 * 60_000).toISOString()) : null;
-  const dndAction = (catalogue.data ?? NO_ACTIONS).find((a) => sceneOfAction(a) === "dnd") ?? null;
-  const dndLive = errandRows.some((e) => isActive(e) && e.kind === dndAction?.code);
-  const [dndOffered, setDndOffered] = useState<string | null>(null);
-  const offerDnd = meetingNow !== null && dndAction !== null && !dndLive && dndOffered !== meetingNow.id;
+  // the secretary's desk next to the face and everything round it — only when the company has
+  // somebody to ask (D-79 §4, D-85)
+  const desk = useDeskState({ people: peopleRows, hydrated, now, events });
+  const { hasSecretary, errandRows, deskStage, visitRows, visitorsWaiting, messagesWaiting, meetingNow, meetingEndsAt } = desk;
   // the director is saying a request into the desk (D-99)
   const toSecretary = useIngestStore((state) => state.toSecretary);
-  // «К вам посетитель» (D-96): somebody at the secretary's desk waits for an answer — the card
-  // sits under the face even on the waiting screen, a person is standing there
-  const visits = useVisits(hasSecretary);
-  const visitsData = hydrated ? visits.data : undefined;
-  const visitRows = useMemo(() => visitsData ?? [], [visitsData]);
-  const visitorsWaiting = awaitingDirector(visitRows).length > 0;
-  // the secretary's words on the wall (D-116): the same words under the face, «Понятно» clears both
-  const messagesWaiting = unreadMessages(visitRows).length > 0;
   // Эфир is news too: an announcement going out and every «ознакомился» coming back;
   // so are the calendar — an answer, a move, the reminder the tick has just written —
   // and the errands: «Айгуль · кофе принят»
-  const speech = useSpeech(rows, lanes, now, directorName, meId, ether.data, calendar.data, errands.data);
+  const speech = useSpeech(rows, lanes, now, directorName, meId, ether.data, calendar.data, desk.errandsData);
   const nextMeeting = useMemo(() => nextEvent(events, now), [events, now]);
   const eventSoon = startsSoon(nextMeeting, now);
   const [openEvent, setOpenEvent] = useState<CalendarEvent | null>(null);
@@ -421,56 +293,24 @@ export default function PulsePage() {
   // behind the face (D-166) — the words, the balls, the open card, the team at rest
   const listening = stage === "recording" || stage === "uploading" || stage === "transcribing" || stage === "parsing";
 
-  // ---- a question the phrase turned out to be ---------------------------------------------
-  const asked = stage === "question" && question ? question : null;
-  // the closed list (200 rows, two joins) is fetched only while a question needs it
-  const sent = useSentTasks(asked ? me.data?.userId : undefined);
-  const reply = useMemo(() => {
-    if (!asked || !rows || people.isLoading || sent.isLoading) return null;
-    return answer({
-      question: asked,
-      now,
-      people: (peopleRows ?? [])
-        .filter((p) => p.is_active && p.role !== "tv")
-        .map((p) => ({ id: p.id, fullName: p.full_name, aliases: p.aliases ?? [] })),
-      open: rows.filter((t) => WORK_STATUSES.includes(t.status)).map((t) => ({ ...toBriefTask(t), status: t.status })),
-      closed: (sent.data ?? [])
-        .filter((t) => t.status === "done" || t.status === "declined" || t.status === "revoked")
-        .map((t) => ({ id: t.id, title: t.title, deadline: t.deadline, assignee: t.assignee?.full_name ? shortName(t.assignee.full_name) : null, assigneeId: t.assignee_id, status: t.status, closedAt: t.closed_at })),
-      overdue: lanes.overdue.map(toBriefTask),
-      declined: lanes.declined.map((t) => ({ ...toBriefTask(t), reason: t.decline_reason })),
-      questions: lanes.question.map(toBriefTask),
-      review: lanes.review.map(toBriefTask),
-    });
-  }, [asked, now, rows, lanes, people.isLoading, peopleRows, sent.isLoading, sent.data]);
-
-  // The exchange stays on screen after the pipeline goes idle: the assistant keeps its
-  // answer until the director asks again, taps the face, or closes it.
-  const [exchange, setExchange] = useState<Exchange | null>(null);
-  const exchangeKey = asked ? (requestId ?? asked) : null;
-  if (asked && reply && exchangeKey && exchange?.key !== exchangeKey) {
-    setExchange({ key: exchangeKey, said: asked, lines: reply.lines, understood: reply.understood });
-  }
-  useEffect(() => {
-    if (asked && reply?.understood) resetIngest();
-  }, [asked, reply, resetIngest]);
-  const closeExchange = useStableCallback(() => {
-    setExchange(null);
-    if (stage === "question") resetIngest();
+  // ---- a question the phrase turned out to be: answered right here, kept until closed -------
+  const { exchange, closeExchange } = useQuestionExchange({
+    stage,
+    question,
+    requestId,
+    resetIngest,
+    userId: me.data?.userId,
+    rows,
+    lanes,
+    now,
+    people: peopleRows,
+    peopleLoading: people.isLoading,
   });
 
   // A change on the board is a thought: it pops above the head, the face wakes up and reads it
   // (`processing`, D-65), and after a while the thought is gone and the face dozes off again. The opening
   // line (the summary on a tap) is speech, under the face. Both answer to the same line.
-
-  const [expiredThought, setExpiredThought] = useState<string | null>(null);
-  const thought = speech.line && !speech.line.opening && speech.line.id !== expiredThought ? speech.line : null;
-  const thoughtId = thought?.id ?? null;
-  useEffect(() => {
-    if (!thoughtId) return;
-    const timer = setTimeout(() => setExpiredThought(thoughtId), THOUGHT_MS);
-    return () => clearTimeout(timer);
-  }, [thoughtId]);
+  const { thought, dismiss: dismissThought } = useThought(speech.line);
 
   const lines = useMemo<AssistantLine[]>(() => {
     if (exchange) return exchange.lines.map((text, i) => ({ id: `${exchange.key}:${i}`, text }));
@@ -483,7 +323,7 @@ export default function PulsePage() {
     return soonest ? [speech.line, { id: "calendar", text: soonest }] : [speech.line];
   }, [exchange, speech.line, mode, events, now]);
 
-  // The director's assistant is never angry (D-70, владелец): whatever waits for him — a
+  // The director's assistant is never angry (D-70, the owner): whatever waits for him — a
   // deadline within the hour, an order unaccepted for half an hour, an unread word — the
   // face just goes watchful. The balls and the line say which of the three it is.
   const alarm = useMemo(() => alarmOf(rows ?? [], now, meId), [rows, now, meId]);
@@ -508,7 +348,7 @@ export default function PulsePage() {
   // a thought wakes the face whatever it was doing; without one the idle face sleeps
   // a change on the board is data the assistant has just read: it reports the new status (D-65)
   // The face sleeps only when the board is quiet: a mood outranks sleep, so the barometer
-  // is readable without a tap (владелец, 2026-09-17 — «маскот должен меняться и в покое»).
+  // is readable without a tap (the owner, 2026-09-17 — «маскот должен меняться и в покое»).
   const restFace: MascotState = mood ?? "sleeping";
   // a picked person wakes the face: it cannot look at anybody with its eyes shut
   const attending = picked !== null && (stage === "idle" || stage === "recording");
@@ -613,12 +453,7 @@ export default function PulsePage() {
     }
     // a phrase is in hand: the face is the throw, nothing else (D-36 — never by itself)
     if (phraseInHand) {
-      if (confirmRef.current?.throwBatch()) {
-        setThrowing(true);
-        throwEndsAt.current = Date.now() + THROW_MS;
-        if (throwTimer.current) clearTimeout(throwTimer.current);
-        throwTimer.current = setTimeout(() => setThrowing(false), THROW_MS);
-      }
+      if (confirmRef.current?.throwBatch()) startThrow();
       return;
     }
     closeExchange();
@@ -687,10 +522,10 @@ export default function PulsePage() {
   // the face is small over a card and under a crowded phrase; a phrase landing over an open card
   // sends the card down and gives the face its size back (D-178)
   const faceSize = cardOpen || crowded ? FACE_SMALL : FACE;
-  const box = mode === "ring" ? RING_RADIUS * 2 + 84 : faceSize + 24;
+  const box = faceBox(mode, faceSize);
   // Where the balls are (D-178): in a row under the small face over a card; orbiting on the ring;
-  // inside the head at rest — and inside it too while a phrase is in hand
-  const ballsShow: BallsShow | null = cardOpen ? "row" : phraseInHand ? null : mode === "idle" ? "rest" : "ring";
+  // inside the head at rest — and none while a phrase is in hand: whatever was out goes into the head
+  const ballsShow = ballsShowOf(mode, cardOpen, phraseInHand);
   // what the screen showed before: the band's own lines come back only once a card has gone down. A
   // tap moves it with the mode (`moveScene`); a phrase taken in hand or dropped moves it here
   const viewNow = viewOf(mode, phraseInHand);
@@ -731,7 +566,7 @@ export default function PulsePage() {
   const serviceLines = useMemo(() => <ServiceLines draftCount={draftCount} noTeam={noTeam} />, [draftCount, noTeam]);
 
   // somebody at the door, the secretary's words on the wall: above whatever is open (D-96, D-116)
-  const refetchErrands = errands.refetch;
+  const { refetchErrands, actions: deskActions, dndAction } = desk;
   const asks = useMemo(
     () =>
       visitorsWaiting || messagesWaiting ? (
@@ -741,14 +576,14 @@ export default function PulsePage() {
               visits={visitRows}
               now={now}
               // tea or coffee for the guest goes with «Пусть заходит» (D-99)
-              hospitality={(catalogue.data ?? NO_ACTIONS).filter((a) => ["tea", "coffee"].includes(sceneOfAction(a)))}
+              hospitality={deskActions.filter((a) => ["tea", "coffee"].includes(sceneOfAction(a)))}
               onErrand={() => void refetchErrands()}
             />
           ) : null}
           {messagesWaiting ? <MessageAsk visits={visitRows} now={now} /> : null}
         </>
       ) : null,
-    [visitorsWaiting, messagesWaiting, visitRows, now, catalogue.data, refetchErrands],
+    [visitorsWaiting, messagesWaiting, visitRows, now, deskActions, refetchErrands],
   );
 
   // what the open ball shows inside its card — drawn again only when its own data changes (D-178)
@@ -834,9 +669,6 @@ export default function PulsePage() {
   const gazeY = gaze?.y;
   const faceGaze = useMemo(() => (gazeX === undefined || gazeY === undefined ? null : { x: gazeX, y: gazeY }), [gazeX, gazeY]);
   const pin = useMemo(() => (picked && !phraseInHand ? { id: picked.id, name: picked.name, address: picked.address } : null), [picked, phraseInHand]);
-  const dismissThought = useCallback(() => {
-    if (thoughtId) setExpiredThought(thoughtId);
-  }, [thoughtId]);
   const openThoughtThread = useCallback(() => {
     if (thoughtTask) openThread(thoughtTask);
   }, [thoughtTask, openThread]);
@@ -853,39 +685,21 @@ export default function PulsePage() {
   );
 
   return (
-    // three bands, and the middle one never moves: the face sits in the centre of the screen
-    // in every mode, the assistant's words grow upwards above it and the cards downwards
-    // under it — one exception: a phrase of several things lifts it, the cards band growing
-    // by a CSS transition (`crowded`, D-146). The bands scroll inside themselves, so the page
-    // itself is always one screen — no scrollbar appearing and disappearing on a tap (D-60).
-    // `data-board` stops the shell growing with its content (globals.css); PulseSkeleton draws
-    // the same bands, so the face stands where the skeleton had it.
-    // Clipped sideways only: an open ball's card reaches down under the floating tab bar to the
-    // screen's edge (D-166) — the shell is one screen high, so nothing below it can scroll. `relative`:
-    // a leaving card is popped out in place against the board, not against a band that moves.
-    <main
-      className="relative mx-auto flex w-full min-h-0 max-w-lg flex-1 flex-col overflow-x-clip overflow-y-visible px-4"
-      style={{ overscrollBehaviorY: "contain" }}
-      data-mode={mode}
-      data-board=""
-    >
-      {/* framer's own motion (the balls, the deck, the bands) honours «уменьшить движение» (DESIGN §4) */}
-      <MotionConfig reducedMotion="user">
-      <LayoutGroup>
-        {/* above the head: what the assistant says. A mode change moves the band's edge by up to
-            110 px: the words glide there on the face's spring instead of jumping in one frame — and
-            are not cut off by the band's new edge on the way (`useBandGlide`). A thought floats up
-            over them: they step aside while it is up (D-178) */}
-        <SaidBand show={saying} said={assistantSaid} lines={assistantLines} buttons={buttons} aside={thoughtUp} receded={listening} />
-
-        {/* the face, and the balls orbiting it (ring) or in a row under it (panel) */}
-        <div className="relative flex shrink-0 flex-col items-center">
-          {/* The box changes size with the mode, but its middle never moves (the bands around it are
-              equal; under a crowded phrase they glide by CSS, not by framer), so it is not animated:
-              a layout animation of it was a pure scale, and it squashed
-              everything inside without a `layout` of its own — the team came in twice too big when
-              the face fell asleep, a thought's text zoomed. The face animates its own size. */}
-          <div className="relative flex items-center justify-center" style={{ width: box, height: box }}>
+    // the three bands of the home stage (HomeStage) — one exception: a phrase of several things lifts
+    // the face, the cards band growing by a CSS transition (`crowded`, D-146). PulseSkeleton draws the
+    // same bands, so the face stands where the skeleton had it.
+    <HomeStage
+      mode={mode}
+      box={box}
+      faceSize={faceSize}
+      // above the head: what the assistant says. A mode change moves the band's edge by up to 110 px:
+      // the words glide there on the face's spring instead of jumping in one frame — and are not cut
+      // off by the band's new edge on the way (`useBandGlide`). A thought floats up over them: they
+      // step aside while it is up (D-178)
+      words={<SaidBand show={saying} said={assistantSaid} lines={assistantLines} buttons={buttons} aside={thoughtUp} receded={listening} />}
+      // the face, and the balls orbiting it (ring) or in a row under it (panel)
+      face={
+          <>
             {/* The waiting screen (D-89, D-91): drawn before the face, so the team and the
                 dream pass behind the head. It belongs to the screen being at rest, not to one
                 pose of the face — since D-70 the resting face is a barometer and only sleeps
@@ -956,11 +770,11 @@ export default function PulsePage() {
                     attending={asking}
                     scene={deskStage.scene}
                     phase={deskStage.phase}
-                    urgency={urgencyOf(deskStage.phase === "asked" ? deskStage.errand : null, now, secretarySetup.data?.escalateAfterMin ?? 3)}
-                    count={activeCount(errandRows) + waitingErrands}
-                    away={awayUntil}
-                    seen={deskSeen}
-                    waiting={waitingErrands}
+                    urgency={urgencyOf(deskStage.phase === "asked" ? deskStage.errand : null, now, desk.escalateAfterMin)}
+                    count={activeCount(errandRows) + desk.waitingErrands}
+                    away={desk.awayUntil}
+                    seen={desk.deskSeen}
+                    waiting={desk.waitingErrands}
                     etaLeft={deskStage.phase === "doing" ? etaLeftMin(deskStage.errand, now) : null}
                     asking={errandRows.some((e) => isActive(e) && e.question && !e.answer)}
                     listening={stage === "recording" && toSecretary}
@@ -986,7 +800,7 @@ export default function PulsePage() {
                     }}
                   />
                   </div>
-                  {offerDnd && meetingNow && meetingEndsAt && dndAction && !asking ? (
+                  {desk.offerDnd && meetingNow && meetingEndsAt && dndAction && !asking ? (
                     // a meeting is on: one tap guards the door until it ends (D-99)
                     // right-aligned under the desk: the desk sits right of the face, a centred pill ran off the screen
                     <div className="absolute right-0 top-full mt-5 flex items-center gap-1 whitespace-nowrap" data-testid="dnd-offer">
@@ -996,13 +810,13 @@ export default function PulsePage() {
                         style={{ borderColor: "color-mix(in srgb, var(--danger) 45%, var(--border))", background: "var(--surface)" }}
                         onClick={() => {
                           const left = Math.max(5, Math.ceil((new Date(meetingEndsAt).getTime() - Date.now()) / 60_000));
-                          askSecretary(dndAction, "на встречу", () => void errands.refetch(), undefined, { untilMin: left });
-                          setDndOffered(meetingNow.id);
+                          askSecretary(dndAction, "на встречу", () => void refetchErrands(), undefined, { untilMin: left });
+                          desk.setDndOffered(meetingNow.id);
                         }}
                       >
                         🔕 Не беспокоить {untilLine(meetingEndsAt)}?
                       </button>
-                      <button type="button" aria-label="Не надо" className="h-8 w-8 text-[16px] text-muted" onClick={() => setDndOffered(meetingNow.id)}>
+                      <button type="button" aria-label="Не надо" className="h-8 w-8 text-[16px] text-muted" onClick={() => desk.setDndOffered(meetingNow.id)}>
                         ×
                       </button>
                     </div>
@@ -1015,88 +829,51 @@ export default function PulsePage() {
                 <div key="secretary" className="absolute bottom-full left-1/2 z-30 mb-3 -translate-x-1/2">
                   <SecretaryCard
                     names={secretaries.map((p) => shortName(p.full_name)).join(", ") || "на месте"}
-                    actions={catalogue.data ?? []}
+                    actions={deskActions}
                     errands={errandRows}
                     now={now}
-                    onRefresh={() => void errands.refetch()}
+                    onRefresh={() => void refetchErrands()}
                     // «спасибо» for a closed request waits for the adaptation gate (D-40, D-97)
                     thanks={pointsEnabled}
-                    secretaries={secretaryPeople.data}
+                    secretaries={desk.secretaries}
                     meetingEndsAt={meetingEndsAt}
                     onClose={() => setDeskOpen(false)}
                   />
                 </div>
               ) : null}
             </LocalPresence>
-            {/* one thought at a time: a new one comes once the old has left; over the ring it
-                floats above the orbit, clear of the balls and their taps (D-178) */}
-            <LocalPresence mode="wait">
-              {thought && thoughtUp ? (
-                <ThoughtBubble
-                  key={thought.id}
-                  text={thought.text}
-                  tone={thought.tone}
-                  faceSize={faceSize}
-                  rise={mode === "ring" ? OVER_RING : undefined}
-                  onDismiss={dismissThought}
-                  // a thought about Эфир or the calendar opens no thread — there is none behind it
-                  onOpen={!thought.source && thoughtTask ? openThoughtThread : undefined}
-                />
+          </>
+      }
+      // a thought about Эфир or the calendar opens no thread — there is none behind it
+      thought={
+        thought && thoughtUp
+          ? { id: thought.id, text: thought.text, tone: thought.tone, onDismiss: dismissThought, onOpen: !thought.source && thoughtTask ? openThoughtThread : undefined }
+          : null
+      }
+      band={
+        <>
+          {/* the phrase in hand takes the whole band: its cards, and nothing else to do */}
+          {confirming ? <ConfirmInline ref={confirmRef} /> : null}
+          {/* after a card they wait for it to be gone: the card going down holds them too */}
+          <div className={`flex flex-col gap-2 empty:hidden${afterCard ? ` ${AFTER_CARD}` : ""}`} style={recede(listening, { scale: false })}>
+            {!phraseInHand ? asks : null}
+            {/* service cards only once the face has been tapped — the idle screen is the face
+                alone; the face dozing off takes them with it in a short fade */}
+            <LocalPresence initial={false}>
+              {!phraseInHand && mode !== "idle" ? (
+                <motion.div key="service" className="flex flex-col gap-2 empty:hidden" exit={{ opacity: 0, transition: { duration: 0.15, ease: "easeOut" } }}>
+                  {serviceLines}
+                </motion.div>
               ) : null}
             </LocalPresence>
           </div>
-        </div>
-
-        {/* under the head: the cards — or, with a ball open, the ball's card up from the bottom edge
-            (D-166) under the row of balls. The row is drawn round the face and travels with it
-            (D-178); here it has only its room, outside the card and the scroller.
-            A ball's card takes its room at once: the face, the words, the balls and a thought glide
-            from where they stood by transform (their framer `layout`), while the card comes up on
-            the compositor. Glided by CSS, the band resized the frosted card every frame of that.
-            A phrase in hand glides it by CSS (D-146) — in, and out while the face throws it; a
-            phrase dropped gives the room back at once, the face gliding by its `layout`. */}
-        <div
-          className={`flex min-h-0 flex-1 flex-col${phraseInHand ? " transition-[flex-grow] duration-300 ease-out motion-reduce:transition-none" : ""}`}
-          style={{ flexGrow: crowded ? CROWDED_GROW : cardOpen ? PANEL_GROW : 1 }}
-          data-band="cards"
-          data-crowded={crowded ? "" : undefined}
-        >
-          {cardOpen ? (
-            // the row of balls is drawn round the face (it travels with it): here only its room
-            <div aria-hidden className="w-full shrink-0" style={{ height: ROW_GAP + BALL_H + 8 }} />
-          ) : (
-            // the band's top moves with the mode, as the words' bottom does: the cards glide with it
-            <motion.div layout="position" layoutScroll transition={BAND_SPRING} className="no-bar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 pt-2">
-              {/* the phrase in hand takes the whole band: its cards, and nothing else to do */}
-              {confirming ? <ConfirmInline ref={confirmRef} /> : null}
-              {/* after a card they wait for it to be gone: the card going down holds them too */}
-              <div className={`flex flex-col gap-2 empty:hidden${afterCard ? ` ${AFTER_CARD}` : ""}`} style={recede(listening, { scale: false })}>
-                {!phraseInHand ? asks : null}
-                {/* service cards only once the face has been tapped — the idle screen is the face
-                    alone; the face dozing off takes them with it in a short fade */}
-                <LocalPresence initial={false}>
-                  {!phraseInHand && mode !== "idle" ? (
-                    <motion.div key="service" className="flex flex-col gap-2 empty:hidden" exit={{ opacity: 0, transition: { duration: 0.15, ease: "easeOut" } }}>
-                      {serviceLines}
-                    </motion.div>
-                  ) : null}
-                </LocalPresence>
-              </div>
-            </motion.div>
-          )}
-          {/* popLayout: the leaving card is popped out where it stood against the board and slides
-              down from there, while the face, the balls and the band below already take their places */}
-          <LocalPresence mode="popLayout">
-            {cardOpen ? (
-              <PanelCard key="card" panelKey={panel ?? ""} receded={listening} label={balls.find((ball) => ball.id === panel)?.label ?? "Панель"} onClose={closePanel}>
-                {cardBody}
-              </PanelCard>
-            ) : null}
-          </LocalPresence>
-        </div>
-      </LayoutGroup>
-      </MotionConfig>
-
+        </>
+      }
+      card={{ open: cardOpen, panel: panel ?? "", label: balls.find((ball) => ball.id === panel)?.label ?? "Панель", receded: listening, onClose: closePanel, body: cardBody }}
+      grow={crowded ? CROWDED_GROW : 1}
+      gliding={phraseInHand}
+      crowded={crowded}
+    >
       {/* the bottom: the gesture hint — never under the face */}
       {/* the hint is for an idle face: while the phrase is in flight the face says what it does */}
       {showHint && mode === "idle" && stage === "idle" && !picked && !asking && !visitorsWaiting && !messagesWaiting && !keptPill ? (
@@ -1123,67 +900,6 @@ export default function PulsePage() {
         actions={actions}
         isDirector
       />
-    </main>
-  );
-}
-
-/**
- * The service lines (a draft not sent, nobody in the team yet, push, the home screen): under the
- * band's words on the ring, under the open ball in the card. Their own part — a tap does not touch them (D-178).
- */
-const ServiceLines = memo(function ServiceLines({ draftCount, noTeam }: { draftCount: number; noTeam: boolean }) {
-  return (
-    <>
-      {draftCount > 0 ? (
-        <Link href="/confirm" className="card-in relative block py-1 pl-4 text-[15px] leading-5">
-          <span aria-hidden className="absolute left-0 top-[8px] h-2 w-2 rounded-full bg-accent" />
-          Черновик: {draftCount} {draftCount === 1 ? "сущность" : draftCount < 5 ? "сущности" : "сущностей"}, не отправлен.{" "}
-          <span className="text-accent">Открыть ›</span>
-        </Link>
-      ) : null}
-      {noTeam ? (
-        <Link href="/people/new" className="card-in relative block py-1 pl-4 text-[15px] leading-5">
-          <span aria-hidden className="absolute left-0 top-[8px] h-2 w-2 rounded-full bg-accent" />
-          В команде пока никого. Добавь первого сотрудника. <span className="text-accent">Добавить ›</span>
-        </Link>
-      ) : null}
-      <PushCard bubble />
-      <InstallHint bubble />
-    </>
-  );
-});
-
-/**
- * The ways out of «не разобрал», right under the words (the same three as /confirm): fix the
- * words in the typed input and parse again, make them a task by hand, or drop them.
- */
-function UnparsedButtons({ onFix, onManual, onClose }: { onFix: () => void; onManual: () => void; onClose: () => void }) {
-  return (
-    <div className="card-in flex flex-wrap justify-center gap-2 pt-1" data-testid="unparsed-actions">
-      <Button className="!min-h-[40px] !px-4 !text-[14px]" onClick={onFix}>
-        Исправить текст
-      </Button>
-      <Button variant="secondary" className="!min-h-[40px] !px-4 !text-[14px]" onClick={onManual}>
-        Сделать задачей
-      </Button>
-      <Button variant="ghost" className="!min-h-[40px] !px-3 !text-[14px]" onClick={onClose}>
-        Закрыть
-      </Button>
-    </div>
-  );
-}
-
-function ExchangeButtons({ exchange, onManual, onClose }: { exchange: Exchange; onManual: () => void; onClose: () => void }) {
-  return (
-    <div className="card-in flex flex-wrap justify-center gap-2 pt-1">
-      {!exchange.understood ? (
-        <Button variant="secondary" className="!min-h-[40px] !px-4 !text-[14px]" onClick={onManual}>
-          Сделать задачей
-        </Button>
-      ) : null}
-      <Button variant="ghost" className="!min-h-[40px] !px-3 !text-[14px]" onClick={onClose}>
-        Закрыть
-      </Button>
-    </div>
+    </HomeStage>
   );
 }

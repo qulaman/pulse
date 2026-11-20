@@ -3,27 +3,22 @@
 import { ArrowRight, CircleCheck, MessagesSquare } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, type CSSProperties, type RefObject } from "react";
 
+import { useScreenKeys } from "@/components/desk/team/keys";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
-import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
 import type { BoardTask } from "@/lib/pulse/board";
-import { answersFor } from "@/lib/tasks/answers";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { Me } from "@/lib/tasks/queries";
 
 import { DeskComposer, DeskThread } from "./DeskThread";
 import { LoadFailure } from "./LoadState";
-import { focusReply, openMoreOf, TaskFacts, TaskHead, TaskKeys } from "./TaskParts";
+import { pressTaskKey } from "./taskKeys";
+import { focusReply, TaskFacts, TaskHead, TaskKeys } from "./TaskParts";
 import { useDeskTask, type DeskTask } from "./useDeskTask";
 
 /** The task has left the tab it was opened from (accepted, returned, answered): one press to the next. */
 export type PanelNext = { id: string | null; onGo: () => void };
 
-/** Something of the desk holds the keys right now: a dialog, a sheet, a popover or a menu. */
-export function deskLayerOpen(): boolean {
-  const body = document.body;
-  return body.hasAttribute("data-dialog-open") || body.hasAttribute("data-sheet-open") || document.querySelector(".desk-pop") !== null;
-}
 
 /**
  * The keys of one task on screen (the panel, the stack): its letters (A, R, O, N, D, T — the
@@ -31,45 +26,25 @@ export function deskLayerOpen(): boolean {
  * while the caret is inside `root` (not in a field), and — `onBody` — when it is nowhere at all.
  */
 export function useTaskKeys(desk: DeskTask, root: RefObject<HTMLElement | null>, onBody: boolean, now: Date) {
-  const latest = useRef({ desk, now });
-  useLayoutEffect(() => {
-    latest.current = { desk, now };
+  useScreenKeys((event) => {
+    if (event.shiftKey) return false;
+    const box = root.current;
+    const target = event.target as HTMLElement | null;
+    if (!box) return false;
+    const inside = Boolean(target && box.contains(target));
+    const nowhere = !target || target === document.body;
+    if (!inside && !(onBody && nowhere)) return false;
+    const task = desk.task;
+    if (!task) return false;
+    return pressTaskKey(event.code, task, {
+      root: box,
+      letters: desk.letters,
+      question: desk.signals.question,
+      now,
+      onAnswer: (text, deadlineIso) => desk.acts.answer(task, text, deadlineIso),
+      onLetter: (action) => (action === "reply" ? focusReply(box) : desk.acts.press(action, task, { scope: box })),
+    });
   });
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || !isPlainKey(event) || event.shiftKey) return;
-      const box = root.current;
-      const target = event.target as HTMLElement | null;
-      if (!box) return;
-      const inside = Boolean(target && box.contains(target));
-      const nowhere = !target || target === document.body;
-      if (!inside && !(onBody && nowhere)) return;
-      if (isTypingTarget(target) || deskLayerOpen()) return;
-      const { desk: current, now: at } = latest.current;
-      const task = current.task;
-      if (!task) return;
-      if (event.code === "Period") {
-        event.preventDefault();
-        openMoreOf(task.id, box);
-        return;
-      }
-      const digit = /^Digit([1-9])$/.exec(event.code);
-      if (digit && current.signals.question) {
-        const answer = answersFor(current.signals.question, task.deadline, at)[Number(digit[1]) - 1];
-        if (!answer) return;
-        event.preventDefault();
-        current.acts.answer(task, answer.text, answer.deadlineIso);
-        return;
-      }
-      const key = current.letters.find((one) => one.code === event.code);
-      if (!key) return;
-      event.preventDefault();
-      if (key.action === "reply") focusReply(box);
-      else current.acts.press(key.action, task, { scope: box });
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [root, onBody]);
 }
 
 /**
@@ -168,9 +143,6 @@ export function TaskPanel({
             <button type="button" onClick={next.onGo} className="ml-auto inline-flex items-center gap-1 font-medium text-accent hover:underline" data-testid="desk-panel-next-go">
               следующая
               <ArrowRight aria-hidden size={14} strokeWidth={2.2} className="tasks-ico" />
-              <span className="tasks-journal-only" aria-hidden>
-                →
-              </span>
             </button>
           ) : (
             <span className="ml-auto text-muted">в списке пусто</span>

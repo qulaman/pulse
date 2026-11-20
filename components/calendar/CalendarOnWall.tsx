@@ -8,9 +8,10 @@ import { useTvState } from "@/lib/tv/queries";
 import { sceneOf } from "@/lib/tv/state";
 
 /**
- * «На экран» у календаря директора (D-96): тот же жест, что «На экран» на карточке
- * сотрудника, — неделя вперёд встаёт на стену в кабинете заставкой «Календарь». Повторный
- * тап возвращает лицо. Команда — пультом (`tv_control`), без сети — честное «нет связи».
+ * «На экран» on the director's calendar (D-96): the same gesture as «На экран» on an employee's
+ * card — the week ahead goes up on the office wall as the «Календарь» screensaver. A second tap
+ * brings the face back. The command goes through the remote (`tv_control`); offline — an honest
+ * «нет связи».
  */
 export function CalendarOnWall() {
   const state = useTvState();

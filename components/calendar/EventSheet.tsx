@@ -3,7 +3,7 @@
 import { EventDetails } from "@/components/calendar/EventDetails";
 import { Sheet } from "@/components/ui/Sheet";
 import type { CalendarEvent } from "@/lib/calendar/queries";
-import { useNow } from "@/lib/pulse/queries";
+import { useNow } from "@/lib/useNow";
 
 type Props = {
   event: CalendarEvent | null;

@@ -1,4 +1,4 @@
-import { VoiceApiError, type VoiceApi } from "./api";
+import { alreadyStored, VoiceApiError, type VoiceApi } from "./api";
 import { claimPhrase, dropPhrase, listPhrases, patchPhrase, releasePhrase, type KeptPhrase } from "./kept";
 import { extForMime } from "./recorder";
 
@@ -23,12 +23,6 @@ export function isTransient(error: unknown): boolean {
     error.code === "rate_limited" ||
     error.code === "ai_timeout"
   );
-}
-
-/** The object of this key is in Storage already: an earlier attempt landed, its answer was lost. */
-function alreadyStored(error: unknown): boolean {
-  if (!(error instanceof VoiceApiError) || error.code !== "upload_failed") return false;
-  return error.status === 409 || /duplicate|already exists/i.test(JSON.stringify(error.body ?? ""));
 }
 
 export type ReplayDeps = {

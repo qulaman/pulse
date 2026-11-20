@@ -1,11 +1,11 @@
-/* «Отчёты → Сводка» of the desk (D-183): reports-day. One builder a file.
+/* «Отчёты → Сводка» of the desk (D-183): reports-day.
    The ledger of the day's handed-in reports (Ledger.tsx) and the roll call beside it or above it
    (RollCall.tsx), the morning band and the day-off line (SummaryView.tsx).
-   Base rules lay it out in both looks with the journal's inks (the graphite-only ones fall back);
+   Base rules lay it out with the base inks (the graphite-only ones fall back);
    «Графит» gives the ledger and the rail a sheet, its inks and motion. Teal (`--pen`) only for the
    choice, today and «только что»; green / red / grey — handed in / missed / away (DESIGN §8). */
 
-/* ---- both looks ------------------------------------------------------------------------------ */
+/* ---- the base ------------------------------------------------------------------------------- */
 html[data-surface="desk"][data-journal] {
   .rep-day {
     --rep-ink-3: var(--ink-3, var(--ink-2));
@@ -116,7 +116,6 @@ html[data-surface="desk"][data-journal] {
     gap: 10px;
     padding: 6px 8px 6px 12px;
     border-bottom: 1px solid var(--rule-soft);
-    background: var(--page);
   }
   .rep-day-ledger-title {
     flex-shrink: 0;
@@ -196,9 +195,6 @@ html[data-surface="desk"][data-journal] {
     &[data-selected],
     &[data-open] {
       background: color-mix(in srgb, var(--pen) 8%, transparent);
-    }
-    &[data-selected] {
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 50%, transparent);
     }
     &:is([data-selected], [data-open])::before,
     &:is([data-selected], [data-open]) + .rep-day-entry::before {
@@ -702,26 +698,6 @@ html[data-surface="desk"][data-journal] {
   }
   .rep-day-roll.rep-day-bone {
     padding: 16px;
-  }
-}
-
-/* ---- «Журнал»: no sheets, the hairlines say it ------------------------------------------------- */
-html[data-surface="desk"][data-journal]:not([data-graphite]) {
-  .rep-day-ledger {
-    border-top: 2px solid var(--line);
-  }
-  .rep-day-roll[data-mode="rail"] {
-    padding: 0 0 0 20px;
-    border-left: 1px solid var(--rule);
-  }
-  .rep-day-roll[data-mode="strip"] {
-    border-top: 1px solid var(--rule);
-    border-bottom: 1px solid var(--rule);
-  }
-  .rep-day-band,
-  .rep-day-entry,
-  .rep-day-person {
-    border-radius: 0;
   }
 }
 

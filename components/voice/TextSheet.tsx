@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
-import { initialsOf } from "@/lib/people/queries";
+
 import { useComposeStore, type ComposePin } from "@/lib/store/compose";
 import { useIngestStore } from "@/lib/store/ingest";
+import { initialsOf } from "@/lib/people/names";
 
 /**
  * The typed half of the single input (principle 1): free text goes through the very

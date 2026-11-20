@@ -1,6 +1,8 @@
 import type { Note } from "@/lib/notes/queries";
 import type { TvState } from "@/lib/tv/queries";
 
+import { CAST } from "../fixtures/people";
+
 /**
  * Boards of «Заметки» on fixtures (D-102, D-121) for /dev/board: every state of the screen
  * without a login or the shared database. Times are relative to the moment the sandbox opens.
@@ -46,7 +48,7 @@ export const SKETCH_UPRIGHT = {
 export type BoardCase = (typeof BOARD_CASES)[number];
 
 export const COMPANY = "company";
-export const DIRECTOR = "u-director";
+export const DIRECTOR = CAST.director.id;
 export const BOARD_ID = "board-1";
 
 const MIN = 60_000;
@@ -66,8 +68,8 @@ export type BoardFixture = {
   wall: { onWall: boolean; spot: string | null };
 };
 
-function note(base: number, id: string, text: string, position: number, extra: Partial<Note> = {}): Note {
-  const created = new Date(base - (60 - position) * MIN).toISOString();
+/** A line of the sandbox board as the base keeps it, made at `at`; `extra` — what differs. */
+export function noteRow(id: string, text: string, at: string, extra: Partial<Note> = {}): Note {
   return {
     id,
     company_id: COMPANY,
@@ -78,7 +80,7 @@ function note(base: number, id: string, text: string, position: number, extra: P
     inbox_item_id: null,
     pinned: false,
     board_id: BOARD_ID,
-    position,
+    position: 0,
     parent_id: null,
     done_at: null,
     converted_task_id: null,
@@ -88,11 +90,16 @@ function note(base: number, id: string, text: string, position: number, extra: P
     remind_at: null,
     reminded_at: null,
     sketch: null,
-    client_request_id: `crid-${id}`,
-    created_at: created,
-    updated_at: created,
+    client_request_id: id,
+    created_at: at,
+    updated_at: at,
     ...extra,
   };
+}
+
+function note(base: number, id: string, text: string, position: number, extra: Partial<Note> = {}): Note {
+  const created = new Date(base - (60 - position) * MIN).toISOString();
+  return noteRow(id, text, created, { position, client_request_id: `crid-${id}`, ...extra });
 }
 
 const sub = (base: number, id: string, parent: string, text: string, position: number, extra: Partial<Note> = {}) =>
@@ -280,6 +287,9 @@ export function wallRow(now: Date, spot: string | null): TvState {
   return {
     applied_version: 1,
     awake_until: null,
+    scene_set_at: null,
+    scale: 100,
+    health: null,
     board_guest: false,
     board_id: BOARD_ID,
     board_point: spot,

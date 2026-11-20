@@ -23,7 +23,7 @@ export const calendarKeys = {
   one: (id: string) => ["calendar", "event", id] as const,
 };
 
-/** Что видят Пульс и Лента: со вчерашнего дня и на месяц вперёд (D-78). */
+/** What Пульс and Лента see: from yesterday to a month ahead (D-78). */
 const BACK_MS = 24 * 60 * 60 * 1000;
 const AHEAD_MS = 30 * BACK_MS;
 

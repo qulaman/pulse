@@ -12,11 +12,11 @@ import { LedgerTable } from "@/components/desk/settings/points/LedgerTable";
 import { ShopDesk } from "@/components/desk/settings/points/ShopDesk";
 import { PointsHero } from "@/components/desk/settings/points/PointsHero";
 import { usePageSearch } from "@/components/desk/settings/SettingsFrame";
+import { useScreenKeys } from "@/components/desk/team/keys";
 import { PageTitle } from "@/components/desk/ui/PageTitle";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SearchField, SegmentTabs, Select, Toolbar } from "@/components/desk/ui/Toolbar";
 import { Button } from "@/components/ui/Button";
-import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
 import { usePeople } from "@/lib/people/queries";
 import { useOpenDisputes } from "@/lib/points/game";
 import { usePointsEnabled, type RatingPeriod } from "@/lib/points/queries";
@@ -91,26 +91,19 @@ export function PointsScreen() {
   );
 
   // N — «Начислить» (to the chosen person on «Люди»), 1–4 — the sections; outside a field
-  const keys = useRef({ on, view, chosen, setView });
-  useEffect(() => {
-    keys.current = { on, view, chosen, setView };
+  useScreenKeys((event) => {
+    if (event.shiftKey) return false;
+    const index = ["Digit1", "Digit2", "Digit3", "Digit4"].indexOf(event.code);
+    if (index >= 0) {
+      setView(VIEWS[index]);
+      return true;
+    }
+    if (event.code === "KeyN" && on) {
+      setAward(view === "people" && chosen ? { userId: chosen } : {});
+      return true;
+    }
+    return false;
   });
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || !isPlainKey(event) || event.shiftKey || isTypingTarget(event.target)) return;
-      if (document.body.hasAttribute("data-dialog-open") || document.body.hasAttribute("data-sheet-open")) return;
-      const index = ["Digit1", "Digit2", "Digit3", "Digit4"].indexOf(event.code);
-      if (index >= 0) {
-        event.preventDefault();
-        keys.current.setView(VIEWS[index]);
-      } else if (event.code === "KeyN" && keys.current.on) {
-        event.preventDefault();
-        setAward(keys.current.view === "people" && keys.current.chosen ? { userId: keys.current.chosen } : {});
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
   useShortcuts("Очки и магазин", [
     { keys: ["1", "2", "3", "4"], label: "Люди, Споры, История, Магазин" },
     { keys: ["N"], label: "Начислить (выбранному в «Людях»)" },

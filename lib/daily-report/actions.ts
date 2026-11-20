@@ -11,10 +11,11 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tansta
 
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
+import { postJson } from "@/lib/api/client";
 import { todayYmd, type Ymd } from "@/lib/datetime/calendar";
 import { isNetworkError, NetworkError } from "@/lib/net";
-import { dequeue, enqueue } from "@/lib/outbox";
 import { createBrowserSupabase } from "@/lib/supabase/client";
+import { rpcJson } from "@/lib/supabase/rpc";
 import { pluralRu } from "@/lib/tasks/status-text";
 
 import { DAILY_REPORT_ERROR_TEXT, errorCodeOf } from "./format";
@@ -114,35 +115,21 @@ function remindWords(answer: RemindAnswer, now: Date): string {
 async function postRemind(userIds: string[], requestId: string, date: string): Promise<RemindAnswer> {
   // the tap's own day goes along: replayed tomorrow from the outbox, the route refuses it (stale_day)
   const payload = { user_ids: userIds, client_request_id: requestId, date };
-  let res: Response;
-  try {
-    res = await fetch(REMIND_PATH, {
-      method: "POST",
-      credentials: "include",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-  } catch {
-    enqueue({ id: requestId, path: REMIND_PATH, payload });
-    throw new NetworkError("Нет связи. Напомню, как появится");
-  }
-  dequeue(requestId);
-  const body = (await res.json().catch(() => null)) as
-    | (RemindAnswer & { error?: { code?: string; message_ru?: string } })
-    | null;
-  if (res.status === 401) throw new Error("Сессия истекла. Войдите заново");
-  if (!res.ok || !body || !Array.isArray(body.reminded)) throw new Error(body?.error?.message_ru ?? REMIND_FAILED);
+  const body = (await postJson(REMIND_PATH, payload, {
+    offline: "Нет связи. Напомню, как появится",
+    fallback: REMIND_FAILED,
+  })) as RemindAnswer | null;
+  if (!body || !Array.isArray(body.reminded)) throw new Error(REMIND_FAILED);
   return body;
 }
 
 /** «Напомнить» one person or everyone waiting: one push a person a day, the sweep's own included. */
 export function useRemindDailyReport() {
   const queryClient = useQueryClient();
-  return useMutation<RemindDailyReportResult, Error, { userIds: string[] }>({
-    // the answer may carry `late` and `deliver_after` beyond the contract (RemindAnswer)
-    mutationFn: async (input) => (await postRemind(input.userIds, requestIdOf(input), dayOf(input))) as unknown as RemindDailyReportResult,
+  return useMutation<RemindAnswer, Error, { userIds: string[] }>({
+    mutationFn: (input) => postRemind(input.userIds, requestIdOf(input), dayOf(input)),
     onSuccess: (answer) => {
-      toast(remindWords(answer as unknown as RemindAnswer, new Date()));
+      toast(remindWords(answer, new Date()));
     },
     onError: (error) => toast(error.message || REMIND_FAILED),
     // the day's rows carry `reminded` — the receipt shows up at once
@@ -178,14 +165,15 @@ export function useExcuseDailyReport() {
   const queryClient = useQueryClient();
   return useMutation<ExcuseDailyReportResult, Error, { reportId: string; reason: string }, ExcuseContext>({
     mutationFn: async (input) => {
-      const supabase = createBrowserSupabase();
-      const { data, error } = await supabase.rpc(DAILY_REPORT_RPC.excuse, {
-        p_report: input.reportId,
-        p_reason: input.reason,
-        client_request_id: requestIdOf(input),
-      });
+      const { data, error } = await rpcJson<ExcuseDailyReportResult>(
+        createBrowserSupabase().rpc(DAILY_REPORT_RPC.excuse, {
+          p_report: input.reportId,
+          p_reason: input.reason,
+          client_request_id: requestIdOf(input),
+        }),
+      );
       if (error) throw failureOf(error.message, EXCUSE_FAILED);
-      return data as unknown as ExcuseDailyReportResult;
+      return data;
     },
     // on screen at once (принцип 1a): the reason and a minus gone; the answer replaces it
     onMutate: async (input) => {
@@ -233,14 +221,11 @@ export function usePersonDailyReports(userId: string | null, from: Ymd, to: Ymd,
     enabled: enabled && Boolean(userId) && Boolean(from && to) && from <= to,
     placeholderData: (previous, previousQuery) => (previousQuery?.queryKey[3] === userId ? previous : undefined),
     queryFn: async () => {
-      const supabase = createBrowserSupabase();
-      const { data, error } = await supabase.rpc(DAILY_REPORT_RPC.person, {
-        p_user_id: userId as string,
-        p_from: from,
-        p_to: to,
-      });
+      const { data, error } = await rpcJson<PersonDailyReport[] | null>(
+        createBrowserSupabase().rpc(DAILY_REPORT_RPC.person, { p_user_id: userId as string, p_from: from, p_to: to }),
+      );
       if (error) throw failureOf(error.message, PERSON_FAILED);
-      return (data as unknown as PersonDailyReport[] | null) ?? [];
+      return data ?? [];
     },
   });
 }

@@ -1,33 +1,28 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
-import { CleanupSheet } from "@/components/dictionary/CleanupSheet";
 import { EntryInput } from "@/components/dictionary/EntryInput";
 import { Guide, type GuideStep } from "@/components/dictionary/Guide";
-import { ImportSheet } from "@/components/dictionary/ImportSheet";
 import { KindPicker } from "@/components/dictionary/KindPicker";
 import { SearchField } from "@/components/dictionary/SearchField";
-import { SpellingSheet } from "@/components/dictionary/SpellingSheet";
-import { TypesSheet } from "@/components/dictionary/TypesSheet";
+import { useWordsEditor, wordsCount } from "@/components/dictionary/useWordsEditor";
 import { WordSheet } from "@/components/dictionary/WordSheet";
-import { STALE_DAYS, timesLine, wordFacts, type WordFact } from "@/components/dictionary/word-facts";
+import { STALE_DAYS, timesLine, type WordFact } from "@/components/dictionary/word-facts";
 import { toast } from "@/components/ui/Toast";
 import {
   NO_KIND_LABEL,
   VOCABULARY_SOFT_MAX,
   byRussian,
   entryKey,
-  planWords,
   splitEntries,
   type RosterPerson,
   kindLabel,
-  type WordKind,
   type WordKindDef,
   type WordMeta,
 } from "@/lib/dictionary";
-import { useDismissWords, useEditVocabulary, useWaitingEdits, useWordStats } from "@/lib/dictionary-queries";
-import { whenLine, type WordSuggestion } from "@/lib/dictionary-usage";
+import { useWaitingEdits } from "@/lib/dictionary-queries";
+import { whenLine } from "@/lib/dictionary-usage";
 import { pluralRu } from "@/lib/tasks/status-text";
 
 const STEPS: GuideStep[] = [
@@ -61,7 +56,6 @@ const SORTS: { key: Sort; label: string }[] = [
   { key: "new", label: "Новые" },
 ];
 
-const KIND_STORE = "pulse:dictionary-kind";
 const SORT_STORE = "pulse:dictionary-sort";
 
 /** A per-browser convenience: the kind of the last added word, the chosen order. Never state that matters. */
@@ -80,10 +74,6 @@ function remember(key: string, value: string | null): void {
   } catch {
     // storage off: the choice lives until the page closes
   }
-}
-
-function words(n: number): string {
-  return `${n} ${pluralRu(n, ["слово", "слова", "слов"])}`;
 }
 
 function sortFacts(facts: WordFact[], sort: Sort): WordFact[] {
@@ -122,80 +112,20 @@ export function WordsPanel({
   kinds: WordKindDef[];
   people: RosterPerson[];
 }) {
-  const edit = useEditVocabulary();
-  const stats = useWordStats();
-  const dismiss = useDismissWords();
   const waiting = useWaitingEdits();
 
-  const [text, setText] = useState("");
-  const [kindState, setKindState] = useState<WordKind | null>(() => remembered(KIND_STORE, kinds.map((k) => k.id), kinds[0]?.id ?? null));
-  // a remembered type since removed is no choice at all
-  const kind = kindState && kinds.some((k) => k.id === kindState) ? kindState : null;
+  const editor = useWordsEditor({ vocabulary, meta, kinds, people });
+  const { edit, stats, dismiss, text, setText, kind, setKind, setImportText, setSpelling, setCleanup, setTypesOpen, fresh, setFresh, facts, keys, stale, entries, plan, single, add, submit, remove } = editor;
   const [sort, setSortState] = useState<Sort>(() => remembered(SORT_STORE, ["often", "abc", "new"] as const, "often"));
   const [query, setQuery] = useState("");
-  const [importText, setImportText] = useState<string | null>(null);
   const [openKey, setOpenKey] = useState<string | null>(null);
-  const [cleanup, setCleanup] = useState(false);
-  const [spelling, setSpelling] = useState<WordSuggestion | null>(null);
-  const [typesOpen, setTypesOpen] = useState(false);
-  const [fresh, setFresh] = useState<ReadonlySet<string>>(new Set());
 
-  const setKind = (value: WordKind | null) => {
-    setKindState(value);
-    remember(KIND_STORE, value);
-  };
   const setSort = (value: Sort) => {
     setSortState(value);
     remember(SORT_STORE, value);
   };
 
-  const facts = useMemo(() => wordFacts(vocabulary, meta, stats.data, kinds), [vocabulary, meta, stats.data, kinds]);
-  const perKind = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const f of facts) if (f.kind) counts[f.kind] = (counts[f.kind] ?? 0) + 1;
-    return counts;
-  }, [facts]);
-  const stale = facts.filter((f) => f.stale);
   const open = facts.find((f) => f.key === openKey) ?? null;
-  const keys = useMemo(() => new Set(vocabulary.map(entryKey)), [vocabulary]);
-
-  const entries = splitEntries(text);
-  const plan = planWords(vocabulary, text, people);
-  const single = entries.length === 1;
-
-  const add = (list: string[], as: WordKind | null) => {
-    if (!list.length) return;
-    edit.mutate({ add: list, kind: as });
-    setFresh((seen) => new Set([...seen, ...list.map(entryKey)]));
-    toast(list.length === 1 ? `Добавил «${list[0]}»` : `Добавил ${words(list.length)}`);
-  };
-
-  const submit = () => {
-    if (entries.length > 1) {
-      setImportText(text);
-      return;
-    }
-    if (!plan.add.length) return;
-    add(plan.add, kind);
-    setText("");
-  };
-
-  const remove = (list: WordFact[]) => {
-    if (!list.length) return;
-    edit.mutate({ remove: list.map((f) => f.word) });
-    toast(list.length === 1 ? `Убрал «${list[0].word}»` : `Убрал ${words(list.length)}`, {
-      lifetimeMs: 6000,
-      action: {
-        label: "Вернуть",
-        onClick: () => {
-          // back with their kinds: one call per kind
-          const byKind = new Map<WordKind | null, string[]>();
-          for (const f of list) byKind.set(f.kind, [...(byKind.get(f.kind) ?? []), f.word]);
-          for (const [k, group] of byKind) edit.mutate({ add: group, kind: k });
-        },
-      },
-    });
-  };
 
   const q = entryKey(query);
   const visible = q ? facts.filter((f) => f.key.includes(q)) : facts;
@@ -423,7 +353,7 @@ export function WordsPanel({
               className="mt-2 flex min-h-[48px] items-center justify-between gap-3 rounded-[14px] border border-dashed border-border px-4 text-left text-[14px] leading-5 active:bg-surface-2"
             >
               <span>
-                {words(stale.length)} не {pluralRu(stale.length, ["встречалось", "встречались", "встречались"])} {STALE_DAYS} дней
+                {wordsCount(stale.length)} не {pluralRu(stale.length, ["встречалось", "встречались", "встречались"])} {STALE_DAYS} дней
               </span>
               <span className="shrink-0 font-display font-semibold text-accent">Посмотреть</span>
             </button>
@@ -431,20 +361,7 @@ export function WordsPanel({
         </>
       )}
 
-      <ImportSheet
-        text={importText}
-        vocabulary={vocabulary}
-        people={people}
-        kinds={kinds}
-        kind={kind}
-        onClose={() => setImportText(null)}
-        onAdd={(list, as) => {
-          add(list, as);
-          if (as !== kind) setKind(as);
-          setImportText(null);
-          setText("");
-        }}
-      />
+      {editor.sheets}
       <WordSheet
         fact={open}
         kinds={kinds}
@@ -461,30 +378,6 @@ export function WordsPanel({
         onRemove={(fact) => {
           setOpenKey(null);
           remove([fact]);
-        }}
-      />
-      <SpellingSheet
-        suggestion={spelling}
-        kinds={kinds}
-        kind={kind}
-        taken={keys}
-        onClose={() => setSpelling(null)}
-        onAdd={(word, as, suggestion) => {
-          setSpelling(null);
-          add([word], as);
-          // the heard spellings are this word now: none of them is offered again
-          dismiss.mutate(suggestion.keys);
-        }}
-      />
-      <TypesSheet open={typesOpen} onClose={() => setTypesOpen(false)} kinds={kinds} counts={perKind} />
-      <CleanupSheet
-        facts={stale}
-        kinds={kinds}
-        open={cleanup}
-        onClose={() => setCleanup(false)}
-        onRemove={(list) => {
-          setCleanup(false);
-          remove(list);
         }}
       />
     </div>

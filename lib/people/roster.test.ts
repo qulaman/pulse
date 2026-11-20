@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { firstNameOf, foldRu, initialsOf, searchPeople } from "./roster";
+import { initialsOf } from "@/lib/people/names";
+import { firstNameOf } from "@/lib/text/normalize";
+
+import { foldRu, searchPeople } from "./search";
 
 const PEOPLE = [
   { full_name: "Ерлан Бекмуханов", position: "Прораб" },

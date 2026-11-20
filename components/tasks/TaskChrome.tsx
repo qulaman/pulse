@@ -1,8 +1,10 @@
 "use client";
 
-import { initialsOf } from "@/lib/people/queries";
 import { deadlineLabel, SHORT_STATUS, TEXT, type TaskStatus } from "@/lib/tasks/status-text";
 import { deadlineToneOf, pillStyle, TONE_VAR, toneOf, type Tone } from "@/lib/tasks/tone";
+
+import { Icon } from "./icons";
+import { initialsOf } from "@/lib/people/names";
 
 /**
  * The parts every task wears, in one place: the rail and the tint that carry its state,
@@ -54,23 +56,6 @@ export function StatusEyebrow({
   );
 }
 
-function FlameIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0">
-      <path d="M12 3s5 4.5 5 9.5a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 1.5.8 2.5 2 3 0-3 1-5.5 1-8z" />
-    </svg>
-  );
-}
-
-function ClockIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0">
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M12 7.5V12l3 2" />
-    </svg>
-  );
-}
-
 /**
  * The deadline, always with its clock — «без срока» included, so the right edge of every
  * list is one shape. Red past the deadline, amber inside a day, accent further out.
@@ -93,7 +78,7 @@ export function DeadlinePill({
       className="nums inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-1 text-[12px] font-semibold leading-4"
       style={pillStyle(urgentNow ? "warn" : deadlineToneOf(task, now))}
     >
-      {urgentNow ? <FlameIcon /> : <ClockIcon />}
+      {urgentNow ? <Icon name="flame" size={13} /> : <Icon name="clock" size={14} />}
       {urgentNow ? TEXT.urgent : label.text}
     </span>
   );

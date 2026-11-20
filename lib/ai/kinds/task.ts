@@ -51,7 +51,7 @@ export const taskKind: KindModule = {
   section,
   modelSchema: ModelTaskEntitySchema,
   examples: [
-    // П1. Одиночная задача, явный дедлайн.
+    // П1. A single task, an explicit deadline.
     {
       n: 1,
       user: "Марат, подготовь коммерческое предложение по Альфе к пятнице к трём часам",
@@ -74,7 +74,7 @@ export const taskKind: KindModule = {
         ],
       },
     },
-    // П2. Мульти-сущность: мероприятие всем + 2 задачи + очки.
+    // П2. Several entities: an event for everyone + 2 tasks + points.
     {
       n: 2,
       user:
@@ -132,7 +132,7 @@ export const taskKind: KindModule = {
         ],
       },
     },
-    // П3. Телеграфный стиль.
+    // П3. Telegraph style.
     {
       n: 3,
       user: "марат кп альфа завтра до обеда, ерлану б +10",
@@ -163,7 +163,7 @@ export const taskKind: KindModule = {
         ],
       },
     },
-    // П4. Без исполнителя — null, не выдумывать.
+    // П4. No assignee — null, never made up.
     {
       n: 4,
       user: "Надо заказать щебень на третий объект до конца недели",
@@ -185,7 +185,7 @@ export const taskKind: KindModule = {
         ],
       },
     },
-    // П5. Неоднозначный дедлайн (low confidence).
+    // П5. An ambiguous deadline (low confidence).
     {
       n: 5,
       user: "Айгуль пусть на неделе закроет отчёты по командировкам",
@@ -207,7 +207,7 @@ export const taskKind: KindModule = {
         ],
       },
     },
-    // П7. Казахские падежи и вставка казахского.
+    // П7. Kazakh case endings and Kazakh words mixed in.
     {
       n: 7,
       user:
@@ -244,7 +244,7 @@ export const taskKind: KindModule = {
         ],
       },
     },
-    // П8. Два исполнителя → две копии с общим group_id.
+    // П8. Two assignees → two copies with a shared group_id.
     {
       n: 8,
       user: "Ерлану Б. и Марату подготовить площадку к приезду комиссии к понедельнику",
@@ -281,7 +281,7 @@ export const taskKind: KindModule = {
         ],
       },
     },
-    // П9. Бытовые поручения: телеграф из двух слов, задача без имени (не reminder).
+    // П9. Everyday orders: a two-word telegraph, a task without a name (not a reminder).
     {
       n: 9,
       // not «забери машину с мойки»: eval ev-05 says nearly that without a deadline, and the

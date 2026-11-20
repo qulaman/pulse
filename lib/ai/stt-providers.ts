@@ -64,24 +64,30 @@ async function openaiTranscribe(
   return { text: json.text ?? "", durationMs: Date.now() - startedAt, provider: providerName };
 }
 
-const openai4o: SttProvider = {
+/** A provider of ours, with the model it calls — what ai_logs.model says. */
+type ModelProvider = SttProvider & { model: string };
+
+const openai4o: ModelProvider = {
   name: "openai-4o",
-  transcribe: (audio, mime, opts) => openaiTranscribe("openai-4o", "gpt-4o-transcribe", audio, mime, opts),
+  model: "gpt-4o-transcribe",
+  transcribe: (audio, mime, opts) => openaiTranscribe("openai-4o", openai4o.model, audio, mime, opts),
 };
 
-const whisper1: SttProvider = {
+const whisper1: ModelProvider = {
   name: "whisper1",
-  transcribe: (audio, mime, opts) => openaiTranscribe("whisper1", "whisper-1", audio, mime, opts),
+  model: "whisper-1",
+  transcribe: (audio, mime, opts) => openaiTranscribe("whisper1", whisper1.model, audio, mime, opts),
 };
 
-const deepgram: SttProvider = {
+const deepgram: ModelProvider = {
   name: "deepgram",
+  model: "nova-3",
   async transcribe(audio, mime, opts) {
     const kw = hintSurfaces(opts.vocabularyHints ?? [])
       .map((k) => "keyterm=" + encodeURIComponent(k)) // nova-3: keyterm prompting, not keywords
       .join("&");
     const url =
-      `https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true` +
+      `https://api.deepgram.com/v1/listen?model=${deepgram.model}&smart_format=true` +
       (opts.language ? `&language=${opts.language}` : "") +
       (kw ? `&${kw}` : "");
 
@@ -104,8 +110,9 @@ const deepgram: SttProvider = {
   },
 };
 
-const elevenlabs: SttProvider = {
+const elevenlabs: ModelProvider = {
   name: "elevenlabs",
+  model: "scribe_v2",
   async transcribe(audio, mime, opts) {
     const fd = new FormData();
     fd.append("file", new Blob([toBlobPart(audio)], { type: mime }), fileNameFor(mime));
@@ -113,7 +120,7 @@ const elevenlabs: SttProvider = {
     // «Казхрому» with them, but roster names as keyterms made noisy phone audio come back
     // as a list of roster names (4 of 15 runs) — the one failure class the matcher cannot
     // catch. Scribe has no free-text prompt, so it cannot echo one (docs/AI.md §1, D-53).
-    fd.append("model_id", "scribe_v2");
+    fd.append("model_id", elevenlabs.model);
     if (opts.language) fd.append("language_code", opts.language);
     const { counterparties } = splitVocabularyHints(opts.vocabularyHints ?? []);
     for (const term of counterparties) fd.append("keyterms", term);
@@ -131,7 +138,7 @@ const elevenlabs: SttProvider = {
   },
 };
 
-const PROVIDERS: Record<SttProviderName, SttProvider> = {
+const PROVIDERS: Record<SttProviderName, ModelProvider> = {
   "openai-4o": openai4o,
   whisper1,
   deepgram,
@@ -140,4 +147,9 @@ const PROVIDERS: Record<SttProviderName, SttProvider> = {
 
 export function createProvider(name: SttProviderName): SttProvider {
   return PROVIDERS[name];
+}
+
+/** The model behind a provider's name, for ai_logs.model (not null there): «unknown» for none of ours. */
+export function sttModelOf(provider: string | undefined): string {
+  return (provider && Object.hasOwn(PROVIDERS, provider) && PROVIDERS[provider as SttProviderName].model) || "unknown";
 }

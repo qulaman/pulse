@@ -4,11 +4,12 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEve
 
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { humanAqtobe } from "@/lib/ai/time";
-import { addMonths, aqtobeIsoToYmdHm, monthMatrix, monthOf, monthTitleRu, WEEKDAYS_SHORT_RU, type Month } from "@/lib/datetime/calendar";
-import { deadlinePresets, parseTimeInput, shiftYmd, stepHm, wallIso, wallYmd } from "@/lib/desk/tasks";
+import { addDays, addMonths, aqtobeIsoToYmdHm, monthMatrix, monthOf, monthTitleRu, todayYmd, WEEKDAYS_SHORT_RU, type Month } from "@/lib/datetime/calendar";
+import { deadlinePresets, parseTimeInput, stepHm, wallIso } from "@/lib/desk/tasks";
 import { useTeamLoads } from "@/lib/people/loads";
 import { shortName } from "@/lib/people/names";
-import { searchPeople, useRoster, type RosterEntry } from "@/lib/people/roster";
+import { useRoster, type RosterEntry } from "@/lib/people/roster";
+import { searchPeople } from "@/lib/people/search";
 import { pluralRu } from "@/lib/tasks/status-text";
 
 /**
@@ -161,7 +162,7 @@ export function DeadlinePicker({
   onPick: (iso: string | null) => void;
 }) {
   const start = aqtobeIsoToYmdHm(currentIso);
-  const today = wallYmd(now);
+  const today = todayYmd(now);
   const [ymd, setYmd] = useState<string | null>(start?.ymd ?? null);
   const [time, setTime] = useState(start?.hm ?? "18:00");
   const [month, setMonth] = useState<Month>(() => monthOf(start?.ymd ?? today, now));
@@ -202,7 +203,7 @@ export function DeadlinePicker({
     const step: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
     if (event.code in step) {
       event.preventDefault();
-      const next = shiftYmd(ymd ?? today, ymd ? step[event.code] : 0);
+      const next = addDays(ymd ?? today, ymd ? step[event.code] : 0);
       choose(next < today ? today : next);
     } else if (event.code === "PageUp" || event.code === "PageDown") {
       event.preventDefault();

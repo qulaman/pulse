@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { withAuth, type HandlerContext } from "@/lib/api/handler";
+import { PERSON_ID, withAuth, type HandlerContext } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
 import { canResetLogin } from "@/lib/people/access";
 import type { Role } from "@/lib/routes";
@@ -17,13 +17,10 @@ type Target = { id: string; role: Role };
  * `canResetLogin` (D-104). Anything else answers «не найден» / 403, never the email.
  */
 async function loadTarget<T>({ profile, params }: HandlerContext<T>): Promise<Target | Response> {
-  const id = z.guid().safeParse(params.id); // guid: seed ids are not RFC-4122
-  if (!id.success) return apiError(404, "not_found", "Сотрудник не найден");
-
   const { data: target } = await createServiceSupabase()
     .from("profiles")
     .select("id, role, company_id")
-    .eq("id", id.data)
+    .eq("id", params.id)
     .maybeSingle();
   if (!target || target.company_id !== profile.companyId) {
     return apiError(404, "not_found", "Сотрудник не найден");
@@ -39,17 +36,22 @@ async function loadTarget<T>({ profile, params }: HandlerContext<T>): Promise<Ta
  * did — «ни разу не входил» tells the director the first password never reached them.
  * The email lives in auth.users, so this is a service-role read after the checks above.
  */
-export const GET = withAuth(["director", "secretary"], async (ctx) => {
-  const target = await loadTarget(ctx);
-  if (target instanceof Response) return target;
+export const GET = withAuth(
+  ["director", "secretary"],
+  async (ctx) => {
+    const target = await loadTarget(ctx);
+    if (target instanceof Response) return target;
 
-  const { data, error } = await createServiceSupabase().auth.admin.getUserById(target.id);
-  if (error || !data.user) {
-    console.error("getUserById failed:", error?.message);
-    return apiError(502, "auth_failed", "Не удалось прочитать вход, попробуй ещё раз");
-  }
-  return apiOk({ email: data.user.email ?? null, last_sign_in_at: data.user.last_sign_in_at ?? null });
-});
+    const { data, error } = await createServiceSupabase().auth.admin.getUserById(target.id);
+    if (error || !data.user) {
+      console.error("getUserById failed:", error?.message);
+      return apiError(502, "auth_failed", "Не удалось прочитать вход, попробуй ещё раз");
+    }
+    return apiOk({ email: data.user.email ?? null, last_sign_in_at: data.user.last_sign_in_at ?? null });
+  },
+  undefined,
+  { id: PERSON_ID },
+);
 
 /** A wrong email at creation is fixed here instead of a second account. */
 export const PATCH = withAuth<z.infer<typeof PatchSchema>>(
@@ -71,4 +73,5 @@ export const PATCH = withAuth<z.infer<typeof PatchSchema>>(
     return apiOk({ email: updated.data.user?.email ?? email });
   },
   PatchSchema,
+  { id: PERSON_ID },
 );

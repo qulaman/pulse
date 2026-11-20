@@ -2,18 +2,21 @@
 
 import { ReactionBar } from "@/components/points/ReactionBar";
 import { DeliveryStatus } from "@/components/tasks/DeliveryStatus";
+import { WordBubble } from "@/components/tasks/detail/WordBubble";
+import { Note, RevokedNote } from "@/components/tasks/TaskNotes";
 import { Button } from "@/components/ui/Button";
 import { humanAqtobe } from "@/lib/ai/time";
+import { shortName } from "@/lib/people/names";
 import { hasUnread, type BoardTask } from "@/lib/pulse/board";
-import { isWaiting, keysFor, type DeskAction, type DeskReason } from "@/lib/tasks/desk";
-import { isWorking, passedWord, untilWords, type Suggestion, type TimeRequest } from "@/lib/tasks/lifecycle";
+import { isWaiting, keysFor, type DeskAction, type DeskReason } from "@/lib/tasks/reasons";
+import { isWorking, untilWords, type Suggestion, type TimeRequest } from "@/lib/tasks/lifecycle";
 import { REASON_TONE, REASON_WORD, statusWord, stepsOf } from "@/lib/tasks/overview";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
-import { isOverdue, TEXT } from "@/lib/tasks/status-text";
+import { isOverdue, wordText } from "@/lib/tasks/status-text";
 
-import { Icon, type IconName } from "../desk/icons";
-import { QuickAnswers } from "../desk/QuickAnswers";
-import { CardFoot, CardHead, CardShell, LastWord, Note, Stepper } from "./TaskList";
+import { Icon, type IconName } from "../icons";
+import { QuickAnswers } from "../director/QuickAnswers";
+import { CardFoot, CardHead, CardShell, Stepper } from "./TaskList";
 
 /** On a card the verbs are short: «Передать» fits a third of a phone, «Переназначить» does not. */
 const LABEL: Record<DeskAction, string> = {
@@ -58,8 +61,8 @@ const ICON: Partial<Record<DeskAction, IconName>> = {
 export type CardFlags = { question?: boolean; request?: boolean; suggestion?: boolean };
 
 /**
- * Everything the thread card lets the director do with this task (`DirectorActions` in
- * TaskCard.tsx) — the keys on the card are the first three of it, «Ещё» holds the rest.
+ * Everything the director may do with this task — the full row of TaskCard.tsx; the keys on
+ * the card are the first three of it, «Ещё» holds the rest.
  */
 export function allActionsFor(task: { status: TaskWithPeople["status"] }, { request = false, suggestion = false }: CardFlags = {}): DeskAction[] {
   switch (task.status) {
@@ -124,7 +127,7 @@ export function isPrimaryKey(key: DeskAction, reason: DeskReason | null): boolea
  */
 export function wideLabelOf(key: DeskAction, request: TimeRequest | null, suggestion: Suggestion | null, now: Date): string | null {
   if (key === "grant" && request) return `Согласовать · ${untilWords(request.proposed, now)}`;
-  if (key === "handoff" && suggestion) return `Передать · ${suggestion.name.trim().split(/\s+/)[0]}`;
+  if (key === "handoff" && suggestion) return `Передать · ${shortName(suggestion.name)}`;
   return null;
 }
 
@@ -270,13 +273,7 @@ export function DirectorTaskCard({
   const more = allActionsFor(task, flags).filter((action) => !keys.includes(action));
   const closed = task.status === "done" || task.status === "revoked";
   const last = row?.last_message ?? null;
-  const lastText = last
-    ? last.type === "photo"
-      ? `фото${last.content ? ` · ${last.content}` : ""}`
-      : last.type === "voice"
-        ? `голосовое${last.content ? ` · ${last.content}` : ""}`
-        : (last.content ?? "")
-    : "";
+  const lastText = last ? wordText(last) : "";
   const lastName = last ? (last.sender_id === meId ? "Вы" : (task.assignee?.full_name ?? "Сотрудник")) : "";
   // the queue's own word leads the row: «на приёмке», «отказ», «просрочена» say what to do;
   // a question keeps the stage and adds its own flag
@@ -334,20 +331,10 @@ export function DirectorTaskCard({
             На доработке — ждём новый отчёт
           </Note>
         ) : null}
-        {task.status === "revoked" ? (
-          task.passed_to ? (
-            <Note tone="muted" icon={<Icon name="swap" size={15} />}>
-              {passedWord(task.passed?.full_name)}
-            </Note>
-          ) : (
-            <Note tone="muted" icon={<Icon name="undo" size={15} />}>
-              {TEXT.revoked}
-            </Note>
-          )
-        ) : null}
+        {task.status === "revoked" ? <RevokedNote task={task} /> : null}
         <LifecycleNotes task={task} request={request} suggestion={suggestion} partial={Boolean(row?.partial)} nudgedAt={row?.nudged_at ?? null} now={now} />
 
-        {last && lastText && !question && !request ? <LastWord name={lastName} text={lastText} at={last.created_at} now={now} unread={unread} /> : null}
+        {last && lastText && !question && !request ? <WordBubble name={lastName} text={lastText} at={last.created_at} now={now} unread={unread} brief /> : null}
       </div>
 
       <div className="mt-4">

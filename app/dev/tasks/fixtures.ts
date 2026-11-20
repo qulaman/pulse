@@ -3,17 +3,20 @@ import type { Rule } from "@/lib/recurrence/queries";
 import type { TaskMessage, TaskWithPeople } from "@/lib/tasks/queries";
 import type { TaskStatus } from "@/lib/tasks/status-text";
 
+import { CAST } from "../fixtures/people";
+
 /** Fixtures of the task sandboxes (/dev/tasks, /dev/task): now-relative, every state there is. */
 const HOUR = 3_600_000;
-export const DIRECTOR = { id: "u-director", name: "Ерлан Сапаров" };
-export const PEOPLE = {
-  marat: "Марат Оспанов",
-  askhat: "Асхат Нурланов",
-  aigul: "Айгуль Сейтказиева",
-  erlan: "Ерлан Бекмуханов",
-  dana: "Дана Жумабаева",
-} as const;
-type Who = keyof typeof PEOPLE;
+export const DIRECTOR = { id: CAST.director.id, name: CAST.director.full_name };
+/** The part of the cast the orders go to. */
+type Who = "marat" | "askhat" | "aigul" | "erlan" | "dana";
+const PEOPLE: Record<Who, string> = {
+  marat: CAST.marat.full_name,
+  askhat: CAST.askhat.full_name,
+  aigul: CAST.aigul.full_name,
+  erlan: CAST.erlan.full_name,
+  dana: CAST.dana.full_name,
+};
 
 type Fixture = {
   title: string;
@@ -136,9 +139,9 @@ export function build(): { tasks: TaskWithPeople[]; board: BoardTask[] } {
       id,
       company_id: "company",
       author_id: DIRECTOR.id,
-      assignee_id: `u-${f.who}`,
+      assignee_id: CAST[f.who].id,
       parent_task_id: null,
-      passed_to: f.passedTo ? `u-${f.passedTo}` : null,
+      passed_to: f.passedTo ? CAST[f.passedTo].id : null,
       passed: f.passedTo ? { full_name: PEOPLE[f.passedTo] } : null,
       group_id: null,
       title: f.title,
@@ -172,7 +175,7 @@ export function build(): { tasks: TaskWithPeople[]; board: BoardTask[] } {
         time_request: f.timeRequest
           ? { id: `${id}-t`, proposed: at(f.timeRequest.hours) as string, words: f.timeRequest.words ?? null, at: at(-0.5) as string, senderId: task.assignee_id }
           : null,
-        suggestion: f.suggest ? { id: `u-${f.suggest}`, name: PEOPLE[f.suggest] } : null,
+        suggestion: f.suggest ? { id: CAST[f.suggest].id, name: PEOPLE[f.suggest] } : null,
         nudged_at: at(f.nudged),
         partial: Boolean(f.partial),
         last_message: f.last
@@ -271,10 +274,10 @@ export function rules(): Rule[] {
     updated_at: at(-2) as string,
   };
   return [
-    { ...base, id: "rule-1", target: "task", title: "Акт сверки с «Актобе-Энерго»", assignee_id: "u-aigul", assignee: { full_name: PEOPLE.aigul }, every: "week", weekdays: [1], at_time: "18:00:00", is_active: true, next_on: ymdIn(4) },
-    { ...base, id: "rule-2", target: "task", title: "Сводка продаж за день", assignee_id: "u-marat", assignee: { full_name: PEOPLE.marat }, every: "workday", at_time: "09:00:00", is_active: true, next_on: ymdIn(1) },
-    { ...base, id: "rule-3", target: "task", title: "Отчёт по зарплате", assignee_id: "u-dana", assignee: { full_name: PEOPLE.dana }, every: "month", month_day: 5, at_time: "18:00:00", is_active: false, next_on: null },
-    { ...base, id: "rule-4", target: "task", title: "Проверка склада", assignee_id: "u-erlan", assignee: { full_name: PEOPLE.erlan }, every: "week", weekdays: [2, 4], interval_n: 2, at_time: "10:00:00", is_active: false, stopped_reason: "assignee_inactive", next_on: null },
+    { ...base, id: "rule-1", target: "task", title: "Акт сверки с «Актобе-Энерго»", assignee_id: CAST.aigul.id, assignee: { full_name: CAST.aigul.full_name }, every: "week", weekdays: [1], at_time: "18:00:00", is_active: true, next_on: ymdIn(4) },
+    { ...base, id: "rule-2", target: "task", title: "Сводка продаж за день", assignee_id: CAST.marat.id, assignee: { full_name: CAST.marat.full_name }, every: "workday", at_time: "09:00:00", is_active: true, next_on: ymdIn(1) },
+    { ...base, id: "rule-3", target: "task", title: "Отчёт по зарплате", assignee_id: CAST.dana.id, assignee: { full_name: CAST.dana.full_name }, every: "month", month_day: 5, at_time: "18:00:00", is_active: false, next_on: null },
+    { ...base, id: "rule-4", target: "task", title: "Проверка склада", assignee_id: CAST.erlan.id, assignee: { full_name: CAST.erlan.full_name }, every: "week", weekdays: [2, 4], interval_n: 2, at_time: "10:00:00", is_active: false, stopped_reason: "assignee_inactive", next_on: null },
     { ...base, id: "rule-5", target: "event", title: "Планёрка", assignee_id: null, assignee: null, every: "week", weekdays: [3], at_time: "10:00:00", location: "в офисе", everyone: true, is_active: true, next_on: ymdIn(6) },
   ];
 }

@@ -1,7 +1,10 @@
 import { humanAqtobe } from "@/lib/ai/time";
 import { shortName } from "@/lib/people/names";
+import { WORKING } from "@/lib/tasks/lifecycle";
+import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { pluralRu, SHORT_STATUS, type TaskStatus } from "@/lib/tasks/status-text";
 import { firstNameOf, stem, tokens } from "@/lib/text/normalize";
+import { toBriefTask, type BoardTask, type Lanes } from "./board";
 import { quoteTitle, type BriefTask } from "./briefing";
 
 /**
@@ -35,6 +38,54 @@ export type Answer = {
   /** false — the assistant could not read the question; the UI offers a way out. */
   understood: boolean;
 };
+
+/** A roster row as the screens hold it: whom a question may be about. */
+type RosterRow = { id: string; full_name: string; aliases: string[] | null; is_active: boolean; role: string };
+
+/** The closed end of the director's sent list — what «что там по …» may find finished. */
+export function closedOf<T extends { status: TaskStatus }>(sent: readonly T[]): T[] {
+  return sent.filter((task) => task.status === "done" || task.status === "declined" || task.status === "revoked");
+}
+
+/**
+ * The answerer's facts from what Пульс and the desk already hold (D-51 п.4, D-154): the active
+ * roster without the wall's kiosk, the board in work and by lanes, the director's closed tasks.
+ */
+export function answerInput({
+  question,
+  now,
+  people,
+  rows,
+  lanes,
+  sent,
+}: {
+  question: string;
+  now: Date;
+  people: readonly RosterRow[];
+  rows: readonly BoardTask[];
+  lanes: Lanes;
+  sent: readonly TaskWithPeople[];
+}): AnswerInput {
+  return {
+    question,
+    now,
+    people: people.filter((p) => p.is_active && p.role !== "tv").map((p) => ({ id: p.id, fullName: p.full_name, aliases: p.aliases ?? [] })),
+    open: rows.filter((t) => WORKING.includes(t.status)).map((t) => ({ ...toBriefTask(t), status: t.status })),
+    closed: closedOf(sent).map((t) => ({
+      id: t.id,
+      title: t.title,
+      deadline: t.deadline,
+      assignee: t.assignee?.full_name ? shortName(t.assignee.full_name) : null,
+      assigneeId: t.assignee_id,
+      status: t.status,
+      closedAt: t.closed_at,
+    })),
+    overdue: lanes.overdue.map(toBriefTask),
+    declined: lanes.declined.map((t) => ({ ...toBriefTask(t), reason: t.decline_reason })),
+    questions: lanes.question.map(toBriefTask),
+    review: lanes.review.map(toBriefTask),
+  };
+}
 
 const NOT_UNDERSTOOD = "Пока отвечаю только про задачи и людей: кто чем занят, что там по делу, кто просрочил, что на приёмке. Спроси иначе или скажи задачу.";
 

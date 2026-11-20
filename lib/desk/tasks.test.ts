@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { addDays, todayYmd, weekdayOf } from "@/lib/datetime/calendar";
 import { closedSections } from "@/lib/tasks/overview";
 import type { DeliveryRow } from "@/lib/tasks/receipts";
 
@@ -39,7 +40,6 @@ import {
   reasonHeadline,
   rowKeys,
   rowMoves,
-  shiftYmd,
   stackMoves,
   stageOf,
   staleNote,
@@ -48,8 +48,6 @@ import {
   togglePick,
   underTitle,
   wallIso,
-  wallYmd,
-  weekdayOf,
   verdictRank,
   widthBucket,
   withSkipped,
@@ -463,10 +461,10 @@ describe("the desk's own hand (wave 3)", () => {
   });
 
   it("the picker's days on the Aqtobe wall clock", () => {
-    expect(wallYmd(NOW)).toBe("2026-11-03");
-    expect(wallYmd(new Date("2026-11-03T19:30:00Z"))).toBe("2026-11-04");
-    expect(shiftYmd("2026-10-31", 1)).toBe("2026-11-01");
-    expect(shiftYmd("2026-03-01", -1)).toBe("2026-02-28");
+    expect(todayYmd(NOW)).toBe("2026-11-03");
+    expect(todayYmd(new Date("2026-11-03T19:30:00Z"))).toBe("2026-11-04");
+    expect(addDays("2026-10-31", 1)).toBe("2026-11-01");
+    expect(addDays("2026-03-01", -1)).toBe("2026-02-28");
     expect(weekdayOf("2026-11-03")).toBe(1);
     expect(wallIso("2026-11-04", "09:00")).toBe("2026-11-04T09:00:00+05:00");
   });

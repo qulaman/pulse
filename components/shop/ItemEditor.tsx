@@ -12,7 +12,7 @@ const ICONS = ["🎁", "🧥", "🦺", "🏖️", "💰", "☕", "🎟️", "�
 const PRICES = [100, 200, 500, 1000, 2000];
 
 const INPUT = "mt-1.5 min-h-[46px] w-full field px-3 text-[16px] outline-none";
-// поле остатка стоит рядом с чипом «сколько угодно» — своя ширина, без w-full
+// the stock field stands next to the «сколько угодно» chip — a width of its own, no w-full
 const INPUT_QTY = "nums min-h-[46px] w-24 field px-3 text-[16px] outline-none";
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
@@ -26,11 +26,11 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 }
 
 /**
- * Редактор награды — один лист и для «добавить», и для «изменить»: id выдаётся заранее,
- * поэтому сохранение всегда upsert, а повторный тап не рождает второй товар (принцип 7).
- * Сверху — живое превью: директор видит карточку ровно такой, какой её увидит сотрудник,
- * и не гадает, как сложатся значок, название и цена. Удаление возможно, только пока
- * награду никто не заказывал: история заказов дороже.
+ * The reward editor — one sheet for both «добавить» and «изменить»: the id is issued in advance, so
+ * saving is always an upsert and a second tap does not give birth to a second item (principle 7).
+ * A live preview on top: the director sees the card exactly as an employee will and does not guess
+ * how the icon, the title and the price will come together. Deleting is possible only while nobody
+ * has ordered the reward: the order history is worth more.
  */
 export function ItemEditor({
   item,
@@ -56,7 +56,7 @@ export function ItemEditor({
   const stockNumber = stock.trim() === "" ? null : Math.trunc(Number(stock));
   const valid = title.trim().length > 0 && Number.isFinite(priceNumber) && priceNumber > 0;
 
-  // превью — та же карточка, что на витрине; баланс не передаём, поэтому кнопки в ней нет
+  // the preview is the same card as in the shop window; no balance is passed, so it has no button
   const preview: ShopItem = {
     id: existing?.id ?? "preview",
     company_id: companyId ?? "",

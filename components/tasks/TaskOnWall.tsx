@@ -10,10 +10,11 @@ import { effectiveMode } from "@/lib/tv/state";
 const ON_WALL = new Set(["sent", "accepted", "in_progress", "rework", "pending_review", "done"]);
 
 /**
- * «На экран» на экране задачи директора (D-123): тот же жест, что у карточки сотрудника и
- * календаря (D-109), — это дело со всей его историей встаёт на стену в кабинете на 10 минут,
- * повторный тап возвращает эфир. Команда — пультом (`tv_control`), без сети — честное «нет
- * связи». Отказанное, отозванное и отложенное дело кнопки не получает.
+ * «На экран» on the director's task screen (D-123): the same gesture as on a person's card and
+ * the calendar (D-109) — this task with its whole history goes up on the office wall for
+ * 10 minutes, a second tap gives the wall back to its own programme. The command goes through
+ * the remote (`tv_control`); without network — an honest «нет связи». A declined, recalled or
+ * held task gets no button.
  */
 export function TaskOnWall({ taskId, status, title }: { taskId: string; status: string; title: string }) {
   const state = useTvState();

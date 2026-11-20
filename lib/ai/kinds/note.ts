@@ -30,7 +30,7 @@ export const noteKind: KindModule = {
   section,
   modelSchema: NoteEntitySchema,
   examples: [
-    // П10. Заметка директора самому себе: ни исполнителя, ни времени (D-75).
+    // П10. The director's note to himself: no assignee, no time (D-75).
     {
       n: 10,
       user: "Запиши мысль: сделать акцию для Альфы к сезону",
@@ -44,7 +44,7 @@ export const noteKind: KindModule = {
         ],
       },
     },
-    // П11. Заметка и поручение в одной фразе: имя разводит их по разным типам.
+    // П11. A note and an order in one phrase: the name sends them to different kinds.
     {
       n: 11,
       user: "Заметка: подумать про склад. И Марат, позвони Альфе сегодня до шести",

@@ -1,19 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
-
-import { TileFace } from "@/components/desk/team/TeamGrid";
-import { usePeople } from "@/lib/people/queries";
+import { Face } from "@/components/desk/ui/Face";
 import { shortName, useNamesKey } from "@/lib/people/names";
 
-/** Everybody's photo by id, read once per screen: the faces of a table share one map. */
-export function useAvatars(): ReadonlyMap<string, string | null> {
-  const people = usePeople();
-  return useMemo(() => new Map((people.data ?? []).map((person) => [person.id, person.avatar_url])), [people.data]);
-}
-
 /**
- * A person at the work screens of «Графит» (D-174): the face of «Команда» — the photo, or the
+ * A person at the desk's work screens (D-174): the face of «Команда» — the photo, or the
  * initials on the person's own hue — and the short name beside it. `gone` — the person left while
  * the task is still open (D-160): the red word under the name, as `PersonCell` says it.
  */
@@ -39,7 +30,7 @@ export function FaceName({
   const text = name ?? "";
   return (
     <span className={`tasks-face-name flex min-w-0 items-center gap-2 ${muted ? "opacity-55" : ""}`} data-gone={gone ? "" : undefined}>
-      <TileFace person={{ id, full_name: text || "—", avatar_url: avatar }} size={size} />
+      <Face person={{ id, full_name: text || "—", avatar_url: avatar }} size={size} />
       <span className="flex min-w-0 flex-col">
         <span className="truncate" title={text || undefined}>
           {text ? (full ? text : shortName(text)) : "Без исполнителя"}

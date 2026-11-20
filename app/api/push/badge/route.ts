@@ -6,7 +6,7 @@ import { myMoveFilter } from "@/lib/tasks/my-move";
  * The number on the app icon (D-114, Badging API — the iPhone home-screen app and desktop;
  * Android shows the notification dot itself). What waits for this person's hand: for the
  * director — work handed back (на приёмке, отказы); for everybody else — the orders waiting for
- * their move (новые, вернули на доработку, просроченные), the same number as the «Дела» tab
+ * their move (new, sent back for rework, overdue), the same number as the «Дела» tab
  * (D-173). Counted under the caller's own RLS.
  */
 export const GET = withAuth("any", async ({ req, profile }) => {

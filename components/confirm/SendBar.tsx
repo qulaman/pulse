@@ -1,11 +1,10 @@
 "use client";
 
-import { useRef, useSyncExternalStore } from "react";
+import { useRef } from "react";
 
 import { Button } from "@/components/ui/Button";
-import { useDeliveryWindow } from "@/lib/points/queries";
 import { useKeyboardDock } from "@/lib/ui/keyboard";
-import { isWithinDeliveryWindow, WINDOW_OPEN_HOUR } from "@/lib/voice/quietHours";
+import { useQuietHours } from "@/lib/voice/quietHours";
 
 type Props = {
   sendable: number;
@@ -22,15 +21,7 @@ type Props = {
  * for real; this bar only tells the director what is about to happen.
  */
 export function SendBar({ sendable, total, sending, onSend, onReset, onFixFirst }: Props) {
-  // Read after hydration: the server renders "within the window" so both passes match.
-  const hydrated = useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false,
-  );
-  const window = useDeliveryWindow().data;
-  const quietHours = hydrated && !isWithinDeliveryWindow(new Date(), window);
-  const opensAt = window?.from ?? `0${WINDOW_OPEN_HOUR}:00`;
+  const { quiet: quietHours, opensAt } = useQuietHours();
   // on the keyboard while a card's title is being typed, and never over that title (D-112)
   const bar = useRef<HTMLDivElement>(null);
   useKeyboardDock(bar);

@@ -8,6 +8,7 @@ import type { BoardTask } from "@/lib/pulse/board";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { Me, TaskWithPeople } from "@/lib/tasks/queries";
 
+import { CAST } from "../fixtures/people";
 import { build, DIRECTOR, messagesFor } from "../tasks/fixtures";
 
 /**
@@ -35,7 +36,7 @@ function Sandbox({ role, id }: { role: "director" | "employee"; id: string }) {
   const me: Me =
     role === "director"
       ? { userId: DIRECTOR.id, companyId: "company", role: "director", isActive: true, fullName: DIRECTOR.name }
-      : { userId: task?.assignee_id ?? "u-marat", companyId: "company", role: "employee", isActive: true, fullName: task?.assignee?.full_name ?? "" };
+      : { userId: task?.assignee_id ?? CAST.marat.id, companyId: "company", role: "employee", isActive: true, fullName: task?.assignee?.full_name ?? "" };
 
   const stamp = new Date().toISOString();
   const patch = (change: Partial<TaskWithPeople>) => setTask((current) => (current ? { ...current, ...change } : current));

@@ -5,11 +5,11 @@ import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { pluralRu } from "@/lib/tasks/status-text";
 
 type Props = {
-  /** Сколько наград выдано за последние 30 дней — главная цифра экрана. */
+  /** How many rewards were handed out in the last 30 days — the screen's main number. */
   delivered: number;
-  /** Очки на руках у команды. */
+  /** The points the team holds. */
   onHands: number;
-  /** Сколько заказов ждёт выдачи прямо сейчас. */
+  /** How many orders wait to be handed out right now. */
   waiting: number;
   loading?: boolean;
 };
@@ -26,12 +26,12 @@ function Fact({ label, value, color }: { label: string; value: number; color?: s
 }
 
 /**
- * Герой пульта: чем магазин жил этот месяц. Крупная цифра — выданные награды (это и есть
- * смысл магазина, а не остатки на складе), рядом лицо ассистента, под чертой — два факта,
- * за которыми директор следит: очки на руках и сколько заказов ждёт.
+ * The console's hero: what the shop lived on this month. The big number is the rewards handed out
+ * (that is the point of the shop, not the stock), the assistant's face beside it, and under the
+ * rule two facts the director follows: the points people hold and how many orders wait.
  *
- * Золотое сияние в углу — статичный радиальный градиент: «дорого» без анимации теней и
- * фильтров (перф-контракт DESIGN §2). Золото здесь уместно: это экран наград и очков.
+ * The gold glow in the corner is a static radial gradient: «дорого» without animated shadows or
+ * filters (the perf contract, DESIGN §2). Gold fits here: this is the screen of rewards and points.
  */
 export function ShopHero({ delivered, onHands, waiting, loading }: Props) {
   return (

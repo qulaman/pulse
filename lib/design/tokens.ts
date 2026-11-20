@@ -21,14 +21,6 @@ export const colors = {
 /** Not a hex color: kept apart so the CSS parity test stays exact. */
 export const overlay = "rgba(4,8,12,.6)";
 
-/**
- * Every letter in Golos Text, every digit in the digits cut of Inter; `--font-body` and
- * `--font-display` hold the same stack (app/globals.css, self-hosted by next/font, D-179).
- */
-export const fontStack =
-  'var(--font-body), -apple-system, "SF Pro", Roboto, "Segoe UI", system-ui, sans-serif';
-export const displayStack = 'var(--font-display), var(--font-body), system-ui, sans-serif';
-
 export const typography = {
   display: { size: 40, lineHeight: 44, weight: 700 },
   h1: { size: 24, lineHeight: 30, weight: 700 },
@@ -43,16 +35,6 @@ export const radii = {
   button: 12,
   sheet: 20,
   round: 9999,
-} as const;
-
-/** 4/8/12/16/24/32; screen side padding is 16. */
-export const space = [4, 8, 12, 16, 24, 32] as const;
-
-export const minTapTarget = 44;
-
-export const shadows = {
-  none: "none",
-  raised: "0 8px 24px rgba(0,0,0,.4)",
 } as const;
 
 /**
@@ -70,9 +52,6 @@ export const springs = {
   object: { type: "spring", stiffness: 400, damping: 38, mass: 0.9 },
   alive: { type: "spring", stiffness: 260, damping: 24 },
 } as const;
-
-/** The bouncy spring of the mascot and counters under its first name — `springs.alive`. */
-export const spring = springs.alive;
 
 type SpringParams = { stiffness: number; damping: number; mass?: number };
 
@@ -132,20 +111,3 @@ export const easing = {
   /** `springs.object` sampled into a curve: arriving things in CSS and WAAPI (`durations.object`). */
   object: objectCurve.easing,
 } as const;
-
-export const tokens = {
-  colors,
-  overlay,
-  fontStack,
-  typography,
-  radii,
-  space,
-  minTapTarget,
-  shadows,
-  durations,
-  easing,
-  springs,
-  spring,
-} as const;
-
-export type ColorToken = keyof typeof colors;

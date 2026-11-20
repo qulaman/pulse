@@ -11,7 +11,7 @@ import { createBrowserSupabase } from "@/lib/supabase/client";
  * under `components/desk` or `app/desk` talks to Supabase or the API by itself.
  */
 
-/** The same key as the phone's rules screen (components/notify/NotifySettings.tsx): one cache. */
+/** The rules' cache — the desk's and the phone's rules screen (components/notify/NotifySettings.tsx) read and save through these hooks. */
 export const notifyPrefsKey = ["notify-prefs"] as const;
 
 async function fetchPrefs(): Promise<NotifyPrefs> {

@@ -6,13 +6,15 @@ import { useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 
 import { aqtobeDay, humanAqtobe } from "@/lib/ai/time";
 import { springs } from "@/lib/design/tokens";
+import { useNow } from "@/lib/useNow";
 import { haptic } from "@/lib/haptics";
-import { initialsOf } from "@/lib/people/queries";
+import { shortName, initialsOf } from "@/lib/people/names";
+
 import type { Section, Step } from "@/lib/tasks/overview";
 import { isOverdue, SHORT_STATUS, TEXT, type TaskStatus } from "@/lib/tasks/status-text";
 import { deadlineToneOf, TONE_VAR, type Tone } from "@/lib/tasks/tone";
 
-import { Icon } from "../desk/icons";
+import { Icon } from "../icons";
 import { StatusGlyph } from "./StatusGlyph";
 
 /**
@@ -79,13 +81,9 @@ export function useAccordion(ids: readonly string[], { scope, autoOpen }: { scop
 }
 
 /** The clock of a task screen: overdue and «ближайший срок» move on their own, once a minute is enough. */
+/** @deprecated use `useNow()` from "@/lib/useNow" — the same minute clock. */
 export function useMinute(): Date {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 60_000);
-    return () => clearInterval(timer);
-  }, []);
-  return now;
+  return useNow();
 }
 
 /** Brings the opened card fully on screen once it has grown (scroll margins keep the tabs and the tab bar clear). */
@@ -385,7 +383,7 @@ export function CardHead({
           {person ? (
             <>
               <Face name={person} />
-              <span className="min-w-0 truncate">{person.split(/\s+/)[0]}</span>
+              <span className="min-w-0 truncate">{shortName(person)}</span>
               <Sep />
             </>
           ) : null}
@@ -439,7 +437,7 @@ const STEP_COLOR: Record<Step["state"], string> = {
 };
 
 /** A station's time, short: «9:41» today, «вчера», «пн», «21.09» — the order matters more than the minute. */
-function stepTime(iso: string, now: Date): string {
+export function stepTime(iso: string, now: Date): string {
   const date = new Date(iso);
   const days = aqtobeDay(date) - aqtobeDay(now);
   const text = humanAqtobe(date, now);
@@ -501,44 +499,6 @@ export function Stepper({ steps, now, deadline }: { steps: readonly Step[]; now:
         );
       })}
     </ol>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Little pieces of the body                                                   */
-/* -------------------------------------------------------------------------- */
-
-/** A tinted note inside the body: a refusal, a return, a recall. */
-export function Note({ tone, icon, children }: { tone: Tone; icon: ReactNode; children: ReactNode }) {
-  return (
-    <p
-      className="mt-3 flex items-start gap-2 rounded-[12px] border px-3 py-2 text-[14px] leading-[19px]"
-      style={{
-        color: TONE_VAR[tone],
-        borderColor: `color-mix(in srgb, ${TONE_VAR[tone]} 32%, transparent)`,
-        background: `color-mix(in srgb, ${TONE_VAR[tone]} 8%, transparent)`,
-      }}
-    >
-      <span className="mt-[2px]">{icon}</span>
-      <span className="min-w-0">{children}</span>
-    </p>
-  );
-}
-
-/** The newest word of the thread, as a small bubble with its author. */
-export function LastWord({ name, text, at, now, unread }: { name: string; text: string; at: string; now: Date; unread: boolean }) {
-  return (
-    <div className="mt-3 flex items-start gap-2.5">
-      <Face name={name} size={24} />
-      <div className="min-w-0 flex-1 rounded-[14px] rounded-tl-[6px] bg-surface-2/80 px-3 py-2">
-        <p className="flex items-center gap-2 text-[12px] leading-4 text-muted">
-          <span className="font-semibold text-text/90">{name.split(/\s+/)[0]}</span>
-          <span className="nums">{stepTime(at, now)}</span>
-          {unread ? <span className="ml-auto text-[11px] font-semibold uppercase tracking-[0.06em] text-accent">новое</span> : null}
-        </p>
-        <p className="mt-0.5 line-clamp-3 text-[14px] leading-[19px] text-text/90">{text}</p>
-      </div>
-    </div>
   );
 }
 

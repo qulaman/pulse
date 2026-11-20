@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState, type ReactNode } from "react";
 
-import { Icon } from "@/components/tasks/desk/icons";
+import { Icon } from "@/components/tasks/icons";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { DateTimeField } from "@/components/ui/datetime/DateTimeField";

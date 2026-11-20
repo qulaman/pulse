@@ -1,0 +1,487 @@
+/* The screen head (components/ui/PageHead.tsx): the living sky, the bar, the title — part of
+   app/globals.css by its @import. */
+
+/* ---- the screen head: «свет состояния» (D-117) in the bar grammar of D-113 ----------------
+   The screen is lit from above by the colour of its state (the tone the screen already
+   computes for its status card) and the colour belongs to the state alone — the controls
+   are neutral glass. No bar at rest: a tab's large title sits under the notch with its
+   buttons; scrolled, the title leaves with the finger and the sky folds into a horizon — a
+   tinted glass strip with the small title. Static paint everywhere; only opacity/transform
+   move: the sky's lights (D-176), its crossfade, the collapse (scroll timeline, thresholds
+   elsewhere). */
+.nav-glass {
+  background: color-mix(in srgb, var(--bg) 76%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .nav-glass { background: var(--bg); }
+}
+
+/* the sky: fixed behind the page (z -1 under the content), one layer per light. A layer is a
+   wide still wash and a few lights of its own (`.page-sky-blob`, PageHead's `SkyLights`) that
+   drift and breathe (D-176) — transform and opacity only, so the motion runs on the compositor
+   and costs the main thread nothing. Only the lit layer and one fading out have lights in the
+   DOM; a dark layer is hidden, so it takes no layer either. `--sky-tempo` scales every period
+   (the /dev/heads sandbox compares tempos with it). */
+.page-sky {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: -1;
+  height: 460px;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent);
+  mask-image: linear-gradient(180deg, #000 55%, transparent);
+}
+.page-sky-layer {
+  --c: #7b8aa0;
+  --c2: var(--c);
+  --drift: 16s;
+  --breath: 4s;
+  --breathe: sky-breath-calm;
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 900ms var(--ease-in-out), visibility 0s linear 900ms;
+  background: radial-gradient(140% 70% at 50% -22%, color-mix(in oklch, var(--c) 24%, transparent), transparent 100%);
+}
+.page-sky-layer[data-lit] {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 900ms var(--ease-in-out), visibility 0s;
+}
+/* the state's character: its colour and a neighbour hue of it (`--c2`, the second source) —
+   green into lime, the brand's teal into cyan, amber into orange, red into crimson. Green rests,
+   teal is steady, amber stirs, red breathes fast and comes up brighter on the breath in — never
+   a blink */
+.page-sky-layer[data-tone="ok"] { --c: oklch(0.74 0.21 148); --c2: oklch(0.84 0.2 128); --drift: 17s; --breath: 4.6s; }
+.page-sky-layer[data-tone="accent"] { --c: oklch(0.78 0.15 178); --c2: oklch(0.74 0.15 222); --drift: 15s; --breath: 4s; }
+.page-sky-layer[data-tone="warn"] { --c: oklch(0.8 0.165 75); --c2: oklch(0.7 0.19 50); --drift: 12s; --breath: 3.2s; --breathe: sky-breath; }
+.page-sky-layer[data-tone="danger"] { --c: oklch(0.66 0.23 25); --c2: oklch(0.6 0.25 8); --drift: 9s; --breath: 1.9s; --breathe: sky-breath-deep; }
+/* a head mounted after another — the screen after its skeleton, a tab after a tab — is a new
+   sky: its first frame is the light that was up (PageHead's `data-from`, the layer `data-was`),
+   and the crossfade above runs from there instead of the new colour switching on. The lights
+   run on one clock (`SkyLights`), so the light handed over goes on where it was. `!important`
+   only lets the first frame win over the lit layer's own rule; it is never the style that stays */
+@starting-style {
+  .page-sky[data-from] .page-sky-layer { opacity: 0 !important; }
+  .page-sky[data-from] .page-sky-layer[data-was] { opacity: 1 !important; visibility: visible !important; }
+}
+
+/* a light: one soft source, its box the ellipse of its gradient. A state's sky has three — a
+   bright core just above the top edge, its halo, a second source on the right in the neighbour
+   hue: a bright core falling off fast reads as light, a wide dim wash of amber alone reads as
+   brown */
+.page-sky-blob {
+  --a: 30%;
+  position: absolute;
+  background: radial-gradient(closest-side, color-mix(in oklch, var(--c) var(--a), transparent), transparent);
+  animation-name: sky-drift-1, var(--breathe);
+  animation-duration: calc(var(--drift) * var(--k, 1) * var(--sky-tempo, 1)), calc(var(--breath) * var(--kb, 1) * var(--sky-tempo, 1));
+  animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1), ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: normal, alternate;
+}
+/* scrolled under the glass: the lights hold still (PageHead holds the sky's clock with them) */
+.page-sky[data-glass] .page-sky-blob { animation-play-state: paused; }
+/* how many lights each sky has is `BLOBS` in PageHead.tsx — a rule here for every one of them */
+.page-sky-blob[data-b="1"] { --a: 86%; left: -16%; top: -30%; width: 96%; height: 60%; }
+.page-sky-blob[data-b="2"] { --a: 40%; animation-name: sky-drift-2, var(--breathe); --k: 1.27; --kb: 1.3; left: -46%; top: -54%; width: 150%; height: 96%; }
+.page-sky-blob[data-b="3"] { --c: var(--c2); --a: 76%; animation-name: sky-drift-3, var(--breathe); --k: 1.13; --kb: 0.8; left: 34%; top: -38%; width: 98%; height: 62%; }
+.page-sky-layer[data-tone="danger"] .page-sky-blob[data-b="1"] { --a: 92%; }
+
+/* the quiet sky of a state at rest: one grey haze drifting slowly, no breath */
+.page-sky-layer[data-tone="none"] { --drift: 30s; --breathe: none; background: none; }
+.page-sky-layer[data-tone="none"] .page-sky-blob[data-b="1"] {
+  --a: 16%;
+  animation-name: sky-drift-2;
+  left: -45%;
+  top: -50%;
+  width: 130%;
+  height: 79%;
+}
+
+/* a screen with no state (D-176): five lights along one stretch of the colour wheel — the
+   brand's teal, cyan, blue, violet, magenta, one lightness, full chroma; never green, amber or
+   red (DESIGN §3). Each on its own path and breath across the whole width, so the colours run
+   through each other like a polar light */
+.page-sky-layer[data-tone="iris"] {
+  --c: oklch(0.6 0.26 298);
+  --breathe: sky-breath-iris;
+  background: radial-gradient(140% 70% at 50% -22%, color-mix(in oklch, var(--c) 26%, transparent), transparent 100%);
+}
+.page-sky-layer[data-tone="iris"] .page-sky-blob {
+  animation-duration: calc(var(--drift) * var(--sky-tempo, 1)), calc(var(--breath) * var(--sky-tempo, 1));
+}
+.page-sky-layer[data-tone="iris"] .page-sky-blob[data-b="1"] {
+  --c: oklch(0.8 0.16 178); --a: 84%; --drift: 11s; --breath: 3.4s;
+  animation-name: sky-iris-1, sky-breath-iris;
+  left: -34%; top: -28%; width: 84%; height: 58%;
+}
+.page-sky-layer[data-tone="iris"] .page-sky-blob[data-b="2"] {
+  --c: oklch(0.72 0.17 232); --a: 82%; --drift: 14s; --breath: 4.1s;
+  animation-name: sky-iris-2, sky-breath-iris;
+  left: 2%; top: -36%; width: 90%; height: 62%;
+}
+.page-sky-layer[data-tone="iris"] .page-sky-blob[data-b="3"] {
+  --c: oklch(0.62 0.24 268); --a: 86%; --drift: 17s; --breath: 5.3s;
+  animation-name: sky-iris-3, sky-breath-iris;
+  left: 50%; top: -30%; width: 86%; height: 60%;
+}
+.page-sky-layer[data-tone="iris"] .page-sky-blob[data-b="4"] {
+  --c: oklch(0.6 0.27 302); --a: 86%; --drift: 13s; --breath: 3.8s;
+  animation-name: sky-iris-4, sky-breath-iris;
+  left: 26%; top: -14%; width: 80%; height: 48%;
+}
+.page-sky-layer[data-tone="iris"] .page-sky-blob[data-b="5"] {
+  --c: oklch(0.67 0.27 340); --a: 80%; --drift: 19s; --breath: 4.7s;
+  animation-name: sky-iris-5, sky-breath-iris;
+  left: -12%; top: -6%; width: 70%; height: 42%;
+}
+
+/* paths in % of the light's own box: a state's light wanders about a sixth of the screen, the
+   shimmer's lights cross each other's place */
+@keyframes sky-drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(12%, 8%) scale(1.1); }
+  50% { transform: translate(18%, -4%) scale(0.92); }
+  75% { transform: translate(5%, -9%) scale(1.06); }
+}
+@keyframes sky-drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  30% { transform: translate(-8%, 6%) scale(1.08); }
+  60% { transform: translate(6%, 10%) scale(0.95); }
+  80% { transform: translate(10%, 2%) scale(1.04); }
+}
+@keyframes sky-drift-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  35% { transform: translate(-18%, 10%) scale(1.12); }
+  70% { transform: translate(-7%, -6%) scale(0.9); }
+}
+@keyframes sky-iris-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(36%, 12%) scale(1.18); }
+  50% { transform: translate(70%, -4%) scale(0.9); }
+  75% { transform: translate(28%, -10%) scale(1.08); }
+}
+@keyframes sky-iris-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-36%, 10%) scale(0.86); }
+  66% { transform: translate(34%, 14%) scale(1.16); }
+}
+@keyframes sky-iris-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(-30%, 14%) scale(1.12); }
+  50% { transform: translate(-64%, 2%) scale(0.88); }
+  75% { transform: translate(-24%, -8%) scale(1.04); }
+}
+@keyframes sky-iris-4 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  30% { transform: translate(-46%, -12%) scale(1.2); }
+  65% { transform: translate(40%, 8%) scale(0.86); }
+}
+@keyframes sky-iris-5 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  35% { transform: translate(70%, -16%) scale(1.14); }
+  70% { transform: translate(110%, 10%) scale(0.88); }
+}
+/* breaths run there and back (`alternate`): a period is half a breath */
+@keyframes sky-breath-calm { from { opacity: 0.78; } to { opacity: 1; } }
+@keyframes sky-breath { from { opacity: 0.62; } to { opacity: 1; } }
+@keyframes sky-breath-deep { from { opacity: 0.42; } to { opacity: 1; } }
+@keyframes sky-breath-iris { from { opacity: 0.5; } to { opacity: 1; } }
+/* film grain: a dark gradient on OLED bands into steps without it */
+.page-sky-grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.07;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+/* a lit screen owns the light: the page glow and the status card's own glow step aside (the
+   shimmer is no state: a status card under it keeps its glow) */
+body:has(.page-sky) { background: var(--bg); }
+body:has(.page-sky:not([data-tone="none"]):not([data-tone="iris"])) .status-screen {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 72%, var(--surface)), var(--surface) 70%);
+}
+
+/* the bar: back and buttons over the light; the horizon strip once the page scrolls */
+.nav-bar {
+  --c: #7b8aa0;
+  --rest: 0px; /* how far the buttons stand below the bar row while the page is at its top */
+  --glass-from: 0px;
+  --glass-to: 16px;
+  --small-from: 30px;
+  --small-to: 64px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin: 0 -16px;
+  padding: env(safe-area-inset-top) 16px 0;
+  pointer-events: none;
+}
+/* a tab's root: no empty row — the large title starts under the notch, the buttons stand in
+   its row and glide up into the bar as the page scrolls */
+.nav-bar[data-compact] {
+  margin-bottom: -44px;
+  --rest: 2px;
+  --glass-from: 8px;
+  --glass-to: 40px;
+  --small-from: 26px;
+  --small-to: 60px;
+}
+.nav-bar[data-compact][data-eyebrow] { --rest: 19px; }
+.nav-bar[data-tone="accent"] { --c: var(--accent); }
+.nav-bar[data-tone="ok"] { --c: var(--ok); }
+.nav-bar[data-tone="warn"] { --c: var(--warn); }
+.nav-bar[data-tone="danger"] { --c: var(--danger); }
+.nav-bar-glass {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--c) 15%, transparent), color-mix(in srgb, var(--c) 5%, transparent)),
+    color-mix(in srgb, var(--bg) 76%, transparent);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(22px) saturate(160%);
+  border-bottom: 1px solid color-mix(in srgb, var(--c) 24%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+/* a band stuck right under the bar (the segments of «Задачи», the pinned tiles of
+   «Настройки») carries the one hairline of the pair */
+:root[data-band-stuck] .nav-bar-glass { border-bottom-color: transparent; }
+.nav-bar-row {
+  position: relative;
+  display: flex;
+  height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.nav-bar-side {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  align-items: center;
+}
+.nav-bar-side > * { pointer-events: auto; }
+.nav-bar-end { justify-content: flex-end; }
+.nav-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transform: translateY(var(--rest));
+}
+/* the small title floats over the middle of the row; shown, it keeps clear of a back
+   button and two round buttons */
+.nav-bar-title {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: flex;
+  max-width: calc(100% - 192px);
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(-50%, calc(-50% + 6px));
+  pointer-events: none;
+}
+.nav-bar-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.nav-bar-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--c);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--c) 24%, transparent), 0 0 8px color-mix(in srgb, var(--c) 70%, transparent);
+}
+.nav-bar[data-tone="none"] .nav-bar-dot,
+.nav-bar[data-tone="iris"] .nav-bar-dot { display: none; }
+.nav-back {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  height: 44px;
+  align-items: center;
+  gap: 1px;
+  margin-left: -9px;
+  padding: 0 8px 0 2px;
+  color: color-mix(in srgb, var(--text) 88%, transparent);
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 500;
+  transition: opacity var(--t-instant) var(--ease-out);
+}
+.nav-back:active { opacity: 0.45; }
+/* a long way back gives way to the small title, as iOS shortens it */
+.nav-bar[data-titled] .nav-back-label { max-width: 64px; }
+
+/* the words: a date, the large title, the state in its colour, a neutral line */
+.page-head {
+  --c: #93a2b4;
+  --title-from: 8px;
+  --title-to: 56px;
+  position: relative;
+  /* a soft shade under the words: they stay readable where the sky is at its brightest */
+  text-shadow: 0 1px 14px rgb(0 0 0 / 0.32);
+  padding: 0 2px;
+  padding-right: calc(2px + var(--beside, 0px));
+}
+.page-head[data-compact] { --title-from: 0px; --title-to: 44px; }
+.page-head[data-tone="accent"] { --c: var(--accent); }
+.page-head[data-tone="ok"] { --c: var(--ok); }
+.page-head[data-tone="warn"] { --c: var(--warn); }
+.page-head[data-tone="danger"] { --c: var(--danger); }
+.page-head-eyebrow {
+  display: flex;
+  min-height: 16px;
+  align-items: center;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--text) 62%, transparent);
+}
+.page-head-title {
+  margin-top: 1px;
+  font-size: 34px;
+  line-height: 40px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+  transform-origin: 0 100%;
+}
+/* a long title shrinks to one line (34 → 26 px, `FitTitle`) and only then wraps */
+/* before the browser has measured (a hard load), a long title ends in «…» instead of running under the buttons */
+.page-head-title[data-fit] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.page-head-title[data-fit][data-wrap] { white-space: normal; line-height: 32px; }
+.page-head-state {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--c) 82%, white);
+  transition: color 600ms var(--ease-in-out);
+}
+.page-head[data-tone="none"] .page-head-state,
+.page-head[data-tone="iris"] .page-head-state { color: var(--text-muted); font-size: 14px; }
+.page-head-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--c);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 24%, transparent), 0 0 12px color-mix(in srgb, var(--c) 70%, transparent);
+}
+.page-head[data-tone="none"] .page-head-dot,
+.page-head[data-tone="iris"] .page-head-dot { display: none; }
+.page-head-sub {
+  margin-top: 3px;
+  font-size: 14px;
+  line-height: 19px;
+  color: var(--text-muted);
+}
+
+/* the collapse follows the scroll where the browser can (Chrome, Safari 26) */
+@supports (animation-timeline: scroll()) {
+  .page-sky { animation: page-sky-dim linear both; animation-timeline: scroll(root); animation-range: 0px 220px; }
+  .nav-bar-glass { animation: page-head-in linear both; animation-timeline: scroll(root); animation-range: var(--glass-from) var(--glass-to); }
+  .nav-bar-title { animation: nav-title-in linear both; animation-timeline: scroll(root); animation-range: var(--small-from) var(--small-to); }
+  .nav-bar[data-compact] .nav-bar-actions { animation: nav-actions-rise linear both; animation-timeline: scroll(root); animation-range: 0px 44px; }
+  .page-head-title { animation: page-title-out linear both; animation-timeline: scroll(root); animation-range: var(--title-from) var(--title-to); }
+  .page-head-eyebrow, .page-head-state, .page-head-sub { animation: page-words-out linear both; animation-timeline: scroll(root); animation-range: 0px 36px; }
+}
+@keyframes page-sky-dim { from { opacity: 1; } to { opacity: 0.4; } }
+@keyframes page-head-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes nav-title-in { from { opacity: 0; transform: translate(-50%, calc(-50% + 6px)); } to { opacity: 1; transform: translate(-50%, -50%); } }
+@keyframes nav-actions-rise { from { transform: translateY(var(--rest)); } to { transform: translateY(0); } }
+@keyframes page-title-out { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.92); } }
+@keyframes page-words-out { from { opacity: 1; } to { opacity: 0.15; } }
+/* the thresholds of D-113: where there is no scroll timeline, and under reduced motion (a
+   running animation outranks these rules, so they only speak when nothing animates) */
+.nav-bar[data-glass] .nav-bar-glass { opacity: 1; }
+.nav-bar[data-titled] .nav-bar-title { opacity: 1; transform: translate(-50%, -50%); }
+.nav-bar[data-compact][data-glass] .nav-bar-actions { transform: none; }
+@supports not (animation-timeline: scroll()) {
+  .nav-bar-glass, .nav-bar-title, .nav-bar-actions { transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out); }
+}
+
+/* the round glass button of the bar: search, «на стену», «+», «⋯» — a specular edge, a
+   spring on release; no blur of its own (it stands on the horizon glass or on the sky) */
+.head-btn {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--text) 94%, transparent);
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .03) 40%, rgba(255, 255, 255, 0) 62%, rgba(255, 255, 255, .06)),
+    color-mix(in srgb, var(--surface-2) 70%, transparent);
+  box-shadow:
+    inset 0 1px 0.5px rgba(255, 255, 255, .30),
+    inset 0 -1px 1px rgba(255, 255, 255, .07),
+    inset 0 0 0 0.5px rgba(255, 255, 255, .12),
+    0 1px 2px rgba(0, 0, 0, .35),
+    0 8px 18px rgba(0, 0, 0, .28);
+  /* let go: the circle springs back past its size and settles */
+  transition: transform 460ms cubic-bezier(.34, 1.56, .64, 1), color var(--t-instant) var(--ease-out);
+}
+/* 44 px to the finger (DESIGN §2), 38 to the eye */
+.head-btn::before { content: ""; position: absolute; inset: -3px; border-radius: inherit; }
+.head-btn:active { transform: scale(0.86); transition: transform 90ms ease-out; }
+.head-btn:disabled { opacity: 0.5; }
+.head-btn[data-on] {
+  color: var(--accent);
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, .14), rgba(255, 255, 255, 0) 55%),
+    color-mix(in srgb, var(--accent) 22%, color-mix(in srgb, var(--surface-2) 62%, transparent));
+}
+/* the screen's one «create»: a solid accent circle */
+.head-btn[data-tone="accent"] {
+  color: var(--bg);
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, .45), rgba(255, 255, 255, 0) 45%),
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, white), var(--accent) 55%, var(--accent-2));
+  box-shadow:
+    inset 0 1px 0.5px rgba(255, 255, 255, .55),
+    inset 0 -1px 1px rgba(0, 0, 0, .12),
+    0 1px 2px rgba(0, 0, 0, .3),
+    0 6px 18px color-mix(in srgb, var(--accent) 34%, transparent);
+}
+.head-btn-screen { fill: transparent; transition: fill var(--t-instant) var(--ease-out); }
+.head-btn[data-live] .head-btn-screen { fill: color-mix(in srgb, var(--accent) 28%, transparent); }
+/* the diode: lit while something is on the office wall — a static glow, only opacity changes */
+.head-btn-led {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--bg), 0 0 8px color-mix(in srgb, var(--accent) 80%, transparent);
+  opacity: 0;
+  transition: opacity var(--t-instant) var(--ease-out);
+}
+.head-btn[data-live] .head-btn-led { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .page-sky, .page-sky-blob, .nav-bar-glass, .nav-bar-title, .nav-bar-actions, .page-head-title,
+  .page-head-eyebrow, .page-head-state, .page-head-sub { animation: none !important; }
+  .page-sky-layer, .page-head-state, .nav-bar-glass, .nav-bar-title, .nav-bar-actions, .head-btn, .head-btn:active { transition: none; }
+}

@@ -7,8 +7,8 @@ import { ORDER_STATUS, cancellableByOwner, isOpenOrder, pointsWord } from "@/lib
 import { useCancelOrder, useSetOrderStatus, type Order } from "@/lib/shop/queries";
 
 /**
- * Шапка заказа: что заказано, кем и когда. Статус и действия идут строкой ниже — на
- * 360 px чип рядом с названием съедал его до многоточия.
+ * The order's head: what was ordered, by whom and when. The status and the actions go on the line
+ * below — at 360 px a chip beside the title ate it down to an ellipsis.
  */
 function OrderHead({ order, who }: { order: Order; who?: string }) {
   return (
@@ -41,7 +41,7 @@ function StatusChip({ order }: { order: Order }) {
   );
 }
 
-/** «Мои заказы»: что заказано и на какой стадии; забрать очки назад можно до подтверждения. */
+/** «Мои заказы»: what was ordered and at what stage; the points can be taken back until it is confirmed. */
 export function MyOrders({ orders }: { orders: Order[] }) {
   const cancel = useCancelOrder();
 
@@ -75,14 +75,14 @@ export function MyOrders({ orders }: { orders: Order[] }) {
 }
 
 /**
- * Очередь выдачи: директор и завхоз видят чужие заказы. Очки уже списаны при заказе
- * (hold-final, D-10), поэтому выдача — один тап и ни одной новой транзакции.
+ * The hand-out queue: the director and the storekeeper see other people's orders. The points were
+ * already written off at the order (hold-final, D-10), so handing out is one tap and no new transaction.
  */
 export function OrdersQueue({ orders, meId, className = "mt-7" }: { orders: Order[]; meId?: string; className?: string }) {
   const setStatus = useSetOrderStatus();
   const cancel = useCancelOrder();
-  // завхоз копит очки как все: его собственный заказ живёт в «Моих заказах» и проводит
-  // его директор — сам себе выдать нельзя (то же правило стоит в RPC)
+  // the storekeeper saves points like everyone: their own order lives in «Мои заказы» and the director
+  // puts it through — nobody hands out to themselves (the RPC holds the same rule)
   const queue = orders.filter((order) => order.user_id !== meId);
   const open = queue.filter((order) => isOpenOrder(order.status));
   const closed = queue.filter((order) => !isOpenOrder(order.status)).slice(0, 10);

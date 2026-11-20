@@ -4,7 +4,8 @@ import Link from "next/link";
 
 import { PeopleGridBone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { LOAD_COLOR, loadColor, useTeamLoads } from "@/lib/people/loads";
-import { initialsOf, usePeople } from "@/lib/people/queries";
+import { usePeople } from "@/lib/people/queries";
+import { initialsOf } from "@/lib/people/names";
 
 /** «Команда»: the team at a glance — one dot per person, tap opens the card. */
 export function PeopleGrid({ title = "Люди" }: { title?: string }) {

@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { Fragment, useState, type ReactNode } from "react";
 
 import { ruleLine, ruleState } from "@/components/recurrence/RecurrenceSection";
-import { AnswerSheet } from "@/components/tasks/desk/AnswerSheet";
-import { DirectorSheets, type DirectorSheetName, type PassTo } from "@/components/tasks/desk/DirectorSheets";
-import { Icon } from "@/components/tasks/desk/icons";
+import { AnswerSheet } from "@/components/tasks/director/AnswerSheet";
+import { DirectorSheets, type DirectorSheetName, type PassTo } from "@/components/tasks/director/DirectorSheets";
+import { Icon } from "@/components/tasks/icons";
 import { Button } from "@/components/ui/Button";
 import { Sheet, SHEET_CLOSE_MS } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
@@ -16,7 +16,7 @@ import { haptic } from "@/lib/haptics";
 import { shortName } from "@/lib/people/names";
 import { peopleQuery } from "@/lib/people/queries";
 import { useRecurrenceRules, useUpdateRule } from "@/lib/recurrence/queries";
-import type { DeskAction } from "@/lib/tasks/desk";
+import type { DeskAction } from "@/lib/tasks/reasons";
 import { reassignNeedsDeadline, type Suggestion, type TimeRequest } from "@/lib/tasks/lifecycle";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
@@ -40,8 +40,8 @@ const MORE_LABEL: Partial<Record<DeskAction, string>> = {
 /**
  * What the director's buttons do, wherever a task shows them — a card of «Задачи» or the
  * task's own screen (D-83, D-87): the existing actions with a receipt in words («Принято ·
- * Асхат»), the sheets that ask before a move (доработка, срок, кому, отзыв, удаление, ответ
- * словами), and «Все действия». One hook, so a button cannot mean two things on two screens.
+ * Асхат»), the sheets that ask before a move (rework, deadline, to whom, recall, delete, an
+ * answer in words), and «Все действия». One hook, so a button cannot mean two things on two screens.
  */
 export function useDirectorControls({
   base,

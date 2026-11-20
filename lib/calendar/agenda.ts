@@ -2,11 +2,13 @@ import {
   addMonths,
   compareYmd,
   daysBetween,
-  hmOf,
+  hmAt,
+  hmFrom,
   humanYmd,
   nowHm,
   parseHm,
   todayYmd,
+  ymdAt,
   ymdHmToAqtobeIso,
   ymdOf,
   type Hm,
@@ -24,22 +26,12 @@ import type { CalendarEvent } from "./queries";
  * same clock give the same words on the page, on Пульс and on ТВ.
  */
 
-/** Aqtobe is +05:00 all year (docs/AI.md §2), so the wall clock is plain arithmetic. */
-const OFFSET_MS = 5 * 60 * 60 * 1000;
-const pad = (n: number) => String(n).padStart(2, "0");
-
-function wall(iso: string): Date {
-  return new Date(new Date(iso).getTime() + OFFSET_MS);
-}
-
 export function ymdOfEvent(event: { starts_at: string }): Ymd {
-  const w = wall(event.starts_at);
-  return `${w.getUTCFullYear()}-${pad(w.getUTCMonth() + 1)}-${pad(w.getUTCDate())}`;
+  return ymdAt(new Date(event.starts_at));
 }
 
 export function hhmm(iso: string): string {
-  const w = wall(iso);
-  return `${pad(w.getUTCHours())}:${pad(w.getUTCMinutes())}`;
+  return hmAt(new Date(iso));
 }
 
 /** «10:00» or «10:00–11:30» — the end only when the director named one. */
@@ -120,13 +112,6 @@ export function monthWindow({ year, month }: Month): { from: string; to: string 
   };
 }
 
-/** A day so many days on (or back) — the week view steps by seven. */
-export function shiftDay(ymd: Ymd, days: number): Ymd {
-  const [year, month, day] = ymd.split("-").map(Number);
-  const moved = new Date(Date.UTC(year, month - 1, day + days));
-  return ymdOf(moved.getUTCFullYear(), moved.getUTCMonth() + 1, moved.getUTCDate());
-}
-
 /** Meetings per company day — the dots under the numbers of the grid. */
 export function countByDay(events: readonly { starts_at: string }[]): Map<Ymd, number> {
   const counts = new Map<Ymd, number>();
@@ -159,7 +144,7 @@ export function agendaFrom<T extends { starts_at: string }>(
 /** Where a new meeting starts: the next whole hour today, ten in the morning any other day. */
 export function defaultStartHm(day: Ymd, now: Date): Hm {
   if (day !== todayYmd(now)) return "10:00";
-  return hmOf(Math.min(23, parseHm(nowHm(now))!.hours + 1), 0);
+  return hmFrom(Math.min(23, parseHm(nowHm(now))!.hours + 1), 0);
 }
 
 const minutesOf = (hm: Hm) => {
@@ -175,7 +160,7 @@ export function shiftEnd(startBefore: Hm, end: Hm | null, startAfter: Hm): Hm | 
   if (!end) return null;
   const moved = minutesOf(end) + minutesOf(startAfter) - minutesOf(startBefore);
   if (moved >= 24 * 60 || moved <= minutesOf(startAfter)) return null;
-  return hmOf(Math.floor(moved / 60), moved % 60);
+  return hmFrom(Math.floor(moved / 60), moved % 60);
 }
 
 /** The end must come after the start — on the same day, by the rule above. */

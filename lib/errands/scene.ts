@@ -1,3 +1,5 @@
+import { aqtobeWall, atAqtobe } from "@/lib/ai/time";
+import { hmAt, ymdAt, ymdHmToAqtobeIso } from "@/lib/datetime/calendar";
 import { shortName } from "@/lib/people/names";
 import type { SecretaryAction } from "@/lib/settings";
 import { normalize } from "@/lib/text/normalize";
@@ -173,16 +175,10 @@ export function urgencyOf(errand: Pick<Errand, "created_at" | "escalated_at" | "
   return waited >= 60_000 ? 1 : 0;
 }
 
-/** Aqtobe is UTC+5 all year: the wall clock of the office, whatever the phone says. */
-const AQTOBE_OFFSET_MS = 5 * 60 * 60_000;
-
+/** Minutes since midnight on the Aqtobe wall clock — the office's, whatever the phone says. */
 function wallMinutes(date: Date): number {
-  const wall = new Date(date.getTime() + AQTOBE_OFFSET_MS);
+  const wall = aqtobeWall(date);
   return wall.getUTCHours() * 60 + wall.getUTCMinutes();
-}
-
-function dayOf(date: Date): string {
-  return new Date(date.getTime() + AQTOBE_OFFSET_MS).toISOString().slice(0, 10);
 }
 
 function parseHm(value: string): number {
@@ -209,10 +205,8 @@ export function daypartOf(now: Date, window: { from: string; to: string }): Dayp
   return "day";
 }
 
-/** The Aqtobe date of a moment — «today» of the secretary's tally and of the morning arrival. */
-export function aqtobeDay(date: Date): string {
-  return dayOf(date);
-}
+/** @deprecated use `ymdAt` from lib/datetime/calendar.ts — lib/ai/time.ts' `aqtobeDay` is a day NUMBER, this one a "YYYY-MM-DD" */
+export const aqtobeDay = ymdAt;
 
 export type DayTally = { items: { kind: string; label: string; icon: string; count: number }[]; averageMin: number | null; total: number };
 
@@ -221,8 +215,8 @@ export type DayTally = { items: { kind: string; label: string; icon: string; cou
  * The average is «попросил → готово», the time the director actually waited.
  */
 export function todayTally(errands: readonly Errand[], meId: string, now: Date, catalogue: readonly SecretaryAction[] = []): DayTally {
-  const today = dayOf(now);
-  const done = errands.filter((e) => e.status === "done" && e.claimed_by === meId && e.done_at && dayOf(new Date(e.done_at)) === today);
+  const today = ymdAt(now);
+  const done = errands.filter((e) => e.status === "done" && e.claimed_by === meId && e.done_at && ymdAt(new Date(e.done_at)) === today);
   const byKind = new Map<string, { kind: string; label: string; icon: string; count: number }>();
   for (const row of done) {
     const icon = catalogue.find((action) => action.code === row.kind)?.icon ?? "";
@@ -255,9 +249,9 @@ export function isQuick(errand: Pick<Errand, "created_at" | "done_at">): boolean
 
 /** How many of this secretary's latest jobs today were quick in a row, the newest first. */
 export function quickStreak(errands: readonly Errand[], meId: string, now: Date): number {
-  const today = dayOf(now);
+  const today = ymdAt(now);
   const done = errands
-    .filter((e) => e.status === "done" && e.claimed_by === meId && e.done_at && dayOf(new Date(e.done_at)) === today)
+    .filter((e) => e.status === "done" && e.claimed_by === meId && e.done_at && ymdAt(new Date(e.done_at)) === today)
     .sort((a, b) => (b.done_at ?? "").localeCompare(a.done_at ?? ""));
   let streak = 0;
   for (const row of done) {
@@ -384,7 +378,7 @@ export const AWAY_SPANS = [
 
 /** Until when a span takes her away; 0 — «до конца дня», 21:00 Aqtobe, the end of the delivery window (D-38). */
 export function awayUntil(min: number, now: number = Date.now()): string {
-  const until = min ? new Date(now + min * 60_000) : new Date(new Date(now + 5 * 3_600_000).toISOString().slice(0, 10) + "T16:00:00Z");
+  const until = new Date(min ? now + min * 60_000 : ymdHmToAqtobeIso(ymdAt(new Date(now)), "21:00")!);
   return until.toISOString();
 }
 
@@ -403,12 +397,11 @@ export function untilLine(iso: string): string {
  * 17:30» when it falls on the next day — typed at ten at night, «17:30» means tomorrow.
  */
 export function atLine(iso: string, now: Date = new Date()): string {
-  return `${dayOf(new Date(iso)) > dayOf(now) ? "завтра " : ""}к ${wallTime(iso)}`;
+  return `${ymdAt(new Date(iso)) > ymdAt(now) ? "завтра " : ""}к ${wallTime(iso)}`;
 }
 
 function wallTime(iso: string): string {
-  const wall = new Date(new Date(iso).getTime() + AQTOBE_OFFSET_MS);
-  return `${String(wall.getUTCHours()).padStart(2, "0")}:${String(wall.getUTCMinutes()).padStart(2, "0")}`;
+  return hmAt(new Date(iso));
 }
 
 /** Further ahead than this, a request for a time is planned — not the job in hand yet (D-106 §8). */
@@ -438,8 +431,7 @@ export function dueFromWall(hm: string, now: Date): string | null {
   const hours = Number(match[1]);
   const minutes = Number(match[2]);
   if (hours > 23 || minutes > 59) return null;
-  const wallNow = new Date(now.getTime() + AQTOBE_OFFSET_MS);
-  let at = Date.UTC(wallNow.getUTCFullYear(), wallNow.getUTCMonth(), wallNow.getUTCDate(), hours, minutes) - AQTOBE_OFFSET_MS;
+  let at = atAqtobe(now, 0, hours, minutes).getTime();
   if (at - now.getTime() < 60_000) at += 24 * 60 * 60_000;
   return new Date(at).toISOString();
 }

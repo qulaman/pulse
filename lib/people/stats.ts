@@ -2,10 +2,10 @@
 
 import { useQuery } from "@tanstack/react-query";
 
-import { addDaysYmd, isoWeekday } from "@/lib/daily-report/format";
+import { isoWeekday } from "@/lib/daily-report/format";
 import { useTeamDailyReportPeriod } from "@/lib/daily-report/queries";
 import type { DailyReportStatus, TeamPeriodRow } from "@/lib/daily-report/types";
-import { aqtobeIsoToYmdHm, todayYmd, ymdHmToAqtobeIso, type Ymd } from "@/lib/datetime/calendar";
+import { addDays, aqtobeIsoToYmdHm, todayYmd, ymdHmToAqtobeIso, type Ymd } from "@/lib/datetime/calendar";
 import { useCompanySettings } from "@/lib/dictionary-queries";
 import { useTeamLoads, type Load } from "@/lib/people/loads";
 import { periodWindows, tallyTasks, type PeriodTask, type TaskTally, type Window } from "@/lib/people/period";
@@ -49,8 +49,8 @@ export type WeekPoint = { from: Ymd; to: Ymd; count: number };
  */
 export function weekSeries(tasks: readonly PeriodTask[], today: Ymd, weeks = STATS_WEEKS): WeekPoint[] {
   const series: WeekPoint[] = Array.from({ length: weeks }, (_, index) => {
-    const to = addDaysYmd(today, -7 * (weeks - 1 - index));
-    return { from: addDaysYmd(to, -6), to, count: 0 };
+    const to = addDays(today, -7 * (weeks - 1 - index));
+    return { from: addDays(to, -6), to, count: 0 };
   });
   for (const task of tasks) {
     if (!handedIn(task)) continue;
@@ -81,13 +81,8 @@ export function handSpans(tasks: readonly StatsTask[], window: Window): number[]
     .filter((span) => Number.isFinite(span) && span >= 0);
 }
 
-/** The middle value — what is typical; one task stuck for a month does not move it. */
-export function median(values: readonly number[]): number | null {
-  if (values.length === 0) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
-}
+/** @deprecated import `median` from lib/stats.ts */
+export { median } from "@/lib/stats";
 
 /** «1 д 4 ч», «3 ч 20 мин», «40 мин», «12 д» — a span said short, for a figure. */
 export function spanShort(ms: number): string {
@@ -158,7 +153,7 @@ export function reportDayState(day: Ymd, today: Ymd, row: Pick<ReportRow, "statu
   if (row?.status === "submitted") return "submitted";
   if (row?.status === "missed") return "missed";
   if (day > today) return "future";
-  const joinedAfter = new Date(person.created_at).getTime() >= new Date(ymdHmToAqtobeIso(addDaysYmd(day, 1), "00:00") ?? day).getTime();
+  const joinedAfter = new Date(person.created_at).getTime() >= new Date(ymdHmToAqtobeIso(addDays(day, 1), "00:00") ?? day).getTime();
   if (!isTeamMember(person) || !rules.enabled || !isWorkday(rules, day) || day < (rules.started_on ?? today) || joinedAfter) return "off";
   if (person.availability !== "active") return "away";
   if (rules.checked_on && day <= rules.checked_on) return "away";
@@ -170,10 +165,10 @@ export type ReportCell = { day: Ymd; state: ReportDayState; today: boolean; row:
 /** The calendar: `weeks` rows of Monday to Sunday, the current week last. */
 export function reportCalendar(rows: readonly ReportRow[], today: Ymd, rules: ReportRules, person: ReportPerson, weeks = HEATMAP_WEEKS): ReportCell[][] {
   const byDay = new Map(rows.map((row) => [row.report_date, row]));
-  const monday = addDaysYmd(today, 1 - isoWeekday(today));
+  const monday = addDays(today, 1 - isoWeekday(today));
   return Array.from({ length: weeks }, (_, week) =>
     Array.from({ length: 7 }, (_, weekday) => {
-      const day = addDaysYmd(monday, 7 * (week - (weeks - 1)) + weekday);
+      const day = addDays(monday, 7 * (week - (weeks - 1)) + weekday);
       const row = byDay.get(day);
       return { day, state: reportDayState(day, today, row, rules, person), today: day === today, row };
     }),
@@ -188,7 +183,7 @@ export function reportStreak(rows: readonly ReportRow[], today: Ymd, rules: Repo
   const byDay = new Map(rows.map((row) => [row.report_date, row]));
   let streak = 0;
   for (let back = 0; back < days; back++) {
-    const day = addDaysYmd(today, -back);
+    const day = addDays(today, -back);
     const state = reportDayState(day, today, byDay.get(day), rules, person);
     if (state === "missed") break;
     if (state === "submitted") streak += 1;
@@ -327,7 +322,7 @@ export function usePersonStats(person: Person, now: Date, pointsOn: boolean) {
   const personId = person.id;
   const today = todayYmd(now);
   const windows = periodWindows(today);
-  const seriesFrom = addDaysYmd(today, 1 - 7 * STATS_WEEKS);
+  const seriesFrom = addDays(today, 1 - 7 * STATS_WEEKS);
   const since = ymdHmToAqtobeIso(seriesFrom < windows.previous.from ? seriesFrom : windows.previous.from, "00:00") ?? seriesFrom;
 
   const settings = useCompanySettings();
