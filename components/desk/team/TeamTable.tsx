@@ -2,9 +2,10 @@
 
 import { LayoutGrid, List } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState, ViewTransition, type ReactNode } from "react";
 
+import { useDeskParams, writeDeskAddress } from "@/components/desk/DeskAddress";
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { DataGrid, type Column, type Group } from "@/components/desk/ui/DataGrid";
 import { InPanel } from "@/components/desk/ui/DeskPanel";
@@ -27,6 +28,7 @@ import { useTeamDailyReportDay } from "@/lib/daily-report/queries";
 import type { TeamDayRow } from "@/lib/daily-report/types";
 import { todayYmd } from "@/lib/datetime/calendar";
 import { pointsTone } from "@/lib/desk/format";
+import { SWITCH_IN, SWITCH_OUT } from "@/lib/desk/motion";
 import { useCompanySettings } from "@/lib/dictionary-queries";
 import { canChangeAccess, canEditPerson, canResetLogin, type Who } from "@/lib/people/access";
 import { usePhones, useSetWorking } from "@/lib/people/card-queries";
@@ -215,7 +217,10 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
   const router = useRouter();
   const setWorking = useSetWorking();
   const [removing, setRemoving] = useState<{ person: Person; mode: RemoveMode } | null>(null);
-  const params = useSearchParams();
+  // whose card is open (`?p=`) and how the team is laid out (`?view=`): the desk's address (D-184),
+  // written without a trip to the server and changed inside a transition — that is what opens the
+  // card and swaps the view as view transitions; a link and a reload bring both back
+  const params = useDeskParams();
   const openId = params.get("p");
   const view: View = params.get("view") === "list" ? "list" : "grid";
   // the card under the row: which tab, and whose data is being edited — another person opens unedited
@@ -386,12 +391,15 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
     const query = next.toString();
     return query ? `/desk/team?${query}` : "/desk/team";
   };
-  const peek = (id: string | null) => router.replace(addressOf_(id), { scroll: false });
-  const switchView = (face: View) => router.replace(addressOf_(openId, face), { scroll: false });
-  const choose = (id: string) => {
+  // the card under the row and the panel: a quick hand on the keys sees the card at once, the move
+  // still playing ends there
+  const peek = (id: string | null, fromKeys = false) => writeDeskAddress(addressOf_(id), { type: "desk-pick", burst: fromKeys });
+  // the card open as the address says now — a pick may still wait for its transition
+  const switchView = (face: View) => writeDeskAddress(addressOf_(new URLSearchParams(window.location.search).get("p"), face), { type: "desk-switch" });
+  const choose = (id: string, fromKeys = false) => {
     setSelected(id);
     // the panel follows the choice while it is open
-    if (openId && openId !== id) peek(id);
+    if (openId && openId !== id) peek(id, fromKeys);
   };
   const openCard = (id: string) => router.push(`/desk/team/${id}`);
   const byId = (id: string | null) => (id ? (all.find((p) => p.id === id) ?? null) : null);
@@ -450,6 +458,13 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
 
   /* ---- the keys: by the physical key, never while a field or a menu has them ---- */
   const chosenId = selected ?? openId;
+  // the page of the person whose card is open or whose tile is chosen is fetched ahead: «Открыть»
+  // lands without waiting for the server, and only a page that lands at once lets the circle fly
+  // to it (D-184). Next keeps one copy, so walking the tiles asks once a person.
+  const ahead = openId ?? chosenId;
+  useEffect(() => {
+    if (ahead) router.prefetch(`/desk/team/${ahead}`);
+  }, [ahead, router]);
   useScreenKeys((event) => {
     const arrow = arrowOf(event) ?? (view === "grid" ? (event.code === "ArrowRight" ? "down" : event.code === "ArrowLeft" ? "up" : null) : null);
     if (arrow) {
@@ -457,14 +472,14 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
       const keys = [...document.querySelectorAll<HTMLElement>(view === "grid" ? TILES : ROWS)].map((row) => row.dataset.rowKey ?? "");
       const next = stepKey(keys, chosenId, arrow === "down");
       if (next) {
-        choose(next);
+        choose(next, true);
         document.querySelector<HTMLElement>(`[data-row-key="${CSS.escape(next)}"]`)?.scrollIntoView({ block: "nearest" });
       }
       return Boolean(next);
     }
     // the card under the row goes with Esc (the panel of the table closes by the frame's own Esc)
     if (event.code === "Escape" && view === "grid" && openId && !editing) {
-      peek(null);
+      peek(null, true);
       return true;
     }
     if (event.code === "KeyN") {
@@ -482,7 +497,7 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
       return true;
     }
     if (event.code === "Space" && !onControl(event.target)) {
-      peek(openId === person.id ? null : person.id);
+      peek(openId === person.id ? null : person.id, true);
       return true;
     }
     if (event.code === "KeyE" && editable(person)) {
@@ -505,7 +520,7 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
   const dialog: { person: Person; mode: RemoveMode } | null = removing ?? (asked && removable(asked) ? { person: asked, mode: asked.is_active ? "remove" : "erase" } : null);
   const closeDialog = () => {
     setRemoving(null);
-    if (asked) router.replace(`/desk/team?p=${asked.id}`, { scroll: false });
+    if (asked) writeDeskAddress(addressOf_(asked.id));
   };
   useShortcuts("Команда", [
     { keys: view === "grid" ? ["←", "→"] : ["↑", "↓"], label: "Выбрать человека" },
@@ -646,122 +661,127 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
           </button>
         ) : null}
       </Toolbar>}
-      {failed ? null : loading ? (
-        view === "grid" ? (
-          <TilesBone />
-        ) : (
-          <GridBone columns={director ? 6 : 3} />
-        )
-      ) : view === "grid" ? (
-        shown.length === 0 ? (
-          <EmptyState
-            tone={filter && !query && !role ? "ok" : undefined}
-            title={filter && !query && !role ? `Никого ${FILTER_LABEL[filter]}` : narrowed ? "Никого не нашлось" : "В команде пока никого"}
-            hint={filter ? "Фильтр снимается повторным нажатием на число сверху" : narrowed ? "Поиск — по имени, должности и тому, как человека зовут в речи" : "Добавьте первого — он войдёт по коду из 8 цифр"}
-          />
-        ) : (
-          <TeamGrid
-            groups={groups}
-            director={director}
-            crew={crew}
-            factsOf={factsOf}
-            chosenId={chosenId}
-            openId={opened ? opened.id : null}
-            onOpen={(id) => {
-              setSelected(id);
-              peek(openId === id ? null : id);
-            }}
-            onCard={openCard}
-            onMenu={(id, event) => {
-              const person = byId(id);
-              if (!person) return;
-              choose(id);
-              menu.open(event, menuOf(person));
-            }}
-            card={
-              opened && me ? (
-                <TeamCard
-                  person={opened}
-                  director={director}
-                  crew={crew(opened)}
-                  me={me}
-                  companyId={companyId}
-                  roster={all}
-                  phone={phones.data?.[opened.id] ?? null}
-                  phonesReady={!phones.isPending}
-                  load={load(opened) ?? (opened.is_active ? undefined : loads[opened.id])}
-                  tasks={director ? openTasksOf(opened.id) : NO_TASKS}
-                  push={push?.get(opened.id)}
-                  now={now}
-                  tab={cardTab}
-                  onTab={setCardTab}
-                  editing={editing}
-                  onEditing={setEditing}
-                  onClose={() => peek(null)}
-                  moves={{
-                    give: givable(opened) ? () => give(opened) : undefined,
-                    open: () => openCard(opened.id),
-                    more: tidy(menuOf(opened).filter((item) => item === "separator" || !["open", "peek", "give", "edit"].includes(item.key))),
-                  }}
-                  stats={director && crew(opened) ? statsOf(opened) : null}
-                />
-              ) : null
-            }
-          />
-        )
-      ) : (
-        <div
-          ref={box}
-          data-testid="desk-team-table"
-          // the right button on a row: its moves at the cursor, the row chosen under them
-          onContextMenu={(event) => {
-            const person = byId((event.target as HTMLElement).closest<HTMLElement>("[data-row-key]")?.dataset.rowKey ?? null);
-            if (!person) return;
-            // the row under the cursor is chosen, as in a file list — the panel follows when open
-            choose(person.id);
-            menu.open(event, menuOf(person));
-          }}
-        >
-          <DataGrid
-            aria-label="Команда"
-            columns={visibleColumns}
-            groups={groups}
-            rowKey={(p) => p.id}
-            selectedKey={chosenId}
-            onSelect={(p) => choose(p.id)}
-            onActivate={(p) => openCard(p.id)}
-            // a click peeks in the panel, the table stays; the load and the task in a row lead on their own
-            onRowClick={(p) => peek(p.id)}
-            empty={
+      {failed ? null : (
+        // «Сетка» and «Список» swap as two pictures, only when the switch is pressed (D-184)
+        <ViewTransition key={view} enter={SWITCH_IN} exit={SWITCH_OUT} default="none">
+          {loading ? (
+            view === "grid" ? (
+              <TilesBone />
+            ) : (
+              <GridBone columns={director ? 6 : 3} />
+            )
+          ) : view === "grid" ? (
+            shown.length === 0 ? (
               <EmptyState
                 tone={filter && !query && !role ? "ok" : undefined}
                 title={filter && !query && !role ? `Никого ${FILTER_LABEL[filter]}` : narrowed ? "Никого не нашлось" : "В команде пока никого"}
-                hint={
-                  filter
-                    ? "Фильтр снимается повторным нажатием на число сверху"
-                    : narrowed
-                      ? "Поиск — по имени, должности и тому, как человека зовут в речи"
-                      : "Добавьте первого — он войдёт по коду из 8 цифр"
-                }
-                action={
-                  narrowed ? (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => {
-                        setFilter(null);
-                        setQuery("");
-                        setRole("");
+                hint={filter ? "Фильтр снимается повторным нажатием на число сверху" : narrowed ? "Поиск — по имени, должности и тому, как человека зовут в речи" : "Добавьте первого — он войдёт по коду из 8 цифр"}
+              />
+            ) : (
+              <TeamGrid
+                groups={groups}
+                director={director}
+                crew={crew}
+                factsOf={factsOf}
+                chosenId={chosenId}
+                openId={opened ? opened.id : null}
+                onOpen={(id) => {
+                  setSelected(id);
+                  peek(openId === id ? null : id);
+                }}
+                onCard={openCard}
+                onMenu={(id, event) => {
+                  const person = byId(id);
+                  if (!person) return;
+                  choose(id);
+                  menu.open(event, menuOf(person));
+                }}
+                card={
+                  opened && me ? (
+                    <TeamCard
+                      person={opened}
+                      director={director}
+                      crew={crew(opened)}
+                      me={me}
+                      companyId={companyId}
+                      roster={all}
+                      phone={phones.data?.[opened.id] ?? null}
+                      phonesReady={!phones.isPending}
+                      load={load(opened) ?? (opened.is_active ? undefined : loads[opened.id])}
+                      tasks={director ? openTasksOf(opened.id) : NO_TASKS}
+                      push={push?.get(opened.id)}
+                      now={now}
+                      tab={cardTab}
+                      onTab={setCardTab}
+                      editing={editing}
+                      onEditing={setEditing}
+                      onClose={() => peek(null)}
+                      moves={{
+                        give: givable(opened) ? () => give(opened) : undefined,
+                        open: () => openCard(opened.id),
+                        more: tidy(menuOf(opened).filter((item) => item === "separator" || !["open", "peek", "give", "edit"].includes(item.key))),
                       }}
-                    >
-                      Показать всех
-                    </Button>
+                      stats={director && crew(opened) ? statsOf(opened) : null}
+                    />
                   ) : null
                 }
               />
-            }
-          />
-        </div>
+            )
+          ) : (
+            <div
+              ref={box}
+              data-testid="desk-team-table"
+              // the right button on a row: its moves at the cursor, the row chosen under them
+              onContextMenu={(event) => {
+                const person = byId((event.target as HTMLElement).closest<HTMLElement>("[data-row-key]")?.dataset.rowKey ?? null);
+                if (!person) return;
+                // the row under the cursor is chosen, as in a file list — the panel follows when open
+                choose(person.id);
+                menu.open(event, menuOf(person));
+              }}
+            >
+              <DataGrid
+                aria-label="Команда"
+                columns={visibleColumns}
+                groups={groups}
+                rowKey={(p) => p.id}
+                selectedKey={chosenId}
+                onSelect={(p) => choose(p.id)}
+                onActivate={(p) => openCard(p.id)}
+                // a click peeks in the panel, the table stays; the load and the task in a row lead on their own
+                onRowClick={(p) => peek(p.id)}
+                empty={
+                  <EmptyState
+                    tone={filter && !query && !role ? "ok" : undefined}
+                    title={filter && !query && !role ? `Никого ${FILTER_LABEL[filter]}` : narrowed ? "Никого не нашлось" : "В команде пока никого"}
+                    hint={
+                      filter
+                        ? "Фильтр снимается повторным нажатием на число сверху"
+                        : narrowed
+                          ? "Поиск — по имени, должности и тому, как человека зовут в речи"
+                          : "Добавьте первого — он войдёт по коду из 8 цифр"
+                    }
+                    action={
+                      narrowed ? (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setFilter(null);
+                            setQuery("");
+                            setRole("");
+                          }}
+                        >
+                          Показать всех
+                        </Button>
+                      ) : null
+                    }
+                  />
+                }
+              />
+            </div>
+          )}
+        </ViewTransition>
       )}
 
       {shown.length > 0 && !failed ? (

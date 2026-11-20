@@ -2,14 +2,16 @@
 
 import { Check, Circle, KeyRound, Mail, Phone } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useState, ViewTransition, type ReactNode } from "react";
 
+import { useDeskParams, writeDeskAddress } from "@/components/desk/DeskAddress";
 import { Face } from "@/components/desk/ui/Face";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SegmentTabs } from "@/components/desk/ui/Toolbar";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
+import { SWITCH_IN, SWITCH_OUT } from "@/lib/desk/motion";
 import { assignableRoles } from "@/lib/people/access";
 import { useSavePhoto } from "@/lib/people/card-queries";
 import { cleanPhone } from "@/lib/people/phone";
@@ -130,7 +132,7 @@ function CardPreview({ view, managers }: { view: EditorView; managers: Person[] 
  */
 export function NewPersonDesk() {
   const router = useRouter();
-  const params = useSearchParams();
+  const params = useDeskParams();
   const me = useMe();
   const people = usePeople();
   const create = useCreatePerson();
@@ -158,7 +160,8 @@ export function NewPersonDesk() {
               aria-label="Как добавить"
               value={tab}
               onChange={(next) => {
-                if (!busy) router.replace(next === "list" ? "/desk/team/new?tab=list" : "/desk/team/new");
+                // one form or the list: swapped in place, no trip to the server (D-184)
+                if (!busy) writeDeskAddress(next === "list" ? "/desk/team/new?tab=list" : "/desk/team/new", { type: "desk-switch" });
               }}
               items={[
                 { value: "one", label: "Один" },
@@ -174,37 +177,41 @@ export function NewPersonDesk() {
           <Bone h={300} />
         </SkeletonGroup>
       ) : tab === "list" ? (
-        <BulkPeople editor={me.data.role} people={people.data ?? []} onBusy={setBusy} />
+        <ViewTransition key="list" enter={SWITCH_IN} exit={SWITCH_OUT} default="none">
+          <BulkPeople editor={me.data.role} people={people.data ?? []} onBusy={setBusy} />
+        </ViewTransition>
       ) : (
-        <PersonEditor
-          mode="create"
-          draftKey="new"
-          initial={deskDraftOf(null)}
-          roles={assignableRoles(me.data.role, null)}
-          managers={(people.data ?? []).filter((p) => p.is_active && (p.role === "manager" || p.role === "director"))}
-          roster={(people.data ?? []).filter((p) => p.is_active && p.role !== "tv")}
-          everyone={(people.data ?? []).filter((p) => p.role !== "tv")}
-          pending={create.isPending || savePhoto.isPending}
-          onCancel={() => router.push("/desk/team")}
-          onSubmit={async (draft, photo) => {
-            const email = (draft.email ?? "").trim().toLowerCase() || null;
-            const password = email ? (draft.password ?? "") : null;
-            const { id } = await create.mutateAsync({
-              ...(email && password ? { email, password } : {}),
-              full_name: draft.full_name.trim(),
-              role: draft.role,
-              position: draft.position.trim() || undefined,
-              phone: cleanPhone(draft.phone) ?? undefined,
-              aliases: splitAliases(draft.aliases),
-              manager_id: draft.manager_id,
-            });
-            handOver(id, { email, password });
-            // the person exists from here on: a photo that fails says so and is added on the card
-            if (me.data) await savePhoto.mutateAsync({ id, companyId: me.data.companyId, photo }).catch(() => undefined);
-            router.replace(`/desk/team/${id}`);
-          }}
-          preview={(view) => <CardPreview view={view} managers={(people.data ?? []).filter((p) => p.is_active)} />}
-        />
+        <ViewTransition key="one" enter={SWITCH_IN} exit={SWITCH_OUT} default="none">
+          <PersonEditor
+            mode="create"
+            draftKey="new"
+            initial={deskDraftOf(null)}
+            roles={assignableRoles(me.data.role, null)}
+            managers={(people.data ?? []).filter((p) => p.is_active && (p.role === "manager" || p.role === "director"))}
+            roster={(people.data ?? []).filter((p) => p.is_active && p.role !== "tv")}
+            everyone={(people.data ?? []).filter((p) => p.role !== "tv")}
+            pending={create.isPending || savePhoto.isPending}
+            onCancel={() => router.push("/desk/team")}
+            onSubmit={async (draft, photo) => {
+              const email = (draft.email ?? "").trim().toLowerCase() || null;
+              const password = email ? (draft.password ?? "") : null;
+              const { id } = await create.mutateAsync({
+                ...(email && password ? { email, password } : {}),
+                full_name: draft.full_name.trim(),
+                role: draft.role,
+                position: draft.position.trim() || undefined,
+                phone: cleanPhone(draft.phone) ?? undefined,
+                aliases: splitAliases(draft.aliases),
+                manager_id: draft.manager_id,
+              });
+              handOver(id, { email, password });
+              // the person exists from here on: a photo that fails says so and is added on the card
+              if (me.data) await savePhoto.mutateAsync({ id, companyId: me.data.companyId, photo }).catch(() => undefined);
+              router.replace(`/desk/team/${id}`);
+            }}
+            preview={(view) => <CardPreview view={view} managers={(people.data ?? []).filter((p) => p.is_active)} />}
+          />
+        </ViewTransition>
       )}
       </div>
     </DeskPage>

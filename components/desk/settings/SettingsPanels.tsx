@@ -1,8 +1,9 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useLayoutEffect, useRef, useState, ViewTransition, type ReactNode } from "react";
 
+import { useDeskParams, writeDeskAddress } from "@/components/desk/DeskAddress";
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { useBrandDraft } from "@/components/desk/settings/brand";
 import { rowAnchor, SaveBar } from "@/components/desk/settings/form";
@@ -19,6 +20,7 @@ import { useDraft, type SectionKey } from "@/components/settings/draft";
 import { SETTINGS_TAB_META } from "@/components/settings/SettingsTiles";
 import { toast } from "@/components/ui/Toast";
 import { Bone } from "@/components/ui/Skeleton";
+import { SWITCH_SWAP } from "@/lib/desk/motion";
 import { useCompanySettings } from "@/lib/dictionary-queries";
 import type { CompanySettings, SettingsPatch } from "@/lib/settings";
 import { withSecretaryCodes } from "@/lib/settings-plain";
@@ -231,7 +233,7 @@ export function SettingsPanels({ tab }: { tab: SettingsTab }) {
   const { role } = useDeskScope();
   const director = role === "director";
   const router = useRouter();
-  const params = useSearchParams();
+  const params = useDeskParams();
   const panel = useDeskPanel();
   const focus = params.get("focus");
   const [visited, setVisited] = useState<ReadonlySet<SettingsTab>>(() => new Set([tab]));
@@ -270,7 +272,7 @@ export function SettingsPanels({ tab }: { tab: SettingsTab }) {
       tries += 1;
       if (landOn(focus) || tries > 40) {
         clearInterval(timer);
-        window.history.replaceState(null, "", `/desk/settings?tab=${tab}`);
+        writeDeskAddress(`/desk/settings?tab=${tab}`);
       }
     }, 50);
     return () => clearInterval(timer);
@@ -278,11 +280,14 @@ export function SettingsPanels({ tab }: { tab: SettingsTab }) {
 
   const meta = SETTINGS_TAB_META[tab];
   return (
-    <div className="flex w-full max-w-[880px] flex-col gap-5">
-      <PageTitle title={meta.title} state={{ text: meta.about }} />
-      <Ready>
-        <Panels tab={tab} visited={visited} director={director} />
-      </Ready>
-    </div>
+    // another tab changes the page in place (D-184): the title and the tab's settings cross-fade
+    <ViewTransition update={SWITCH_SWAP} default="none">
+      <div className="flex w-full max-w-[880px] flex-col gap-5">
+        <PageTitle title={meta.title} state={{ text: meta.about }} />
+        <Ready>
+          <Panels tab={tab} visited={visited} director={director} />
+        </Ready>
+      </div>
+    </ViewTransition>
   );
 }

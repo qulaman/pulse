@@ -9,7 +9,7 @@
  */
 import type { Page, Route } from "playwright";
 
-import { APP_URL, injected, open, record, skip, type Ctx } from "./shared";
+import { APP_URL, cutShort, injected, open, record, skip, VT_PROBE, vtCount, vtNames, vtSince, watchServerTrips, type Ctx } from "./shared";
 
 /** «Сегодня» (D-154): the hero and every block, or the block's empty state — looked at, nothing pressed. */
 async function checkToday(ctx: Ctx) {
@@ -107,8 +107,8 @@ async function checkToday(ctx: Ctx) {
     await page.waitForTimeout(200);
     const gone = (await page.locator("#desk-main [data-cursor]").count()) === 0;
     record("сегодня: J — курсор по решениям, Esc — снят, ничего не открыто", cursor === 1 && stillShut && gone, `курсор ${cursor}`);
-    // a right click is the row's menu — looked at, closed
-    await page.locator('#desk-main [data-row-key]').first().click({ button: "right", position: { x: 220, y: 12 } });
+    // a right click is the row's menu — looked at, closed (a decision or a late row: the just-sent rows above them have none)
+    await page.locator('[data-testid="today-decision"], [data-testid="today-overdue-row"]').first().click({ button: "right", position: { x: 220, y: 12 } });
     const menu = page.getByTestId("desk-menu");
     const opened = await menu.waitFor({ timeout: 3_000 }).then(() => true, () => false);
     const items = opened ? await menu.getByRole("menuitem").count() : 0;
@@ -258,6 +258,7 @@ async function checkNarrow(ctx: Ctx) {
 
 export async function checkTasks(ctx: Ctx) {
   const { page } = ctx;
+  await page.addInitScript(VT_PROBE);
   await checkToday(ctx);
   await checkFailure(ctx);
   await checkNarrow(ctx);
@@ -438,11 +439,21 @@ export async function checkTasks(ctx: Ctx) {
     skip("задачи: поиск фильтрует таблицу", "задач нет");
   }
 
-  // the tabs are the address's
+  // the tabs are the address's — and change the table as a transition, no trip to the server (D-184)
+  const tabFrom = await vtCount(page);
+  const tabTrips = watchServerTrips(page);
   await page.getByTestId("seg-closed").click();
   await page.waitForTimeout(600);
   record("задачи: вкладка «Закрытые» пишется в адрес", new URL(page.url()).searchParams.get("tab") === "closed", page.url().replace(APP_URL, ""));
+  const tabRuns = await vtSince(page, tabFrom);
+  const tabAsked = tabTrips();
+  record(
+    "задачи (D-184): вкладка меняет таблицу переходом на месте — сервер не спрошен, переход не оборван",
+    tabRuns.some((run) => run.names.includes("vt-fade-in")) && !tabRuns.some(cutShort) && tabAsked === 0,
+    `${vtNames(tabRuns) || "переходов нет"}; запросов к серверу ${tabAsked}`,
+  );
   await ctx.shot("tasks-closed");
+  await checkPanelMoves(ctx);
   await checkArchive(ctx);
 
   if (unread > 0) {
@@ -489,4 +500,44 @@ export async function checkTasks(ctx: Ctx) {
   } else {
     skip("разобрать: → и S", "в очереди меньше двух задач");
   }
+}
+
+/**
+ * The right-hand panel moves (D-184), on the closed tab — its rows are there on any account: it
+ * comes in from the right with the task, another row changes the task in place, Esc takes it back
+ * to the right with what it showed. Read only: rows are opened, nothing is pressed in them.
+ */
+async function checkPanelMoves(ctx: Ctx) {
+  const { page } = ctx;
+  const rows = page.getByTestId("desk-row");
+  if ((await rows.count()) < 2) {
+    skip("задачи (D-184): панель въезжает, задача меняется на месте, Esc — уезжает", "в «Закрытых» меньше двух строк");
+    return;
+  }
+  // the name, not the first cell: that one is the mark's box
+  const nameOf = (index: number) => rows.nth(index).locator('[role="gridcell"]').nth(1);
+  const from = await vtCount(page);
+  await nameOf(0).click();
+  await page.getByTestId("desk-task-panel").waitFor({ timeout: 15_000 }).catch(() => undefined);
+  await page.waitForTimeout(500);
+  const came = await vtSince(page, from);
+  const swapFrom = await vtCount(page);
+  await nameOf(1).click();
+  await page.waitForTimeout(600);
+  const swapped = await vtSince(page, swapFrom);
+  const goFrom = await vtCount(page);
+  await page.keyboard.press("Escape");
+  const gone = await page.getByTestId("desk-panel").waitFor({ state: "detached", timeout: 5_000 }).then(() => true, () => false);
+  await page.waitForTimeout(400);
+  const left = await vtSince(page, goFrom);
+  const all = [...came, ...swapped, ...left];
+  record(
+    "задачи (D-184): панель въезжает, задача меняется на месте, Esc — уезжает; ни один переход не оборван",
+    came.some((run) => run.names.includes("vt-panel-in")) &&
+      swapped.some((run) => run.names.includes("vt-arrive")) &&
+      gone &&
+      left.some((run) => run.names.includes("vt-panel-out")) &&
+      !all.some(cutShort),
+    `въезд ${vtNames(came) || "—"} · смена ${vtNames(swapped) || "—"} · Esc ${vtNames(left) || "—"}`,
+  );
 }

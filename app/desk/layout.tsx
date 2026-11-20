@@ -37,6 +37,8 @@ import "./reports-day.css";
 import "./reports-tabel.css";
 import "./reports-diary.css";
 import "./settings.css";
+// the transitions of the screen and of «Команда» (D-184): last, they style only ::view-transition-*
+import "./transitions.css";
 
 export const metadata: Metadata = { title: "Pulse" };
 

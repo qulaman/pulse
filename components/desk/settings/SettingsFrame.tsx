@@ -3,9 +3,10 @@
 import { AppWindow, BookText, BrainCircuit, Building2, Database, FlaskConical, Sparkles, Users, type LucideIcon } from "lucide-react";
 import { motion } from "motion/react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode, type RefObject } from "react";
 
+import { useDeskParams } from "@/components/desk/DeskAddress";
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { BrandDraftProvider, useBrandDraft } from "@/components/desk/settings/brand";
 import { entryHref, searchSettings, type SettingEntry } from "@/components/desk/settings/search";
@@ -159,7 +160,7 @@ function Results({ results, at, onPick, onHover }: { results: SettingEntry[]; at
 function SettingsNav({ searchRef }: { searchRef: RefObject<HTMLInputElement | null> }) {
   const { role } = useDeskScope();
   const pathname = usePathname();
-  const params = useSearchParams();
+  const params = useDeskParams();
   const router = useRouter();
   const sections = useDirtySections();
   const brand = useBrandDraft();

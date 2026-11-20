@@ -1,13 +1,14 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, ViewTransition } from "react";
 
 import { useDirectorDoor } from "@/components/desk/calendar/DirectorBusyLine";
 import { DeskPage } from "@/components/desk/ui/PageTitle";
 import { useSettled } from "@/components/desk/ui/SideNav";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
+import { SWITCH_IN, SWITCH_OUT } from "@/lib/desk/motion";
 import { isActive, useErrands, useSecretaries, useSecretaryActions, waitedFor, type Errand } from "@/lib/errands/queries";
 import { etaLeftMin, etaLine, sceneOf } from "@/lib/errands/scene";
 import { shortName } from "@/lib/people/names";
@@ -139,47 +140,50 @@ export function SecretaryErrands({ meId, openId, onOpen, history }: { meId: stri
     <DeskPage>
       <StoikaHead meId={meId} history={history} count={loading ? 0 : queue.length} now={now} settled={settled} />
       {settled ? <AwayBand meId={meId} now={now} /> : null}
-      {history ? (
-        <ErrandHistory viewer="secretary" meId={meId} openId={openId} onOpen={onOpen} now={now} pointsOn={false} catalogue={actions} />
-      ) : (
-        /* two columns while the screen's own width allows — the panel takes 440 px of the window */
-        <div className="@container">
-          <div className="stoika-grid">
-            <section className="stoika-column" data-testid="desk-errand-queue" data-busy={busy ? "" : undefined}>
-              <DoorCard door={settled ? door.door : null} spans={door.spans} hold={door.hold} pending={!settled || door.pending} now={now} meId={meId} compact={busy} />
-              {loading ? (
-                <StoikaBone />
-              ) : failed ? (
-                <LoadFailedHero busy={errands.isFetching} onRetry={() => void errands.refetch()} />
-              ) : (
-                <QueueList
-                  queue={queue}
-                  results={results}
-                  meId={meId}
-                  now={now}
-                  catalogue={actions}
-                  openId={openId}
-                  fresh={fresh}
-                  onOpen={onOpen}
-                  onDismiss={(id) => setDismissed((was) => new Set(was).add(id))}
-                />
-              )}
-              {(loading ? [] : colleagues).map(({ person, rows: theirs }) => (
-                <Colleague key={person.id} id={person.id} name={person.full_name} rows={theirs} now={now} catalogue={actions} onOpen={onOpen} />
-              ))}
-              {loading || failed ? null : (
-                <motion.div layout={still ? false : "position"}>
-                  {busy ? <DayTally day={day} /> : <DayJournal day={day} now={now} catalogue={actions} openId={openId} onOpen={onOpen} />}
-                </motion.div>
-              )}
-            </section>
+      {/* the queue and «История» swap as two pictures (D-184) */}
+      <ViewTransition key={history ? "history" : "queue"} enter={SWITCH_IN} exit={SWITCH_OUT} default="none">
+        {history ? (
+          <ErrandHistory viewer="secretary" meId={meId} openId={openId} onOpen={onOpen} now={now} pointsOn={false} catalogue={actions} />
+        ) : (
+          /* two columns while the screen's own width allows — the panel takes 440 px of the window */
+          <div className="@container">
+            <div className="stoika-grid">
+              <section className="stoika-column" data-testid="desk-errand-queue" data-busy={busy ? "" : undefined}>
+                <DoorCard door={settled ? door.door : null} spans={door.spans} hold={door.hold} pending={!settled || door.pending} now={now} meId={meId} compact={busy} />
+                {loading ? (
+                  <StoikaBone />
+                ) : failed ? (
+                  <LoadFailedHero busy={errands.isFetching} onRetry={() => void errands.refetch()} />
+                ) : (
+                  <QueueList
+                    queue={queue}
+                    results={results}
+                    meId={meId}
+                    now={now}
+                    catalogue={actions}
+                    openId={openId}
+                    fresh={fresh}
+                    onOpen={onOpen}
+                    onDismiss={(id) => setDismissed((was) => new Set(was).add(id))}
+                  />
+                )}
+                {(loading ? [] : colleagues).map(({ person, rows: theirs }) => (
+                  <Colleague key={person.id} id={person.id} name={person.full_name} rows={theirs} now={now} catalogue={actions} onOpen={onOpen} />
+                ))}
+                {loading || failed ? null : (
+                  <motion.div layout={still ? false : "position"}>
+                    {busy ? <DayTally day={day} /> : <DayJournal day={day} now={now} catalogue={actions} openId={openId} onOpen={onOpen} />}
+                  </motion.div>
+                )}
+              </section>
 
-            <aside className="stoika-side">
-              <ReceptionCard visits={visits.data ?? []} now={now} loading={!settled || visits.isLoading} />
-            </aside>
+              <aside className="stoika-side">
+                <ReceptionCard visits={visits.data ?? []} now={now} loading={!settled || visits.isLoading} />
+              </aside>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </ViewTransition>
       <ErrandPanel rows={rows} openId={openId} viewer="secretary" meId={meId} now={now} catalogue={actions} pointsOn={false} />
     </DeskPage>
   );

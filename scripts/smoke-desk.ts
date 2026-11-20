@@ -461,9 +461,11 @@ async function runSafari() {
     await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
     await page.getByRole("navigation", { name: "Разделы" }).getByRole("link", { name: "Команда" }).click();
     await page.waitForURL((url) => url.pathname === "/desk/team", { timeout: 15_000 }).catch(() => undefined);
-    await page.getByTestId("desk-row").first().waitFor({ timeout: 15_000 }).catch(() => undefined);
-    const rows = await page.getByTestId("desk-row").count();
-    record("WebKit: «Команда» рисуется", rows > 0, `строк ${rows}`);
+    // the grid of tiles is «Команда»'s default since D-172, the table is «Список»
+    const people = page.locator('[data-testid="desk-team-tile"], [data-testid="desk-row"]');
+    await people.first().waitFor({ timeout: 15_000 }).catch(() => undefined);
+    const rows = await people.count();
+    record("WebKit: «Команда» рисуется", rows > 0, `плиток и строк ${rows}`);
     await page.screenshot({ path: join(OUT, "safari-team.png") });
     shots.push(join(OUT, "safari-team.png"));
     await context.close();

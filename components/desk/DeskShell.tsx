@@ -1,8 +1,9 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, ViewTransition, type ReactNode } from "react";
 
+import { DeskAddress } from "@/components/desk/DeskAddress";
 import { DeskScope } from "@/components/desk/DeskScope";
 import { QuickNote } from "@/components/desk/QuickNote";
 import { DeskLinks } from "@/components/desk/ui/DeskLinks";
@@ -24,6 +25,7 @@ import { useVisits } from "@/lib/visits/queries";
 import { useDeskLook, useDeskTheme } from "@/lib/desk/theme";
 import { LIST_MIN, NAV_ICONS, NAV_WIDE, PANEL_DEFAULT, PANEL_MIN, readNavFolded, readPanelWidth, subscribeFrame, writeNavCookie, writeNavFolded, writePanelWidth } from "@/lib/desk/frame";
 import { isCommandKey, focusCommandLine, isPlainKey, isTypingTarget } from "@/lib/desk/keys";
+import { screenMove, type ScreenMove } from "@/lib/desk/motion";
 import { chordHref, DESK_NAV, DESK_PROFILE_KEY, deskAllows, deskHomeFor, type DeskRole } from "@/lib/desk/routes";
 import { homeForRole } from "@/lib/routes";
 import type { Me } from "@/lib/tasks/queries";
@@ -65,30 +67,37 @@ function useDeskSurface() {
 }
 
 /**
- * The move between sections (D-171): the new screen rises a few pixels and comes up out of
- * nothing — on the compositor, never holding a click (the screen is there and live from its first
- * frame). «Журнал» and «уменьшить движение» change the screen in one frame, as before.
+ * The screen's move for the render that changes the address (D-184, lib/desk/motion.ts): the
+ * class the screen's <ViewTransition> plays once — `played` (its onUpdate) puts `none` back as the
+ * move starts, so a later change that stays on the screen (`?p=`, a filter, a part coming out of
+ * Suspense) does not replay it. Kept as state, not a ref: a render React throws away takes its move
+ * with it. The reset changes no DOM, so it starts nothing.
  */
-function useScreenArrival(main: RefObject<HTMLElement | null>, pathname: string) {
-  const first = useRef(true);
+function useScreenMove(pathname: string, role: DeskRole): [ScreenMove, () => void] {
+  const [seen, setSeen] = useState<{ path: string; move: ScreenMove }>({ path: pathname, move: "none" });
+  let now = seen;
+  if (seen.path !== pathname) {
+    now = { path: pathname, move: screenMove(seen.path, pathname, DESK_NAV[role].map((item) => item.href)) };
+    setSeen(now);
+  }
+  const played = () => setSeen((was) => (was.move === "none" ? was : { path: was.path, move: "none" }));
+  // and a frame after the commit in any case: a move that never played (skipped, cut by a quick hand,
+  // a browser without View Transitions) must not wait for the next change on the screen to play there
+  const { move } = now;
   useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
-    const screen = main.current?.firstElementChild;
-    if (!(screen instanceof HTMLElement)) return;
-    if (!document.documentElement.hasAttribute("data-graphite")) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    screen.animate(
-      [
-        { opacity: 0, transform: "translateY(10px) scale(0.995)" },
-        { opacity: 1, transform: "none" },
-      ],
-      { duration: 280, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
-    );
-  }, [main, pathname]);
+    if (move === "none") return;
+    const frame = requestAnimationFrame(() => setSeen((was) => (was.move === "none" ? was : { path: was.path, move: "none" })));
+    return () => cancelAnimationFrame(frame);
+  }, [move]);
+  return [move, played];
 }
+
+/**
+ * A switch inside the screen (a view, a tab, `writeDeskAddress(…, { type: "desk-switch" })`): the
+ * screen takes part as a still frame, so the pictures of what changed are cut by its box — a list
+ * scrolled under the top bar does not spill over it while it fades (app/desk/transitions.css).
+ */
+const HOLD_FOR_SWITCH = { "desk-switch": "desk-frame", default: "none" };
 
 /** How long «G» waits for the section's letter; once its card of letters is up, longer — it is being read. */
 const CHORD_MS = 1200;
@@ -436,7 +445,7 @@ export function DeskShell({ me, role, brand, navFolded = false, children }: { me
   const [chord, setChord] = useState(false);
   const grid = useRef<HTMLDivElement>(null);
   const main = useRef<HTMLElement>(null);
-  useScreenArrival(main, pathname);
+  const [move, played] = useScreenMove(pathname, role);
   const navWidth = folded ? NAV_ICONS : NAV_WIDE;
   const toggleNav = () => writeNavFolded(!folded);
   useDeskSurface();
@@ -484,44 +493,57 @@ export function DeskShell({ me, role, brand, navFolded = false, children }: { me
   };
 
   return (
-    <DeskPanelProvider value={panel.api}>
-      <DeskScope me={me} role={role} pointsEnabled={brand.pointsEnabled}>
-        <div ref={grid} data-desk="" data-nav={folded ? "icons" : "wide"} className="grid h-dvh overflow-hidden bg-bg" style={{ gridTemplateColumns: columns(panelWidth) }}>
-          <SideNav role={role} brand={brand} folded={folded} onToggle={toggleNav} />
-          <div className="flex min-h-0 min-w-0 flex-col">
-            <TopBar fullName={me.fullName} role={role} folded={folded} onToggleNav={toggleNav} />
-            {/* the work area: the screen, and for a secretary the alarm over it or its strip above it (D-175) */}
-            <div className="relative flex min-h-0 flex-1 flex-col" data-desk-work="">
-              <DeskAlarmGate meId={me.userId} role={role} main={main} />
-              {/* `isolate`: the screen's light (DeskLight) sits under the content, inside the screen */}
-              <main ref={main} id="desk-main" className="relative isolate min-h-0 flex-1 overflow-y-auto">
-                {allowed ? <DeskLinks className="contents">{children}</DeskLinks> : null}
-              </main>
+    // the desk's own address (D-184): a screen's `?…` changes in a transition, so it can move
+    <DeskAddress>
+      <DeskPanelProvider value={panel.api}>
+        <DeskScope me={me} role={role} pointsEnabled={brand.pointsEnabled}>
+          <div ref={grid} data-desk="" data-nav={folded ? "icons" : "wide"} className="grid h-dvh overflow-hidden bg-bg" style={{ gridTemplateColumns: columns(panelWidth) }}>
+            <SideNav role={role} brand={brand} folded={folded} onToggle={toggleNav} />
+            <div className="flex min-h-0 min-w-0 flex-col">
+              <TopBar fullName={me.fullName} role={role} folded={folded} onToggleNav={toggleNav} />
+              {/* the work area: the screen, and for a secretary the alarm over it or its strip above it (D-175) */}
+              <div className="relative flex min-h-0 flex-1 flex-col" data-desk-work="">
+                <DeskAlarmGate meId={me.userId} role={role} main={main} />
+                {/* `isolate`: the screen's light (DeskLight) sits under the content, inside the screen.
+                    The screen moves as one picture of its own box when the address leaves it (D-184):
+                    the navigation and the top bar stay live, the scroll offset does not travel. A
+                    switch inside it («desk-switch») keeps the box still and holds the parts that move
+                    inside it, cut by its edges. */}
+                <ViewTransition name="desk-screen" update={move === "none" ? HOLD_FOR_SWITCH : move} default="none" onUpdate={played}>
+                  <main ref={main} id="desk-main" className="relative isolate min-h-0 flex-1 overflow-y-auto">
+                    {allowed ? <DeskLinks className="contents">{children}</DeskLinks> : null}
+                  </main>
+                </ViewTransition>
+              </div>
             </div>
-          </div>
-          {panel.api.isOpen ? (
+            {/* the right-hand panel comes in from the right edge and leaves there (D-184): the boundary
+                sits on the column itself, inside a wrapper that stays, so React sees the column come */}
             <DeskLinks className="contents">
-              <DeskPanelColumn node={panel.node} onClose={panel.close} setHost={panel.setHost} width={panelWidth} onResize={resizePanel} />
+              {panel.api.isOpen ? (
+                <ViewTransition enter="desk-panel-in" exit="desk-panel-out" default="none">
+                  <DeskPanelColumn node={panel.node} onClose={panel.close} attachHost={panel.attachHost} width={panelWidth} onResize={resizePanel} />
+                </ViewTransition>
+              ) : null}
             </DeskLinks>
+          </div>
+          {narrow ? <NarrowHint role={role} /> : null}
+          {chord ? <ChordHint role={role} left={navWidth + 12} /> : null}
+          <DeskSignals role={role} meId={me.userId} />
+          {/* a meeting of this person rings a quarter of an hour before it (D-180) */}
+          <MeetingRing meId={me.userId} />
+          {role === "director" ? (
+            <>
+              {/* a thought kept on this computer without network lands once it is back, from any section (D-95, D-177) */}
+              <NotesReplay />
+              {/* Alt+N — a thought into «Заметки» from any section, verbatim (D-177) */}
+              <QuickNote me={me} />
+              <DeskReminders meId={me.userId} />
+            </>
           ) : null}
-        </div>
-        {narrow ? <NarrowHint role={role} /> : null}
-        {chord ? <ChordHint role={role} left={navWidth + 12} /> : null}
-        <DeskSignals role={role} meId={me.userId} />
-        {/* a meeting of this person rings a quarter of an hour before it (D-180) */}
-        <MeetingRing meId={me.userId} />
-        {role === "director" ? (
-          <>
-            {/* a thought kept on this computer without network lands once it is back, from any section (D-95, D-177) */}
-            <NotesReplay />
-            {/* Alt+N — a thought into «Заметки» from any section, verbatim (D-177) */}
-            <QuickNote me={me} />
-            <DeskReminders meId={me.userId} />
-          </>
-        ) : null}
-        {/* «?» — every key of the screen and of the desk (D-154 wave 3) */}
-        <ShortcutsHelp />
-      </DeskScope>
-    </DeskPanelProvider>
+          {/* «?» — every key of the screen and of the desk (D-154 wave 3) */}
+          <ShortcutsHelp />
+        </DeskScope>
+      </DeskPanelProvider>
+    </DeskAddress>
   );
 }

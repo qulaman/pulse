@@ -1,7 +1,7 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
 
+import { useDeskParams } from "@/components/desk/DeskAddress";
 import { SettingsPanels } from "@/components/desk/settings/SettingsPanels";
 import { parseSettingsTab } from "@/lib/settings-tabs";
 
@@ -10,6 +10,6 @@ import { parseSettingsTab } from "@/lib/settings-tabs";
  * «ИИ-модель»; `?tab=` opens one. The director and the secretary (D-104).
  */
 export default function DeskSettingsPage() {
-  const params = useSearchParams();
+  const params = useDeskParams();
   return <SettingsPanels tab={parseSettingsTab(params.get("tab") ?? undefined)} />;
 }

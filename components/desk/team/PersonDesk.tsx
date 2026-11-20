@@ -2,9 +2,10 @@
 
 import { ArrowRight, Bell, BellOff, CalendarOff, ClipboardCheck, Phone } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, ViewTransition, type ReactNode } from "react";
 
+import { useDeskParams, writeDeskAddress } from "@/components/desk/DeskAddress";
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
@@ -20,6 +21,7 @@ import { useMinute } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
+import { SWITCH_SWAP } from "@/lib/desk/motion";
 import { humanAqtobe } from "@/lib/ai/time";
 import { timeOf } from "@/lib/daily-report/format";
 import { useTeamDailyReportDay } from "@/lib/daily-report/queries";
@@ -58,7 +60,7 @@ import { PersonEditor } from "./PersonEditor";
 import { PersonStats } from "./PersonStats";
 import { RemoveDialog, type RemoveMode } from "./RemoveDialog";
 import { addressOf, AVAILABILITY_TONE, GridBone, LoadFailed, loadWords, roleLine, StateWord, tidy } from "./shared";
-import { TileFace, tileState } from "./TeamGrid";
+import { Morph, TileFace, tileState } from "./TeamGrid";
 
 const OPEN: TaskStatus[] = ["scheduled", "sent", "accepted", "in_progress", "rework"];
 const CLOSED: TaskStatus[] = ["done", "declined", "revoked"];
@@ -137,13 +139,18 @@ function PersonHero({
   return (
     <section className="person-hero" data-testid="desk-person-identity" data-gone={person.is_active ? undefined : ""}>
       <div className="person-hero-top">
+        {/* the circle and the name came from the tile or the card in «Команда» (D-184) */}
         <span className="person-hero-face">
-          {director && works ? <LoadedFace person={person} size={88} /> : <TileFace person={person} size={88} state={tileState(person, undefined, false)} />}
+          <Morph part="face" id={person.id}>
+            {director && works ? <LoadedFace person={person} size={88} /> : <TileFace person={person} size={88} state={tileState(person, undefined, false)} />}
+          </Morph>
         </span>
         <div className="person-hero-who">
-          <h1 className="person-hero-name" title={person.full_name}>
-            {person.full_name}
-          </h1>
+          <Morph part="name" id={person.id}>
+            <h1 className="person-hero-name" title={person.full_name}>
+              {person.full_name}
+            </h1>
+          </Morph>
           <p className="person-hero-line">{line}</p>
           <p className="person-hero-chips">
             {away ? (
@@ -529,7 +536,7 @@ export function PersonDesk({ id }: { id: string }) {
   const now = useMinute();
   const router = useRouter();
   const pathname = usePathname();
-  const params = useSearchParams();
+  const params = useDeskParams();
   const editing = params.get("edit") === "1";
   const focusLogin = params.get("login") === "1";
   // a person just created here: their code (or first password) comes with them, once
@@ -537,7 +544,8 @@ export function PersonDesk({ id }: { id: string }) {
   useEffect(() => dropHandover(id), [id]);
   const [removing, setRemoving] = useState<RemoveMode | null>(null);
 
-  const setEditing = (on: boolean) => router.replace(on ? `${pathname}?edit=1` : pathname, { scroll: false });
+  // the card turns into its editor and back in place, no trip to the server (D-184)
+  const setEditing = (on: boolean) => writeDeskAddress(on ? `${pathname}?edit=1` : pathname, { type: "desk-switch" });
 
   // the roster carries the same row: one of the two answering is enough to know the person
   const p = person.data ?? people.data?.find((row) => row.id === id);
@@ -602,7 +610,9 @@ export function PersonDesk({ id }: { id: string }) {
       </DeskPage>
     );
   }
-  if (person.isLoading || people.isLoading || !me.data) return <PersonBone />;
+  // the roster's row is enough to draw the card at once — from «Команда» the person is always in
+  // it, so the page lands with its circle in the first frame (D-184) instead of a bone, then a card
+  if (!me.data || (!p && (person.isLoading || people.isLoading))) return <PersonBone />;
   if (!p || !editor) {
     return (
       <DeskPage>
@@ -628,7 +638,7 @@ export function PersonDesk({ id }: { id: string }) {
   const more: MenuItem[] = [];
   if (director && works) more.push({ key: "tasks", label: "Задачи человека", onSelect: () => router.push(`/desk/tasks?who=${p.id}`) });
   if (director && works) more.push({ key: "reports", label: "Отчёт за сегодня", onSelect: () => router.push(`/desk/reports?day=${todayYmd()}&p=${p.id}`) });
-  if (manageLogin && p.is_active) more.push({ key: "login", label: "Выдать код входа…", onSelect: () => router.replace(`${pathname}?login=1`, { scroll: false }) });
+  if (manageLogin && p.is_active) more.push({ key: "login", label: "Выдать код входа…", onSelect: () => writeDeskAddress(`${pathname}?login=1`) });
   const kiosk = p.role === "tv";
   const revive = () =>
     setWorking.mutate(
@@ -698,7 +708,9 @@ export function PersonDesk({ id }: { id: string }) {
   return (
     <DeskPage>
       <nav aria-label="Путь" className="person-crumbs">
-        <Link href={`/desk/team?p=${p.id}`} data-testid="desk-person-back">
+        {/* in full, ahead (D-184): back lands on the card in one go, not on the screen's bone, so the
+            circle and the name fly home */}
+        <Link href={`/desk/team?p=${p.id}`} prefetch data-testid="desk-person-back">
           Команда
         </Link>
         <span aria-hidden>›</span>
@@ -712,49 +724,51 @@ export function PersonDesk({ id }: { id: string }) {
       <div className="@container">
         <div className="person-columns grid items-start gap-x-8 gap-y-7 @min-[920px]:grid-cols-[minmax(0,1fr)_minmax(340px,420px)]" data-testid="desk-person">
           <div className="flex min-w-0 flex-col gap-7">
-            <CardSection
-              id="person-card"
-              title="Карточка"
-              testId="desk-person-card"
-              end={editing ? <span className="person-editing-tag">правка</span> : null}
-            >
-              {!mayEdit ? (
-                <>
-                  <CardFacts person={p} phone={phone} people={roster} />
-                  <p className="person-note">Карточку директора меняет только директор</p>
-                </>
-              ) : editing && phones.isPending ? null : editing ? (
-                <PersonEditor
-                  key={p.id}
-                  mode="edit"
-                  draftKey={p.id}
-                  photoUrl={p.avatar_url}
-                  initial={deskDraftOf(p, phone)}
-                  roles={assignableRoles(editor.role, p.role)}
-                  lockedRole={
-                    access
-                      ? undefined
-                      : editor.id === p.id
-                        ? "Свою роль и доступ здесь не меняют — иначе можно закрыть себе вход в настройки"
-                        : "Роль директора меняет только директор"
-                  }
-                  managers={roster.filter((m) => m.id !== id && m.is_active && (m.role === "manager" || m.role === "director"))}
-                  roster={roster.filter((m) => m.id !== id && m.is_active && m.role !== "tv")}
-                  pending={update.isPending || savePhoto.isPending || savePhone.isPending}
-                  onSubmit={async (draft, photo, { leaving }) => {
-                    // the photo first: it is what fails, and then nothing else has been written
-                    await savePhoto.mutateAsync({ id, companyId: me.data.companyId, photo });
-                    await update.mutateAsync({ id, patch: deskPatchOf(draft, access) });
-                    const typed = cleanPhone(draft.phone);
-                    if (typed !== phone) await savePhone.mutateAsync({ id, companyId: me.data.companyId, phone: typed });
-                    if (!leaving) setEditing(false);
-                  }}
-                  onCancel={() => setEditing(false)}
-                />
-              ) : (
-                <CardFacts person={p} phone={phone} people={roster} onEdit={() => setEditing(true)} />
-              )}
-            </CardSection>
+            <ViewTransition update={SWITCH_SWAP} default="none">
+              <CardSection
+                id="person-card"
+                title="Карточка"
+                testId="desk-person-card"
+                end={editing ? <span className="person-editing-tag">правка</span> : null}
+              >
+                {!mayEdit ? (
+                  <>
+                    <CardFacts person={p} phone={phone} people={roster} />
+                    <p className="person-note">Карточку директора меняет только директор</p>
+                  </>
+                ) : editing && phones.isPending ? null : editing ? (
+                  <PersonEditor
+                    key={p.id}
+                    mode="edit"
+                    draftKey={p.id}
+                    photoUrl={p.avatar_url}
+                    initial={deskDraftOf(p, phone)}
+                    roles={assignableRoles(editor.role, p.role)}
+                    lockedRole={
+                      access
+                        ? undefined
+                        : editor.id === p.id
+                          ? "Свою роль и доступ здесь не меняют — иначе можно закрыть себе вход в настройки"
+                          : "Роль директора меняет только директор"
+                    }
+                    managers={roster.filter((m) => m.id !== id && m.is_active && (m.role === "manager" || m.role === "director"))}
+                    roster={roster.filter((m) => m.id !== id && m.is_active && m.role !== "tv")}
+                    pending={update.isPending || savePhoto.isPending || savePhone.isPending}
+                    onSubmit={async (draft, photo, { leaving }) => {
+                      // the photo first: it is what fails, and then nothing else has been written
+                      await savePhoto.mutateAsync({ id, companyId: me.data.companyId, photo });
+                      await update.mutateAsync({ id, patch: deskPatchOf(draft, access) });
+                      const typed = cleanPhone(draft.phone);
+                      if (typed !== phone) await savePhone.mutateAsync({ id, companyId: me.data.companyId, phone: typed });
+                      if (!leaving) setEditing(false);
+                    }}
+                    onCancel={() => setEditing(false)}
+                  />
+                ) : (
+                  <CardFacts person={p} phone={phone} people={roster} onEdit={() => setEditing(true)} />
+                )}
+              </CardSection>
+            </ViewTransition>
 
             {/* a person who left still has their last 30 days */}
             {director && crew ? (

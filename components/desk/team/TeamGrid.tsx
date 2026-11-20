@@ -1,7 +1,7 @@
 "use client";
 
 import { ClipboardCheck, ClipboardX, Sparkles, ListChecks, BellOff } from "lucide-react";
-import { useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, ViewTransition, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 
 import type { Group } from "@/components/desk/ui/DataGrid";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
@@ -66,6 +66,22 @@ export function TileFace({ person, size, state }: { person: Pick<Person, "id" | 
 }
 
 /**
+ * One person's circle or name in several places at once in the eye (D-184): the tile, the card
+ * under the row and the person's page carry the same name, so a move between them flies the one
+ * thing across instead of hiding one and showing the other. A name may stand on one element at a
+ * time — two at once and the browser drops the whole transition — so the tile gives its circle up
+ * while its card is open (`off`). The `key` makes that a remount, and a remount is what pairs: the
+ * circle drops from the tile into the card and goes back up when the card closes.
+ */
+export function Morph({ part, id, off = false, children }: { part: "face" | "name"; id: string; off?: boolean; children: ReactNode }) {
+  return (
+    <ViewTransition key={off ? "off" : "on"} name={off ? undefined : `desk-${part}-${id}`} share={part === "name" ? "desk-morph-text" : "desk-morph"} default="none">
+      {children}
+    </ViewTransition>
+  );
+}
+
+/**
  * One person as a tile of the grid (D-172): the circle with its ring in the colour of their state,
  * the name and the position, and — for the director — three small facts under them: the open work,
  * today's report, the points. A click opens the card under the row, a double click the full card.
@@ -112,7 +128,9 @@ function PersonTile({
       className="team-tile"
     >
       <span className="team-tile-face">
-        <TileFace person={person} size={60} state={state} />
+        <Morph part="face" id={person.id} off={open}>
+          <TileFace person={person} size={60} state={state} />
+        </Morph>
         {open ? <span aria-hidden className="team-tile-pulse" /> : null}
         {director && crew && overdue > 0 ? (
           <span className="team-tile-badge" data-tone="danger" aria-hidden>
@@ -181,13 +199,24 @@ export function TilesBone({ count = 10 }: { count?: number }) {
   );
 }
 
+/**
+ * The count last measured. A grid drawn again — back from a person's page with their card open —
+ * starts from it, so the card stands under the right row in the first frame. Measured only after
+ * the frame, it would hop rows a moment later, in the middle of the flight of the person's circle,
+ * and the browser drops a transition whose flying part is taken out of the page (D-184).
+ */
+let knownColumns = 0;
+
 /** How many tiles stand in a row of this grid now: the card goes after the last of the chosen one's row. */
 function useColumns(): [(node: HTMLDivElement | null) => void, number, HTMLDivElement | null] {
   const [node, setNode] = useState<HTMLDivElement | null>(null);
-  const [columns, setColumns] = useState(0);
+  const [columns, setColumns] = useState(knownColumns);
   useLayoutEffect(() => {
     if (!node) return;
-    const measure = () => setColumns(getComputedStyle(node).gridTemplateColumns.split(" ").filter(Boolean).length);
+    const measure = () => {
+      knownColumns = getComputedStyle(node).gridTemplateColumns.split(" ").filter(Boolean).length;
+      setColumns(knownColumns);
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(node);
@@ -252,18 +281,35 @@ function Section({
       ) : null}
       <div ref={ref} className="team-grid" role="list" aria-label={typeof group.title === "string" ? group.title : "Команда"}>
         {group.rows.map((person, index) => (
-          <FragmentWithCard key={person.id} after={index === rowEnd ? <div ref={sheet} className="team-card-slot" data-testid="team-card-slot">{card}</div> : null}>
+          <FragmentWithCard
+            key={person.id}
+            after={
+              index === rowEnd ? (
+                // the card comes and goes as one (D-184); another person's — in place or under another
+                // row: theirs comes as this one goes. The boundary stands right on the slot: inside a
+                // freshly placed element React does not look for an entering one.
+                <ViewTransition key={openId ?? "card"} enter="desk-card-in" exit="desk-card-out" default="none">
+                  <div ref={sheet} className="team-card-slot" data-testid="team-card-slot">
+                    {card}
+                  </div>
+                </ViewTransition>
+              ) : null
+            }
+          >
             <div role="listitem" className="contents">
-              <PersonTile
-                person={person}
-                director={director}
-                crew={crew(person)}
-                facts={factsOf(person)}
-                chosen={chosenId === person.id}
-                open={openId === person.id}
-                onClick={() => onOpen(person.id)}
-                onDouble={() => onCard(person.id)}
-              />
+              {/* a tile the card under its row pushes down glides there (D-184), it does not jump */}
+              <ViewTransition update="desk-move" default="none">
+                <PersonTile
+                  person={person}
+                  director={director}
+                  crew={crew(person)}
+                  facts={factsOf(person)}
+                  chosen={chosenId === person.id}
+                  open={openId === person.id}
+                  onClick={() => onOpen(person.id)}
+                  onDouble={() => onCard(person.id)}
+                />
+              </ViewTransition>
             </div>
           </FragmentWithCard>
         ))}

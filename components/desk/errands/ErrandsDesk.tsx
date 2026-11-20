@@ -1,7 +1,7 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
 
+import { useDeskParams } from "@/components/desk/DeskAddress";
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { useNamesKey } from "@/lib/people/names";
 import { useMe } from "@/lib/tasks/queries";
@@ -16,10 +16,10 @@ export function ErrandsDesk() {
   useNamesKey();
   const { role } = useDeskScope();
   const me = useMe();
-  const params = useSearchParams();
+  const params = useDeskParams();
   const openId = params.get("e");
   // the panel leaves the rest of the address alone: the range and the view stay
-  const onOpen = (id: string) => writeParams({ e: id });
+  const onOpen = (id: string) => writeParams({ e: id }, { type: "desk-pick" });
   const meId = me.data?.userId ?? "";
   return role === "secretary" ? (
     <SecretaryErrands meId={meId} openId={openId} onOpen={onOpen} history={params.get("view") === "history"} />

@@ -1,10 +1,11 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { CalendarRange, ChevronLeft, ChevronRight, Diamond, MonitorUp, Plus } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, ViewTransition, type ReactNode } from "react";
 
+import { useDeskParams, writeDeskAddress } from "@/components/desk/DeskAddress";
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { useScreenKeys } from "@/components/desk/team/keys";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
@@ -18,6 +19,7 @@ import type { Tone } from "@/components/desk/ui/tone";
 import { Button } from "@/components/ui/Button";
 import { Bone } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
+import { PICK_SWAP, SWITCH_IN, SWITCH_OUT } from "@/lib/desk/motion";
 import { noticeOfEdit, ymdOfEvent } from "@/lib/calendar/agenda";
 import { canMove, MOVE_HOLD_MS, moveDraft } from "@/lib/calendar/move";
 import { DESK_WORDS, useEditEvent } from "@/lib/calendar/mutations";
@@ -104,7 +106,7 @@ export function DeskCalendar() {
   // the company's working days live with the daily report (D-155 §7): one list for the whole product
   const workdays = settings.data?.daily_report.workdays ?? WORKDAYS;
 
-  const params = useSearchParams();
+  const params = useDeskParams();
   const pathname = usePathname();
   const view: CalendarView = params.get("view") === "month" ? "month" : "week";
   const asked = params.get("d");
@@ -114,9 +116,14 @@ export function DeskCalendar() {
   const showDeadlines = isDirector && params.get("deadlines") === "1";
   const openId = params.get("e");
 
-  /** The address holds what is on screen: steps replace it, a change of view is a step back can undo. */
+  /**
+   * The address holds what is on screen: steps replace it, a change of view is a step back can undo.
+   * Through the desk's address (D-184): the week and the month swap as two pictures, the side
+   * changes in place for a meeting or a day; a step of weeks changes at once.
+   */
   const go = (next: { d?: Ymd; view?: CalendarView; deadlines?: boolean; day?: Ymd | null; e?: string | null }, push = false) => {
-    const query = new URLSearchParams(params.toString());
+    // from the address as it is now, not as drawn: a step may still wait for its transition
+    const query = new URLSearchParams(window.location.search);
     const set = (name: string, value: string | null) => (value === null ? query.delete(name) : query.set(name, value));
     if (next.d !== undefined) set("d", next.d === today ? null : next.d);
     if (next.view !== undefined) set("view", next.view === "week" ? null : next.view);
@@ -125,8 +132,9 @@ export function DeskCalendar() {
     if (next.e !== undefined) set("e", next.e);
     const text = query.toString();
     const url = text ? `${pathname}?${text}` : pathname;
-    if (push) window.history.pushState(null, "", url);
-    else window.history.replaceState(null, "", url);
+    const switched = next.view !== undefined && next.view !== view;
+    const picked = !switched && next.d === undefined && (next.e !== undefined || next.day !== undefined);
+    writeDeskAddress(url, { push, type: switched ? "desk-switch" : picked ? "desk-pick" : undefined });
   };
 
   // seven to forty-two day strings: cheaper to draw again than to remember
@@ -496,28 +504,34 @@ export function DeskCalendar() {
       {/* the grid and, beside it, the day or the open meeting; the shell's own panel takes the side's place */}
       <div className="cal-layout grid items-start gap-6">
         <div ref={stage} className="min-w-0">
-          {grid}
+          {/* the week and the month swap as two pictures (D-184) */}
+          <ViewTransition key={view} enter={SWITCH_IN} exit={SWITCH_OUT} default="none">
+            {grid}
+          </ViewTransition>
         </div>
-        <div className="cal-side-slot min-w-0">
-          {isSecretary && !openId ? (
-            <WindowsSide now={now} busy={busyState} mine={ahead} meId={meId} onOpen={open} />
-          ) : (
-            <CalendarSide
-              day={sideDay}
-              upcoming={sideEvents}
-              status={sideStatus}
-              onRetry={() => void upcoming.refetch()}
-              now={now}
-              meId={meId}
-              isDirector={isDirector}
-              deadlines={showDeadlines ? (marks.get(sideDay) ?? []) : null}
-              open={sideOpen}
-              onOpen={open}
-              onClose={close}
-              onEdit={editOpen}
-            />
-          )}
-        </div>
+        {/* the day or the open meeting: the side stays, what is on it changes in place */}
+        <ViewTransition update={PICK_SWAP} default="none">
+          <div className="cal-side-slot min-w-0">
+            {isSecretary && !openId ? (
+              <WindowsSide now={now} busy={busyState} mine={ahead} meId={meId} onOpen={open} />
+            ) : (
+              <CalendarSide
+                day={sideDay}
+                upcoming={sideEvents}
+                status={sideStatus}
+                onRetry={() => void upcoming.refetch()}
+                now={now}
+                meId={meId}
+                isDirector={isDirector}
+                deadlines={showDeadlines ? (marks.get(sideDay) ?? []) : null}
+                open={sideOpen}
+                onOpen={open}
+                onClose={close}
+                onEdit={editOpen}
+              />
+            )}
+          </div>
+        </ViewTransition>
       </div>
 
       {isDirector ? (

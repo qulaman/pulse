@@ -1,9 +1,9 @@
 "use client";
 
 import { Heart } from "lucide-react";
-import { useSearchParams } from "next/navigation";
 import { useMemo, useRef, useState, type ReactNode } from "react";
 
+import { useDeskParams } from "@/components/desk/DeskAddress";
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
@@ -109,7 +109,7 @@ export function ErrandHistory({
   aside?: ReactNode;
 }) {
   const director = viewer === "director";
-  const params = useSearchParams();
+  const params = useDeskParams();
   const rangeFrom = params.get("from");
   const rangeTo = params.get("to");
   const range = useMemo(() => parseRange(rangeFrom, rangeTo), [rangeFrom, rangeTo]);

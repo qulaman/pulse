@@ -70,7 +70,7 @@ function Thanked({ errand, now }: { errand: Errand; now: Date }) {
 
 function HistoryLink() {
   return (
-    <button type="button" onClick={() => writeParams({ view: "history" })} className="stoika-link desk-focus" data-testid="desk-errands-all">
+    <button type="button" onClick={() => writeParams({ view: "history" }, { type: "desk-switch" })} className="stoika-link desk-focus" data-testid="desk-errands-all">
       История
       <ArrowRight size={14} strokeWidth={2.25} aria-hidden />
     </button>

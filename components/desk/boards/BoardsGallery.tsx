@@ -1,9 +1,10 @@
 "use client";
 
 import { Lock, Plus, Presentation } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, ViewTransition, type CSSProperties } from "react";
 
+import { useDeskParams, writeDeskAddress } from "@/components/desk/DeskAddress";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { keysTaken } from "@/components/desk/ui/layers";
@@ -15,6 +16,7 @@ import { useMinute } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
+import { SWITCH_IN, SWITCH_OUT } from "@/lib/desk/motion";
 import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
 import { binCards } from "@/lib/mindboard/branch";
 import { BOARD_TRASH_DAYS, boardExpiresAt, defaultTitle, splitBoards, summariesOf, type BoardSummary } from "@/lib/mindboard/list";
@@ -77,7 +79,7 @@ function rowsByBoard(rows: readonly Note[]): Map<string, Note[]> {
 export function BoardsGallery() {
   const router = useRouter();
   const pathname = usePathname();
-  const params = useSearchParams();
+  const params = useDeskParams();
   const tab = tabOf(params.get("tab"));
   const me = useMe();
   const userId = me.data?.userId;
@@ -148,13 +150,14 @@ export function BoardsGallery() {
 
   const setTab = useCallback(
     (next: BoardsTab) => {
-      const query = new URLSearchParams(params.toString());
+      const query = new URLSearchParams(window.location.search);
       if (next === "live") query.delete("tab");
       else query.set("tab", next);
       const tail = query.toString();
-      router.replace(tail ? `${pathname}?${tail}` : pathname, { scroll: false });
+      // the desk's own address, no trip to the server; the boards swap as two pictures (D-184)
+      writeDeskAddress(tail ? `${pathname}?${tail}` : pathname, { type: "desk-switch" });
     },
-    [params, pathname, router],
+    [pathname],
   );
 
   const open = useCallback((id: string) => router.push(`/desk/boards/${id}`), [router]);
@@ -249,61 +252,63 @@ export function BoardsGallery() {
         </div>
       </div>
 
-      {loading ? (
-        <GalleryBones />
-      ) : tab === "trash" ? (
-        <BoardsBin
-          boards={shown.trashBoards}
-          points={shown.trashPoints}
-          total={{ boards: piles.trash, points: trashPoints }}
-          summaries={summaries}
-          titleOf={titleOf}
-          now={now}
-          onRestoreBoard={(board) => {
-            restoreBoard.mutate({ id: board.id });
-            toast("Вернул доску", { action: { label: "Открыть", onClick: () => open(board.id) } });
-          }}
-          onRestorePoint={(note) => {
-            restoreNote.mutate({ id: note.id });
-            toast("Вернул на доску", { action: { label: "Открыть", onClick: () => note.board_id && open(note.board_id) } });
-          }}
-          onPurge={setPurging}
-        />
-      ) : (
-        <>
-          {heroShown ? <WallHero board={heroShown} rows={byBoard.get(heroShown.id) ?? EMPTY} summary={summaries.get(heroShown.id)} now={now} onOpen={() => open(heroShown.id)} onLead={() => lead(heroShown.id)} /> : null}
-          {tab === "live" && heroShown ? (
-            <p className="desk-label boards-group-label -mb-2 mt-1" data-testid="boards-ready">
-              Готовятся <span className="nums text-muted">{shown.live.length}</span>
-            </p>
-          ) : null}
-          <div className="boards-grid" data-testid="boards-grid" data-tab={tab}>
-            {tab === "live" && !needle ? (
-              <button type="button" className="boards-new" onClick={newBoard} data-testid="boards-new">
-                <span className="boards-new-plate">
-                  <Plus aria-hidden size={20} strokeWidth={2} />
-                  <span className="text-[14px] font-semibold leading-5 text-text">Новая доска</span>
-                  <span className="flex items-center gap-1.5 text-[12px] leading-4 text-muted">
-                    <Kbd>N</Kbd> пункты к встрече
-                  </span>
-                </span>
-              </button>
+      <ViewTransition key={tab} enter={SWITCH_IN} exit={SWITCH_OUT} default="none">
+        {loading ? (
+          <GalleryBones />
+        ) : tab === "trash" ? (
+          <BoardsBin
+            boards={shown.trashBoards}
+            points={shown.trashPoints}
+            total={{ boards: piles.trash, points: trashPoints }}
+            summaries={summaries}
+            titleOf={titleOf}
+            now={now}
+            onRestoreBoard={(board) => {
+              restoreBoard.mutate({ id: board.id });
+              toast("Вернул доску", { action: { label: "Открыть", onClick: () => open(board.id) } });
+            }}
+            onRestorePoint={(note) => {
+              restoreNote.mutate({ id: note.id });
+              toast("Вернул на доску", { action: { label: "Открыть", onClick: () => note.board_id && open(note.board_id) } });
+            }}
+            onPurge={setPurging}
+          />
+        ) : (
+          <>
+            {heroShown ? <WallHero board={heroShown} rows={byBoard.get(heroShown.id) ?? EMPTY} summary={summaries.get(heroShown.id)} now={now} onOpen={() => open(heroShown.id)} onLead={() => lead(heroShown.id)} /> : null}
+            {tab === "live" && heroShown ? (
+              <p className="desk-label boards-group-label -mb-2 mt-1" data-testid="boards-ready">
+                Готовятся <span className="nums text-muted">{shown.live.length}</span>
+              </p>
             ) : null}
-            {(tab === "live" ? shown.live : shown.finished).map((board) => (
-              <BoardTile key={board.id} board={board} rows={byBoard.get(board.id) ?? EMPTY} summary={summaries.get(board.id)} now={now} me={me.data} onOpen={open} onBin={binBoard} />
-            ))}
-          </div>
-          {(tab === "live" ? shown.live.length + (heroShown ? 1 : 0) : shown.finished.length) === 0 ? (
-            needle ? (
-              <EmptyState title="Ничего не нашлось" hint="Ищу в названиях досок и в словах пунктов" />
-            ) : tab === "finished" ? (
-              <EmptyState title="Завершённых досок нет" hint="Доска уходит сюда, когда совещание прошло: «⋯» → «Завершить доску»" />
-            ) : (
-              <p className="text-[13px] leading-5 text-muted">Доска — пункты к совещанию: их видят на стене кабинета, а вы ведёте по ним встречу.</p>
-            )
-          ) : null}
-        </>
-      )}
+            <div className="boards-grid" data-testid="boards-grid" data-tab={tab}>
+              {tab === "live" && !needle ? (
+                <button type="button" className="boards-new" onClick={newBoard} data-testid="boards-new">
+                  <span className="boards-new-plate">
+                    <Plus aria-hidden size={20} strokeWidth={2} />
+                    <span className="text-[14px] font-semibold leading-5 text-text">Новая доска</span>
+                    <span className="flex items-center gap-1.5 text-[12px] leading-4 text-muted">
+                      <Kbd>N</Kbd> пункты к встрече
+                    </span>
+                  </span>
+                </button>
+              ) : null}
+              {(tab === "live" ? shown.live : shown.finished).map((board) => (
+                <BoardTile key={board.id} board={board} rows={byBoard.get(board.id) ?? EMPTY} summary={summaries.get(board.id)} now={now} me={me.data} onOpen={open} onBin={binBoard} />
+              ))}
+            </div>
+            {(tab === "live" ? shown.live.length + (heroShown ? 1 : 0) : shown.finished.length) === 0 ? (
+              needle ? (
+                <EmptyState title="Ничего не нашлось" hint="Ищу в названиях досок и в словах пунктов" />
+              ) : tab === "finished" ? (
+                <EmptyState title="Завершённых досок нет" hint="Доска уходит сюда, когда совещание прошло: «⋯» → «Завершить доску»" />
+              ) : (
+                <p className="text-[13px] leading-5 text-muted">Доска — пункты к совещанию: их видят на стене кабинета, а вы ведёте по ним встречу.</p>
+              )
+            ) : null}
+          </>
+        )}
+      </ViewTransition>
       <PurgeDialog purging={purging} onClose={() => setPurging(null)} onConfirm={confirmPurge} />
     </DeskPage>
   );

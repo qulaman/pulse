@@ -1,8 +1,8 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ViewTransition, type ReactNode } from "react";
 
+import { useDeskParams, writeDeskAddress } from "@/components/desk/DeskAddress";
 import { useContextMenu } from "@/components/desk/ui/Menu";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SearchField, SegmentTabs } from "@/components/desk/ui/Toolbar";
@@ -11,6 +11,7 @@ import { useDeskVoiceClaim } from "@/components/desk/voice/claim";
 import { NoteIcon } from "@/components/notes/icons";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
+import { PICK_SWAP, SWITCH_SWAP } from "@/lib/desk/motion";
 import { splitBoards, summariesOf, type BoardSummary } from "@/lib/mindboard/list";
 import { useBoards, type MindBoard } from "@/lib/mindboard/queries";
 import { useDictation, type Dictation, type Receipt } from "@/lib/notes/dictation";
@@ -123,7 +124,7 @@ export function NotesDesk({ children }: { children: ReactNode }) {
   const menu = useContextMenu();
   const search = useRef<HTMLInputElement>(null);
   const now = useNow();
-  const params = useSearchParams();
+  const params = useDeskParams();
 
   // the page's own microphone (D-177): everything said here is a thought, word for word (D-81)
   const isMine = useDeskVoiceClaim(MIC_LABEL);
@@ -184,14 +185,19 @@ export function NotesDesk({ children }: { children: ReactNode }) {
   const reminders = useMemo(() => groups.find((group) => group.key === "reminders")?.notes.length ?? 0, [groups]);
 
   // the address and the screen: a ref for the handlers that outlive a render
-  const live = useRef({ params, tab, selectedId, order, noteById, rows });
+  const live = useRef({ tab, selectedId, order, noteById, rows });
   useEffect(() => {
-    live.current = { params, tab, selectedId, order, noteById, rows };
+    live.current = { tab, selectedId, order, noteById, rows };
   });
 
-  /** One key of the address changes; `n` goes with a change of the tab. */
-  const replace = useCallback((next: { tab?: NotesTab; n?: string | null }, push = false) => {
-    const query = new URLSearchParams(live.current.params.toString());
+  /**
+   * One key of the address changes; `n` goes with a change of the tab. Through the desk's address
+   * (D-184): a tab swaps the list and the paper («desk-switch»), a note — the paper only
+   * («desk-pick»); from the keys a quick hand sees each note at once.
+   */
+  const replace = useCallback((next: { tab?: NotesTab; n?: string | null }, push = false, fromKeys = false) => {
+    // from the address as it is now, not as drawn: a pick may still wait for its transition
+    const query = new URLSearchParams(window.location.search);
     if (next.tab !== undefined) {
       if (next.tab === "notes") query.delete("tab");
       else query.set("tab", next.tab);
@@ -203,13 +209,12 @@ export function NotesDesk({ children }: { children: ReactNode }) {
     }
     const text = query.toString();
     const url = text ? `/desk/notes?${text}` : "/desk/notes";
-    if (push) window.history.pushState(null, "", url);
-    else window.history.replaceState(null, "", url);
+    writeDeskAddress(url, { push, type: next.tab !== undefined ? "desk-switch" : "desk-pick", burst: fromKeys });
   }, []);
 
   const select = useCallback(
-    (id: string | null) => {
-      replace({ n: id });
+    (id: string | null, fromKeys = false) => {
+      replace({ n: id }, false, fromKeys);
       if (id && live.current.tab === "notes") keepLast(id);
     },
     [replace],
@@ -470,47 +475,52 @@ export function NotesDesk({ children }: { children: ReactNode }) {
                 </Button>
               </div>
             ) : null}
-            <div className="nb-scroll no-bar" data-testid="desk-notes-list" data-notes-list="" data-tab={tab}>
-              {loading ? (
-                <ListBones />
-              ) : order.length === 0 ? (
-                emptyWords && !(emptyAccount && !needle) ? <p className="nb-empty">{emptyWords}</p> : null
-              ) : (
-                <NoteList
-                  groups={groups}
-                  kind={tab}
-                  selectedId={selectedId}
-                  picked={picked}
-                  now={now}
-                  query={query}
-                  stateOf={stateOf}
-                  handlers={handlers}
-                  label={tab === "converted" ? "В деле" : tab === "trash" ? "Корзина" : "Мысли"}
-                  trashActions={tab === "trash" ? { restore: actions.restore, purge: (note) => actions.purge([note]) } : undefined}
-                  convertedLine={convertedLine}
-                />
-              )}
-
-              {/* the feed holds the latest months; the rest is one click away, and the search reaches it anyway */}
-              {tab !== "trash" && hasOlder && !loading ? (
-                needle ? (
-                  <p className="nb-foot" data-testid="desk-notes-search-older">
-                    {found.isFetching ? "Ищу и в старых заметках…" : "Искал и в старых заметках"}
-                  </p>
+            <ViewTransition update={SWITCH_SWAP} default="none">
+              <div className="nb-scroll no-bar" data-testid="desk-notes-list" data-notes-list="" data-tab={tab}>
+                {loading ? (
+                  <ListBones />
+                ) : order.length === 0 ? (
+                  emptyWords && !(emptyAccount && !needle) ? <p className="nb-empty">{emptyWords}</p> : null
                 ) : (
-                  <div className="nb-foot">
-                    <Button size="sm" variant="secondary" block loading={older.isPending} onClick={() => older.mutate()} data-testid="desk-notes-older">
-                      Показать раньше
-                    </Button>
-                  </div>
-                )
-              ) : null}
-            </div>
+                  <NoteList
+                    groups={groups}
+                    kind={tab}
+                    selectedId={selectedId}
+                    picked={picked}
+                    now={now}
+                    query={query}
+                    stateOf={stateOf}
+                    handlers={handlers}
+                    label={tab === "converted" ? "В деле" : tab === "trash" ? "Корзина" : "Мысли"}
+                    trashActions={tab === "trash" ? { restore: actions.restore, purge: (note) => actions.purge([note]) } : undefined}
+                    convertedLine={convertedLine}
+                  />
+                )}
+
+                {/* the feed holds the latest months; the rest is one click away, and the search reaches it anyway */}
+                {tab !== "trash" && hasOlder && !loading ? (
+                  needle ? (
+                    <p className="nb-foot" data-testid="desk-notes-search-older">
+                      {found.isFetching ? "Ищу и в старых заметках…" : "Искал и в старых заметках"}
+                    </p>
+                  ) : (
+                    <div className="nb-foot">
+                      <Button size="sm" variant="secondary" block loading={older.isPending} onClick={() => older.mutate()} data-testid="desk-notes-older">
+                        Показать раньше
+                      </Button>
+                    </div>
+                  )
+                ) : null}
+              </div>
+            </ViewTransition>
           </section>
 
-          <section className="nb-main notes-main" aria-label="Заметка">
-            {children}
-          </section>
+          {/* the paper stays, the note on it changes (D-184) */}
+          <ViewTransition update={PICK_SWAP} default="none">
+            <section className="nb-main notes-main" aria-label="Заметка">
+              {children}
+            </section>
+          </ViewTransition>
         </div>
       </div>
 

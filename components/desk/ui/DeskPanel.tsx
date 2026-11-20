@@ -1,13 +1,14 @@
 "use client";
 
-import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, startTransition, useCallback, useContext, useId, useLayoutEffect, useMemo, useRef, useState, ViewTransition, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { clampPanel, PANEL_DEFAULT, PANEL_MAX, PANEL_MIN } from "@/lib/desk/frame";
+import { PICK_IN, PICK_OUT } from "@/lib/desk/motion";
 
-/** One thing asking for the panel: a node given to `open`, or an `InPanel` rendering into it. */
-type Claim = { key: string; onClose?: () => void; node?: ReactNode };
+/** One thing asking for the panel: a node given to `open`, or an `InPanel` rendering into it (`id` — that `InPanel`'s own). */
+type Claim = { id: string; key: string; onClose?: () => void; node?: ReactNode };
 
 export type DeskPanelApi = {
   /** Shows `node` in the right-hand panel; `key` names what is open (a task's id, an errand's). */
@@ -20,9 +21,13 @@ export type DeskPanelApi = {
 };
 
 type PanelInternals = {
+  /** Where an `InPanel` draws: one element for the shell's life, put into the column while it stands. */
   host: HTMLElement | null;
-  claim: (key: string, onClose: () => void) => void;
-  release: (key: string) => void;
+  /** The `InPanel` on top of the stack — the one drawn. */
+  topId: string | null;
+  claim: (id: string, key: string, onClose: () => void) => void;
+  rename: (id: string, key: string) => void;
+  release: (id: string) => void;
 };
 
 const PanelContext = createContext<(DeskPanelApi & PanelInternals) | null>(null);
@@ -32,33 +37,80 @@ const IMPERATIVE = "__open";
 /**
  * The panel's state for the shell. Claims stack: the newest is shown, and when it goes the one
  * under it comes back — a task opened over an unsent order leaves the order where it was.
+ *
+ * The panel moves (D-184): it comes in from the right edge and leaves there, the thing in it
+ * changes in place. So it opens and closes inside transitions, and what an `InPanel` draws is in
+ * the column the moment the column stands: `host` is one element made once and put into the column
+ * by its ref — not a node the column makes after it is drawn, which would fill it a commit late,
+ * outside the move. The stack itself is kept at once (`stack`), its picture for React a transition
+ * later when something comes: Esc right after a task was opened closes that task, not the one under
+ * it, and a claim that comes after its `InPanel` has gone (a quick close) is not there to come.
  */
 export function useDeskPanelState() {
   const [claims, setClaims] = useState<Claim[]>([]);
-  const [host, setHost] = useState<HTMLElement | null>(null);
-  const latest = useRef(claims);
-  useLayoutEffect(() => {
-    latest.current = claims;
+  const [host] = useState<HTMLElement | null>(() => {
+    if (typeof document === "undefined") return null;
+    const element = document.createElement("div");
+    element.className = "contents";
+    return element;
   });
+  const stack = useRef<Claim[]>([]);
+  /** The stack as it is now, to React: inside a transition when the column may come or go with it. */
+  const publish = useCallback((moving: boolean) => {
+    const next = stack.current.slice();
+    if (moving) startTransition(() => setClaims(next));
+    else setClaims(next);
+  }, []);
 
   const top = claims.at(-1) ?? null;
 
+  // × and Esc: the panel and what it shows go in one transition — the column leaves with its content
   const close = useCallback(() => {
-    const shown = latest.current.at(-1);
+    const shown = stack.current.at(-1);
     if (!shown) return;
-    setClaims((current) => current.filter((claim) => claim !== shown));
-    shown.onClose?.();
+    stack.current = stack.current.filter((claim) => claim !== shown);
+    const next = stack.current.slice();
+    startTransition(() => {
+      setClaims(next);
+      shown.onClose?.();
+    });
   }, []);
-  const open = useCallback<DeskPanelApi["open"]>((node, options) => {
-    const key = options?.key ?? IMPERATIVE;
-    setClaims((current) => [...current.filter((claim) => claim.node === undefined || claim.key !== key), { key, node, onClose: options?.onClose }]);
-  }, []);
-  const claim = useCallback((key: string, onClose: () => void) => {
-    setClaims((current) => [...current.filter((c) => c.key !== key), { key, onClose }]);
-  }, []);
-  const release = useCallback((key: string) => {
-    setClaims((current) => current.filter((c) => c.node !== undefined || c.key !== key));
-  }, []);
+  const open = useCallback<DeskPanelApi["open"]>(
+    (node, options) => {
+      const key = options?.key ?? IMPERATIVE;
+      stack.current = [...stack.current.filter((claim) => claim.node === undefined || claim.key !== key), { id: `${IMPERATIVE}:${key}`, key, node, onClose: options?.onClose }];
+      publish(true);
+    },
+    [publish],
+  );
+  // an InPanel coming: on top, and the column comes in moving
+  const claim = useCallback(
+    (id: string, key: string, onClose: () => void) => {
+      stack.current = [...stack.current.filter((c) => c.id !== id), { id, key, onClose }];
+      publish(true);
+    },
+    [publish],
+  );
+  // the same InPanel showing another thing: on top again, as a new claim was — a result that lands
+  // under a task opened meanwhile comes back over it
+  const rename = useCallback(
+    (id: string, key: string) => {
+      const was = stack.current.find((c) => c.id === id);
+      if (!was || was.key === key) return;
+      stack.current = [...stack.current.filter((c) => c.id !== id), { ...was, key }];
+      publish(false);
+    },
+    [publish],
+  );
+  // an InPanel gone with its screen: at once — a column left standing over the next screen would be empty
+  const release = useCallback(
+    (id: string) => {
+      if (!stack.current.some((c) => c.id === id)) return;
+      stack.current = stack.current.filter((c) => c.id !== id);
+      publish(false);
+    },
+    [publish],
+  );
 
   const api = useMemo(
     () => ({
@@ -67,12 +119,21 @@ export function useDeskPanelState() {
       isOpen: top !== null,
       openKey: top && top.key !== IMPERATIVE ? top.key : null,
       host,
+      topId: top && top.node === undefined ? top.id : null,
       claim,
+      rename,
       release,
     }),
-    [open, close, top, host, claim, release],
+    [open, close, top, host, claim, rename, release],
   );
-  return { api, node: top?.node ?? null, setHost, close };
+  /** The column's ref: the host goes into the column as it stands. */
+  const attachHost = useCallback(
+    (element: HTMLElement | null) => {
+      if (element && host && host.parentNode !== element) element.appendChild(host);
+    },
+    [host],
+  );
+  return { api, node: top?.node ?? null, attachHost, close };
 }
 
 export function DeskPanelProvider({ value, children }: { value: DeskPanelApi & PanelInternals; children: ReactNode }) {
@@ -89,22 +150,37 @@ export function useDeskPanel(): DeskPanelApi {
  * The declarative way into the panel: while this is mounted (and newest) its children render in
  * the panel — with the screen's own state and handlers, never a stale copy. `panelKey` names what
  * is open; × and Esc call `onClose`, which should unmount this (a screen drops its `?id` there).
+ * Another `panelKey` is the same place in the stack showing another thing: drawn in the same
+ * commit, the old thing going and the new one coming when the screen's write says `desk-pick`
+ * (`PICK_IN`, `PICK_OUT` of lib/desk/motion.ts).
  */
 export function InPanel({ panelKey, onClose, children }: { panelKey: string; onClose: () => void; children: ReactNode }) {
   const api = useContext(PanelContext);
+  const id = useId();
   const closeRef = useRef(onClose);
+  const keyRef = useRef(panelKey);
   useLayoutEffect(() => {
     closeRef.current = onClose;
+    keyRef.current = panelKey;
   });
   const claim = api?.claim;
+  const rename = api?.rename;
   const release = api?.release;
   useLayoutEffect(() => {
     if (!claim || !release) return;
-    claim(panelKey, () => closeRef.current());
-    return () => release(panelKey);
-  }, [claim, release, panelKey]);
-  if (!api?.host || api.openKey !== panelKey) return null;
-  return createPortal(children, api.host);
+    claim(id, keyRef.current, () => closeRef.current());
+    return () => release(id);
+  }, [claim, release, id]);
+  useLayoutEffect(() => {
+    rename?.(id, panelKey);
+  }, [rename, id, panelKey]);
+  if (!api?.host || api.topId !== id) return null;
+  return createPortal(
+    <ViewTransition key={panelKey} enter={PICK_IN} exit={PICK_OUT} default="none">
+      <div data-panel-item="">{children}</div>
+    </ViewTransition>,
+    api.host,
+  );
 }
 
 /** The left edge of the panel: drag (or ←/→ when focused) to widen it; a double click — back to the default. */
@@ -193,13 +269,13 @@ export function PanelHeader({ children, className = "" }: { children: ReactNode;
 export function DeskPanelColumn({
   node,
   onClose,
-  setHost,
+  attachHost,
   width,
   onResize,
 }: {
   node: ReactNode;
   onClose: () => void;
-  setHost: (el: HTMLElement | null) => void;
+  attachHost: (el: HTMLElement | null) => void;
   width?: number;
   onResize?: (width: number, phase: "move" | "end") => void;
 }) {
@@ -224,7 +300,7 @@ export function DeskPanelColumn({
       </div>
       <div className="no-bar min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-4">
         {node}
-        <div ref={setHost} className="contents" />
+        <div ref={attachHost} className="contents" />
       </div>
     </aside>
   );

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import type { MouseEvent, ReactNode } from "react";
 
+import { writeDeskAddress } from "@/components/desk/DeskAddress";
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { deskRouteFor } from "@/lib/desk/routes";
 
@@ -11,12 +12,13 @@ type Router = ReturnType<typeof useRouter>;
 /**
  * Goes to a desk address. The same screen with another query (`/desk/settings?tab=team` from the
  * settings themselves) only swaps the address — the screen reads it and keeps what is open and
- * half-typed, as the phone's tabs do; another screen is a navigation.
+ * half-typed, as the phone's tabs do, and swaps what it shows as a switch (D-184); another screen
+ * is a navigation.
  */
 export function goDesk(router: Router, target: string) {
   const url = new URL(target, window.location.href);
   if (url.pathname === window.location.pathname) {
-    window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+    writeDeskAddress(`${url.pathname}${url.search}`, { type: "desk-switch" });
     return;
   }
   router.push(`${url.pathname}${url.search}`);

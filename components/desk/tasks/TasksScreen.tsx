@@ -1,8 +1,8 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, ViewTransition, type KeyboardEvent, type MouseEvent } from "react";
 
+import { useDeskParams } from "@/components/desk/DeskAddress";
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { DataGrid, type Group } from "@/components/desk/ui/DataGrid";
 import { InPanel, useDeskPanel } from "@/components/desk/ui/DeskPanel";
@@ -17,6 +17,7 @@ import { toast } from "@/components/ui/Toast";
 import { appendPage, inRange, parseRange, rowsLeft, type DayRange } from "@/lib/desk/archive";
 import { useDraftTasks } from "@/lib/desk/drafts";
 import { isPlainKey } from "@/lib/desk/keys";
+import { SWITCH_SWAP } from "@/lib/desk/motion";
 import { shortName, useNamesKey } from "@/lib/people/names";
 import { useGoneIds, usePeople } from "@/lib/people/queries";
 import { HELD_STATUS, type BoardTask } from "@/lib/pulse/board";
@@ -110,7 +111,7 @@ export function TasksScreen() {
   const board = usePulseBoard(me.data);
   // «Повторы» stand over the table: the screen comes with them, nothing lands later
   const rulesSettled = useRecurrenceRulesSettled();
-  const archiveTab = useSearchParams().get("tab") === "closed";
+  const archiveTab = useDeskParams().get("tab") === "closed";
 
   const taskLoad = loadStateOf(tasks);
   const boardLoad = loadStateOf(board);
@@ -161,7 +162,7 @@ function TasksView({
   const now = useNow();
   const { pointsEnabled } = useDeskScope();
   const panel = useDeskPanel();
-  const params = useSearchParams();
+  const params = useDeskParams();
   const context = useContextMenu();
 
   const openId = params.get("id");
@@ -186,7 +187,8 @@ function TasksView({
     setQueryState(value);
     writeParams({ q: value.trim() ? value : null });
   };
-  const openTask = useCallback((id: string) => writeParams({ id }), []);
+  // the panel shows another task in place (D-184)
+  const openTask = useCallback((id: string) => writeParams({ id }, { type: "desk-pick" }), []);
   const closeTask = useCallback(() => writeParams({ id: null }), []);
 
   // the board holds the company; the table is this director's — only the author's answer closes a question
@@ -225,7 +227,8 @@ function TasksView({
   // the first look opens where the director's move is; after that the tab is the address's
   const [firstTab] = useState<DirectorTab>(() => (counts.yours > 0 ? "yours" : "working"));
   const tab = parseTab(params.get("tab")) ?? firstTab;
-  const setTab = (next: DirectorTab) => writeParams({ tab: next });
+  // the table swaps its rows as one picture (D-184): «desk-switch» on the grid below
+  const setTab = (next: DirectorTab) => writeParams({ tab: next }, { type: "desk-switch" });
   const group = groupOf(tab, params.get("group"));
   const choices = groupChoices(tab);
 
@@ -314,7 +317,8 @@ function TasksView({
 
   const choose = (id: string) => {
     setSelected(id);
-    if (openId && openId !== id) openTask(id);
+    // the panel follows the arrows: a quick hand sees each task at once (D-184)
+    if (openId && openId !== id) writeParams({ id }, { type: "desk-pick", burst: true });
   };
   const pressMove = (move: Move, task: TaskWithPeople, target?: HTMLElement) => {
     if (move.held) return;
@@ -625,22 +629,24 @@ function TasksView({
         onPurge={archiveTab && !who && !range && closedCount > 0 ? () => setPurgeAsk(true) : null}
       />
 
-      <div ref={gridBox} data-desk-tasks="" onMouseDownCapture={onGridMouseDown} onClickCapture={onGridClick} onContextMenu={onGridMenu}>
-        <DataGrid<TaskWithPeople>
-          aria-label="Задачи"
-          columns={columns}
-          groups={groups}
-          rowKey={(task) => task.id}
-          selectedKey={focusKey}
-          onSelect={(task) => choose(task.id)}
-          onActivate={(task) => openTask(task.id)}
-          // a click opens the row in the panel (master–detail)
-          onRowClick={(task) => openTask(task.id)}
-          rowHighlightKey={glow}
-          empty={empty}
-          onKey={onKey}
-        />
-      </div>
+      <ViewTransition update={SWITCH_SWAP} default="none">
+        <div ref={gridBox} data-desk-tasks="" onMouseDownCapture={onGridMouseDown} onClickCapture={onGridClick} onContextMenu={onGridMenu}>
+          <DataGrid<TaskWithPeople>
+            aria-label="Задачи"
+            columns={columns}
+            groups={groups}
+            rowKey={(task) => task.id}
+            selectedKey={focusKey}
+            onSelect={(task) => choose(task.id)}
+            onActivate={(task) => openTask(task.id)}
+            // a click opens the row in the panel (master–detail)
+            onRowClick={(task) => openTask(task.id)}
+            rowHighlightKey={glow}
+            empty={empty}
+            onKey={onKey}
+          />
+        </div>
+      </ViewTransition>
 
       {ids.length > 0 && picked.size === 0 ? <TableKeysHint /> : null}
 

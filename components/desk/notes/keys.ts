@@ -40,7 +40,8 @@ export type NotesKeysState = {
   /** The notes in the order the list shows them. */
   order: readonly string[];
   selectedId: string | null;
-  select: (id: string | null) => void;
+  /** `fromKeys` — the arrows: a quick hand sees each note at once (D-184). */
+  select: (id: string | null, fromKeys?: boolean) => void;
   picked: ReadonlySet<string>;
   setPicked: (picked: ReadonlySet<string>) => void;
   /** Where a Shift-run of choices starts. */
@@ -101,7 +102,7 @@ function notesKey(event: KeyboardEvent, s: NotesKeysState, toCapture: () => void
       s.anchor.current = next;
       if (s.picked.size > 0) s.setPicked(NOBODY);
     }
-    s.select(next);
+    s.select(next, true);
     if (fromList) focusRow(next);
     return true;
   }

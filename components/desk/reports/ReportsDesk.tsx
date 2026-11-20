@@ -2,9 +2,10 @@
 
 import { Download, Printer } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useRef, useState, ViewTransition } from "react";
 
+import { useDeskParams, writeDeskAddress } from "@/components/desk/DeskAddress";
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { InPanel } from "@/components/desk/ui/DeskPanel";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
@@ -14,6 +15,7 @@ import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SearchField, SegmentTabs, Toolbar } from "@/components/desk/ui/Toolbar";
 import { Button } from "@/components/ui/Button";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
+import { SWITCH_IN, SWITCH_OUT } from "@/lib/desk/motion";
 import { askFromOf } from "@/lib/daily-report/due";
 import { addDaysYmd } from "@/lib/daily-report/format";
 import { useTeamDailyReportDay } from "@/lib/daily-report/queries";
@@ -73,7 +75,7 @@ export function ReportsDesk() {
   const now = useNow();
   const today = todayYmd(now);
   const pathname = usePathname();
-  const params = useSearchParams();
+  const params = useDeskParams();
   const address = readAddress(new URLSearchParams(params.toString()));
   const { tab } = address;
   const openId = address.person;
@@ -107,15 +109,20 @@ export function ReportsDesk() {
   /**
    * Writes the address without a trip to the server: only what changed. Each move is a step of the
    * browser's history, so «Назад» goes back to the day, the period or the diary before it; a held
-   * arrow key replaces its own step instead of stacking dozens.
+   * arrow key replaces its own step instead of stacking dozens. Through the desk's address (D-184):
+   * «Сводка» ↔ «Табель» swap as two pictures, another person's diary changes in the panel in place
+   * (a held arrow — at once); a day or a period changes at once, its data is on its way anyway.
    */
   const go = (next: Partial<ReportsAddress>, replace = false) => {
-    const merged: ReportsAddress = { ...address, day: address.day, period: address.period, ...next };
+    // from the address as it is now, not as drawn: another person may still wait for its transition
+    const current = readAddress(new URLSearchParams(window.location.search));
+    const merged: ReportsAddress = { ...current, day: current.day, period: current.period, ...next };
     const text = writeAddress(merged);
     const url = text ? `${pathname}?${text}` : pathname;
     if (url === `${pathname}${window.location.search}`) return;
-    if (replace) window.history.replaceState(null, "", url);
-    else window.history.pushState(null, "", url);
+    const switched = next.tab !== undefined && next.tab !== tab;
+    const picked = !switched && next.person !== undefined && next.person !== openId && Boolean(next.person && openId);
+    writeDeskAddress(url, { push: !replace, type: switched ? "desk-switch" : picked ? "desk-pick" : undefined, burst: replace });
   };
   const setDay = (next: Ymd, replace = false) => go({ day: next > today ? today : next }, replace);
   const setPeriod = (next: TabelPeriod, replace = false) => go({ period: next }, replace);
@@ -258,41 +265,44 @@ export function ReportsDesk() {
         </SkeletonGroup>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-3.5" data-testid="desk-reports">
-          {tab === "day" ? (
-            <SummaryView
-              day={day.data}
-              stale={day.isPlaceholderData}
-              failed={day.isError && !day.data}
-              onRetry={() => void day.refetch()}
-              match={match}
-              selectedId={chosenId}
-              openId={openId}
-              onSelect={choose}
-              onOpen={open}
-              pointsOn={pointsEnabled}
-              now={now}
-              today={today}
-              autoFrom={autoFrom}
-              askFrom={askFrom}
-              onToday={() => setDay(today)}
-            />
-          ) : (
-            <TabelView
-              tabel={tabel.data}
-              stale={tabel.isPlaceholderData}
-              failed={tabel.isError && !tabel.data}
-              onRetry={() => void tabel.refetch()}
-              match={match}
-              show={tabelShow}
-              onShow={setTabelShow}
-              selectedId={chosenId}
-              openId={openId}
-              onSelect={choose}
-              onOpen={open}
-              onDay={(next) => go({ tab: "day", day: next > today ? today : next })}
-              today={today}
-            />
-          )}
+          {/* «Сводка» and «Табель» swap as two pictures (D-184) */}
+          <ViewTransition key={tab} enter={SWITCH_IN} exit={SWITCH_OUT} default="none">
+            {tab === "day" ? (
+              <SummaryView
+                day={day.data}
+                stale={day.isPlaceholderData}
+                failed={day.isError && !day.data}
+                onRetry={() => void day.refetch()}
+                match={match}
+                selectedId={chosenId}
+                openId={openId}
+                onSelect={choose}
+                onOpen={open}
+                pointsOn={pointsEnabled}
+                now={now}
+                today={today}
+                autoFrom={autoFrom}
+                askFrom={askFrom}
+                onToday={() => setDay(today)}
+              />
+            ) : (
+              <TabelView
+                tabel={tabel.data}
+                stale={tabel.isPlaceholderData}
+                failed={tabel.isError && !tabel.data}
+                onRetry={() => void tabel.refetch()}
+                match={match}
+                show={tabelShow}
+                onShow={setTabelShow}
+                selectedId={chosenId}
+                openId={openId}
+                onSelect={choose}
+                onOpen={open}
+                onDay={(next) => go({ tab: "day", day: next > today ? today : next })}
+                today={today}
+              />
+            )}
+          </ViewTransition>
         </div>
       )}
       {hydrated && !off && openId ? (

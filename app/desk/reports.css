@@ -604,7 +604,10 @@ html[data-surface="desk"][data-journal] {
   .person-hero-face {
     display: inline-flex;
     flex-shrink: 0;
-    animation: person-face-in 460ms var(--ease-snap, ease-out) both;
+    /* where View Transitions are, the circle flies in from «Команда» (transitions.css, D-184) */
+    @supports not (view-transition-class: none) {
+      animation: person-face-in 460ms var(--ease-snap, ease-out) both;
+    }
   }
   .person-hero-who {
     min-width: 0;

@@ -1,9 +1,9 @@
 "use client";
 
 import { AudioLines, CheckCheck, Clock3, Gift, Megaphone, MoonStar, Sparkles } from "lucide-react";
-import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useState, ViewTransition, type MouseEvent } from "react";
 
+import { moveWith, useDeskParams } from "@/components/desk/DeskAddress";
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { PersonFace } from "@/components/desk/errands/look";
 import { KeyCap } from "@/components/desk/errands/Queue";
@@ -21,6 +21,7 @@ import { useShortcuts, type Shortcut } from "@/components/desk/ui/Shortcuts";
 import { SegmentTabs, Toolbar } from "@/components/desk/ui/Toolbar";
 import { When } from "@/components/desk/ui/When";
 import { Button } from "@/components/ui/Button";
+import { SWITCH_IN, SWITCH_OUT } from "@/lib/desk/motion";
 import { humanAqtobe } from "@/lib/ai/time";
 import { reachOf, splitEther, type Reach } from "@/lib/desk/ether";
 import { formatNum } from "@/lib/desk/format";
@@ -250,7 +251,7 @@ function NewsCards({ news, now, director, onRemove }: { news: readonly EtherEven
  */
 export function EtherDesk() {
   useNamesKey();
-  const params = useSearchParams();
+  const params = useDeskParams();
   const { role } = useDeskScope();
   const director = role === "director";
   const me = useMe();
@@ -273,7 +274,7 @@ export function EtherDesk() {
 
   const open = (id: string) => {
     setCursor(id);
-    writeParams({ id });
+    writeParams({ id }, { type: "desk-pick" });
   };
   const close = () => writeParams({ id: null });
 
@@ -385,7 +386,7 @@ export function EtherDesk() {
           <SegmentTabs<View>
             aria-label="Что показать"
             value={shown}
-            onChange={setView}
+            onChange={(next) => moveWith("desk-switch", () => setView(next))}
             items={[
               { value: "ether", label: "Объявления", count: rows.length },
               { value: "news", label: "Хорошие новости", count: news.length },
@@ -394,59 +395,62 @@ export function EtherDesk() {
         </Toolbar>
       ) : null}
 
-      {shown === "news" ? (
-        <NewsCards news={news} now={now} director={director} onRemove={(id) => removeEvent.mutate(id)} />
-      ) : rows.length === 0 ? (
-        <EmptyState
-          title="Объявлений пока нет"
-          hint={director ? "Начните строку поручения со слова «всем» — объявление получит вся команда" : "Здесь появятся объявления директора и «Ознакомился» под каждым"}
-        />
-      ) : (
-        <div
-          role="grid"
-          aria-label="Объявления"
-          className="flex flex-col gap-5"
-          data-testid="ether-table"
-          onContextMenu={(event: MouseEvent) => {
-            const key = (event.target as HTMLElement).closest<HTMLElement>("[data-row-key]")?.dataset.rowKey;
-            const row = rows.find((one) => one.item.id === key);
-            if (!row) return;
-            setCursor(row.item.id);
-            context.open(event, menuOf(row));
-          }}
-        >
-          {sections.map((section) => (
-            <section key={section.key} role="rowgroup" className="flex flex-col gap-2" data-testid={section.held ? "ether-held-group" : undefined}>
-              <h2 className="ether-day" data-held={section.held ? "" : undefined}>
-                {section.held ? <MoonStar size={14} strokeWidth={2.25} aria-hidden /> : null}
-                {section.title}
-                <span className="nums">{section.rows.length}</span>
-              </h2>
-              <div className={section.held ? "ether-cards ether-cards-held" : "ether-cards"}>
-                {section.rows.map((row, index) => (
-                  <EtherCard
-                    key={row.item.id}
-                    row={row}
-                    index={index}
-                    chosen={chosenId === row.item.id}
-                    director={director}
-                    reach={reachOfItem(row.item)}
-                    team={team}
-                    now={now}
-                    heard={heardBy(row.item)}
-                    acking={ack.isPending && ack.variables === row.item.id}
-                    menu={() => menuOf(row)}
-                    onOpen={() => open(row.item.id)}
-                    onAck={() => answer(row.item)}
-                    onSend={() => send(row.item)}
-                  />
-                ))}
-              </div>
-            </section>
-          ))}
-          {rows.length >= FEED_CAP ? <p className="text-[13px] leading-[18px] text-muted">Показаны последние {FEED_CAP}</p> : null}
-        </div>
-      )}
+      {/* «Объявления» and «Хорошие новости» swap as two pictures (D-184) */}
+      <ViewTransition key={shown} enter={SWITCH_IN} exit={SWITCH_OUT} default="none">
+        {shown === "news" ? (
+          <NewsCards news={news} now={now} director={director} onRemove={(id) => removeEvent.mutate(id)} />
+        ) : rows.length === 0 ? (
+          <EmptyState
+            title="Объявлений пока нет"
+            hint={director ? "Начните строку поручения со слова «всем» — объявление получит вся команда" : "Здесь появятся объявления директора и «Ознакомился» под каждым"}
+          />
+        ) : (
+          <div
+            role="grid"
+            aria-label="Объявления"
+            className="flex flex-col gap-5"
+            data-testid="ether-table"
+            onContextMenu={(event: MouseEvent) => {
+              const key = (event.target as HTMLElement).closest<HTMLElement>("[data-row-key]")?.dataset.rowKey;
+              const row = rows.find((one) => one.item.id === key);
+              if (!row) return;
+              setCursor(row.item.id);
+              context.open(event, menuOf(row));
+            }}
+          >
+            {sections.map((section) => (
+              <section key={section.key} role="rowgroup" className="flex flex-col gap-2" data-testid={section.held ? "ether-held-group" : undefined}>
+                <h2 className="ether-day" data-held={section.held ? "" : undefined}>
+                  {section.held ? <MoonStar size={14} strokeWidth={2.25} aria-hidden /> : null}
+                  {section.title}
+                  <span className="nums">{section.rows.length}</span>
+                </h2>
+                <div className={section.held ? "ether-cards ether-cards-held" : "ether-cards"}>
+                  {section.rows.map((row, index) => (
+                    <EtherCard
+                      key={row.item.id}
+                      row={row}
+                      index={index}
+                      chosen={chosenId === row.item.id}
+                      director={director}
+                      reach={reachOfItem(row.item)}
+                      team={team}
+                      now={now}
+                      heard={heardBy(row.item)}
+                      acking={ack.isPending && ack.variables === row.item.id}
+                      menu={() => menuOf(row)}
+                      onOpen={() => open(row.item.id)}
+                      onAck={() => answer(row.item)}
+                      onSend={() => send(row.item)}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
+            {rows.length >= FEED_CAP ? <p className="text-[13px] leading-[18px] text-muted">Показаны последние {FEED_CAP}</p> : null}
+          </div>
+        )}
+      </ViewTransition>
 
       {context.node}
 

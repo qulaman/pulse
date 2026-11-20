@@ -2,6 +2,8 @@
 
 import { useEffect, useLayoutEffect, useMemo, useState, type RefObject } from "react";
 
+import { writeDeskAddress } from "@/components/desk/DeskAddress";
+import { withParams } from "@/lib/desk/address-state";
 import { inPlaceOf, widthBucket } from "@/lib/desk/tasks";
 import type { BoardTask } from "@/lib/pulse/board";
 import type { DeskReason } from "@/lib/tasks/desk";
@@ -11,15 +13,13 @@ import type { TaskWithPeople } from "@/lib/tasks/queries";
 
 import type { PanelNext } from "./TaskPanel";
 
-/** The address of a desk screen, written without a navigation: `?tab`, `?who`, `?status`, `?due`, `?group`, `?q`, `?id` (D-153 §1). */
-export function writeParams(patch: Record<string, string | null>) {
-  const next = new URLSearchParams(window.location.search);
-  for (const [name, value] of Object.entries(patch)) {
-    if (value === null || value === "") next.delete(name);
-    else next.set(name, value);
-  }
-  const text = next.toString();
-  window.history.replaceState(null, "", text ? `${window.location.pathname}?${text}` : window.location.pathname);
+/**
+ * The address of a desk screen, written without a navigation: `?tab`, `?who`, `?status`, `?due`,
+ * `?group`, `?q`, `?id` (D-153 §1) — through the desk's address (D-184), so what it changes can
+ * move: `options` are `writeDeskAddress`'s (a transition type, a write from the keys).
+ */
+export function writeParams(patch: Record<string, string | null>, options?: Parameters<typeof writeDeskAddress>[1]) {
+  writeDeskAddress(withParams(window.location.pathname, window.location.search.slice(1), patch), options);
 }
 
 /**

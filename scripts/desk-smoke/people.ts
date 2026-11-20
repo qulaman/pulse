@@ -11,13 +11,14 @@ import { readFile } from "node:fs/promises";
 
 import type { Page } from "playwright";
 
-import { open, record, skip, type Ctx } from "./shared";
+import { cutShort, open, record, skip, VT_PROBE, vtCount, vtSince, vtWords, watchServerTrips, type Ctx } from "./shared";
 
 const UUID = /\/desk\/team\/([0-9a-f-]{36})/;
 const TEAM_ROWS = '[data-testid="desk-team-table"] [data-testid="desk-row"]';
 /** «Команда» as the table (D-172: the grid is the default, «Список» the table). */
 const TEAM_LIST = "/desk/team?view=list";
 const TEAM_TILES = '[data-testid="desk-team-grid"] [data-testid="desk-team-tile"]';
+
 
 /** The column titles of the desk table under `scope`, lower-cased (CSS upper-cases them) and without the sort marks. */
 async function headsOf(ctx: Ctx, scope: string): Promise<string[]> {
@@ -177,6 +178,7 @@ async function personMoves(ctx: Ctx) {
  */
 async function teamGrid(ctx: Ctx) {
   const { page } = ctx;
+  await page.addInitScript(VT_PROBE);
   await open(page, "/desk/team");
   const tiles = page.locator(TEAM_TILES);
   await tiles.first().waitFor({ timeout: 15_000 }).catch(() => undefined);
@@ -188,6 +190,9 @@ async function teamGrid(ctx: Ctx) {
   // an employee, whose card has the dashboard — the tile says «Сотрудник» or a position of the crew
   const employee = tiles.filter({ hasText: /Сотрудник|Шустряк|Специалист/ }).first();
   const tile = (await employee.count()) ? employee : tiles.first();
+  const who = (await tile.getAttribute("data-row-key")) ?? "";
+  const vtBefore = await vtCount(page);
+  const stopWatch = watchServerTrips(page);
   await tile.click();
   const card = page.getByTestId("team-card");
   const opened = await card.waitFor({ timeout: 5_000 }).then(() => true, () => false);
@@ -199,6 +204,15 @@ async function teamGrid(ctx: Ctx) {
   const lit = (await tile.getAttribute("data-open")) !== null;
   record("команда: щелчок по плитке — карточка под её рядом, плитка подсвечена, ?p= в адресе", opened && under && lit && page.url().includes("p="), page.url());
   await page.waitForTimeout(500);
+  // D-184: the card opens as a transition — the circle flies from the tile into it — without asking the server
+  const peekRuns = await vtSince(page, vtBefore);
+  const flew = peekRuns.some((run) => run.groups.includes(`desk-face-${who}`));
+  const asked = stopWatch();
+  record(
+    "команда (D-184): карточка под рядом открывается переходом — кружок летит из плитки, сервер не спрошен, переход не оборван",
+    opened && flew && asked === 0 && !peekRuns.some(cutShort),
+    `переходы ${vtWords(peekRuns) || "нет"}; запросов к серверу ${asked}`,
+  );
   await ctx.shot("team-grid-card");
 
   const stats = page.getByTestId("seg-stats");
@@ -238,6 +252,30 @@ async function teamGrid(ctx: Ctx) {
   await tile.click();
   const toggled = await card.waitFor({ state: "detached", timeout: 3_000 }).then(() => true, () => false);
   record("карточка в сетке: Esc и повторный щелчок по плитке закрывают её", closed && toggled, page.url());
+
+  // D-184: «Открыть» — the screen goes deeper as a transition; «Команда ›» brings it back, and the
+  // circle and the name fly home into the card (the way in pairs once the page's code is loaded —
+  // in `next dev` the first visit loads it, so only the way back is held to the pair)
+  await tile.click();
+  await card.waitFor({ timeout: 5_000 }).catch(() => undefined);
+  await page.waitForTimeout(400);
+  const tripFrom = await vtCount(page);
+  await page.getByTestId("team-card-open").click();
+  const person = await page.getByTestId("desk-person-identity").waitFor({ timeout: 15_000 }).then(() => true, () => false);
+  await page.waitForTimeout(600);
+  await page.getByTestId("desk-person-back").click();
+  const home = await card.waitFor({ timeout: 10_000 }).then(() => true, () => false);
+  await page.waitForTimeout(600);
+  const trip = await vtSince(page, tripFrom);
+  const deeper = trip.length >= 2 && trip[0].groups.includes("desk-screen");
+  const last = trip.at(-1);
+  const flewHome = Boolean(last && ["desk-screen", `desk-face-${who}`, `desk-name-${who}`].every((group) => last.groups.includes(group)));
+  record(
+    "команда (D-184): «Открыть» — экран уходит вглубь переходом; «Команда ›» — обратно, кружок и имя летят в карточку; ни один переход не оборван",
+    person && home && deeper && flewHome && !trip.some(cutShort),
+    `переходы ${vtWords(trip) || "нет"}`,
+  );
+  await ctx.shot("team-grid-back");
 }
 
 async function teamTable(ctx: Ctx) {
@@ -538,7 +576,9 @@ export async function checkErrands(ctx: Ctx) {
     // back to «Сейчас»: the address loses its view
     await page.getByTestId("seg-now").click();
     const back = await page.waitForURL((url) => !url.searchParams.has("view"), { timeout: 5_000 }).then(() => true, () => false);
-    record("заявки: «Сейчас» возвращает пульт", back && (await page.getByTestId("desk-pult-keypad").isVisible().catch(() => false)), page.url());
+    // the address changes at once, the screen a frame later, in its transition (D-184)
+    const pult = await page.getByTestId("desk-pult-keypad").waitFor({ timeout: 5_000 }).then(() => true, () => false);
+    record("заявки: «Сейчас» возвращает пульт", back && pult, page.url());
 
     // «Объявления» (D-174): the feed of cards or its empty state; a card opens in the panel from the
     // keys (↓, Enter) and goes with Esc — nothing is acknowledged, sent or deleted

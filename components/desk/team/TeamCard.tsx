@@ -22,7 +22,7 @@ import { CardFacts, PushBlock } from "./PersonDesk";
 import { OpenTasks } from "./PersonPeek";
 import { PersonEditor } from "./PersonEditor";
 import { loadWords, tidy } from "./shared";
-import { TileFace, tileState } from "./TeamGrid";
+import { Morph, TileFace, tileState } from "./TeamGrid";
 
 /** The card's three faces: the numbers, the data (read or edited), the open work. */
 export type CardTab = "stats" | "data" | "tasks";
@@ -111,11 +111,15 @@ export function TeamCard({
   return (
     <article className="team-card" data-testid="team-card" data-person={person.id} aria-label={`Карточка: ${person.full_name}`}>
       <header className="team-card-head">
-        <TileFace person={person} size={72} state={state} />
+        <Morph part="face" id={person.id}>
+          <TileFace person={person} size={72} state={state} />
+        </Morph>
         <div className="min-w-0 flex-1">
-          <h2 className="team-card-name" title={person.full_name}>
-            {person.full_name}
-          </h2>
+          <Morph part="name" id={person.id}>
+            <h2 className="team-card-name" title={person.full_name}>
+              {person.full_name}
+            </h2>
+          </Morph>
           <p className="team-card-line">
             {[position, ROLE_LABEL[person.role], person.is_active ? null : "не в команде"].filter(Boolean).join(" · ")}
           </p>
@@ -164,7 +168,9 @@ export function TeamCard({
             </Tooltip>
           ) : null}
           <Tooltip label="Полная карточка" keys={["Enter"]} side="bottom">
-            <Link href={`/desk/team/${person.id}`} className="btn-secondary inline-flex h-9 items-center px-3 text-[13px] font-medium leading-4" data-testid="team-card-open" onClick={(event) => {
+            {/* in full, ahead (D-184): a page that lands with its code and its circle in one go lets
+                the circle fly; one that loads after the click shows empty for a moment and breaks the pair */}
+            <Link href={`/desk/team/${person.id}`} prefetch className="btn-secondary inline-flex h-9 items-center px-3 text-[13px] font-medium leading-4" data-testid="team-card-open" onClick={(event) => {
               event.preventDefault();
               moves.open();
             }}>

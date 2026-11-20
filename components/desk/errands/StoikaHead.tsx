@@ -104,7 +104,7 @@ export function StoikaHead({ meId, history, count, now, settled }: { meId: strin
       <SegmentTabs<"queue" | "history">
         aria-label="Вид"
         value={history ? "history" : "queue"}
-        onChange={(view) => writeParams(view === "history" ? { view: "history" } : { view: null, from: null, to: null })}
+        onChange={(view) => writeParams(view === "history" ? { view: "history" } : { view: null, from: null, to: null }, { type: "desk-switch" })}
         items={[
           { value: "queue", label: "Очередь", count: count > 0 ? count : undefined },
           { value: "history", label: "История" },

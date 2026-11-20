@@ -240,7 +240,10 @@ html[data-surface="desk"] {
     border-radius: 16px;
     background: var(--sheet, var(--surface));
     box-shadow: var(--shadow-pop, 0 0 0 1px var(--border));
-    animation: team-card-in 340ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    /* where View Transitions are, the card comes as one (transitions.css, D-184); here — itself */
+    @supports not (view-transition-class: none) {
+      animation: team-card-in 340ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
 
     /* the notch: a corner of the sheet pointing up at the open tile */
     &::before {

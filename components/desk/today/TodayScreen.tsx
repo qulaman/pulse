@@ -1,8 +1,9 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 
+import { useDeskParams } from "@/components/desk/DeskAddress";
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { taggedActions, useDirectorBoard, usePanelFlow, writeParams } from "@/components/desk/tasks/flow";
 import { FailedScreen, LoadFailure, LoadNote } from "@/components/desk/tasks/LoadState";
@@ -190,7 +191,7 @@ function TodayView({
   orders: OrdersQuery | null;
 }) {
   const router = useRouter();
-  const params = useSearchParams();
+  const params = useDeskParams();
   const now = useNow();
   const actions = useTaskActions(me);
   const { pointsEnabled } = useDeskScope();
@@ -216,9 +217,10 @@ function TodayView({
   // the tiles (D-164, D-168); a task opened from it goes to the panel and the card stays
   const personId = params.get("p");
   const [focus, setFocus] = useState<string | null>(null);
-  const openTask = useCallback((id: string) => writeParams({ id }), []);
+  // the panel shows another task or person in place (D-184)
+  const openTask = useCallback((id: string) => writeParams({ id }, { type: "desk-pick" }), []);
   const closeTask = useCallback(() => writeParams({ id: null }), []);
-  const openPerson = useCallback((id: string) => writeParams({ p: id, id: null }), []);
+  const openPerson = useCallback((id: string) => writeParams({ p: id, id: null }, { type: "desk-pick" }), []);
   const closePerson = useCallback(() => writeParams({ p: null }), []);
 
   /* ---- the moment: the same numbers as «Задачи» ---- */

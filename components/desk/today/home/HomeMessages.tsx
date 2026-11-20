@@ -1,9 +1,9 @@
 "use client";
 
 import { CheckCheck, MessageSquareText } from "lucide-react";
-import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { useDeskParams } from "@/components/desk/DeskAddress";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { When } from "@/components/desk/ui/When";
 import { toast } from "@/components/ui/Toast";
@@ -41,7 +41,7 @@ export function HomeMessages({ me, onOpenTask }: { me: Me; onOpenTask: (id: stri
   const board = usePulseBoard(me);
   const now = useNow();
   const markRead = useMarkRead(me);
-  const openId = useSearchParams().get("id");
+  const openId = useDeskParams().get("id");
   const [all, setAll] = useState(false);
   const load = loadStateOf(board);
   // questions and requests are «Ждут вас»'s: one place for each thing on the home
