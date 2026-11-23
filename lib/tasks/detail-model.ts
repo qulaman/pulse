@@ -1,5 +1,5 @@
 import { handedInPartly, isWorking, lastNudgeAt, latestSuggestion, latestTimeRequest, WORKING, type Suggestion, type TimeRequest } from "./lifecycle";
-import { REASON_TONE, REASON_WORD, reasonFor, statusWord, timeLeft } from "./overview";
+import { REASON_TONE, REASON_WORD, reasonFor, statusWord } from "./overview";
 import type { TaskMessage, TaskWithPeople } from "./query-core";
 import type { DeskReason } from "./reasons";
 import { isOverdue, reworkCommentOf, spokenOf, unreadWordOf, type TaskStatus } from "./status-text";
@@ -8,6 +8,21 @@ import { deadlineToneOf, toneOf, type Tone } from "./tone";
 
 /** Work the assignee still holds: a word from the director on it waits for them (D-173). */
 const IN_HAND: readonly TaskStatus[] = [...WORKING, "pending_review"];
+
+/** A task whose deadline the director may still move: not handed in, not closed (D-187). */
+const MOVABLE: readonly TaskStatus[] = ["scheduled", ...WORKING];
+
+/** The newest deadline change the reader has not seen yet: the capsule rolls from `from` (D-187). */
+function deadlineNewsOf(messages: readonly TaskMessage[] | undefined, readerId: string, seenSeq: number | null): { from: string | null } | null {
+  for (let index = (messages?.length ?? 0) - 1; index >= 0; index -= 1) {
+    const message = messages![index]!;
+    if (seenSeq !== null && message.seq <= seenSeq) return null;
+    const meta = message.meta && typeof message.meta === "object" && !Array.isArray(message.meta) ? (message.meta as Record<string, unknown>) : {};
+    if (message.type !== "system" || meta.deadline_changed !== true || message.sender_id === readerId) continue;
+    return { from: typeof meta.old_deadline === "string" ? meta.old_deadline : null };
+  }
+  return null;
+}
 
 /** A question the employee asked and nobody has answered — their own words, waiting. */
 function openQuestionOf(messages: readonly TaskMessage[] | undefined, senderId: string): string | null {
@@ -50,11 +65,22 @@ export type TaskDetailModel = {
   /** Urgent and nobody named a time — the flag is all the «when» this task has. */
   urgentNow: boolean;
   deadlineTone: Tone;
-  left: ReturnType<typeof timeLeft>;
+  /**
+   * What a tap on the deadline capsule does (D-187): the director moves it (`extend`, or `retime`
+   * while the employee asks for time — the same sheet answers the request), the assignee asks for
+   * more time on work in hand; null — the capsule only says.
+   */
+  deadlineMove: "extend" | "retime" | "ask" | null;
+  /** The deadline moved since the assignee last read the task: the capsule rolls from the old one. */
+  deadlineNews: { from: string | null } | null;
+  /**
+   * The people under the title, with no word for either (D-187): who gave the order when it was
+   * not the reader, who does it when the reader is not the one doing it.
+   */
+  from: string | null;
+  to: string | null;
   /** The director's words were spoken, not typed. */
   spoken: boolean;
-  /** «О задаче» carries who, when given and by when — not on the assignee's own order. */
-  facts: boolean;
   /** How many words, photos and recordings the conversation holds (not its status lines). */
   talk: number;
 };
@@ -107,9 +133,20 @@ export function taskDetailModel(
     closed,
     urgentNow: !task.deadline && task.priority === "high" && !closed,
     deadlineTone: deadlineToneOf(task, now),
-    left: timeLeft(task, now),
+    deadlineMove: isDirector
+      ? MOVABLE.includes(task.status)
+        ? request
+          ? "retime"
+          : "extend"
+        : null
+      : mine && task.deadline && isWorking(task.status) && !request
+        ? "ask"
+        : null,
+    // `undefined` — the cursor is still asked for: no news until it is known
+    deadlineNews: mine && seenAtOpen !== undefined && task.deadline && isWorking(task.status) ? deadlineNewsOf(messages, reader.userId, seenAtOpen) : null,
+    from: task.author_id === reader.userId ? null : (task.author?.full_name ?? null),
+    to: mine ? null : (task.assignee?.full_name ?? null),
     spoken: spokenOf(task),
-    facts: !mine,
     talk: (messages ?? []).filter((message) => message.type !== "status_change" && message.type !== "system").length,
   };
 }

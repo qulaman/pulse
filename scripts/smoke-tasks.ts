@@ -16,6 +16,7 @@ import { chromium, type Page } from "playwright";
 
 import { IPHONE_UA, signIn } from "./lib/login";
 import { apiSession, APP_URL, finish, issueTask, record, recordError, refuseWhenBusy } from "./lib/smoke";
+import { sameInstant, sheetPresets } from "../lib/tasks/deadline-choices";
 
 const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui", "tasks");
 const EMPLOYEE = process.env.EMPLOYEE ?? "erlan.b@demo.local";
@@ -116,9 +117,31 @@ async function main() {
     const screen = page.locator('[data-testid="task-screen"]');
     await screen.waitFor({ timeout: 15_000 });
     record("«Открыть задачу» ведёт на экран задачи", (await screen.getAttribute("data-status")) === "accepted");
-    const keysLive = await page.locator('[data-testid="task-action-extend"]').isVisible();
+    const keysLive = await page.locator('[data-testid="task-action-nudge"]').isVisible();
     record("на экране задачи — кнопки директора", keysLive);
+    // D-187: the deadline is said once — the capsule of the head, which is also its door
+    record("«Срок» не стоит кнопкой — он в капсуле", (await page.locator('[data-testid="task-action-extend"]').count()) === 0);
     await page.screenshot({ path: join(SHOTS, "t4b-task-screen.png") });
+    const capsule = page.locator('[data-testid="task-deadline"]');
+    record("капсула срока — кнопка", (await capsule.evaluate((node) => node.tagName)) === "BUTTON");
+    const tomorrow9 = sheetPresets(new Date()).find((preset) => preset.label === "Завтра 9:00")!.iso;
+    await capsule.click();
+    await page.locator('[data-testid="deadline-sheet"]').waitFor({ timeout: 5_000 });
+    await page.screenshot({ path: join(SHOTS, "t4c-deadline-sheet.png") });
+    await page.locator('[data-testid="deadline-presets"]').getByRole("button", { name: "Завтра 9:00" }).click();
+    // the server hears of a deadline picked by hand once «Отменить» is over (D-139, D-187)
+    await page.waitForTimeout(6_500);
+    const moved = await director.supabase.from("tasks").select("deadline").eq("id", questionId).single();
+    record("капсула → «Завтра 9:00»: срок в базе", sameInstant(moved.data?.deadline ?? null, tomorrow9), `deadline=${moved.data?.deadline}`);
+    // a slip taken back: «+1 день», «Отменить» — the employee's phone never hears of it
+    await capsule.click();
+    await page.locator('[data-testid="deadline-shifts"]').getByRole("button").nth(1).click();
+    await page.getByRole("button", { name: "Отменить" }).click();
+    await page.waitForTimeout(6_500);
+    const kept = await director.supabase.from("tasks").select("deadline").eq("id", questionId).single();
+    record("«Отменить» после выбора срока: в базе прежний", sameInstant(kept.data?.deadline ?? null, tomorrow9), `deadline=${kept.data?.deadline}`);
+    const capsuleWords = await capsule.getAttribute("aria-label");
+    record("капсула вернулась к прежнему сроку", Boolean(capsuleWords?.includes("завтра 09:00")), capsuleWords ?? "");
     await page.getByRole("button", { name: "Все действия" }).click();
     await page.locator('[data-testid="more-remove"]').click();
     await page.getByRole("dialog").getByRole("button", { name: "Удалить", exact: true }).click();

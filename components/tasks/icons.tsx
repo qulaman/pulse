@@ -23,7 +23,9 @@ export type IconName =
   | "open"
   | "left"
   | "right"
-  | "repeat";
+  | "repeat"
+  | "plus"
+  | "clockPlus";
 
 const PATHS: Record<IconName, ReactNode> = {
   clock: (
@@ -66,6 +68,15 @@ const PATHS: Record<IconName, ReactNode> = {
   open: <path d="M9 5.5 15.5 12 9 18.5" />,
   left: <path d="M14.5 5.5 8 12l6.5 6.5" />,
   right: <path d="M9.5 5.5 16 12l-6.5 6.5" />,
+  plus: <path d="M12 6v12M6 12h12" />,
+  // no deadline yet, give one (D-187): the clock left open at its lower right for a plus
+  clockPlus: (
+    <>
+      <path d="M19.5 12a7.5 7.5 0 1 0-7.5 7.5" />
+      <path d="M12 8v4l2.5 1.5" />
+      <path d="M18.5 15.5v6M15.5 18.5h6" />
+    </>
+  ),
 };
 
 export function Icon({ name, size = 16 }: { name: IconName; size?: number }) {

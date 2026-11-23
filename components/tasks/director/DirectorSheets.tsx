@@ -68,6 +68,9 @@ export function DirectorSheets({
         open={open === "extend"}
         onClose={onClose}
         currentIso={task.deadline}
+        subject={task.title}
+        flyTo={task.id}
+        after={task.status === "scheduled" ? task.scheduled_send_at : null}
         onPick={(iso) => actions.extend({ taskId: task.id, deadlineIso: iso })}
       />
       <PeoplePicker
@@ -107,6 +110,7 @@ export function DirectorSheets({
         title={passFirst ? `Срок для: ${passFirst}` : "Новый срок"}
         hint={oldLine}
         currentIso={null}
+        none
         onPick={(iso) => {
           if (!passTo) return;
           actions.reassign({
@@ -142,6 +146,7 @@ export function DirectorSheets({
         title={passFirst ? `Срок для: ${passFirst}` : "Новый срок"}
         hint={oldLine}
         currentIso={null}
+        none
         onPick={(iso) => {
           if (!passTo) return;
           actions.reissue({ task, assigneeId: passTo.person.id, assigneeName: passTo.person.full_name, deadlineIso: iso });

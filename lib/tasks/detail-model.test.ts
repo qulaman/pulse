@@ -64,17 +64,61 @@ describe("the task's own screen, derived (D-87)", () => {
     expect(model.reason).toBe("question");
     // a question keeps the stage: the word is the state, not the queue's
     expect(model.word).not.toBe("");
-    expect(model.facts).toBe(true);
+    // his own order: only who does it, no «Поручил» to himself (D-187)
+    expect(model.from).toBeNull();
+    expect(model.to).toBe("Ерлан Сапаров");
     expect(model.talk).toBe(1);
   });
 
-  it("the assignee reads their own order: no facts, their own question waits", () => {
+  it("the assignee reads their own order: who gave it, their own question waits", () => {
     const messages = [message({ content: "Брать 12-ю?", meta: { is_question: true } })];
     const model = taskDetailModel(task(), messages, EMPLOYEE, NOW, 0);
     expect(model.mine).toBe(true);
-    expect(model.facts).toBe(false);
+    expect(model.from).toBe("Тимур Директоров");
+    expect(model.to).toBeNull();
     expect(model.reason).toBeNull();
     expect(model.myQuestion).toBe("Брать 12-ю?");
+  });
+
+  it("an order given by a manager shows both people to the director (D-187)", () => {
+    const model = taskDetailModel(task({ author_id: "u-man", author: { full_name: "Асхат Менеджеров" } } as Partial<TaskWithPeople>), [], DIRECTOR, NOW, undefined);
+    expect(model.from).toBe("Асхат Менеджеров");
+    expect(model.to).toBe("Ерлан Сапаров");
+  });
+
+  it("the deadline capsule: the director moves it while the work is not handed in (D-187)", () => {
+    expect(taskDetailModel(task(), [], DIRECTOR, NOW, undefined).deadlineMove).toBe("extend");
+    expect(taskDetailModel(task({ deadline: null }), [], DIRECTOR, NOW, undefined).deadlineMove).toBe("extend");
+    expect(taskDetailModel(task({ status: "scheduled" }), [], DIRECTOR, NOW, undefined).deadlineMove).toBe("extend");
+    // a request for time is answered by the same sheet
+    const asked = [message({ type: "system", content: "Просит срок", meta: { time_request: true, proposed_deadline: "2026-11-21T05:00:00Z" } })];
+    expect(taskDetailModel(task(), asked, DIRECTOR, NOW, undefined).deadlineMove).toBe("retime");
+    for (const status of ["pending_review", "done", "revoked", "declined"] as const) {
+      expect(taskDetailModel(task({ status, closed_at: "2026-11-20T05:00:00Z" }), [], DIRECTOR, NOW, undefined).deadlineMove).toBeNull();
+    }
+  });
+
+  it("the deadline capsule: the assignee asks for time, only on work in hand with a deadline (D-187)", () => {
+    expect(taskDetailModel(task(), [], EMPLOYEE, NOW, 0).deadlineMove).toBe("ask");
+    expect(taskDetailModel(task({ deadline: null }), [], EMPLOYEE, NOW, 0).deadlineMove).toBeNull();
+    expect(taskDetailModel(task({ status: "pending_review" }), [], EMPLOYEE, NOW, 0).deadlineMove).toBeNull();
+    // a manager reading a subordinate's task only reads
+    expect(taskDetailModel(task(), [], { role: "manager", userId: "u-man" }, NOW, undefined).deadlineMove).toBeNull();
+  });
+
+  it("a deadline moved since the assignee last read the task is news (D-187)", () => {
+    const moved = message({
+      type: "system",
+      sender_id: "u-dir",
+      content: "Срок перенесён раньше: до 20.11 17:00",
+      meta: { deadline_changed: true, old_deadline: "2026-11-21T12:00:00+00:00", new_deadline: "2026-11-20T12:00:00+00:00" },
+    });
+    const messages = [message({ content: "ok" }), moved];
+    expect(taskDetailModel(task(), messages, EMPLOYEE, NOW, moved.seq - 1).deadlineNews).toEqual({ from: "2026-11-21T12:00:00+00:00" });
+    expect(taskDetailModel(task(), messages, EMPLOYEE, NOW, moved.seq).deadlineNews).toBeNull();
+    // the cursor not known yet — no news yet; the director never gets it
+    expect(taskDetailModel(task(), messages, EMPLOYEE, NOW, undefined).deadlineNews).toBeNull();
+    expect(taskDetailModel(task(), messages, DIRECTOR, NOW, 0).deadlineNews).toBeNull();
   });
 
   it("the other side's word waits for the reader until the cursor is known", () => {

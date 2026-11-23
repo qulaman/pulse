@@ -6,27 +6,30 @@ import { ReactionBadge, ReactionBar } from "@/components/points/ReactionBar";
 import { DeliveryStatus } from "@/components/tasks/DeliveryStatus";
 import { QuickAnswers } from "@/components/tasks/director/QuickAnswers";
 import { Icon } from "@/components/tasks/icons";
-import { DirectorKeys, LifecycleNotes } from "@/components/tasks/list/DirectorTaskCard";
+import { DirectorKeys, LifecycleNotes, SCREEN_LABEL } from "@/components/tasks/list/DirectorTaskCard";
 import { EmployeeKeys, type EmployeeAction } from "@/components/tasks/list/EmployeeKeys";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
-import { Face, Stepper } from "@/components/tasks/list/TaskList";
+import { Face } from "@/components/tasks/list/TaskList";
 import { Note, RevokedNote, TimeRequestNote } from "@/components/tasks/TaskNotes";
 import { humanAqtobe } from "@/lib/ai/time";
 import { shortName } from "@/lib/people/names";
 import type { ReactionCode } from "@/lib/points/reactions";
 import type { TaskDetailModel } from "@/lib/tasks/detail-model";
-import { closedAtOf, stepsOf } from "@/lib/tasks/overview";
+import { isWorking } from "@/lib/tasks/lifecycle";
+import { closedAtOf, stepsOf, timeLeft } from "@/lib/tasks/overview";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import type { DeskAction } from "@/lib/tasks/reasons";
 import { reworkBannerText, TEXT, wordText } from "@/lib/tasks/status-text";
 import { TONE_VAR } from "@/lib/tasks/tone";
 
+import { DeadlineCapsule } from "./DeadlineCapsule";
+import { TaskPath, type PathClock } from "./TaskPath";
 import { WordBubble } from "./WordBubble";
 
 /**
  * The status screen of one task at the head of its own screen (D-87): the stage in its colour,
- * «when», the title, who, the four steps, what waits on the task, the buttons of this reader's
- * role and how much time is left. The buttons are the same as on the cards, so a button means
+ * «when» (the capsule that also changes it, D-187), the title, who, the four steps with the time
+ * gone, what waits on the task and the buttons of this reader's role. The buttons are the same as on the cards, so a button means
  * the same thing on the list and here.
  */
 export function TaskStatusCard({
@@ -41,11 +44,12 @@ export function TaskStatusCard({
   onAnswer,
   onDirectorKey,
   onEmployeeKey,
+  onDeadline,
 }: {
   task: TaskWithPeople;
   model: TaskDetailModel;
   now: Date;
-  /** The director's keys of this task (`cardKeysFor`); none for anybody else. */
+  /** The director's keys of this task (`screenKeysFor`); none for anybody else. */
   keys: DeskAction[];
   /** D-133: the director's reaction — a gold badge for the assignee. */
   reaction: ReactionCode | null;
@@ -57,9 +61,10 @@ export function TaskStatusCard({
   onAnswer: (text: string | null, deadlineIso?: string) => void;
   onDirectorKey: (key: DeskAction) => void;
   onEmployeeKey: (action: EmployeeAction) => void;
+  /** A tap on the deadline capsule (D-187): the director moves it, the assignee asks for time. */
+  onDeadline?: () => void;
 }) {
-  const { isDirector, mine, question, request, suggestion, waiting, tone, closed, urgentNow } = model;
-  const person = isDirector ? task.assignee?.full_name : task.author?.full_name;
+  const { isDirector, mine, question, request, suggestion, waiting, tone, from, to } = model;
 
   return (
     <article
@@ -76,63 +81,31 @@ export function TaskStatusCard({
             {model.word}
           </span>
         </span>
-        {/* «when»: the deadline while it matters, the closing time once it is over */}
-        <span
-          className="nums inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-semibold leading-4"
-          style={{
-            color: closed
-              ? "var(--text-muted)"
-              : urgentNow
-                ? "var(--warn)"
-                : // handed-in work has met its deadline: the date stays, the alarm goes — as in the list (D-173)
-                  task.deadline && task.status !== "pending_review"
-                  ? TONE_VAR[model.deadlineTone === "accent" ? "muted" : model.deadlineTone]
-                  : "var(--text-muted)",
-            borderColor: "color-mix(in srgb, currentColor 35%, transparent)",
-          }}
-        >
-          {/* a tick only for work accepted: a refusal or a recall is not «done» (D-173) */}
-          <Icon
-            name={
-              closed
-                ? task.status === "done"
-                  ? "check"
-                  : task.status === "declined"
-                    ? "hand"
-                    : task.passed_to
-                      ? "swap"
-                      : "undo"
-                : urgentNow
-                  ? "flame"
-                  : "clock"
-            }
-            size={13}
-          />
-          {closed
-            ? humanAqtobe(new Date(closedAtOf(task)), now)
-            : task.deadline
-              ? humanAqtobe(new Date(task.deadline), now)
-              : urgentNow
-                ? TEXT.urgent
-                : TEXT.noDeadline}
-        </span>
+        {/* «when» — the one place the deadline is said, and where it is changed (D-187) */}
+        <WhenCapsule task={task} model={model} now={now} onPress={onDeadline} />
       </div>
 
       <h1 className="mt-3 font-display text-[23px] font-bold leading-[29px] tracking-[-0.02em]">{task.title}</h1>
 
       <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[14px] leading-[19px] text-muted">
-        {person ? (
-          <span className="inline-flex min-w-0 items-center gap-1.5">
-            <Face name={person} size={22} />
-            {/* «Поручил» takes the name as it is: «от Тимур Сапаров» wanted a declension (D-173) */}
-            <span className="truncate text-text/90">{isDirector ? person : `Поручил ${person}`}</span>
+        {/* the people without a word for them (D-187): who gave it → who does it; the reader's own
+            side is left out — the director's own order shows its assignee, the assignee's its author */}
+        {from || to ? (
+          <span className="inline-flex min-w-0 items-center gap-1.5" data-testid="task-people">
+            {from ? <Person name={from} short={Boolean(to)} /> : null}
+            {from && to ? (
+              <span className="text-muted/80" aria-label="поручил">
+                <Icon name="right" size={13} />
+              </span>
+            ) : null}
+            {to ? <Person name={to} short={false} /> : null}
           </span>
         ) : null}
         {/* when it was handed out is the first step below; only «уйдёт» is news here */}
         {task.status === "scheduled" && task.scheduled_send_at ? (
           <span className="nums">· уйдёт {humanAqtobe(new Date(task.scheduled_send_at), now)}</span>
         ) : null}
-        {task.priority === "high" && task.deadline && !closed ? (
+        {task.priority === "high" && task.deadline && !model.closed ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-warn/12 px-2 py-0.5 text-[12px] font-semibold leading-4 text-warn">
             <Icon name="flame" size={12} />
             {TEXT.urgent}
@@ -143,10 +116,9 @@ export function TaskStatusCard({
       {!isDirector && reaction ? <ReactionBadge code={reaction} points={reactionPoints} className="mt-3" /> : null}
 
       <div className="mt-4">
-        {/* the assignee hears the deadline twice — the pill above and «осталось» below; a third time
-            under the station («Принять до 18:09») read as a deadline to accept by (D-173) */}
-        {/* the holder reads a new one as «Ждёт вас», not «В работе» (D-173) */}
-        <Stepper steps={stepsOf(task, now, { declinedAt: model.declinedAt, forAssignee: mine })} now={now} deadline={mine ? null : task.deadline} />
+        {/* the date is the capsule's; the path says how much of the time is gone (D-187). The holder
+            reads a new one as «Ждёт вас», not «В работе» (D-173) */}
+        <TaskPath steps={stepsOf(task, now, { declinedAt: model.declinedAt, forAssignee: mine })} now={now} clock={clockOf(task, now)} />
       </div>
 
       {/* what waits on this task: the employee's question, a refusal, a return, a recall */}
@@ -205,7 +177,9 @@ export function TaskStatusCard({
       ) : null}
 
       {/* the buttons of this role — the same as on the card */}
-      {isDirector ? <DirectorKeys keys={keys} reason={model.reason} request={request} suggestion={suggestion} now={now} onPress={onDirectorKey} /> : null}
+      {isDirector ? (
+        <DirectorKeys keys={keys} reason={model.reason} request={request} suggestion={suggestion} now={now} onPress={onDirectorKey} labels={SCREEN_LABEL} />
+      ) : null}
       {canReact ? <ReactionBar taskId={task.id} pointsEnabled={pointsEnabled} className="mt-3" /> : null}
       {/* only the assignee answers: a manager opening a subordinate's task reads it, no more */}
       {mine ? (
@@ -221,23 +195,69 @@ export function TaskStatusCard({
         )
       ) : null}
 
-      {/* the foot: how much time is left, and — for the director — whether the push was seen */}
-      <div className="mt-4 border-t border-border/60 pt-3">
-        <p className="text-[13px] font-semibold leading-[18px]" style={{ color: TONE_VAR[model.left.tone] }} data-testid="time-left">
-          {model.left.text}
-        </p>
-        {model.left.used !== null ? (
-          <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-surface-2">
-            <span
-              className="block h-full origin-left rounded-full"
-              style={{ transform: `scaleX(${Math.max(0.02, model.left.used)})`, background: TONE_VAR[model.left.tone] }}
-            />
-          </span>
-        ) : null}
-        {isDirector && task.status !== "scheduled" && task.status !== "revoked" ? (
+      {/* the foot — for the director, whether the push was seen (принцип 8): «не открывал с 9:14» */}
+      {isDirector && task.status !== "scheduled" && task.status !== "revoked" ? (
+        <div className="mt-3 border-t border-border/60 pt-1">
           <DeliveryStatus taskId={task.id} status={task.status} assigneeId={task.assignee_id} onSendNow={() => onDirectorKey("sendNow")} />
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </article>
   );
+}
+
+/** A face and a name; the giver is shortened when the doer stands next to him. */
+function Person({ name, short }: { name: string; short: boolean }) {
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1.5">
+      <Face name={name} size={22} />
+      <span className="truncate text-text/90">{short ? shortName(name) : name}</span>
+    </span>
+  );
+}
+
+/** How much of the time to the deadline is gone — the ring of the station the work waits at. */
+function clockOf(task: TaskWithPeople, now: Date): PathClock | null {
+  if (!task.deadline || !isWorking(task.status)) return null;
+  const left = timeLeft(task, now);
+  return left.used === null ? null : { used: left.used, color: TONE_VAR[left.tone] };
+}
+
+/**
+ * The capsule of the head (D-187): the closing time of history; the deadline in its colour; «срочно»
+ * when that is all the «when» there is; for the director an empty slot to give one. The assignee of
+ * a task without a deadline sees nothing there — no capsule is the answer.
+ */
+function WhenCapsule({ task, model, now, onPress }: { task: TaskWithPeople; model: TaskDetailModel; now: Date; onPress?: () => void }) {
+  const { closed, urgentNow, deadlineMove, deadlineNews } = model;
+  const press = deadlineMove ? onPress : undefined;
+  if (closed) {
+    const text = humanAqtobe(new Date(closedAtOf(task)), now);
+    // a tick only for work accepted: a refusal or a recall is not «done» (D-173)
+    const icon = task.status === "done" ? "check" : task.status === "declined" ? "hand" : task.passed_to ? "swap" : "undo";
+    return <DeadlineCapsule taskId={task.id} look="bare" icon={icon} text={text} rollKey="closed" color="var(--text-muted)" label={`Закрыта ${text}`} />;
+  }
+  if (task.deadline) {
+    const text = humanAqtobe(new Date(task.deadline), now);
+    // handed-in work has met its deadline: the date stays, the alarm goes — as in the list (D-173)
+    const color = task.status === "pending_review" ? "var(--text-muted)" : TONE_VAR[model.deadlineTone === "accent" ? "muted" : model.deadlineTone];
+    const label = deadlineMove === "ask" ? `Сдать ${text}. Попросить больше времени` : press ? `Сдать ${text}. Изменить` : `Сдать ${text}`;
+    return (
+      <DeadlineCapsule
+        taskId={task.id}
+        look="pill"
+        icon="clock"
+        text={text}
+        rollKey={task.deadline}
+        color={color}
+        label={label}
+        onPress={press}
+        news={deadlineNews ? { from: deadlineNews.from ? humanAqtobe(new Date(deadlineNews.from), now) : null } : null}
+      />
+    );
+  }
+  if (urgentNow) {
+    return <DeadlineCapsule taskId={task.id} look="pill" icon="flame" text={TEXT.urgent} rollKey="urgent" color="var(--warn)" label={press ? "Срочно, время не названо. Назначить" : "Срочно, время не названо"} onPress={press} />;
+  }
+  if (!press) return null;
+  return <DeadlineCapsule taskId={task.id} look="empty" icon="clockPlus" text={null} rollKey="none" color="var(--text-muted)" label="Назначить срок" onPress={press} />;
 }

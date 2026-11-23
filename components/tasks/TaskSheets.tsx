@@ -81,18 +81,22 @@ type CantPick = { kind: "time"; iso: string } | { kind: "decline"; reason: strin
  *    director with the name; «Не знаю кому» returns it without one;
  *  - «Не смогу сделать» — the refusal, with its reason chip, as before.
  * The words in the field go with whichever path is taken. Two taps from the card, as before.
+ * `timeOnly` — opened from the deadline capsule of the task's screen (D-187): the time alone, under
+ * its own question; a refusal is the card's «Не могу».
  */
 export function CantSheet({
   open,
   onClose,
   status,
   deadline,
+  timeOnly = false,
   onTime,
   onDecline,
   onPass,
 }: BaseProps & {
   status: TaskStatus;
   deadline: string | null;
+  timeOnly?: boolean;
   onTime: (iso: string, words: string) => void;
   /** the reason with the employee's words already joined */
   onDecline: (reason: string) => void;
@@ -100,9 +104,9 @@ export function CantSheet({
   onPass: (words: string) => void;
 }) {
   return (
-    <Sheet open={open} onClose={onClose} title={TEXT.cantTitle}>
+    <Sheet open={open} onClose={onClose} title={timeOnly ? TEXT.cantTime : TEXT.cantTitle}>
       {/* born with every opening: the chips count from the clock and the deadline of this moment */}
-      <CantBody status={status} deadline={deadline} onTime={onTime} onDecline={onDecline} onPass={onPass} onClose={onClose} />
+      <CantBody status={status} deadline={deadline} timeOnly={timeOnly} onTime={onTime} onDecline={onDecline} onPass={onPass} onClose={onClose} />
     </Sheet>
   );
 }
@@ -110,6 +114,7 @@ export function CantSheet({
 function CantBody({
   status,
   deadline,
+  timeOnly,
   onTime,
   onDecline,
   onPass,
@@ -117,6 +122,7 @@ function CantBody({
 }: {
   status: TaskStatus;
   deadline: string | null;
+  timeOnly: boolean;
   onTime: (iso: string, words: string) => void;
   onDecline: (reason: string) => void;
   onPass: (words: string) => void;
@@ -140,7 +146,9 @@ function CantBody({
         ? pick.reason === NOT_MINE
           ? TEXT.cantReturn
           : BUTTON.declineSend
-        : TEXT.cantPick;
+        : timeOnly
+          ? TEXT.cantPickTime
+          : TEXT.cantPick;
 
   const submit = () => {
     if (!pick) return;
@@ -152,7 +160,7 @@ function CantBody({
 
   return (
     <div data-testid="cant-sheet">
-      <GroupLabel>{TEXT.cantTime}</GroupLabel>
+      {timeOnly ? null : <GroupLabel>{TEXT.cantTime}</GroupLabel>}
       <div className="flex flex-wrap gap-2">
         {choices.map((choice) => (
           <Chip
@@ -191,6 +199,8 @@ function CantBody({
         </div>
       ) : null}
 
+      {timeOnly ? null : (
+        <>
       <GroupLabel>{TEXT.cantNotMine}</GroupLabel>
       <div className="flex flex-wrap gap-2">
         <Chip data-testid="cant-pass" onClick={() => onPass(words.trim())}>
@@ -209,11 +219,13 @@ function CantBody({
           </Chip>
         ))}
       </div>
+        </>
+      )}
 
       <textarea
         className={`${FIELD_CLASS} mt-4`}
         rows={2}
-        placeholder={TEXT.cantWords}
+        placeholder={timeOnly ? TEXT.cantTimeWords : TEXT.cantWords}
         value={words}
         onChange={(event) => setWords(event.target.value)}
       />

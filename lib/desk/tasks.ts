@@ -1,5 +1,5 @@
 import { aqtobeDay, humanAqtobe } from "@/lib/ai/time";
-import { addDays, hmFrom, todayYmd, weekdayOf } from "@/lib/datetime/calendar";
+import { hmFrom } from "@/lib/datetime/calendar";
 import { ARCHIVE_STATUSES, type ArchiveStatus } from "@/lib/desk/archive";
 import { formatNum } from "@/lib/desk/format";
 import type { BoardTask } from "@/lib/pulse/board";
@@ -912,32 +912,8 @@ export function cursorStep(ids: readonly string[], current: string | null, delta
 
 /* ---- dates of the deadline picker (Aqtobe wall clock, +05:00; the days are lib/datetime/calendar's) ---- */
 
-/** The instant a wall day and time name, with the offset written out — what the deadline routes take. */
-export function wallIso(ymd: string, hm: string): string {
-  return `${ymd}T${hm}:00+05:00`;
-}
-
-export type DeadlinePreset = { label: string; iso: string | null };
-
-/**
- * The deadline picker's quick choices (digits 1…6): the phone's three (D-51) — today 18:00 while
- * the working day still has an hour left, tomorrow 9:00 and 13:00 — the week's end (Friday 18:00,
- * or Monday 9:00 from Friday on), a week ahead, and «без срока».
- */
-export function deadlinePresets(now: Date = new Date(), { none = true }: { none?: boolean } = {}): DeadlinePreset[] {
-  const today = todayYmd(now);
-  const presets: DeadlinePreset[] = [];
-  const evening = wallIso(today, "18:00");
-  if (new Date(evening).getTime() - now.getTime() > 60 * 60_000) presets.push({ label: "Сегодня 18:00", iso: evening });
-  presets.push({ label: "Завтра 9:00", iso: wallIso(addDays(today, 1), "09:00") });
-  presets.push({ label: "Завтра 13:00", iso: wallIso(addDays(today, 1), "13:00") });
-  const weekday = weekdayOf(today);
-  if (weekday <= 3) presets.push({ label: "В пятницу 18:00", iso: wallIso(addDays(today, 4 - weekday), "18:00") });
-  else presets.push({ label: "В понедельник 9:00", iso: wallIso(addDays(today, 7 - weekday), "09:00") });
-  presets.push({ label: "Через неделю", iso: wallIso(addDays(today, 7), "18:00") });
-  if (none) presets.push({ label: "Без срока", iso: null });
-  return presets;
-}
+// the picker's quick choices (digits 1…6) are the phone's sheet's too: one set in lib/tasks
+export { deadlinePresets, wallIso, type DeadlinePreset } from "@/lib/tasks/deadline-choices";
 
 /**
  * What a person types into the time box, as «HH:MM»: «9» → 09:00, «930» → 09:30, «18.30» → 18:30,

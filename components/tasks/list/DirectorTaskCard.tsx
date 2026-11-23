@@ -107,6 +107,33 @@ export function cardKeysFor(task: TaskWithPeople, flags: CardFlags, now: Date): 
 }
 
 /**
+ * The buttons of the task's own screen (D-187): the deadline is its capsule there, so «Срок»
+ * leaves the row — but for a late task, where a new date IS the move («Перенести»); «Отозвать»
+ * lives in «⋯», a step away from a slip of the thumb. Two keys of the rest fill the row.
+ */
+export function screenKeysFor(task: TaskWithPeople, flags: CardFlags, now: Date): DeskAction[] {
+  const overdue = isOverdue(task, now);
+  const off = (key: DeskAction) => key === "open" || key === "answer" || key === "revoke" || key === "remove" || (key === "extend" && !overdue);
+  const keys: DeskAction[] = keysFor(task, {
+    question: flags.question,
+    request: flags.request,
+    suggestion: flags.suggestion,
+    overdue,
+    waiting: isWaiting(task, now),
+  }).filter((key) => !off(key));
+  const all = allActionsFor(task, flags);
+  for (const action of all) {
+    if (keys.length >= 2) break;
+    if (!off(action) && !keys.includes(action)) keys.push(action);
+  }
+  // one order on every task: «Напомнить» before «Передать», however the row was filled
+  return keys.sort((a, b) => all.indexOf(a) - all.indexOf(b));
+}
+
+/** On the task's own screen a late task's new date is a verb, not the noun of the list. */
+export const SCREEN_LABEL: Partial<Record<DeskAction, string>> = { extend: "Перенести" };
+
+/**
  * The loud button: only a move that closes the director's turn — accept, insist, grant, hand
  * over, send a held task now (D-129), or a late task's new date.
  */
@@ -139,6 +166,7 @@ export function DirectorKeys({
   suggestion,
   now,
   onPress,
+  labels,
 }: {
   keys: DeskAction[];
   reason: DeskReason | null;
@@ -146,6 +174,8 @@ export function DirectorKeys({
   suggestion: Suggestion | null;
   now: Date;
   onPress: (key: DeskAction) => void;
+  /** A screen's own words for a key (the task's screen says «Перенести»). */
+  labels?: Partial<Record<DeskAction, string>>;
 }) {
   if (keys.length === 0) return null;
   const wide = wideLabelOf(keys[0]!, request, suggestion, now);
@@ -168,7 +198,7 @@ export function DirectorKeys({
   };
   const grid = (list: DeskAction[], offset: number) => (
     <div className={`grid gap-2 ${list.length === 3 ? "grid-cols-3" : list.length === 2 ? "grid-cols-2" : "grid-cols-1"}`}>
-      {list.map((key, index) => button(key, index + offset, key === "remove" ? "Удалить" : LABEL[key], list.length))}
+      {list.map((key, index) => button(key, index + offset, key === "remove" ? "Удалить" : (labels?.[key] ?? LABEL[key]), list.length))}
     </div>
   );
   return (
@@ -201,7 +231,8 @@ export function LifecycleNotes({
         <Note tone="warn" icon={<Icon name="clock" size={15} />}>
           Просит срок {untilWords(request.proposed, now)}
           {request.words ? ` · «${request.words}»` : ""}
-          <span className="text-muted">{task.deadline ? ` · сейчас ${humanAqtobe(new Date(task.deadline), now)}` : " · сейчас без срока"}</span>
+          {/* the old date to weigh the new one against; none — nothing to compare, the capsule says it */}
+          {task.deadline ? <span className="text-muted"> · сейчас {humanAqtobe(new Date(task.deadline), now)}</span> : null}
         </Note>
       ) : null}
       {suggestion && task.status === "declined" ? (

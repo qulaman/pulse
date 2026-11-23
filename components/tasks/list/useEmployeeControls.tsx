@@ -18,7 +18,8 @@ import { flyAway, flyInto } from "@/lib/ui/flyAway";
 
 import type { EmployeeAction } from "./EmployeeKeys";
 
-type SheetState = { name: "ask" | "cant" | "report" | "pass"; taskId: string; words?: string } | null;
+/** `timeOnly` — «Не могу» opened from the deadline capsule: only its «Нужно больше времени» (D-187). */
+type SheetState = { name: "ask" | "cant" | "report" | "pass"; taskId: string; words?: string; timeOnly?: boolean } | null;
 
 /**
  * What the employee's three buttons do, wherever a task shows them — a card of «Мои дела»
@@ -51,8 +52,12 @@ export function useEmployeeControls({
   const [heldId, setHeldId] = useState<string | null>(null);
   const sheetTask = tasks.find((task) => task.id === (sheet?.taskId ?? heldId)) ?? null;
 
+  // …and the shape it was opened in: a «Не могу» from the capsule keeps its one group while it leaves
+  const [heldTimeOnly, setHeldTimeOnly] = useState(false);
+
   const open = (next: NonNullable<SheetState>) => {
     setHeldId(next.taskId);
+    setHeldTimeOnly(Boolean(next.timeOnly));
     setSheet(next);
   };
 
@@ -77,6 +82,10 @@ export function useEmployeeControls({
       if (card && face) flyInto(card, face, { onLand: flight?.onLand });
       return;
     }
+    if (action === "time") {
+      open({ name: "cant", taskId: task.id, timeOnly: true });
+      return;
+    }
     reportCard.current = action === "complete" && card ? { taskId: task.id, node: card } : null;
     open({ name: action === "complete" ? "report" : action === "decline" ? "cant" : action, taskId: task.id });
   };
@@ -98,6 +107,7 @@ export function useEmployeeControls({
           onClose={() => setSheet((was) => (was?.name === "cant" ? null : was))}
           status={sheetTask.status}
           deadline={sheetTask.deadline}
+          timeOnly={sheet?.name === "cant" ? Boolean(sheet.timeOnly) : heldTimeOnly}
           onTime={(iso, words) => {
             haptic(12);
             actions.requestTime({ taskId: sheetTask.id, fromStatus: sheetTask.status, proposedIso: iso, words: words || undefined });

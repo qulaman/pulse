@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 
-import { cardKeysFor } from "@/components/tasks/list/DirectorTaskCard";
+import { screenKeysFor } from "@/components/tasks/list/DirectorTaskCard";
 import { useDirectorControls } from "@/components/tasks/list/useDirectorControls";
 import { useEmployeeControls } from "@/components/tasks/list/useEmployeeControls";
 import { ThreadView } from "@/components/tasks/thread/ThreadView";
@@ -69,8 +69,12 @@ export function TaskDetail({
   const actions = isDirector ? director.actions : base;
 
   const keys: DeskAction[] = isDirector
-    ? cardKeysFor(task, { question: Boolean(question), request: Boolean(request), suggestion: Boolean(suggestion) }, now)
+    ? screenKeysFor(task, { question: Boolean(question), request: Boolean(request), suggestion: Boolean(suggestion) }, now)
     : [];
+  // the capsule of the head (D-187): the director moves the deadline (answering a request for time,
+  // when there is one), the assignee asks for more
+  const move = model.deadlineMove;
+  const onDeadline = move === "ask" ? () => employee.press("time", task) : move ? () => director.press(move, task) : undefined;
 
   // D-133: the director's reaction — a row of seven for the director, a gold badge for the assignee
   const pointsEnabled = usePointsEnabled().data === true;
@@ -110,6 +114,7 @@ export function TaskDetail({
         onAnswer={(text, deadlineIso) => director.answer(task, text, deadlineIso)}
         onDirectorKey={(key) => director.press(key, task)}
         onEmployeeKey={(action) => employee.press(action, task)}
+        onDeadline={onDeadline}
       />
 
       <TaskAbout task={task} model={model} rule={rule} />

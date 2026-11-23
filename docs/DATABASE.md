@@ -197,7 +197,7 @@ create policy things_select on things for select using (
 | `transition_task` | по матрице §8.1 | переход и в той же транзакции причина, комментарий или отчёт; из `rework` сам проходит через `accepted` (D-130) | да |
 | `revoke_task` | директор | `scheduled` удаляет, остальное отзывает (D-01) | да |
 | `send_task_now` | директор | отложенная и её ждущие пуши команде уходят сейчас (D-129) | да |
-| `extend_task_deadline` | директор | новый срок со словами, закрывает просьбу о сроке | да |
+| `extend_task_deadline` | директор | новый срок со словами, закрывает просьбу о сроке; у `scheduled` меняет только дату — без строки в треде и пуша, не раньше отправки (`deadline_before_send`); прошедшее время — `deadline_in_past`; тот же срок — ничего не пишет, отвечает `unchanged` | да |
 | `reassign_task` | директор | копия новому исполнителю, исходная отозвана с `passed_to` | да |
 | `request_deadline` | исполнитель | просьба о сроке; на `sent` заодно принимает | да |
 | `answer_deadline_request` | директор | «Согласовать» или «Оставить прежний» | да |
@@ -309,7 +309,7 @@ create policy things_select on things for select using (
 
 ### 8.2. Стражи полей
 
-- `trg_tasks_field_guard` — не директор и не автор меняет только `status`; без перехода штампы заморожены.
+- `trg_tasks_field_guard` — `deadline` меняет только директор и только у открытой задачи (`scheduled`, `sent`, `accepted`, `in_progress`, `rework`, `pending_review`); не директор и не автор меняет только `status`; без перехода штампы заморожены.
 - `trg_profiles_guard` — не директор не меняет роль, компанию, `is_active`, руководителя, серию; секретарь на чужой строке меняет, но не директору и не в директоры; `avatar_url` — только директор и секретарь.
 - `trg_recurrence_rules_schedule` — расписание повтора: от ближайшего невыданного дня, после правки — от «сейчас»; человек не меняет владельца и служебные поля.
 - `trg_notes_branch_guard`, `trg_notes_branch_cascade`, `trg_notes_branch_follow` — подпункт только у живого пункта той же доски; корзина и переезд — веткой.
@@ -328,7 +328,7 @@ Service role проходит стражи `tasks` и `profiles` без пров
 - `trg_tv_events_task`, `trg_tv_events_points` (только поощрение, не авто-правило, не тихое), `trg_tv_events_announcement`, `trg_tv_events_order` пишут через `tv_emit()` обе копии `payload`. Правка пункта трогает доску (`trg_notes_mind_board`), версию `tv_state` поднимают `trg_mind_boards_touch_tv`, `trg_tasks_board_touch_tv` и функции визитов; `trg_tv_state_board_point` гасит подсветку при смене доски или сцены.
 - `trg_tasks_points` — авто-очки (`quick_accept`, `early` — в первой половине срока, `on_time`, выключенный `late`) и серия; только при `points_enabled`, «команде», не за свою задачу.
 - `trg_ether_events_praise`, `trg_ether_events_merch` — строки Эфира.
-- `trg_question_answered` — первое сообщение автора закрывает открытые вопросы; `trg_close_time_requests` — задача ушла из рук, просьба о сроке закрыта.
+- `trg_question_answered` — первое сообщение автора закрывает открытые вопросы; его служебная строка (`system`: новый срок, передача) — только вопросы о времени («Когда срок?», то же правило, что `WHEN` в `lib/tasks/answers.ts`); `trg_close_time_requests` — задача ушла из рук, просьба о сроке закрыта.
 - `trg_profiles_deactivated` — увольнение любым путём удаляет сессии, push-подписки, открытые коды.
 - `trg_events_reset_reminder`, `trg_notes_reset_reminder` — перенос времени обнуляет отметку напоминания.
 

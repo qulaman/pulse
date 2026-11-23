@@ -11,13 +11,12 @@ import { Icon } from "@/components/tasks/icons";
 import { Button } from "@/components/ui/Button";
 import { Sheet, SHEET_CLOSE_MS } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
-import { humanAqtobe } from "@/lib/ai/time";
 import { haptic } from "@/lib/haptics";
 import { shortName } from "@/lib/people/names";
 import { peopleQuery } from "@/lib/people/queries";
 import { useRecurrenceRules, useUpdateRule } from "@/lib/recurrence/queries";
 import type { DeskAction } from "@/lib/tasks/reasons";
-import { reassignNeedsDeadline, type Suggestion, type TimeRequest } from "@/lib/tasks/lifecycle";
+import { reassignNeedsDeadline, untilWords, type Suggestion, type TimeRequest } from "@/lib/tasks/lifecycle";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 
@@ -99,9 +98,11 @@ export function useDirectorControls({
       base.transition(input);
       if (task && input.toStatus === "rework") toast(named("На доработку", task));
     },
+    // a deadline picked by hand waits out «Отменить»: the employee's phone hears of it after (D-187)
     extend: (input) => {
-      base.extend(input);
-      toast(input.deadlineIso ? `Срок: ${humanAqtobe(new Date(input.deadlineIso), now)}` : "Теперь без срока");
+      const task = byId(input.taskId);
+      const words = input.deadlineIso ? `Сдать ${untilWords(input.deadlineIso, now)}` : "Без срока";
+      base.extend({ ...input, undo: task ? named(words, task) : words });
     },
     reissue: (input) => base.reissue({ ...input, onOpen: (id) => router.push(`/tasks/${id}`) }),
     reassign: (input) => base.reassign({ ...input, onOpen: (id) => router.push(`/tasks/${id}`) }),
@@ -251,6 +252,8 @@ export function useDirectorControls({
           deadline={sheetTask.deadline}
           actions={{
             ...actions,
+            // the date that rides with an answer in words goes with it, at once — no «Отменить» of its own
+            extend: base.extend,
             sendMessage: (input) => {
               actions.sendMessage(input);
               toast(named("Ответ ушёл", sheetTask));

@@ -85,6 +85,9 @@ export const TEXT = {
   cantRefuse: "Не смогу сделать",
   cantWords: "Пару слов директору — по желанию",
   cantPick: "Выберите, что мешает",
+  // the deadline capsule asks for time alone (D-187)
+  cantPickTime: "Выберите время",
+  cantTimeWords: "Почему — пару слов директору, по желанию",
   cantReturn: "Вернуть директору",
   passTitle: "Кому лучше передать?",
   passHint: "Задача вернётся директору с вашей подсказкой — решит он",

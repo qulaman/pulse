@@ -6,7 +6,8 @@ import { BUTTON, type TaskStatus } from "@/lib/tasks/status-text";
 
 import { Icon } from "../icons";
 
-export type EmployeeAction = "accept" | "ask" | "decline" | "complete";
+/** `time` — the deadline capsule of the task's screen: «Нужно больше времени» alone (D-187), no key of its own. */
+export type EmployeeAction = "accept" | "ask" | "decline" | "complete" | "time";
 
 /** A key of a new order's row: its words' width plus an equal share, as on Лента's card (D-173). */
 const KEY = "min-w-0 flex-auto !px-2 whitespace-nowrap [&>span]:gap-1";

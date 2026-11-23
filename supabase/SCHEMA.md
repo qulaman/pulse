@@ -4,7 +4,7 @@
 
 Зачем он нужен. Схема базы — результат всех миграций по порядку. Функция при каждой правке записывается целиком заново, поэтому одно имя встречается в нескольких файлах, а действует только последнее определение. Указатель говорит, где оно лежит. Перед правкой функции открой файл из столбца «Действует» и копируй тело оттуда, а не из первого найденного поиском.
 
-Миграций — 83, строк — 23847. Функций — 214, их определений — 332; устаревших тел — 9018 строк (38 % текста миграций).
+Миграций — 84, строк — 24079. Функций — 214, их определений — 335; устаревших тел — 9182 строк (38 % текста миграций).
 
 ## Функции
 
@@ -66,7 +66,7 @@
 | `events_due_reminders` | `20260918150000_calendar_events.sql:656` | 1 |
 | `events_reset_reminder` | `20260918150000_calendar_events.sql:216` | 1 |
 | `excuse_daily_report` | `20261118120000_daily_report_remind_excuse.sql:74` | 1 |
-| `extend_task_deadline` | `20260926120000_task_lifecycle.sql:418` | 2 |
+| `extend_task_deadline` | `20261123120000_deadline_fixes.sql:17` | 3 |
 | `fn_rating` | `20260922120100_errands.sql:44` | 2 |
 | `is_event_participant` | `20260918150000_calendar_events.sql:80` | 1 |
 | `issue_login_code` | `20261104130000_ops_console.sql:1510` | 2 |
@@ -174,13 +174,13 @@
 | `set_shop_order_status` | `20260917170000_shop_fixes.sql:225` | 2 |
 | `submit_daily_report` | `20261103120000_daily_report_soft_start.sql:122` | 2 |
 | `subordinates` | `20260907120000_foundation.sql:73` | 1 |
-| `task_question_answered` | `20260926120000_task_lifecycle.sql:599` | 2 |
+| `task_question_answered` | `20261123120000_deadline_fixes.sql:148` | 3 |
 | `task_sent_at` | `20261014120000_points_game.sql:61` | 1 |
 | `task_status_guard` | `20260926140000_send_now.sql:23` | 5 |
 | `task_status_message` | `20260907120100_tasks_and_messages.sql:125` | 1 |
 | `task_streak_of` | `20261014120000_points_game.sql:74` | 1 |
 | `tasks_board_touch_tv` | `20261021150000_board_live_week.sql:253` | 1 |
-| `tasks_field_guard` | `20261022120000_recurrence_live.sql:278` | 3 |
+| `tasks_field_guard` | `20261123120000_deadline_fixes.sql:183` | 4 |
 | `tasks_points` | `20261014120000_points_game.sql:93` | 1 |
 | `team_channel_alerts_due` | `20260924160000_push_followups.sql:124` | 1 |
 | `team_daily_report_day` | `20261118120000_daily_report_remind_excuse.sql:354` | 2 |

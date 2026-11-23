@@ -12,8 +12,9 @@ const BodySchema = z.strictObject({
 });
 
 /**
- * «Продлить»: the director moves (or removes) the deadline of an open task. One RPC —
- * the new date, a system line in the thread, a push to the assignee (principle 7).
+ * The deadline capsule and «Перенести» (D-187): the director moves (or removes) the deadline of an
+ * open task. One RPC — the new date, a system line in the thread, a push to the assignee (principle
+ * 7); a task held for later takes it quietly, a time behind is refused, the same date writes nothing.
  */
 export const POST = withAuth<z.infer<typeof BodySchema>>(
   ["director"],
@@ -31,7 +32,13 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     if (error) {
       return rpcFailure(
         error,
-        { task_not_found: NO_TASK, forbidden: NO_ACCESS, invalid_transition: [409, "Задача уже закрыта — срок менять нечему"] },
+        {
+          task_not_found: NO_TASK,
+          forbidden: NO_ACCESS,
+          deadline_in_past: [422, "Это время уже прошло — выберите позже"],
+          deadline_before_send: [422, "Задача уйдёт позже этого времени — выберите позже"],
+          invalid_transition: [409, "Задача закрыта — срок уже не меняется"],
+        },
         "extend_task_deadline",
       );
     }

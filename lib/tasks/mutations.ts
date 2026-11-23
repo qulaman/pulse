@@ -230,27 +230,45 @@ export function useSendNow() {
 /* «Продлить» and «Переназначить» — RPCs behind their own routes                 */
 /* -------------------------------------------------------------------------- */
 
-export type ExtendInput = { taskId: string; deadlineIso: string | null; requestId: string };
+export type ExtendInput = {
+  taskId: string;
+  deadlineIso: string | null;
+  requestId: string;
+  /**
+   * The receipt of a deadline the director picked himself: the call waits out «Отменить» (D-139),
+   * so a slip of the finger never reaches the employee's phone (D-187). A deadline that rides
+   * with an answer in words goes at once — the words are already on their way.
+   */
+  undo?: string;
+};
 
 export function useExtendDeadline() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: ExtendInput) => {
-      await postJson(`/api/tasks/${input.taskId}/deadline`, {
-        deadline_iso: input.deadlineIso,
-        client_request_id: input.requestId,
-      });
+      const path = `/api/tasks/${input.taskId}/deadline`;
+      const payload = { deadline_iso: input.deadlineIso, client_request_id: input.requestId };
+      if (input.undo) await holdForUndo({ id: input.requestId, path, payload, taskId: input.taskId, text: input.undo });
+      await postJson(path, payload);
     },
     onMutate: async (input) => {
-      const snapshot = await optimistic(queryClient, (old: unknown) => patchCached(old, input.taskId, { deadline: input.deadlineIso }));
+      const patch = (old: unknown) => patchCached(old, input.taskId, { deadline: input.deadlineIso });
+      const snapshot = await optimistic(queryClient, patch);
+      if (input.undo) overlays.set(input.requestId, patch);
       return { snapshot };
     },
-    onError: (error, _input, context) => {
-      if (context) restoreTasks(queryClient, context.snapshot);
+    onError: (error, input, context) => {
+      // one task goes back, not every list: another tap's window may be open on another task
+      if (input.undo) takeBack(queryClient, input, context?.snapshot);
+      else if (context) rollbackTask(queryClient, context.snapshot, input.taskId);
+      if (error instanceof Undone) return;
       toastError(error);
     },
-    onSettled: (_data, _error, input) => invalidateTasks(queryClient, input.taskId),
+    onSettled: (_data, _error, input) => {
+      settleWindow(input.requestId);
+      invalidateTasks(queryClient, input.taskId);
+    },
   });
 }
 

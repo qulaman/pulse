@@ -50,7 +50,7 @@
 | `/api/tasks/[id]/transition` | POST | все | переход статуса | `transition_task` |
 | `/api/tasks/[id]/revoke` | POST | Д | отозвать | `revoke_task` |
 | `/api/tasks/[id]/send-now` | POST | Д | отправить отложенную | `send_task_now` |
-| `/api/tasks/[id]/deadline` | POST | Д | срок | `extend_task_deadline` |
+| `/api/tasks/[id]/deadline` | POST | Д | срок; прошедшее время — 422 `deadline_in_past`, раньше отправки отложенной — 422 `deadline_before_send`, закрытая задача — 409 `invalid_transition` | `extend_task_deadline` |
 | `/api/tasks/[id]/reassign` | POST | Д | передать другому | `reassign_task` |
 | `/api/tasks/[id]/deadline-request` | POST | исполнитель | просить срок | `request_deadline` |
 | `/api/tasks/[id]/deadline-answer` | POST | Д | ответ на просьбу | `answer_deadline_request` |
