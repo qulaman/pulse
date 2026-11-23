@@ -246,6 +246,18 @@ html {
 .app-shell:has(main[data-board]) {
   height: 100dvh;
 }
+/* …and it stands still under the finger: the page neither scrolls nor springs back (an iPhone
+   pulls even a page that fits, with a scrollbar on the right), so a drag on the board moves
+   nothing and the tab bar, which folds on the page's scroll, stays open. The bands inside scroll
+   on their own. overscroll-behavior is said on both elements: the spec gives the viewport the
+   root's, and <body> costs nothing. Every other screen keeps its scroll, the folding head and bar. */
+html:has(main[data-board]) {
+  overflow: hidden;
+}
+html:has(main[data-board]),
+html:has(main[data-board]) body {
+  overscroll-behavior: none;
+}
 
 /* a bottom sheet is open: the page behind it must not scroll under the finger */
 body[data-sheet-open] {
