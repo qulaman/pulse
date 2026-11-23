@@ -41,15 +41,15 @@ function dayIndex(date: Date): number {
 }
 
 /**
- * The caption's time: «сдано 14:22» today, «сдано вчера в 14:22», «сдано 17 ноября» earlier in
+ * The caption's time: «готово в 14:22» today, «готово вчера в 14:22», «готово 17 ноября» earlier in
  * the week — when the report was handed in, or when the photo was sent if it has not been.
  */
 export function handedIn(photo: Pick<TvPhoto, "at" | "done_at">, now: Date): string {
   const at = new Date(photo.done_at ?? photo.at);
   const days = dayIndex(now) - dayIndex(at);
-  if (days <= 0) return `сдано ${timeFmt.format(at)}`;
-  if (days === 1) return `сдано вчера в ${timeFmt.format(at)}`;
-  return `сдано ${dayFmt.format(at)}`;
+  if (days <= 0) return `готово в ${timeFmt.format(at)}`;
+  if (days === 1) return `готово вчера в ${timeFmt.format(at)}`;
+  return `готово ${dayFmt.format(at)}`;
 }
 
 /** The links live an hour: fresh for twenty minutes, asked again every half hour. */

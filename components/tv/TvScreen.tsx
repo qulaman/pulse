@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { lineOf } from "@/lib/tv/feed";
 import { momentOf } from "@/lib/tv/moment";
-import { overlayOf } from "@/lib/tv/overlay";
+import { noticesToStamp, overlayOf } from "@/lib/tv/overlay";
 import { useTvPhotos } from "@/lib/tv/photos";
 import { useTvBoard, useTvCalendar, useTvFeed, useTvFocus, useTvOverlay, useTvRating, useTvState, useTvSummary } from "@/lib/tv/queries";
 import { MONTH_DAYS, monthGridFrom } from "@/lib/tv/calendar";
@@ -91,6 +91,11 @@ export function TvScreen({
   useEffect(() => {
     if (photos.data) primeTvPhotos(photos.data);
   }, [photos.data]);
+  // when the wall first saw each notice: its full-screen minute and its chime count from here (D-185).
+  // State set while rendering, guarded: the second pass finds nothing left to stamp.
+  const [seen, setSeen] = useState<ReadonlyMap<string, number>>(() => new Map());
+  const toStamp = noticesToStamp(overlay.data, now, seen);
+  if (toStamp.length > 0) setSeen(new Map([...seen, ...toStamp.map((id): [string, number] => [id, now.getTime()])]));
   const offline = useOffline(summary.dataUpdatedAt);
 
   useNightReload();
@@ -130,11 +135,12 @@ export function TvScreen({
         calendar={calendar.data ?? null}
         calendarView={calendarView}
         board={scene === "board" ? (board.data ?? null) : null}
-        overlay={overlayOf(overlay.data, data?.events ?? [], now)}
+        overlay={overlayOf(overlay.data, data?.events ?? [], now, seen)}
         photos={photos.data ?? []}
         personPhotos={personPhotos.data ?? []}
         taskPhotos={taskPhotos.data ?? []}
         moment={momentOf(lines, now, guest)}
+        inRound={round.length > 0}
         // only the kiosk rings: the director peeking at /tv from a laptop is not the wall
         sound={role === "tv"}
       />

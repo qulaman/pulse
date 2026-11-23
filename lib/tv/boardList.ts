@@ -10,17 +10,28 @@ import { textLines } from "./boardText";
  *  - одна колонка, пока доска влезает крупно (три кегля, от большого к среднему);
  *  - две колонки, сбалансированные по высоте — ветка не рвётся между колонками;
  *  - дальше страницы по две колонки, ветка целиком на одной странице, номера сквозные.
- * Кегль подбирается под объём: три пункта — крупно, четырнадцать — мельче, но подпункт не
- * мельче 2.6 vh (читается с 3–4 м на 55"). Все размеры — в vh: 1080p, 4K и 55" одинаковы.
+ * Type comes only from the wall's scale (D-185, `tv-type.css`): a point is `tv-body` (5.6 vh), on a crowded
+ * board `tv-small` (4.4 vh); a sub-point and «→ Марат» are `tv-small`, nothing is smaller. What does not fit
+ * goes to pages, not to smaller type. All sizes are in vh: 1080p, 4K and 55" look the same.
  */
+
+/** The wall's type scale (`tv-type.css`), vh: size and line height. Nothing on the board is set smaller than `small`. */
+export const TV_TYPE = {
+  small: { size: 4.4, lh: 5.28 },
+  body: { size: 5.6, lh: 6.61 },
+  lead: { size: 7.4, lh: 8.14 },
+} as const;
+
+const BODY = TV_TYPE.body;
+const SMALL = TV_TYPE.small;
 
 /** Кегль списка: всё, из чего складывается высота ветки, — те же числа рисует `TvBoardList`. */
 export type ListTier = {
-  key: "xl" | "l" | "m" | "s" | "xs";
+  key: "l" | "m" | "s";
   /** Пункт: кегль и интерлиньяж. */
   size: number;
   lh: number;
-  /** Не больше строк у пункта, дальше многоточие. */
+  /** At most this many lines for a point: further lines are not drawn (no ellipsis, D-185). */
   lines: number;
   /** Кружок с номером и отступ от него до текста. */
   badge: number;
@@ -28,10 +39,14 @@ export type ListTier = {
   /** Поля подложки пункта (она же подсветка ведущего). */
   padX: number;
   padY: number;
-  /** «→ Марат» под пунктом. */
+  /**
+   * «→ Марат» — a plate on a line of its own under the text of a point or sub-point: type size, line
+   * height, top margin, the plate's side padding.
+   */
   tag: number;
   tagLh: number;
   tagTop: number;
+  tagPad: number;
   /** Подпункт: кегль, интерлиньяж, строк не больше. */
   sub: number;
   subLh: number;
@@ -46,12 +61,12 @@ export type ListTier = {
   rowGap: number;
 };
 
+/** A large point with air, a large point tighter, a `tv-small` point; a sub-point and a tag are always `tv-small`. */
+const TAG = { tag: SMALL.size, tagLh: SMALL.lh, tagPad: 1.2 } as const;
 export const LIST_TIERS: Record<ListTier["key"], ListTier> = {
-  xl: { key: "xl", size: 5.2, lh: 6.4, lines: 3, badge: 6.8, gap: 2.8, padX: 2.4, padY: 1.4, tag: 2.8, tagLh: 3.4, tagTop: 0.4, sub: 3.6, subLh: 4.6, subLines: 2, subTop: 1, subGap: 0.5, dot: 1.1, dotGap: 1.6, rowGap: 1.4 },
-  l: { key: "l", size: 4.4, lh: 5.6, lines: 3, badge: 6.2, gap: 2.6, padX: 2.4, padY: 1.3, tag: 2.6, tagLh: 3.2, tagTop: 0.4, sub: 3.2, subLh: 4.2, subLines: 2, subTop: 0.8, subGap: 0.4, dot: 1, dotGap: 1.5, rowGap: 1.2 },
-  m: { key: "m", size: 3.7, lh: 4.8, lines: 3, badge: 5.4, gap: 2.2, padX: 2, padY: 1.1, tag: 2.4, tagLh: 3, tagTop: 0.3, sub: 2.9, subLh: 3.8, subLines: 2, subTop: 0.7, subGap: 0.35, dot: 0.9, dotGap: 1.4, rowGap: 1 },
-  s: { key: "s", size: 3.1, lh: 4.1, lines: 2, badge: 4.6, gap: 2, padX: 1.8, padY: 0.9, tag: 2.2, tagLh: 2.8, tagTop: 0.2, sub: 2.7, subLh: 3.5, subLines: 2, subTop: 0.5, subGap: 0.3, dot: 0.8, dotGap: 1.2, rowGap: 0.8 },
-  xs: { key: "xs", size: 2.8, lh: 3.7, lines: 2, badge: 4.2, gap: 1.8, padX: 1.6, padY: 0.8, tag: 2.1, tagLh: 2.6, tagTop: 0.2, sub: 2.6, subLh: 3.3, subLines: 2, subTop: 0.4, subGap: 0.25, dot: 0.8, dotGap: 1.1, rowGap: 0.6 },
+  l: { key: "l", size: BODY.size, lh: BODY.lh, lines: 3, badge: 6.2, gap: 2.4, padX: 2.4, padY: 1.4, ...TAG, tagTop: 0.8, sub: SMALL.size, subLh: SMALL.lh, subLines: 2, subTop: 1, subGap: 0.6, dot: 1.1, dotGap: 1.6, rowGap: 1.6 },
+  m: { key: "m", size: BODY.size, lh: BODY.lh, lines: 3, badge: 5.6, gap: 2.2, padX: 2, padY: 1.1, ...TAG, tagTop: 0.6, sub: SMALL.size, subLh: SMALL.lh, subLines: 2, subTop: 0.8, subGap: 0.4, dot: 1, dotGap: 1.4, rowGap: 1 },
+  s: { key: "s", size: SMALL.size, lh: SMALL.lh, lines: 2, badge: 5, gap: 2, padX: 1.8, padY: 0.9, ...TAG, tagTop: 0.5, sub: SMALL.size, subLh: SMALL.lh, subLines: 2, subTop: 0.6, subGap: 0.3, dot: 0.9, dotGap: 1.2, rowGap: 0.8 },
 };
 
 /** Промежуток между двумя колонками. */
@@ -63,17 +78,15 @@ export const COLUMN_GAP = 5;
  * lights the point. Its height in vh by the size of the list; the width follows the drawing's
  * shape as the wall shows it (`shownRatio`).
  */
-export const THUMB_H: Record<ListTier["key"], number> = { xl: 20, l: 17, m: 14, s: 11, xs: 9.5 };
+export const THUMB_H: Record<ListTier["key"], number> = { l: 18, m: 14, s: 11 };
 
 /** Какие раскладки пробовать, от лучшей: одна колонка крупно, потом две, мельчая. */
 const CANDIDATES: readonly (readonly [1 | 2, ListTier["key"]])[] = [
-  [1, "xl"],
   [1, "l"],
   [1, "m"],
   [2, "l"],
   [2, "m"],
   [2, "s"],
-  [2, "xs"],
 ];
 /**
  * Страниц столько, сколько нужно этим кеглем: мельче незачем — всё равно есть следующая
@@ -83,6 +96,11 @@ const PAGE_TIER: ListTier["key"] = "s";
 const PAGE_TIERS: readonly ListTier["key"][] = ["l", "m", "s"];
 
 export type ListLeaf = { leaf: TvBoardLeaf; lines: number; tag: string | null };
+
+/** A sub-point's height: its lines and the «→ Марат» plate on a line of its own under them. */
+export function leafHeight(tier: ListTier, leaf: Pick<ListLeaf, "lines" | "tag">): number {
+  return leaf.lines * tier.subLh + (leaf.tag ? tier.tagTop + tier.tagLh : 0);
+}
 
 /** Ветка в списке: пункт, его номер на доске, сколько строк ему дано, подпункты. */
 export type ListRow = {
@@ -117,19 +135,13 @@ export function textWidths(tier: ListTier, width: number): { point: number; leaf
   return { point, leaf: point - tier.dot - tier.dotGap };
 }
 
-/** Текст подпункта с его пометкой — они в одной строке. */
-function leafText(leaf: TvBoardLeaf): string {
-  const tag = tagOf(leaf);
-  return tag ? `${wallText(leaf)} ${tag}` : wallText(leaf);
-}
-
 /** Высота ветки, если показать `shown` подпунктов из `children`. */
 function rowHeight(tier: ListTier, lines: number, tag: string | null, children: readonly ListLeaf[], more: number, thumb = 0): number {
   const text = textTop(tier) + lines * tier.lh + (tag ? tier.tagTop + tier.tagLh : 0) + (thumb > 0 ? tier.subTop + thumb : 0);
   let height = tier.padY * 2 + Math.max(tier.badge, text);
   const rows = children.length + (more > 0 ? 1 : 0);
   if (rows > 0) {
-    height += tier.subTop + children.reduce((sum, child) => sum + child.lines * tier.subLh, 0) + (more > 0 ? tier.subLh : 0);
+    height += tier.subTop + children.reduce((sum, child) => sum + leafHeight(tier, child), 0) + (more > 0 ? tier.subLh : 0);
     height += tier.subGap * (rows - 1);
   }
   return height;
@@ -146,7 +158,7 @@ export function rowsAt(items: readonly TvBoardItem[], tier: ListTier, width: num
     const lines = textLines(wallText(item), widths.point, tier.size, tier.lines, "point").lines;
     // a drawing at its own shape (a vertical one stays narrow), never wider than the words' room
     const thumb = item.sketch ? Math.min(THUMB_H[tier.key], widths.point / shownRatio(item.sketch)) : 0;
-    const all = item.children.map((leaf) => ({ leaf, lines: textLines(leafText(leaf), widths.leaf, tier.sub, tier.subLines, "leaf").lines, tag: tagOf(leaf) }));
+    const all = item.children.map((leaf) => ({ leaf, lines: textLines(wallText(leaf), widths.leaf, tier.sub, tier.subLines, "leaf").lines, tag: tagOf(leaf) }));
     let shown = all.length;
     let height = rowHeight(tier, lines, tag, all, 0, thumb);
     while (height > cap && shown > 0) {
@@ -261,12 +273,12 @@ export function pageOfPoint(layout: ListLayout, id: string | null): number | nul
 export type TitleFit = { size: number; lh: number; lines: number };
 
 const TITLE_FITS: readonly { size: number; lh: number; lines: number }[] = [
-  { size: 7, lh: 8, lines: 1 },
-  { size: 5.6, lh: 6.6, lines: 2 },
-  { size: 4.6, lh: 5.6, lines: 2 },
+  { ...TV_TYPE.lead, lines: 1 },
+  { ...BODY, lines: 2 },
+  { ...SMALL, lines: 2 },
 ];
 
-/** Название во всю ширину: одной строкой крупно, длинное — мельче в две, дальше многоточие. */
+/** The title across the full width: one line of `tv-lead`, a long one `tv-body` or `tv-small` in two, the rest not drawn. */
 export function titleFit(title: string, width: number): TitleFit {
   for (const fit of TITLE_FITS) {
     const { lines, clamped } = textLines(title, width, fit.size, fit.lines, "title");

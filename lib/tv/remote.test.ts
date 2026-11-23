@@ -102,10 +102,11 @@ describe("wallNow", () => {
     });
 
     it("карта — только когда она влезает на стену", () => {
-      expect(wallNow(onWall({ board_view: "map", board_point: "p3" }), PEOPLE, NOW, BOARDS, { boardPoints: POINTS })).toBe(
-        "Доска «Планёрка» · карта · пункт 3 из 7 · до 21:00",
+      expect(wallNow(onWall({ board_view: "map", board_point: "p3" }), PEOPLE, NOW, BOARDS, { boardPoints: POINTS.slice(0, 6) })).toBe(
+        "Доска «Планёрка» · карта · пункт 3 из 6 · до 21:00",
       );
-      const many = Array.from({ length: 13 }, (_, i) => `p${i + 1}`);
+      // seven points do not fit the wall as a map (D-185): the remote says nothing of a map
+      const many = Array.from({ length: 7 }, (_, i) => `p${i + 1}`);
       expect(wallNow(onWall({ board_view: "map" }), PEOPLE, NOW, BOARDS, { boardPoints: many })).toBe("Доска «Планёрка» · до 21:00");
       // пустая доска картой не рисуется
       expect(wallNow(onWall({ board_view: "map" }), PEOPLE, NOW, BOARDS, { boardPoints: [] })).toBe("Доска «Планёрка» · до 21:00");

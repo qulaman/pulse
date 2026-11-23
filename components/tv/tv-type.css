@@ -94,3 +94,31 @@
 html:has(.tv-wall) {
   scrollbar-gutter: auto;
 }
+
+/* ---- wave 2 (D-185): one grid, colour roles, one way to say «now» -------------------------- */
+
+:root {
+  /* colour roles: green means «now / live» and nothing else; gold means points and celebration;
+     everything else is white or muted. No amber and no red on the wall (D-45). */
+  --tv-live: var(--accent);
+  --tv-points: var(--gold);
+  /* text on a full-gold or full-accent plane (a moment) */
+  --tv-ink: #14110b;
+}
+
+/* Two columns on one line for every scene: the main matter in seven twelfths, the side (the mascot,
+   photos, a list) from the same x on every scene — the eye never hunts for the second column. */
+.tv-split {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  column-gap: var(--tv-gap);
+  min-height: 0;
+}
+
+/* The one way the wall marks what is happening now — the meeting under way, the point under
+   discussion, the current step of an order: a quiet accent plate and a bar on the left. The text
+   on it stays white. */
+.tv-now {
+  background: color-mix(in srgb, var(--tv-live) 16%, var(--bg));
+  box-shadow: inset 0.6vh 0 0 var(--tv-live);
+}

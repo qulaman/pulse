@@ -144,12 +144,18 @@ export function momentFixture(wallCase: string, base: number): TvMoment | null {
 
 /** Forty-two people: the team scene pages through them (D-185). */
 export function bigTeam(summary: TvSummary, guest: boolean): TvSummary {
-  const first = ["Айбек", "Асель", "Бауыржан", "Гульнара", "Дамир", "Жанар", "Ильяс", "Камила", "Нурсултан", "Сабина", "Тимур", "Улжан", "Фарида", "Шынгыс"];
-  const last = ["Абенов", "Жумабаева", "Касымов", "Мухамеджанова", "Оспанов", "Сарсенбаева", "Тулегенов"];
+  // a man's name with a man's surname, a woman's with a woman's: a mixed pair is the first thing
+  // anyone in Kazakhstan would notice on a demo
+  const men = ["Айбек", "Бауыржан", "Дамир", "Ильяс", "Нурсултан", "Тимур", "Шынгыс", "Ерлан", "Арман", "Канат", "Руслан"];
+  const women = ["Асель", "Гульнара", "Жанар", "Камила", "Сабина", "Улжан", "Фарида", "Айгерим", "Динара", "Мадина"];
+  const surnames = ["Абенов", "Жумабаев", "Касымов", "Мухамеджанов", "Оспанов", "Сарсенбаев", "Тулегенов", "Ахметов", "Нурланов", "Серикбаев"];
   const load = Array.from({ length: 42 }, (_, i) => {
-    // every pair once: the surname moves on by one each time the first names come round again
-    const name = `${first[i % first.length]} ${last[(i + Math.floor(i / first.length)) % last.length]}`;
-    return { name: guest ? name.split(" ")[0]! : name, active: (i * 7) % 6, overdue: 0 };
+    const woman = i % 2 === 1;
+    const pool = woman ? women : men;
+    const first = pool[Math.floor(i / 2) % pool.length]!;
+    const surname = surnames[(i * 3 + Math.floor(i / 20)) % surnames.length]!;
+    const name = `${first} ${woman ? `${surname}а` : surname}`;
+    return { name: guest ? first : name, active: (i * 7) % 6, overdue: 0 };
   });
   return { ...summary, load };
 }

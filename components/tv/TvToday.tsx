@@ -13,142 +13,169 @@ import { TvMascot } from "./TvMascot";
 /**
  * «Сегодня» is the wall's home (D-185): it stands between all the scenes of the round, on screen half the time.
  *
- * On the left of the grid, one number of the day, large: how many were done today, and while nothing is done, how
- * many are in progress; beside it two secondary figures (in progress, this week; zeros are not shown), under them the
- * next meeting and the day's rhythm by the hour with a «сейчас» mark (DayPulse). A day without a single number gets a
- * greeting by the hour in place of the number. On the right, the mascot and its phrase: news of the last minute and a
- * half, or a greeting. The top right corner is the channel mark; the mascot stands below it.
+ * Two columns of the wall's grid (`.tv-split`). The main one carries the day: one number, large — what is done today;
+ * behind a thin rule, the two figures beside it in a column (everything in work, done this week; zeros are not shown);
+ * from noon on, the day's rhythm by the hour (DayPulse); the next meeting at the bottom. The number always means the
+ * same — done today: a day with nothing done yet has the greeting by the hour in its place, never «в работе» standing
+ * in for it. The side column is the mascot's: it stands at the bottom band and says the news of the last minute and a
+ * half — or a greeting — in a speech bubble with a tail to it, not as a caption under it. The mascot is a quiet second
+ * thing on this scene: the number is what the room reads first. The top right corner is the channel mark's.
+ *
+ * Three sizes of type: the number (tv-hero), the figures beside it (tv-lead), every word (tv-body); a day without a
+ * number has its greeting at tv-title instead of the number.
  *
  * Only good news (D-45): no overdue, no declines, no «дел нет».
  */
 
 type Figure = { value: number; label: string };
 
-/** The day's one number and the two beside it — zeros are never shown. */
-function figuresOf(summary: TvSummary | null): { hero: Figure | null; more: Figure[] } {
+/** The day's one number — done today — and the two beside it; zeros are never shown. */
+function figuresOf(summary: TvSummary | null): { done: number | null; more: Figure[] } {
   const today = summary?.today ?? { sent: 0, done: 0, in_work: 0 };
   const week = (summary?.week ?? []).reduce((sum, day) => sum + day.done, 0);
-  const hero: Figure | null =
-    today.done > 0 ? { value: today.done, label: "сделано сегодня" } : today.in_work > 0 ? { value: today.in_work, label: "в работе" } : null;
+  const done = today.done > 0 ? today.done : null;
   const more: Figure[] = [];
-  if (today.done > 0 && today.in_work > 0) more.push({ value: today.in_work, label: "в работе" });
-  // beside «сделано сегодня» the week reads as its sibling; alone it says what it counts
-  if (week > 0) more.push({ value: week, label: today.done > 0 ? "за неделю" : "сделано за неделю" });
-  return { hero, more };
+  if (today.in_work > 0) more.push({ value: today.in_work, label: "всего в работе" });
+  // beside «готово сегодня» the week reads as its sibling; under a greeting it says what it counts
+  if (week > 0) more.push({ value: week, label: done ? "за неделю" : "готово за неделю" });
+  return { done, more };
 }
 
+/** The day's rhythm shows from noon: in the morning it is two bars and an empty scale — a placeholder, not a picture. */
+const PULSE_FROM_HOUR = 12;
+
+const EASE = [0.2, 0, 0, 1] as const;
+
 export function TvToday({ speech, summary, now }: { speech: TvSpeech; summary: TvSummary | null; now: Date }) {
-  const { hero, more } = figuresOf(summary);
+  const { done, more } = figuresOf(summary);
   const next = summary?.events[0] ?? null;
   const meeting = next ? meetingOf(next, now) : null;
-  // a day without numbers has the greeting for its headline: the face then only says the news
-  const greeting = hero ? null : greetingOf(now, summary?.today);
+  // a day without a number has the greeting for its headline: the face then only says the news
+  const greeting = done ? null : greetingOf(now, summary?.today);
   const said = greeting && speech.mood === "calm" ? null : speech.text;
+  const hour = aqtobeClock(now).h;
+  // a number of three digits stacks its figures under it: with a meeting below as well, the rhythm has no room left
+  const roomy = done === null || done < 100 || meeting === null;
+  const pulse = summary && hour >= PULSE_FROM_HOUR && roomy ? summary.pulse : null;
 
   return (
-    <div
-      className="grid h-full w-full grid-cols-[minmax(0,1fr)_60vh] gap-x-[8vh] px-[var(--tv-x)] pb-[var(--tv-gap)] pt-[var(--tv-y)]"
-      data-testid="tv-today"
-    >
-      <div className="flex min-w-0 flex-col justify-center">
-        <div className="flex flex-wrap items-end gap-x-[10vh] gap-y-[4vh]">
-          {hero ? (
-            <div data-testid="tv-today-hero">
-              <p className="tv-hero" style={{ color: "var(--tv-text)" }}>
-                {hero.value}
-              </p>
-              <p className="tv-body mt-[1.6vh] text-muted">{hero.label}</p>
+    <div className="tv-box" data-testid="tv-today">
+      <div className="tv-split min-h-0 flex-1">
+        <div className="flex min-w-0 flex-col justify-center gap-[6vh]">
+          {done ? (
+            // a number of three digits leaves no room beside it: the figures go under it, without the rule
+            <div className={done < 100 ? "flex items-end gap-[4vh]" : "flex flex-col gap-[4vh]"}>
+              {/* as wide as the number: under a narrow one the caption takes two lines */}
+              <div className="w-min shrink-0" data-testid="tv-today-hero">
+                <p className="tv-hero" style={{ color: "var(--tv-text)" }}>
+                  {done}
+                </p>
+                <p className="tv-body mt-[1.6vh] text-muted">готово сегодня</p>
+              </div>
+              {more.length > 0 ? (
+                <>
+                  {done < 100 ? (
+                    <span aria-hidden className="w-[0.3vh] shrink-0 self-stretch" style={{ background: "color-mix(in srgb, var(--text-muted) 32%, var(--bg))" }} />
+                  ) : null}
+                  <Figures figures={more} />
+                </>
+              ) : null}
             </div>
           ) : (
-            <p className="tv-title" style={{ color: "var(--tv-text)" }}>
-              {greeting}
-            </p>
-          )}
-          {more.length > 0 ? (
-            <div className="flex flex-col gap-[2.4vh]">
-              {more.map((figure) => (
-                <p key={figure.label} className="flex items-baseline gap-[1.6vh]">
-                  <span className="tv-lead tv-num" style={{ color: "var(--tv-text)" }}>
-                    {figure.value}
-                  </span>
-                  <span className="tv-body text-muted">{figure.label}</span>
-                </p>
-              ))}
+            <div className="flex flex-col gap-[4vh]">
+              <p className="tv-title" style={{ color: "var(--tv-text)" }}>
+                {greeting}
+              </p>
+              {more.length > 0 ? <Figures figures={more} /> : null}
             </div>
-          ) : null}
+          )}
+
+          {pulse ? <DayPulse pulse={pulse} hour={hour} /> : null}
+
+          {meeting ? <TvMeetingLine meeting={meeting} /> : null}
         </div>
 
-        {meeting ? <TvMeetingLine meeting={meeting} className="mt-[7vh]" /> : null}
-
-        {summary ? (
-          <div className="mt-[7vh]">
-            <DayPulse pulse={summary.pulse} hour={aqtobeClock(now).h} />
-          </div>
-        ) : null}
-      </div>
-
-      <div className="flex min-w-0 flex-col justify-center pt-[12vh]">
-        <TvMascot mood={speech.mood} sizeVh={46} />
-        <div className="mt-[3vh] h-[calc(2*1.18*5.6vh)]">
+        <div className="flex min-w-0 flex-col items-start justify-end">
           <AnimatePresence mode="wait">
             {said ? (
-              <motion.p
+              <motion.div
                 key={said}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+                className="relative mb-[3.4vh] max-w-full rounded-[3vh] px-[3.2vh] py-[2.2vh]"
+                style={{ background: "var(--surface-2)", transformOrigin: "10vh 100%" }}
+                initial={{ opacity: 0, y: "1.2vh" }}
+                animate={{ opacity: 1, y: "0vh" }}
                 exit={{ opacity: 0, transition: { duration: 0.25 } }}
-                transition={{ duration: 0.5, ease: [0.2, 0, 0, 1] }}
-                className="tv-body tv-two-lines pl-[2.6vh] font-semibold"
-                style={{ color: "var(--tv-text)" }}
+                transition={{ duration: 0.5, ease: EASE }}
                 data-testid="tv-speech"
               >
-                {said}
-              </motion.p>
+                <p className="tv-body font-semibold [text-wrap:pretty]" style={{ color: "var(--tv-text)" }}>
+                  {said}
+                </p>
+                {/* the tail: down and to the left, at the mascot's head */}
+                <svg aria-hidden viewBox="0 0 30 24" className="absolute left-[9vh] top-[calc(100%-1px)] h-[2.6vh] w-[3.2vh]">
+                  <path d="M0 0 H30 L3 24 Z" fill="var(--surface-2)" />
+                </svg>
+              </motion.div>
             ) : null}
           </AnimatePresence>
+          <span className="ml-[1vh]">
+            <TvMascot mood={speech.mood} sizeVh={28} />
+          </span>
         </div>
       </div>
     </div>
   );
 }
 
+/** The figures beside the number: each its value and what it counts, in a column. */
+function Figures({ figures }: { figures: readonly Figure[] }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-[2.4vh]">
+      {figures.map((figure) => (
+        <p key={figure.label} className="flex items-baseline gap-[1.8vh] whitespace-nowrap">
+          <span className="tv-lead tv-num" style={{ color: "var(--tv-text)" }}>
+            {figure.value}
+          </span>
+          <span className="tv-body text-muted">{figure.label}</span>
+        </p>
+      ))}
+    </div>
+  );
+}
+
 /**
- * The next meeting (D-185): its hour in the accent and its name, then how soon — within the hour,
- * «идёт», «завтра» — and where. «Сегодня» gives it two lines; the clock, a quiet scene, one —
+ * The next meeting (D-185): its hour and its name, then how soon — within the hour, «идёт», «завтра» — and where.
+ * A meeting under way is the wall's «now» (`.tv-now`). «Сегодня» gives it two lines; the clock, a quiet scene, one —
  * without the place.
  */
 export function TvMeetingLine({ meeting, single = false, className = "" }: { meeting: MeetingLine; single?: boolean; className?: string }) {
-  const when = meeting.when ? (
-    <span className="font-semibold" style={{ color: "var(--tv-text)" }}>
-      {meeting.when}
-    </span>
-  ) : null;
+  const live = meeting.when === "идёт";
+  // the plate of «now» keeps to the grid: it starts at the column's edge, the words step in from it
+  const plate = live ? "tv-now self-start px-[2.6vh] py-[1.4vh]" : "";
   const head = (
     <>
-      <span className="tv-num mr-[2vh] font-semibold" style={{ color: "var(--accent)" }}>
-        {meeting.time}
-      </span>
+      <span className="tv-num mr-[2vh] font-semibold">{meeting.time}</span>
       {meeting.title}
     </>
   );
 
   if (single) {
     return (
-      <p className={`tv-body tv-two-lines min-w-0 ${className}`} style={{ color: "var(--tv-text)" }} data-testid="tv-meeting">
+      <p className={`tv-body tv-two-lines min-w-0 ${plate} ${className}`} style={{ color: "var(--tv-text)" }} data-testid="tv-meeting">
         {head}
-        {when ? <span className="ml-[2.4vh] whitespace-nowrap">{when}</span> : null}
+        {meeting.when ? <span className="ml-[2.4vh] whitespace-nowrap text-muted">{meeting.when}</span> : null}
       </p>
     );
   }
 
   return (
-    <div className={`min-w-0 ${className}`} data-testid="tv-meeting">
+    <div className={`min-w-0 ${plate} ${className}`} data-testid="tv-meeting">
       <p className="tv-body tv-two-lines" style={{ color: "var(--tv-text)" }}>
         {head}
       </p>
-      {when || meeting.place ? (
+      {meeting.when || meeting.place ? (
         <p className="tv-body mt-[0.6vh] flex flex-wrap gap-x-[3vh] text-muted">
-          {when}
+          {meeting.when ? <span className={live ? "font-semibold" : undefined} style={live ? { color: "var(--tv-text)" } : undefined}>{meeting.when}</span> : null}
           {meeting.place ? <span>{meeting.place}</span> : null}
         </p>
       ) : null}

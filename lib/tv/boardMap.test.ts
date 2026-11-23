@@ -1,10 +1,27 @@
 import { describe, expect, it } from "vitest";
 
 import type { TvBoardItem, TvBoardLeaf } from "./board";
-import { boxOf, elbow, MAP_LEAVES_MAX, MAP_TIERS, mapCollisions, mapLayout, mapStage, rectsOverlap, ribbon, splitSides, type MapLayout } from "./boardMap";
+import { TV_TYPE } from "./boardList";
+import {
+  boxOf,
+  elbow,
+  MAP_BRANCHES_MAX,
+  MAP_LEAVES_MAX,
+  MAP_LINE_MIN,
+  MAP_TAG,
+  MAP_TIERS,
+  mapCollisions,
+  mapLayout,
+  mapStage,
+  mapTag,
+  rectsOverlap,
+  ribbon,
+  splitSides,
+  type MapLayout,
+} from "./boardMap";
 
-// the map field on 16:9: 74 − 4.4 − 1.4 tall, 92% of 177.8 wide
-const FRAME = { width: 163.6, height: 68.2 };
+// the map field on 16:9 (D-185): the board's 79 − 6 − 1.4 tall, the screen less the side margins and the map's own
+const FRAME = { width: 158.6, height: 71.6 };
 const LONG =
   "Надо срочно решить вопрос с парковкой для гостей и сотрудников, потому что соседи жалуются уже третью неделю, а управляющая компания не отвечает на письма и звонки, и если мы ничего не сделаем до конца месяца, будет штраф от акимата и испорченные отношения со всем бизнес-центром и арендодателем";
 const TEXTS = [
@@ -51,7 +68,7 @@ describe("mapLayout", () => {
     const items = [point(1, SUBS.slice(0, 3)), point(2), point(3, SUBS.slice(0, 2)), point(4), point(5)];
     const layout = layoutOf(items);
     assertClean(layout, items);
-    // five short points with a few leaves: the size of their step (5–8), every leaf on the map
+    // five short points with a few leaves: the size of their step (5–6), every leaf on the map
     expect(layout.tier.key).toBe("m");
     expect(layout.branches.flatMap((b) => b.leaves).every((l) => l.leaf !== null)).toBe(true);
     const right = layout.branches.filter((b) => b.side === "right");
@@ -99,15 +116,20 @@ describe("mapLayout", () => {
     expect(leaves[leaves.length - 1]).toMatchObject({ leaf: null, more: 4 });
   });
 
-  it("двенадцать ветвей, у многих листья, — влезает, по шесть на сторону", () => {
-    const items = Array.from({ length: 12 }, (_, i) => point(i + 1, i % 2 === 0 ? SUBS.slice(0, 1 + (i % 4)) : []));
+  it("шесть ветвей, у многих листья, — влезает, по три на сторону", () => {
+    const items = Array.from({ length: 6 }, (_, i) => point(i + 1, i % 2 === 0 ? SUBS.slice(0, 1 + (i % 4)) : []));
     const layout = layoutOf(items);
     assertClean(layout, items);
-    expect(layout.branches.filter((b) => b.side === "right")).toHaveLength(6);
+    expect(layout.branches.filter((b) => b.side === "right")).toHaveLength(3);
   });
 
-  it("двенадцать ветвей по четыре листа — мельчит и прячет листья за «+N», но влезает", () => {
-    const items = Array.from({ length: 12 }, (_, i) => point(i + 1, SUBS.slice(0, 4)));
+  it(`больше ${MAP_BRANCHES_MAX} ветвей карта не рисуется: стена покажет список (D-185)`, () => {
+    expect(mapLayout("Планёрка", Array.from({ length: MAP_BRANCHES_MAX }, (_, i) => point(i + 1, [], SHORT[i])), FRAME)).not.toBeNull();
+    expect(mapLayout("Планёрка", Array.from({ length: MAP_BRANCHES_MAX + 1 }, (_, i) => point(i + 1, [], SHORT[i])), FRAME)).toBeNull();
+  });
+
+  it("шесть ветвей по четыре листа — прячет листья за «+N», но влезает", () => {
+    const items = Array.from({ length: 6 }, (_, i) => point(i + 1, SUBS.slice(0, 4)));
     const layout = layoutOf(items);
     assertClean(layout, items);
     for (const branch of layout.branches) {
@@ -127,21 +149,21 @@ describe("mapLayout", () => {
   });
 
   it("поле 16:10 — уже, но карта всё равно влезает", () => {
-    const items = Array.from({ length: 8 }, (_, i) => point(i + 1, i < 3 ? SUBS.slice(0, 3) : []));
-    const layout = mapLayout("Доска · 25 сент.", items, { width: 147, height: 68.2 });
+    const items = Array.from({ length: 6 }, (_, i) => point(i + 1, i < 3 ? SUBS.slice(0, 3) : []));
+    const layout = mapLayout("Доска · 25 сент.", items, { width: 141.6, height: 71.6 });
     expect(layout).not.toBeNull();
     expect(mapCollisions(layout!)).toEqual([]);
   });
 });
 
 describe("ступени масштаба", () => {
-  it("ступень по числу ветвей: 1–2, 3–4, 5–8, 9–12", () => {
-    expect([1, 2, 3, 4, 5, 8, 9, 12].map(mapStage)).toEqual(["xl", "xl", "l", "l", "m", "m", "s", "s"]);
+  it("ступень по числу ветвей: 1–2, 3–4, 5–6", () => {
+    expect([1, 2, 3, 4, 5, 6].map(mapStage)).toEqual(["xl", "xl", "l", "l", "m", "m"]);
   });
 
   it("короткие пункты встают на свою ступень, и чем ветвей меньше, тем крупнее узлы, центр и ленты", () => {
     let prev: MapLayout | null = null;
-    for (let n = 12; n >= 1; n--) {
+    for (let n = MAP_BRANCHES_MAX; n >= 1; n--) {
       const items = Array.from({ length: n }, (_, i) => point(i + 1, [], SHORT[i]));
       const layout = layoutOf(items);
       assertClean(layout, items);
@@ -165,16 +187,17 @@ describe("ступени масштаба", () => {
     expect(two.center.size).toBeGreaterThan(five.center.size);
   });
 
-  it("тяжёлая доска опускается ниже своей ступени по весу, но всё равно чистая", () => {
-    // three points of 300 characters with four long leaves each: «3–4» does not hold it
+  it("тяжёлая доска не крупнее своей ступени, листья, что не влезли, — за «+N», и всё равно чистая", () => {
+    // three points of 300 characters with four long leaves each: «3–4» does not hold them all
     const items = Array.from({ length: 3 }, (_, i) => point(i + 1, [LONG, LONG, LONG, LONG], LONG));
     const layout = layoutOf(items);
     expect(mapCollisions(layout)).toEqual([]);
-    expect(layout.tier.size).toBeLessThan(MAP_TIERS.l.size);
+    expect(layout.tier.size).toBeLessThanOrEqual(MAP_TIERS.l.size);
+    expect(layout.branches.some((b) => b.leaves.some((l) => l.leaf === null))).toBe(true);
   });
 
   it("лента тянется, только пока стороне просторно, и не длиннее `linkMax`", () => {
-    for (const n of [1, 2, 3, 4, 6, 10]) {
+    for (const n of [1, 2, 3, 4, 5, 6]) {
       const layout = layoutOf(Array.from({ length: n }, (_, i) => point(i + 1, [], SHORT[i])));
       const c = layout.center.rect;
       for (const b of layout.branches) {
@@ -186,7 +209,7 @@ describe("ступени масштаба", () => {
   });
 
   it("многострочный узел не шире своих строк", () => {
-    const layout = layoutOf([point(1, [], "Новый прайс на мерч — согласовать с бухгалтерией и отделом продаж"), point(2)]);
+    const layout = layoutOf([point(1, [], "Согласовать новый прайс на мерч"), point(2)]);
     const branch = layout.branches[0];
     expect(branch.lines).toBeGreaterThan(1);
     const half = (FRAME.width - layout.center.rect.w) / 2 - layout.tier.link;
@@ -195,9 +218,9 @@ describe("ступени масштаба", () => {
 
   // every step, every weight, every wall: nothing overlaps, nothing leaves the field, links run clear
   const FRAMES = [
-    { name: "16:9", width: 160.4, height: 68.2 },
-    { name: "16:10", width: 144, height: 68.2 },
-    { name: "4:3", width: 119.5, height: 68.2 },
+    { name: "16:9", width: 158.6, height: 71.6 },
+    { name: "16:10", width: 141.6, height: 71.6 },
+    { name: "4:3", width: 114.1, height: 71.6 },
   ];
   const WEIGHTS: { name: string; leaves: (i: number) => string[]; text: (i: number) => string }[] = [
     { name: "без листьев", leaves: () => [], text: (i) => SHORT[i] },
@@ -210,17 +233,16 @@ describe("ступени масштаба", () => {
   const seen = new Set<string>();
   for (const frame of FRAMES) {
     for (const weight of WEIGHTS) {
-      it(`${frame.name}, ${weight.name}: 1–12 ветвей — без пересечений на каждой ступени`, () => {
-        for (let n = 1; n <= 12; n++) {
+      it(`${frame.name}, ${weight.name}: 1–${MAP_BRANCHES_MAX} ветвей — без пересечений на каждой ступени`, () => {
+        for (let n = 1; n <= MAP_BRANCHES_MAX; n++) {
           const items = Array.from({ length: n }, (_, i) => {
             const p = point(i + 1, weight.leaves(i), weight.text(i));
             return weight.name === "поручено" ? { ...p, assignee: "Марат", children: p.children.map((c) => ({ ...c, assignee: "Асель" })) } : p;
           });
           const layout = mapLayout("Планёрка · понедельник", items, frame);
           if (!layout) {
-            // only a 4:3 screen cannot hold eleven or twelve heavy branches: the wall draws the list
+            // only a 4:3 screen cannot hold a heavy board: the wall draws the list
             expect(frame.name, `${n} branches`).toBe("4:3");
-            expect(n).toBeGreaterThanOrEqual(9);
             continue;
           }
           expect(mapCollisions(layout), `${n} branches on ${layout.tier.key}`).toEqual([]);
@@ -279,5 +301,55 @@ describe("кривые и проверка", () => {
     expect(mapCollisions(broken).length).toBeGreaterThan(0);
     const off = { ...layout, center: { ...layout.center, rect: { ...layout.center.rect, x: -5 } } };
     expect(mapCollisions(off).some((p) => p.includes("off the field"))).toBe(true);
+  });
+});
+
+describe("шкала стены, линии и «→ Марат» (D-185)", () => {
+  it("весь текст карты не мельче `tv-small`, линии не тоньше 0.4 vh", () => {
+    for (const tier of Object.values(MAP_TIERS)) {
+      expect(tier.size).toBeGreaterThanOrEqual(TV_TYPE.small.size);
+      expect(tier.leaf).toBe(TV_TYPE.small.size);
+      for (const fit of tier.center) expect(fit.size).toBeGreaterThanOrEqual(TV_TYPE.small.size);
+      expect(tier.stem).toBeGreaterThanOrEqual(MAP_LINE_MIN);
+      expect(Math.min(...tier.ribbon)).toBeGreaterThanOrEqual(MAP_LINE_MIN);
+    }
+    expect(MAP_TAG.size).toBe(TV_TYPE.small.size);
+  });
+
+  it("плашка не рвётся между именем и стадией: в узком листе — только имя", () => {
+    const handed = { assignee: "Динара", handed_done: false, stage: "review" as const };
+    expect(mapTag(handed, 80)).toBe("→\u00a0Динара · на проверке");
+    expect(mapTag(handed, 30)).toBe("→\u00a0Динара");
+    expect(mapTag({ assignee: null, handed_done: false, stage: null }, 80)).toBeNull();
+  });
+
+  it("плашка исполнителя стоит своей строкой: ветвь и лист с ней выше, ничего не пересекается", () => {
+    const plain = layoutOf([point(1, ["Сверить остатки"]), point(2)]);
+    const handed = layoutOf([
+      { ...point(1, []), assignee: "Марат", children: [leaf("p1.1", "Сверить остатки", { assignee: "Асель", stage: "work" })] },
+      point(2),
+    ]);
+    expect(mapCollisions(handed)).toEqual([]);
+    expect(handed.branches[0].tag).toBe("→\u00a0Марат");
+    expect(handed.branches[0].rect.h).toBeGreaterThan(plain.branches[0].rect.h);
+    expect(handed.branches[0].leaves[0].rect.h).toBeGreaterThan(plain.branches[0].leaves[0].rect.h);
+  });
+
+  it("когда листья прячутся за «+N», поручённые остаются на карте, в порядке доски", () => {
+    const children = [
+      leaf("a", "Толстовки и кепки"),
+      leaf("b", "Макет каталога"),
+      leaf("c", "Цены у двух поставщиков", { assignee: "Асель", stage: "review" }),
+      leaf("d", "Бюджет на осень"),
+      leaf("e", "Образцы ткани"),
+      leaf("f", "Фото для сайта", { assignee: "Марат" }),
+    ];
+    const items = [{ ...point(1), children }, point(2), point(3)];
+    const layout = layoutOf(items);
+    const shown = layout.branches[0].leaves.filter((l) => l.leaf !== null).map((l) => l.leaf!.id);
+    expect(shown.length).toBeLessThan(children.length);
+    // both handed leaves stay; the shown ones keep the board's order
+    expect(shown).toEqual(expect.arrayContaining(["c", "f"]));
+    expect([...shown].sort()).toEqual(shown);
   });
 });

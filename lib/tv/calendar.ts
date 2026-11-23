@@ -1,9 +1,10 @@
+import { lineWidth } from "./boardText";
 import { tvTime } from "./clock";
 import type { TvCalendar, TvCalendarEvent } from "./queries";
 
 /**
  * The «Календарь» scene (D-96, D-98, D-185) as pure functions: what goes on the «сегодня» table, which
- * days go in «Дальше», how the month lies and which event is lit. Checked by a test, not by eye
+ * days go in «Дальше», how the month lies and which event is running. Checked by a test, not by eye
  * on the TV.
  *
  * Негатива в календаре нет по определению (D-45); гостю названий и мест не отдают уже из
@@ -20,8 +21,12 @@ export const TODAY_ROWS = 5;
 /** «Дальше» — the next three days that have something, two events each. */
 export const LATER_DAYS = 3;
 export const PER_LATER_DAY = 2;
-/** A month cell holds two events, then «+N». */
-export const PER_CELL = 2;
+/**
+ * A month cell holds one event — its time by the day's number, its title in whole lines of the
+ * wall's smallest readable size — and «+N» for the rest (D-185): seven columns leave a cell about
+ * eight letters a line, a second event would never be read from across the room.
+ */
+export const PER_CELL = 1;
 /** The working day on the «сегодня» scale; it widens when an event falls outside it. */
 const DAY_FROM_HOUR = 8;
 const DAY_TO_HOUR = 20;
@@ -107,6 +112,40 @@ export function cellTitle(row: Pick<CalendarRow, "title" | "birthday" | "named">
   if (!row.birthday) return row.title;
   const name = row.title.replace(/^\s*(с\s+)?(день|дня|днём|днем|дню)\s+рождения\s*/iu, "").replace(/^\s*др\s*/iu, "").trim();
   return name ? `ДР ${name}` : row.title;
+}
+
+/*
+ * Soft hyphens for the month's cells. A cell is eight letters wide at the wall's smallest readable size
+ * (D-185): «Корпоратив» or «Планёрка» break in any case, and a break at a syllable with a hyphen reads,
+ * a break at any letter («Планёрк|а») does not. The browser's own `hyphens: auto` needs a Russian dictionary
+ * a television may not have, so the breaks are put in the text: Khristov's rules — after й/ъ/ь, between
+ * vowels, between consonants — and never one letter alone at either end of a word.
+ */
+const VOWEL = "[аеёиоуыэюя]";
+const CONSONANT = "[бвгджзклмнпрстфхцчшщ]";
+const LETTER = "[а-яё]";
+const SIGN = "[йъь]";
+const SYLLABLE_BREAKS = [
+  `(${SIGN})(?=${LETTER}${LETTER})`,
+  `(${VOWEL})(?=${VOWEL}${LETTER})`,
+  `(${VOWEL}${CONSONANT})(?=${CONSONANT}${VOWEL})`,
+  `(${CONSONANT}${VOWEL})(?=${CONSONANT}${VOWEL})`,
+  `(${VOWEL}${CONSONANT})(?=${CONSONANT}${CONSONANT}${VOWEL})`,
+  `(${VOWEL}${CONSONANT}${CONSONANT})(?=${CONSONANT}${CONSONANT}${VOWEL})`,
+].map((rule) => new RegExp(rule, "giu"));
+const SHY = "­";
+
+/** «Корпоратив» → «Кор·по·ра·тив» with soft hyphens: the browser breaks a long word there, with a hyphen. */
+export function softHyphens(text: string): string {
+  return text.replace(/[а-яё]{4,}/giu, (word) => {
+    let marked = word;
+    for (const rule of SYLLABLE_BREAKS) marked = marked.replace(rule, `$1${SHY}`);
+    const parts = marked.split(SHY);
+    // two letters at least on each side of a break
+    while (parts.length > 1 && parts[0].length < 2) parts.splice(0, 2, parts[0] + parts[1]);
+    while (parts.length > 1 && parts[parts.length - 1].length < 2) parts.splice(-2, 2, parts[parts.length - 2] + parts[parts.length - 1]);
+    return parts.join(SHY);
+  });
 }
 
 function sorted(calendar: TvCalendar | null | undefined): TvCalendarEvent[] {
@@ -248,6 +287,18 @@ export type LaterDay = {
   more: number;
 };
 
+/** The time of the day's table at `tv-body`, semibold, tabular («18:30»), and the air after it — vh. */
+export const TIME_COLUMN = 17;
+
+/**
+ * The first column of the scene, vh: the day's times and the names of the days ahead stand in it,
+ * so a later day's meetings start on the same line as the titles above (D-185). As wide as the time,
+ * or as the widest day name at `tv-small` («Понедельник», «Воскресенье») when one is on the wall.
+ */
+export function firstColumn(days: readonly Pick<LaterDay, "label">[], size = 4.4): number {
+  return Math.max(TIME_COLUMN, ...days.map((day) => Math.ceil(lineWidth(day.label, size, "point") + 1)));
+}
+
 /** Days after today that have events: «Дальше» has no empty days. */
 export function laterDays(calendar: TvCalendar | null | undefined, now: Date, days = LATER_DAYS, perDay = PER_LATER_DAY): LaterDay[] {
   const events = sorted(calendar);
@@ -330,6 +381,48 @@ export function monthGridStart(now: Date): number {
 export function monthGridFrom(now: Date): string {
   const { year, month, day } = partsOf(monthGridStart(now));
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/** A month cell's text width on a 16:9 wall, vh: a seventh of the grid minus the cell's padding, less a hyphen's slack. */
+const CELL_TEXT = 19.4;
+
+/**
+ * How many lines of `tv-small` the busiest cell of a week wants: the date and the time, the first event's title,
+ * «+N» for the rest (at least two: a week with nothing still keeps a line under its dates). The weeks ahead share
+ * the month's height in these proportions.
+ */
+export function weekLines(week: MonthWeek): number {
+  let most = 2;
+  for (const cell of week.days) {
+    const first = cell.rows[0];
+    if (!cell.inMonth || !first) continue;
+    const title = cellTitle(first);
+    const lines = title ? Math.min(3, Math.ceil(lineWidth(title, 4.4, "leaf") / CELL_TEXT)) : 0;
+    most = Math.max(most, 1 + lines + (cell.rows.length + cell.more > 1 ? 1 : 0));
+  }
+  return most;
+}
+
+/**
+ * The month grid's rows, vh, on the wall's scene box (100 vh less the band, the margins and the head — D-185): the
+ * weekdays' line, a folded line per past week, the weeks ahead sharing the rest. Each week ahead gets the lines its
+ * busiest cell wants when they all fit, and the rest of the room in the same proportions; when they do not, the
+ * proportions alone.
+ */
+const MONTH_HEIGHT = 72.7;
+const SMALL_LH = 5.28;
+const MONTH_GAP = 0.4;
+/** The cell's padding (0.4 vh top and bottom) and a hair for rounding: a title's lines are counted whole. */
+const CELL_PAD = 1;
+
+export function monthRows(grid: Pick<MonthGrid, "weeks">): string {
+  const past = grid.weeks.filter((week) => week.past).length;
+  const room = MONTH_HEIGHT - SMALL_LH - past * 4.4 - grid.weeks.length * MONTH_GAP;
+  const want = grid.weeks.map((week) => (week.past ? 0 : weekLines(week)));
+  const need = want.map((lines) => Math.round((lines * SMALL_LH + CELL_PAD) * 10) / 10);
+  const fits = need.reduce((sum, value) => sum + value, 0) <= room;
+  const tracks = grid.weeks.map((week, i) => (week.past ? "auto" : `minmax(${fits ? `${need[i]}vh` : "0"}, ${want[i]}fr)`));
+  return ["auto", ...tracks].join(" ");
 }
 
 /** This month's weeks from Monday; days of the neighbouring months are empty cells with no events. */

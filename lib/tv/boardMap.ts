@@ -1,4 +1,5 @@
-import { mapText, tagOf, wallText, type TvBoardItem, type TvBoardLeaf } from "./board";
+import { MAP_MAX_POINTS, mapText, tagOf, wallText, type TvBoardItem, type TvBoardLeaf } from "./board";
+import { TV_TYPE } from "./boardList";
 import { lineWidth, snugWidth, textLines } from "./boardText";
 
 /**
@@ -21,15 +22,24 @@ import { lineWidth, snugWidth, textLines } from "./boardText";
  * вверх — номера 7, 6, 5 сверху вниз читаются хуже, а номера у ветвей делают переход с правой
  * стороны на левую явным.
  *
- * Ступени масштаба — по числу ветвей: 1–2, 3–4, 5–8, 9–12. Чем ветвей меньше, тем крупнее
- * узлы, текст и центр и тем длиннее ленты: две ветви на стене должны занимать её так же
- * уверенно, как список из двух пунктов, а не жаться мелко к середине. Ступень — потолок:
- * тяжёлую доску (длинные пункты, много листьев) стена опускает на ступень ниже по весу.
+ * Scale steps go by the number of branches: 1–2, 3–4, 5–6. The fewer the branches, the larger
+ * the nodes, the text and the centre and the longer the ribbons: two branches must fill the wall
+ * as confidently as a list of two points, not huddle small in the middle. A step is a ceiling:
+ * a heavy board (long points, many leaves) is dropped one step lower by its weight.
  *
- * Не влезает — стена мельчит кегль, потом листья в одну строку, потом прячет лишние листья за
- * «+N». Из попыток берётся первая, где ничего не обрезано; если такой нет — где потерь меньше
- * всего. Больше двенадцати ветвей карта не рисуется вовсе (`mapFits`).
+ * Type comes only from the wall's scale (D-185): a branch is `tv-body` or `tv-small`, a leaf and «→ Марат»
+ * are `tv-small`, the title `tv-lead`…`tv-small`; nothing is smaller, no line thinner than 0.4 vh. What does
+ * not fit: the wall squeezes the air, then puts leaves on one line, then hides the extra leaves behind «+N».
+ * Of the attempts the first with nothing cut is taken; if there is none — the one with the least loss. With
+ * more than six branches the map is not drawn at all (`MAP_BRANCHES_MAX`): from 4–5 m a map of twelve nodes
+ * is a scatter of small captions, a list reads better.
  */
+
+/** With more than six branches the wall draws a list, even if the remote asked for the map (D-185). */
+export const MAP_BRANCHES_MAX = MAP_MAX_POINTS;
+
+/** The lines of the map — ribbons, stems — are never thinner than this, vh: thinner ones vanish from 4 m (D-185). */
+export const MAP_LINE_MIN = 0.4;
 
 export type MapRect = { x: number; y: number; w: number; h: number };
 
@@ -38,7 +48,7 @@ export type CenterFit = { size: number; lh: number; lines: number; maxW: number 
 
 /** Кегль карты: ветвь, лист, промежутки, центр, связи. Те же числа рисует `TvBoardMap`. */
 export type MapTier = {
-  key: "xl" | "l" | "m" | "s" | "xs" | "xxs";
+  key: "xl" | "l" | "m" | "s";
   /** Ветвь: кегль, интерлиньяж, строк не больше, кружок номера, поля, скругление. */
   size: number;
   lh: number;
@@ -48,6 +58,8 @@ export type MapTier = {
   padX: number;
   padY: number;
   radius: number;
+  /** «→ Марат» as a plate on a line of its own under a branch's or leaf's text: the top margin; size and padding are shared (`MAP_TAG`). */
+  tagTop: number;
   /** Лист: кегль, интерлиньяж, промежуток между листьями, отступ от ветви до первого. */
   leaf: number;
   leafLh: number;
@@ -84,150 +96,187 @@ const tier = (t: Omit<MapTier, "spine" | "indent">): MapTier => {
   return { ...t, spine, indent: spine + t.elbow * 1.4 };
 };
 
-/** Название на мелких ступенях (девять ветвей и больше): крупно в две строки, длинное — мельче и шире. */
-const CENTER_SMALL: readonly CenterFit[] = [
-  { size: 4.4, lh: 5.4, lines: 2, maxW: 30 },
-  { size: 3.8, lh: 4.7, lines: 3, maxW: 32 },
-  { size: 3.2, lh: 4, lines: 4, maxW: 34 },
-];
-const SMALL = { center: CENTER_SMALL, centerPadX: 2.4, centerPadY: 1.8, centerMinW: 20, centerRadius: 2.6 } as const;
+const { small: SMALL, body: BODY, lead: LEAD } = TV_TYPE;
+
+/** «→ Марат» on the map: `tv-small` on a plate with this much room either side, vh. */
+export const MAP_TAG = { size: SMALL.size, lh: SMALL.lh, pad: 1.2 } as const;
+
+/** Every leaf is `tv-small`: the smallest the wall reads from across the room (D-185). */
+const LEAF = { leaf: SMALL.size, leafLh: SMALL.lh } as const;
 
 export const MAP_TIERS: Record<MapTier["key"], MapTier> = {
-  // 1–2 branches: big cards, the runs stretch across the wall
+  // 1–2 branches: big nodes, the runs stretch across the wall
   xl: tier({
     key: "xl",
-    size: 4.6,
-    lh: 5.8,
+    size: BODY.size,
+    lh: BODY.lh,
     lines: 4,
-    badge: 5.8,
-    gap: 1.8,
-    padX: 2.1,
-    padY: 1.5,
-    radius: 2.6,
-    leaf: 3.4,
-    leafLh: 4.4,
-    leafGap: 0.6,
+    badge: 6.2,
+    gap: 2,
+    padX: 2.4,
+    padY: 1.6,
+    radius: 1.4,
+    tagTop: 0.8,
+    ...LEAF,
+    leafGap: 0.9,
     leafTop: 1.4,
-    dot: 0.7,
+    dot: 0.8,
     dotGap: 1.4,
-    stem: 0.34,
-    elbow: 1.5,
+    stem: 0.5,
+    elbow: 1.6,
     link: 8,
     linkMax: 18,
-    ribbon: [1.5, 0.46],
+    ribbon: [2, 0.7],
     blockGap: 3,
     airMax: 12,
     center: [
-      { size: 5.4, lh: 6.6, lines: 2, maxW: 42 },
-      { size: 4.7, lh: 5.8, lines: 3, maxW: 42 },
-      { size: 4.1, lh: 5.1, lines: 4, maxW: 40 },
+      { ...LEAD, lines: 2, maxW: 50 },
+      { ...BODY, lines: 3, maxW: 46 },
+      { ...SMALL, lines: 4, maxW: 44 },
     ],
-    centerPadX: 3,
+    centerPadX: 3.2,
     centerPadY: 2.4,
-    centerMinW: 26,
-    centerRadius: 3.4,
+    centerMinW: 28,
+    centerRadius: 1.8,
   }),
   // 3–4 branches
   l: tier({
     key: "l",
-    size: 4,
-    lh: 5.1,
-    lines: 4,
-    badge: 5.2,
-    gap: 1.6,
-    padX: 1.9,
-    padY: 1.3,
-    radius: 2.3,
-    leaf: 3.1,
-    leafLh: 4,
-    leafGap: 0.5,
+    size: BODY.size,
+    lh: BODY.lh,
+    lines: 3,
+    badge: 5.8,
+    gap: 1.8,
+    padX: 2.2,
+    padY: 1.4,
+    radius: 1.3,
+    tagTop: 0.7,
+    ...LEAF,
+    leafGap: 0.7,
     leafTop: 1.2,
-    dot: 0.62,
-    dotGap: 1.25,
-    stem: 0.3,
-    elbow: 1.3,
+    dot: 0.75,
+    dotGap: 1.3,
+    stem: 0.46,
+    elbow: 1.4,
     link: 7,
-    linkMax: 15,
-    ribbon: [1.3, 0.4],
+    linkMax: 14,
+    ribbon: [1.8, 0.6],
     blockGap: 2.6,
     airMax: 9,
     center: [
-      { size: 5, lh: 6.2, lines: 2, maxW: 40 },
-      { size: 4.4, lh: 5.4, lines: 3, maxW: 40 },
-      { size: 3.8, lh: 4.7, lines: 4, maxW: 38 },
+      { ...BODY, lines: 2, maxW: 40 },
+      { ...BODY, lines: 3, maxW: 42 },
+      { ...SMALL, lines: 4, maxW: 40 },
     ],
     centerPadX: 2.8,
     centerPadY: 2.2,
     centerMinW: 24,
-    centerRadius: 3.1,
+    centerRadius: 1.6,
   }),
-  // 5–8 branches
+  // 5–6 branches
   m: tier({
     key: "m",
-    size: 3.6,
-    lh: 4.5,
+    size: SMALL.size,
+    lh: SMALL.lh,
     lines: 3,
-    badge: 4.7,
-    gap: 1.45,
-    padX: 1.7,
-    padY: 1.1,
-    radius: 2,
-    leaf: 2.9,
-    leafLh: 3.7,
-    leafGap: 0.45,
+    badge: 5.2,
+    gap: 1.6,
+    padX: 2,
+    padY: 1.2,
+    radius: 1.2,
+    tagTop: 0.6,
+    ...LEAF,
+    leafGap: 0.5,
     leafTop: 1,
-    dot: 0.55,
-    dotGap: 1.1,
-    stem: 0.27,
-    elbow: 1.1,
-    link: 6.5,
+    dot: 0.7,
+    dotGap: 1.2,
+    stem: 0.44,
+    elbow: 1.2,
+    link: 6,
     linkMax: 11,
-    ribbon: [1.05, 0.32],
+    ribbon: [1.6, 0.5],
     blockGap: 2.2,
     airMax: 7,
     center: [
-      { size: 4.6, lh: 5.6, lines: 2, maxW: 36 },
-      { size: 4.1, lh: 5.1, lines: 3, maxW: 36 },
-      { size: 3.4, lh: 4.2, lines: 4, maxW: 34 },
+      { ...BODY, lines: 2, maxW: 36 },
+      { ...SMALL, lines: 3, maxW: 36 },
+      { ...SMALL, lines: 4, maxW: 38 },
     ],
-    centerPadX: 2.7,
+    centerPadX: 2.6,
     centerPadY: 2,
     centerMinW: 22,
-    centerRadius: 2.8,
+    centerRadius: 1.4,
   }),
-  // 9–12 branches, and the fallbacks of every heavy board
-  s: tier({ key: "s", size: 3.2, lh: 4, lines: 2, badge: 4.2, gap: 1.3, padX: 1.5, padY: 1, radius: 1.8, leaf: 2.7, leafLh: 3.4, leafGap: 0.45, leafTop: 0.9, dot: 0.5, dotGap: 1, stem: 0.24, elbow: 1, link: 5.5, linkMax: 8, ribbon: [0.9, 0.28], blockGap: 2.2, airMax: 6, ...SMALL }),
-  xs: tier({ key: "xs", size: 2.9, lh: 3.7, lines: 2, badge: 3.9, gap: 1.2, padX: 1.3, padY: 0.85, radius: 1.7, leaf: 2.6, leafLh: 3.2, leafGap: 0.35, leafTop: 0.7, dot: 0.5, dotGap: 0.9, stem: 0.24, elbow: 1, link: 5, linkMax: 7, ribbon: [0.9, 0.28], blockGap: 1.4, airMax: 6, ...SMALL }),
-  xxs: tier({ key: "xxs", size: 2.7, lh: 3.4, lines: 2, badge: 3.6, gap: 1.1, padX: 1.2, padY: 0.7, radius: 1.6, leaf: 2.5, leafLh: 3.1, leafGap: 0.25, leafTop: 0.5, dot: 0.45, dotGap: 0.8, stem: 0.22, elbow: 1, link: 4.5, linkMax: 6, ribbon: [0.9, 0.28], blockGap: 0.9, airMax: 6, ...SMALL }),
+  // the fallback of every heavy board: the same type, less air
+  s: tier({
+    key: "s",
+    size: SMALL.size,
+    lh: SMALL.lh,
+    lines: 2,
+    badge: 4.8,
+    gap: 1.4,
+    padX: 1.6,
+    padY: 0.9,
+    radius: 1.1,
+    tagTop: 0.5,
+    ...LEAF,
+    leafGap: 0.35,
+    leafTop: 0.7,
+    dot: 0.65,
+    dotGap: 1,
+    stem: MAP_LINE_MIN,
+    elbow: 1,
+    link: 5,
+    linkMax: 8,
+    ribbon: [1.4, 0.45],
+    blockGap: 1.4,
+    airMax: 6,
+    center: [
+      { ...SMALL, lines: 2, maxW: 32 },
+      { ...SMALL, lines: 3, maxW: 34 },
+      { ...SMALL, lines: 4, maxW: 36 },
+    ],
+    centerPadX: 2.2,
+    centerPadY: 1.6,
+    centerMinW: 20,
+    centerRadius: 1.2,
+  }),
 };
 
 /** Листьев у ветви на карте — не больше четырёх, дальше «+N». */
 export const MAP_LEAVES_MAX = 4;
 
-/** Ступень карты по числу ветвей — её потолок кегля: 1–2 → xl, 3–4 → l, 5–8 → m, 9–12 → s. */
+/** The map's step by the number of branches — its type-size ceiling: 1–2 → xl, 3–4 → l, 5–6 → m. */
 export function mapStage(branches: number): MapTier["key"] {
   if (branches <= 2) return "xl";
   if (branches <= 4) return "l";
-  if (branches <= 8) return "m";
-  return "s";
+  return "m";
 }
 
-/** Что пробовать, от лучшего: кегль, сколько листьев у ветви, строк у листа. Начало — ступень доски. */
-const ATTEMPTS: readonly { tier: MapTier["key"]; leaves: number; leafLines: number }[] = [
-  { tier: "xl", leaves: MAP_LEAVES_MAX, leafLines: 2 },
-  { tier: "l", leaves: MAP_LEAVES_MAX, leafLines: 2 },
-  { tier: "m", leaves: MAP_LEAVES_MAX, leafLines: 2 },
-  { tier: "s", leaves: MAP_LEAVES_MAX, leafLines: 2 },
-  { tier: "xs", leaves: MAP_LEAVES_MAX, leafLines: 2 },
-  { tier: "xs", leaves: MAP_LEAVES_MAX, leafLines: 1 },
-  { tier: "xxs", leaves: MAP_LEAVES_MAX, leafLines: 1 },
-  { tier: "xxs", leaves: 3, leafLines: 1 },
-  { tier: "xxs", leaves: 2, leafLines: 1 },
-  { tier: "xxs", leaves: 1, leafLines: 1 },
-  { tier: "xxs", leaves: 0, leafLines: 1 },
-];
-/** Спрятанный за «+N» лист хуже обрезанной строки. */
-const HIDDEN_COST = 1.5;
+const TIER_ORDER: readonly MapTier["key"][] = ["xl", "l", "m", "s"];
+type Attempt = { tier: MapTier["key"]; leaves: number; leafLines: number };
+
+/**
+ * What to try, best first: type size, how many leaves a branch keeps, lines per leaf. It starts at the board's
+ * step; at each size first all leaves in three lines, then in two, then fewer leaves; at the very end, leaves on
+ * one line. A leaf is a phrase of 30–40 characters and a side of the map is 40–50 vh: in `tv-small` that is two
+ * or three lines.
+ */
+function attemptsFrom(stage: MapTier["key"]): Attempt[] {
+  const tiers = TIER_ORDER.slice(TIER_ORDER.indexOf(stage));
+  const counts = Array.from({ length: MAP_LEAVES_MAX + 1 }, (_, i) => MAP_LEAVES_MAX - i);
+  return [
+    ...tiers.flatMap((tier) => counts.flatMap((leaves) => [3, 2].map((leafLines) => ({ tier, leaves, leafLines })))),
+    ...counts.map((leaves) => ({ tier: "s" as const, leaves, leafLines: 1 })),
+  ];
+}
+
+/**
+ * The cost of losses: a cut phrase reads as a different phrase («Сверить остатки по») — it is worse than a
+ * leaf honestly hidden behind «+ ещё N».
+ */
+const CLAMP_COST = 2;
+const HIDDEN_COST = 1;
 
 export type MapCenter = { rect: MapRect; size: number; lh: number; lines: number; padX: number };
 
@@ -250,8 +299,6 @@ export type MapBranch = {
   /** Номер пункта на доске. */
   n: number;
   side: "right" | "left";
-  /** Оттенок ветви: 0…3, по кругу (акцент и его приглушённые тона, не радуга). */
-  tone: number;
   rect: MapRect;
   lines: number;
   tag: string | null;
@@ -311,9 +358,25 @@ export function elbow(x0: number, y0: number, x1: number, y1: number, radius = 1
 /* Раскладка                                                                  */
 /* -------------------------------------------------------------------------- */
 
-function leafText(leaf: TvBoardLeaf): string {
-  const tag = tagOf(leaf);
-  return tag ? `${wallText(leaf)} ${tag}` : wallText(leaf);
+/**
+ * The tag of a point on the map: «→ Марат · в работе» when it stands on one line of a column `width` wide, else
+ * the name alone, «→ Марат» — the plate never breaks between the name and its stage.
+ */
+export function mapTag(item: Pick<TvBoardLeaf, "assignee" | "handed_done" | "stage">, width: number): string | null {
+  const full = tagOf(item);
+  if (!full || !item.assignee) return full;
+  return lineWidth(full, MAP_TAG.size, "point") + MAP_TAG.pad * 2 + 0.4 <= width ? full : `→\u00a0${item.assignee}`;
+}
+
+/**
+ * «→ Марат · в работе» as a plate on a line of its own, in a column `width` wide: how wide the plate is and how tall
+ * (a long name in a narrow leaf wraps once). Zero — no tag.
+ */
+export function tagBox(tag: string | null, width: number): { w: number; h: number } {
+  if (!tag) return { w: 0, h: 0 };
+  const inner = Math.max(1, width - MAP_TAG.pad * 2);
+  const lines = textLines(tag, inner, MAP_TAG.size, 2, "point").lines;
+  return { w: Math.min(width, lineWidth(tag, MAP_TAG.size, "point") + MAP_TAG.pad * 2 + 0.4), h: lines * MAP_TAG.lh };
 }
 
 function centerFit(title: string, t: MapTier): MapCenter {
@@ -351,31 +414,49 @@ type Block = {
 
 /** Ветвь без позиции: ширина узла, строки, листья под ним и высота всей ветви. */
 function blockOf(item: TvBoardItem, n: number, t: MapTier, sideW: number, leavesMax: number, leafLines: number): Block {
-  const tag = tagOf(item);
-  const text = tag ? `${mapText(item)} ${tag}` : mapText(item);
+  const text = mapText(item);
   const chrome = t.padX * 2 + t.badge + t.gap;
-  const natural = chrome + lineWidth(text, t.size, "point") + 0.6;
+  const tag = mapTag(item, Math.min(sideW, 60) - chrome);
+  // the tag's plate stands under the words: the node is as wide as the wider of the two
+  const tagNatural = tag ? lineWidth(tag, MAP_TAG.size, "point") + MAP_TAG.pad * 2 + 0.4 : 0;
+  const natural = chrome + Math.max(lineWidth(text, t.size, "point"), tagNatural) + 0.6;
   const room = Math.max(chrome + t.size * 3, Math.min(natural, sideW, 60));
   const fit = textLines(text, room - chrome, t.size, t.lines, "point");
+  const plate = tagBox(tag, room - chrome);
   // a node of several lines is as wide as its lines, not as the whole side
-  const w = fit.lines === 1 ? room : Math.max(chrome + t.size * 3, Math.min(room, chrome + snugWidth(text, room - chrome, t.size, t.lines, "point") + 0.6));
-  const h = t.padY * 2 + Math.max(t.badge, fit.lines * t.lh);
-  let cost = fit.clamped ? 1 : 0;
+  const w =
+    fit.lines === 1
+      ? room
+      : Math.max(chrome + t.size * 3, Math.min(room, chrome + Math.max(snugWidth(text, room - chrome, t.size, t.lines, "point"), plate.w) + 0.6));
+  const h = t.padY * 2 + Math.max(t.badge, fit.lines * t.lh + (tag ? t.tagTop + plate.h : 0));
+  let cost = fit.clamped ? CLAMP_COST : 0;
 
   const shown = Math.min(item.children.length, leavesMax);
   const more = item.children.length - shown;
   const leafW = sideW - t.indent;
   const leafChrome = t.dot * 2 + t.dotGap;
-  const leaves: Block["leaves"] = item.children.slice(0, shown).map((leaf) => {
-    const words = leafText(leaf);
+  // when some leaves must wait behind «+ ещё N», the handed ones stay: whom a line went to is what the room reads
+  // first (D-185); the shown ones keep the board's order
+  const kept = item.children
+    .map((leaf, index) => ({ leaf, index, handed: tagOf(leaf) !== null }))
+    .sort((a, b) => Number(b.handed) - Number(a.handed) || a.index - b.index)
+    .slice(0, shown)
+    .sort((a, b) => a.index - b.index);
+  const hiddenHanded = item.children.filter((leaf) => tagOf(leaf) !== null).length - kept.filter((entry) => entry.handed).length;
+  const leaves: Block["leaves"] = kept.map(({ leaf }) => {
+    const words = wallText(leaf);
+    const leafTag = mapTag(leaf, leafW - leafChrome);
     const lf = textLines(words, leafW - leafChrome, t.leaf, leafLines, "leaf");
-    if (lf.clamped) cost += 1;
+    const leafPlate = tagBox(leafTag, leafW - leafChrome);
+    if (lf.clamped) cost += CLAMP_COST;
     // a leaf of several lines is as wide as its lines need, not as the whole side
-    const lw = Math.min(leafW, snugWidth(words, leafW - leafChrome, t.leaf, leafLines, "leaf") + leafChrome + 0.6);
-    return { leaf, more: 0, w: lw, h: lf.lines * t.leafLh, lines: lf.lines, tag: tagOf(leaf) };
+    const lw = Math.min(leafW, Math.max(snugWidth(words, leafW - leafChrome, t.leaf, leafLines, "leaf"), leafPlate.w) + leafChrome + 0.6);
+    const lh = lf.lines * t.leafLh + (leafTag ? t.tagTop + leafPlate.h : 0);
+    return { leaf, more: 0, w: lw, h: lh, lines: lf.lines, tag: leafTag };
   });
   if (more > 0) {
-    cost += more * HIDDEN_COST;
+    // a handed leaf out of sight costs twice: its name is gone with it
+    cost += (more + hiddenHanded) * HIDDEN_COST;
     const label = `+ ещё ${more}`;
     leaves.push({ leaf: null, more, w: Math.min(leafW, lineWidth(label, t.leaf, "leaf") + leafChrome + 0.6), h: t.leafLh, lines: 1, tag: null });
   }
@@ -414,14 +495,15 @@ export function splitSides(heights: readonly number[], gap: number): number {
 }
 
 /**
- * Карта в поле `width × height` (vh). Не влезает даже с одним «+N» у каждой ветви — null
- * (при двенадцати ветвях по две строки такого не бывает; `mapFits` отсекает больше).
- * Попытки начинаются со ступени доски (`mapStage`): меньше ветвей — крупнее.
+ * The map in a `width × height` field (vh). More than six branches (`MAP_BRANCHES_MAX`), or it does not
+ * fit even with one «+N» on every branch — null: the wall draws a list. Attempts start at the board's step
+ * (`mapStage`): fewer branches — larger.
  */
 export function mapLayout(title: string, items: readonly TvBoardItem[], frame: { width: number; height: number }): MapLayout | null {
-  let best: { cost: number; draw: () => MapLayout } | null = null;
+  if (items.length > MAP_BRANCHES_MAX) return null;
+  let best: { cost: number; layout: MapLayout } | null = null;
   const stage = mapStage(items.length);
-  for (const attempt of ATTEMPTS.slice(ATTEMPTS.findIndex((a) => a.tier === stage))) {
+  for (const attempt of attemptsFrom(stage)) {
     const t = MAP_TIERS[attempt.tier];
     const center = centerFit(title, t);
     if (center.rect.h > frame.height) continue;
@@ -436,10 +518,22 @@ export function mapLayout(title: string, items: readonly TvBoardItem[], frame: {
     const right = blocks.slice(0, k);
     const left = blocks.slice(k);
     if (sideHeight(right, t.blockGap) > frame.height || sideHeight(left, t.blockGap) > frame.height) continue;
-    const cost = blocks.reduce((sum, block) => sum + block.cost, 0);    if (cost === 0) return place(center, right, left, t, frame, sideW);
-    if (!best || cost < best.cost) best = { cost, draw: () => place(center, right, left, t, frame, sideW) };
+    const cost = blocks.reduce((sum, block) => sum + block.cost, 0);
+    if (best && cost >= best.cost) continue;
+    const layout = place(center, right, left, t, frame, sideW);
+    // big type on a narrow wall (4:3) can push a node past the edge: then the next, smaller attempt
+    if (!inField(layout)) continue;
+    if (cost === 0) return layout;
+    best = { cost, layout };
   }
-  return best ? best.draw() : null;
+  return best ? best.layout : null;
+}
+
+/** Every node of the map inside its field. */
+function inField(layout: MapLayout): boolean {
+  const eps = 0.02;
+  const rects = [layout.center.rect, ...layout.branches.flatMap((branch) => [branch.rect, ...branch.leaves.map((leaf) => leaf.rect)])];
+  return rects.every(({ x, y, w, h }) => x >= -eps && y >= -eps && x + w <= layout.width + eps && y + h <= layout.height + eps);
 }
 
 /**
@@ -488,7 +582,7 @@ function place(center: MapCenter, right: Block[], left: Block[], t: MapTier, fra
         return { leaf: leaf.leaf, more: leaf.more, rect: lrect, lines: leaf.lines, tag: leaf.tag, dotX, dotY, path: stem };
       });
 
-      branches.push({ item: block.item, n: block.n, side, tone: (block.n - 1) % 4, rect, lines: block.lines, tag: block.tag, leaves, path });
+      branches.push({ item: block.item, n: block.n, side, rect, lines: block.lines, tag: block.tag, leaves, path });
       top += block.blockH + gap;
     }
   };

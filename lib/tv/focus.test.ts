@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { STAGE_WORDS } from "./board";
 import { PERSON_ITEMS, personView, STAGE_WORD, stageOf, taskPath, taskTitle } from "./focus";
 import type { TvFocusEmployee, TvFocusTask, TvStoryEvent } from "./queries";
+import { STAGE, stageWord } from "./words";
 
 function focus(tasks: Partial<TvFocusTask>[], guest = false): TvFocusEmployee {
   return {
@@ -38,13 +40,22 @@ const LIFE: TvStoryEvent[] = (
 describe("stageOf — стадия словами стены", () => {
   it("нейтральные слова настоящего времени; доработка — «В работе» (D-45)", () => {
     expect(["sent", "accepted", "in_progress", "rework", "pending_review", "done"].map((s) => STAGE_WORD[stageOf(s)!])).toEqual([
-      "Новое",
+      "Поручено",
       "В работе",
       "В работе",
       "В работе",
       "На проверке",
       "Готово",
     ]);
+  });
+
+  it("одни и те же четыре слова по всей стене: человек, дело, доска (lib/tv/words.ts)", () => {
+    expect(Object.values(STAGE_WORD)).toEqual(Object.values(STAGE));
+    expect(Object.values(STAGE)).toEqual(["Поручено", "В работе", "На проверке", "Готово"]);
+    // inside a line — the same word in lower case
+    expect(Object.values(STAGE_WORDS)).toEqual(["поручено", "в работе", "на проверке", "готово"]);
+    expect((["sent", "work", "review", "done"] as const).map(stageWord)).toEqual(Object.values(STAGE_WORDS));
+    expect([...Object.values(STAGE), ...Object.values(STAGE_WORDS)].join(" ")).not.toMatch(NEGATIVE);
   });
 
   it("отказ, отзыв и отложенное на стену не попадают вовсе", () => {
@@ -75,7 +86,7 @@ describe("personView — человек на стене (D-185)", () => {
     const view = personView(full());
     expect(view.mode).toBe("open");
     expect(view.items).toHaveLength(PERSON_ITEMS);
-    expect(view.items.map((item) => item.word)).toEqual(["Новое", "В работе", "В работе", "На проверке"]);
+    expect(view.items.map((item) => item.word)).toEqual(["Поручено", "В работе", "В работе", "На проверке"]);
     expect(Object.keys(view.items[0]).sort()).toEqual(["id", "stage", "title", "word"]);
   });
 
@@ -152,13 +163,14 @@ describe("taskPath — одно дело во весь экран (D-123, D-185)
 
   it("четыре шага словами настоящего времени, текущий — «сейчас»", () => {
     expect(taskPath({ status: "pending_review" })).toEqual([
-      { key: "posted", label: "Поставлено", state: "passed" },
+      { key: "posted", label: "Поручено", state: "passed" },
       { key: "work", label: "В работе", state: "passed" },
       { key: "review", label: "На проверке", state: "now" },
       { key: "done", label: "Готово", state: "next" },
     ]);
     expect(states("sent")).toEqual(["now", "next", "next", "next"]);
     expect(states("done")).toEqual(["passed", "passed", "passed", "now"]);
+    expect(taskPath({ status: "accepted" }).map((step) => step.label).join(" → ")).toBe("Поручено → В работе → На проверке → Готово");
   });
 
   it("возврат на доработку — снова «В работе»: проверка опять впереди, без своего слова (D-45)", () => {

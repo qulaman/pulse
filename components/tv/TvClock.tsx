@@ -39,29 +39,25 @@ export function TvClock({
   if (clock === "analog") {
     const [weekday, date] = splitDate(tvDate(now));
     return (
-      <div
-        className="flex h-full w-full items-center gap-[9vh] px-[var(--tv-x)] pb-[var(--tv-gap)] pt-[var(--tv-y)]"
-        data-testid="tv-clock"
-        data-clock="analog"
-      >
-        <TvAnalogClock now={now} size="74vh" className="shrink-0" />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <p className="tv-title first-letter:uppercase" style={{ color: "var(--tv-text)" }}>
-            {weekday}
-          </p>
-          {date ? <p className="tv-lead mt-[1.6vh] text-muted">{date}</p> : null}
-          {meeting ? <TvMeetingLine meeting={meeting} single className="mt-[7vh]" /> : null}
+      <div className="tv-box" data-testid="tv-clock" data-clock="analog">
+        {/* the wall's two columns: the dial in the main one, the day and the meeting from the side column's line */}
+        <div className="tv-split min-h-0 flex-1 items-center">
+          <TvAnalogClock now={now} size="74vh" className="shrink-0" />
+          <div className="flex min-w-0 flex-col">
+            {/* the longest weekday («Понедельник», «Воскресенье») just fits the column at tv-title — never wrapped */}
+            <p className="tv-title whitespace-nowrap first-letter:uppercase" style={{ color: "var(--tv-text)" }}>
+              {weekday}
+            </p>
+            {date ? <p className="tv-lead mt-[1.6vh] text-muted">{date}</p> : null}
+            {meeting ? <TvMeetingLine meeting={meeting} single className="mt-[7vh]" /> : null}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div
-      className="flex h-full w-full flex-col justify-center px-[var(--tv-x)] pb-[var(--tv-gap)] pt-[var(--tv-y)]"
-      data-testid="tv-clock"
-      data-clock="digital"
-    >
+    <div className="tv-box justify-center" data-testid="tv-clock" data-clock="digital">
       <p
         className="tv-num font-bold"
         style={{ fontSize: `${DIGITS_VH}vh`, lineHeight: 0.82, letterSpacing: "-0.035em", color: "var(--tv-text)", marginLeft: "-0.04em" }}

@@ -60,8 +60,3 @@
 }
 
 /* The still wall: the tape stands at its start, the way it always did */
-@media (prefers-reduced-motion: reduce) {
-  .tape {
-    animation: none;
-  }
-}

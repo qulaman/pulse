@@ -1,6 +1,22 @@
 import { describe, expect, it } from "vitest";
 
-import { cellTitle, isBirthday, LATER_DAYS, laterDays, monthGrid, monthGridFrom, PER_CELL, PER_LATER_DAY, TODAY_ROWS, todayPlan } from "./calendar";
+import {
+  cellTitle,
+  firstColumn,
+  isBirthday,
+  LATER_DAYS,
+  laterDays,
+  monthGrid,
+  monthGridFrom,
+  monthRows,
+  PER_CELL,
+  PER_LATER_DAY,
+  softHyphens,
+  TIME_COLUMN,
+  TODAY_ROWS,
+  todayPlan,
+  weekLines,
+} from "./calendar";
 import type { TvCalendarEvent } from "./queries";
 
 // пятница, 25 сентября 2026, 14:00 по Актобе
@@ -139,7 +155,8 @@ describe("monthGrid — месяц сеткой", () => {
     expect(grid.weeks.map((w) => w.past)).toEqual([true, true, true, false, false]);
   });
 
-  it(`в клетке ${PER_CELL} мероприятия, дальше «+N»; в соседнем месяце — пусто`, () => {
+  it("в клетке одно мероприятие, дальше «+N»; в соседнем месяце — пусто", () => {
+    expect(PER_CELL).toBe(1);
     const grid = monthGrid(
       cal([
         ...Array.from({ length: PER_CELL + 1 }, (_, i) => event({ id: `d${i}`, starts_at: `2026-09-28T0${i + 4}:00:00Z` })),
@@ -165,7 +182,8 @@ describe("monthGrid — месяц сеткой", () => {
       NOW,
     );
     const today = grid.weeks.flatMap((w) => w.days).find((c) => c.today);
-    expect(today?.rows.map((r) => r.id)).toEqual(["evening", "morning"]);
+    expect(today?.rows.map((r) => r.id)).toEqual(["evening"]);
+    expect(today?.more).toBe(1);
   });
 
   it("месяц, начатый в воскресенье, растягивается на шесть недель", () => {
@@ -178,3 +196,63 @@ describe("monthGrid — месяц сеткой", () => {
     expect(grid.weeks.map((w) => w.past)).toEqual([true, true, false, false, false, false]);
   });
 });
+
+describe("«Дальше» на сетке дня (D-185)", () => {
+  it("первая колонка — по времени, а при длинном имени дня — по нему: дела дня начинаются с линии названий", () => {
+    expect(firstColumn([])).toBe(TIME_COLUMN);
+    expect(firstColumn([{ label: "Среда" }])).toBe(TIME_COLUMN);
+    const monday = firstColumn([{ label: "Понедельник" }]);
+    expect(monday).toBeGreaterThan(TIME_COLUMN);
+    // the free day sets its days one size up: the column grows with them
+    expect(firstColumn([{ label: "Понедельник" }], 5.6)).toBeGreaterThan(monday);
+  });
+});
+
+/** Where the soft hyphens are, drawn as «-». */
+const breaks = (text: string) => softHyphens(text).replace(/­/g, "-");
+/** The grid's tracks: «auto» or a whole «minmax(…)». */
+const tracks = (rows: string) => rows.match(/minmax\([^)]*\)|auto/g) ?? [];
+
+describe("месяц на стене (D-185)", () => {
+  it("мягкие переносы по слогам, по две буквы с каждой стороны", () => {
+    expect(breaks("Корпоратив")).toBe("Кор-по-ра-тив");
+    expect(breaks("Планёрка")).toBe("Пла-нёр-ка");
+    expect(breaks("Созвон с поставщиком")).toBe("Соз-вон с пос-тав-щи-ком");
+    // short words and names stay whole; nothing but soft hyphens is added
+    expect(breaks("ДР Асель")).toBe("ДР Асель");
+    expect(breaks("Аудит")).toBe("Аудит");
+    expect(softHyphens("Выезд на объект «Юг»").replace(/­/g, "")).toBe("Выезд на объект «Юг»");
+  });
+
+  it("неделя хочет строк по самой занятой клетке: дата, название, «+N»", () => {
+    const grid = monthGrid(
+      cal([
+        event({ id: "long", title: "Встреча с заказчиком по второму корпусу", starts_at: "2026-09-29T05:00:00Z" }),
+        event({ id: "more", starts_at: "2026-09-29T08:00:00Z" }),
+      ]),
+      NOW,
+    );
+    const week = grid.weeks.find((w) => w.days.some((c) => c.day === 29 && c.inMonth))!;
+    // the date line, three lines of title at most, «+1»
+    expect(weekLines(week)).toBe(5);
+    const quiet = grid.weeks.find((w) => !w.past && w.days.every((c) => c.rows.length === 0))!;
+    expect(weekLines(quiet)).toBe(2);
+  });
+
+  it("строки сетки: прошедшие недели — по дате, недели впереди — не меньше своих строк, пока всё влезает", () => {
+    const grid = monthGrid(cal([event({ id: "a", title: "Встреча с заказчиком по второму корпусу", starts_at: "2026-09-29T05:00:00Z" })]), NOW);
+    const rows = tracks(monthRows(grid));
+    // the weekdays' line, three folded weeks, two weeks ahead
+    expect(rows).toHaveLength(6);
+    expect(rows.slice(0, 4)).toEqual(["auto", "auto", "auto", "auto"]);
+    expect(rows[4]).toMatch(/^minmax\([\d.]+vh, \dfr\)$/);
+    // a six-week month on its first day: nothing is past, the weeks share the height by proportion only
+    const crowded = monthGrid(
+      cal(Array.from({ length: 30 }, (_, i) => event({ id: `d${i}`, title: "Совещание по бюджету отдела", starts_at: new Date(Date.UTC(2026, 10, 1 + i, 5)).toISOString() }))),
+      new Date("2026-11-01T04:00:00Z"),
+    );
+    expect(crowded.weeks).toHaveLength(6);
+    expect(tracks(monthRows(crowded)).slice(1).every((row) => row.startsWith("minmax(0,"))).toBe(true);
+  });
+});
+

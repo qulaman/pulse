@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useSyncExternalStore } from "react";
 
 import {
@@ -38,17 +38,18 @@ const MAP_MARGIN = 1.6;
  *    колонки, кегль и страницы — по весу веток (`listLayout`); страницы листаются сами раз в
  *    20 с по часам киоска.
  *  - «Карта» — название в центре, пункты ветвями вокруг, подпункты листьями (`mapLayout`).
- *    Больше двенадцати ветвей — всё равно список (`mapFits`).
- * Ведущий с пульта подсвечивает пункт: он на подложке, остальные гаснут, стена стоит на его
- * странице, сверху — «3 / 7» и шкала пунктов. Отмеченный гаснет с галочкой на своём месте;
- * только что сказанный минуту мягко светится. Рядом с поручённым — нейтральное «→ Марат»
- * (D-45). При госте доски нет — часы и «скрыта» (D-33). Движение — только opacity и transform.
+ *    More than six branches — a list all the same (`MAP_BRANCHES_MAX`, D-185).
+ * The presenter on the remote lights a point: it sits on the «сейчас» mark (`.tv-now`), the others dim,
+ * the wall stays on its page, with «3 / 7» and the points' scale on top. A checked point dims with a tick
+ * in its place; the one just said breathes with the same mark for a minute. Under a handed point — the
+ * «→ Марат» plate (D-45, D-185). No text is smaller than `tv-small`, except the numerals in the circles.
+ * With a guest there is no board — a quiet clock with no service caption (D-33, D-185). Motion is opacity
+ * and transform only.
  */
 export function TvBoard({ data, now, aspect: fixed }: { data: TvBoardData | null; now: Date; aspect?: number }) {
   // the preview on the phone (D-140) draws the wall's own proportions, not the phone's
   const screen = useSyncExternalStore(subscribeResize, clientAspect, serverAspect);
   const aspect = fixed ?? screen;
-  const still = useReducedMotion() ?? false;
   const frame = useMemo(() => boardFrame(aspect), [aspect]);
   const board = data?.hidden ? null : (data?.board ?? null);
   const items = board?.items;
@@ -90,15 +91,15 @@ export function TvBoard({ data, now, aspect: fixed }: { data: TvBoardData | null
             // another view, or the map on another step of its scale, crossfades as a whole: type never resizes in view
             key={map ? `map-${map.tier.key}` : "list"}
             className="absolute inset-0"
-            initial={{ opacity: 0, scale: still ? 1 : 0.98 }}
+            initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: still ? 1 : 0.99, transition: { duration: still ? 0 : 0.28 } }}
-            transition={{ duration: still ? 0 : 0.5, ease: EASE }}
+            exit={{ opacity: 0, scale: 0.99, transition: { duration: 0.28 } }}
+            transition={{ duration: 0.5, ease: EASE }}
           >
             {map ? (
-              <TvBoardMap layout={map} title={board.title} focus={focus} fresh={fresh} still={still} />
+              <TvBoardMap layout={map} title={board.title} focus={focus} fresh={fresh} />
             ) : list ? (
-              <TvBoardList layout={list} title={board.title} heading={heading} page={page} focus={focus} fresh={fresh} still={still} />
+              <TvBoardList layout={list} title={board.title} heading={heading} page={page} focus={focus} fresh={fresh} />
             ) : null}
           </motion.div>
         </AnimatePresence>
@@ -160,7 +161,7 @@ function Progress({ board, at, on }: { board: Board; at: number; on: boolean }) 
             style={{
               width: vh(scale.segment),
               height: vh(PROGRESS_H),
-              background: item.done ? "color-mix(in srgb, var(--ok) 55%, transparent)" : "color-mix(in srgb, var(--text-muted) 38%, transparent)",
+              background: item.done ? "color-mix(in srgb, var(--tv-text) 55%, transparent)" : "color-mix(in srgb, var(--text-muted) 38%, transparent)",
             }}
           />
         ))}
@@ -170,7 +171,7 @@ function Progress({ board, at, on }: { board: Board; at: number; on: boolean }) 
           style={{
             width: vh(scale.thumb),
             height: vh(PROGRESS_THUMB_H),
-            background: "var(--accent)",
+            background: "var(--tv-live)",
             // a ring of the wall's own colour: the capsule sits on the scale, not in a gap of it
             boxShadow: "0 0 0 0.3vh var(--bg)",
             transform: `translateX(${vh(scale.shift)})`,
@@ -205,12 +206,16 @@ function PageDots({ page, pages }: { page: number; pages: number }) {
   );
 }
 
-/** «Гость в кабинете»: доски нет — тихие часы и честная строка (D-33). */
+/**
+ * A guest in the office: no board — only a quiet clock. No service caption: a guest is not told that
+ * something is hidden from them (D-33, D-185).
+ */
 function Hidden({ now }: { now: Date }) {
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-[2vh]" data-testid="tv-board-hidden">
-      <p className="tv-num text-[18vh] font-bold leading-[20vh]">{tvTime(now)}</p>
-      <p className="tv-small text-muted">Доска скрыта на время встречи</p>
+    <div className="flex h-full w-full flex-col items-center justify-center" data-testid="tv-board-hidden">
+      <p className="tv-hero tv-num" style={{ color: "var(--tv-text)" }}>
+        {tvTime(now)}
+      </p>
     </div>
   );
 }

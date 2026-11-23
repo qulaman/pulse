@@ -183,8 +183,8 @@ describe("pipsOf", () => {
 describe("mapHint", () => {
   it("молчит, пока карта влезает, и честно говорит, когда нет", () => {
     expect(mapHint(0)).toBeNull();
-    expect(mapHint(12)).toBeNull();
-    expect(mapHint(13)).toBe("Карта — до 12 пунктов, на стене список");
+    expect(mapHint(6)).toBeNull();
+    expect(mapHint(7)).toBe("Карта — до 6 пунктов, на стене список");
   });
 });
 

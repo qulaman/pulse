@@ -1,10 +1,24 @@
 import { describe, expect, it } from "vitest";
 
 import type { TvBoardItem, TvBoardLeaf } from "./board";
-import { balanceColumns, COLUMN_GAP, fillColumns, LIST_TIERS, listLayout, pageOfPoint, rowsAt, stackHeight, textTop, titleFit, type ListLayout } from "./boardList";
+import {
+  balanceColumns,
+  COLUMN_GAP,
+  fillColumns,
+  leafHeight,
+  LIST_TIERS,
+  listLayout,
+  pageOfPoint,
+  rowsAt,
+  stackHeight,
+  textTop,
+  titleFit,
+  TV_TYPE,
+  type ListLayout,
+} from "./boardList";
 
-// the list body under a one-line title on 16:9: 74 − 4.4 − 1.4 − 8 − 2.6
-const FRAME = { width: 163.6, height: 57.6 };
+// the list body under a one-line title on 16:9 (D-185): 79 − 6 − 1.4 board, less the title line (8.14) and its gap
+const FRAME = { width: 161.8, height: 60.86 };
 
 function leaf(id: string, text = `Подпункт ${id}`, patch: Partial<TvBoardLeaf> = {}): TvBoardLeaf {
   return { id, text, done: false, created_at: "2026-09-25T08:00:00Z", assignee: null, handed_done: false, ...patch };
@@ -36,17 +50,18 @@ describe("listLayout", () => {
     const items = points(3);
     const layout = listLayout(items, FRAME);
     expect(layout.columns).toBe(1);
-    expect(layout.tier.key).toBe("xl");
+    expect(layout.tier.key).toBe("l");
     expect(layout.pages).toHaveLength(1);
     assertSound(layout, items);
   });
 
-  it("кегль мельчает с объёмом, пока хватает одной колонки; дальше — две", () => {
+  it("с объёмом сжимается воздух, пока хватает одной колонки; дальше — две", () => {
     const three = listLayout(points(3), FRAME);
     const six = listLayout(points(6), FRAME);
     const eight = listLayout(points(8), FRAME);
     expect(six.columns).toBe(1);
-    expect(six.tier.size).toBeLessThan(three.tier.size);
+    expect(six.tier.key).toBe("m");
+    expect(six.tier.rowGap).toBeLessThan(three.tier.rowGap);
     expect(eight.columns).toBe(2);
   });
 
@@ -77,11 +92,11 @@ describe("listLayout", () => {
     assertSound(layout, items);
   });
 
-  it("четырнадцать пунктов — одна страница, читаемо (подпункт не мельче 2.6 vh)", () => {
+  it("четырнадцать пунктов — одна страница, и ничего мельче `tv-small` (D-185)", () => {
     const layout = listLayout(points(14), FRAME);
     expect(layout.pages).toHaveLength(1);
-    expect(layout.tier.sub).toBeGreaterThanOrEqual(2.6);
-    expect(layout.tier.size).toBeGreaterThanOrEqual(2.8);
+    expect(layout.tier.sub).toBeGreaterThanOrEqual(TV_TYPE.small.size);
+    expect(layout.tier.size).toBeGreaterThanOrEqual(TV_TYPE.small.size);
   });
 
   it("тридцать пунктов с подпунктами — страницы, ветки не рвутся, номера сквозные", () => {
@@ -166,10 +181,11 @@ describe("pageOfPoint", () => {
 
 describe("titleFit", () => {
   it("короткое — крупно в строку, длинное — мельче в две", () => {
-    expect(titleFit("Планёрка · понедельник", 163.6)).toMatchObject({ size: 7, lines: 1 });
+    expect(titleFit("Планёрка · понедельник", 161.8)).toMatchObject({ size: TV_TYPE.lead.size, lines: 1 });
     const long = "Планёрка по итогам квартала: продажи, склад, новые объекты, кадровые вопросы, бюджет на осень и подготовка к выставке в Алматы";
-    const fit = titleFit(long, 163.6);
-    expect(fit.size).toBeLessThan(7);
+    const fit = titleFit(long, 161.8);
+    expect(fit.size).toBeLessThan(TV_TYPE.lead.size);
+    expect(fit.size).toBeGreaterThanOrEqual(TV_TYPE.small.size);
     expect(fit.lines).toBe(2);
   });
 });
@@ -178,22 +194,22 @@ describe("a drawing in the list (D-141)", () => {
   const drawing = { v: 1 as const, strokes: [{ c: "text" as const, w: 1 as const, p: [0, 0, 100, 100] }] };
 
   it("gives the point room for its picture under the words", () => {
-    const plain = rowsAt([point(1)], LIST_TIERS.xl, 160)[0];
-    const drawn = rowsAt([{ ...point(1), sketch: drawing }], LIST_TIERS.xl, 160)[0];
+    const plain = rowsAt([point(1)], LIST_TIERS.l, 160)[0];
+    const drawn = rowsAt([{ ...point(1), sketch: drawing }], LIST_TIERS.l, 160)[0];
     expect(plain.thumb).toBe(0);
     expect(drawn.thumb).toBeGreaterThan(0);
-    const t = LIST_TIERS.xl;
+    const t = LIST_TIERS.l;
     expect(drawn.height).toBeCloseTo(t.padY * 2 + Math.max(t.badge, textTop(t) + t.lh + t.subTop + drawn.thumb), 5);
     expect(drawn.height).toBeGreaterThan(plain.height);
   });
 
   it("keeps the picture at the drawing's shape: a vertical one is held by its height (D-141 amendment)", () => {
-    // a narrow column: 30 vh wide leaves 15.6 vh for the words
-    const wide = rowsAt([{ ...point(1), sketch: drawing }], LIST_TIERS.xl, 30)[0];
-    const upright = rowsAt([{ ...point(1), sketch: { ...drawing, o: "portrait" as const } }], LIST_TIERS.xl, 30)[0];
-    const lying = rowsAt([{ ...point(1), sketch: { ...drawing, o: "portrait" as const, r: 90 as const } }], LIST_TIERS.xl, 30)[0];
-    expect(wide.thumb).toBeCloseTo((15.6 * 9) / 16, 5);
-    expect(upright.thumb).toBe(20);
+    // a narrow column: 30 vh wide leaves 16.6 vh for the words
+    const wide = rowsAt([{ ...point(1), sketch: drawing }], LIST_TIERS.l, 30)[0];
+    const upright = rowsAt([{ ...point(1), sketch: { ...drawing, o: "portrait" as const } }], LIST_TIERS.l, 30)[0];
+    const lying = rowsAt([{ ...point(1), sketch: { ...drawing, o: "portrait" as const, r: 90 as const } }], LIST_TIERS.l, 30)[0];
+    expect(wide.thumb).toBeCloseTo((16.6 * 9) / 16, 5);
+    expect(upright.thumb).toBe(18);
     expect(lying.thumb).toBeCloseTo(wide.thumb, 5);
   });
 
@@ -202,5 +218,27 @@ describe("a drawing in the list (D-141)", () => {
     const layout = listLayout(items, FRAME);
     assertSound(layout, items);
     expect(rowsAt(items, layout.tier, layout.columnWidth)[0].lines).toBe(1);
+  });
+});
+
+describe("шкала стены и «→ Марат» (D-185)", () => {
+  it("все кегли списка — из шкалы стены, ничего мельче `tv-small`", () => {
+    const scale: number[] = [TV_TYPE.small.size, TV_TYPE.body.size];
+    for (const tier of Object.values(LIST_TIERS)) {
+      expect(scale).toContain(tier.size);
+      expect(tier.sub).toBe(TV_TYPE.small.size);
+      expect(tier.tag).toBe(TV_TYPE.small.size);
+    }
+  });
+
+  it("плашка исполнителя — своей строкой под пунктом и под подпунктом: высота ветки её учитывает", () => {
+    const t = LIST_TIERS.l;
+    const plain = rowsAt([point(1, 1)], t, 160)[0];
+    const handed = rowsAt([{ ...point(1, 1), assignee: "Марат", children: [leaf("p1.1", "Подпункт p1.1", { assignee: "Асель", stage: "work" })] }], t, 160)[0];
+    expect(handed.tag).toBe("→ Марат");
+    expect(handed.children[0].tag).toBe("→ Асель · в работе");
+    // the point's plate and the sub-point's plate: a line of `tv-small` and its gap each
+    expect(handed.height - plain.height).toBeCloseTo(2 * (t.tagTop + t.tagLh), 5);
+    expect(leafHeight(t, handed.children[0])).toBeCloseTo(t.subLh + t.tagTop + t.tagLh, 5);
   });
 });

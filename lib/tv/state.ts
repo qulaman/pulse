@@ -73,8 +73,13 @@ export function guestEndsAt(state: TvState | null, now: Date): Date | null {
   return at.getTime() > now.getTime() ? at : null;
 }
 
-/** Заставки по кругу меняются раз в три минуты: успеть прочесть и не устать (D-123). */
-export const CAROUSEL_MS = 3 * 60_000;
+/**
+ * The scenes of the round change every minute and a half (D-185): someone sitting has time to read,
+ * and someone passing by does not see the same picture all day. It was three minutes (D-123).
+ */
+export const CAROUSEL_MS = 90_000;
+/** The same tempo in the remote's words. */
+export const CAROUSEL_WORDS = "раз в 1,5 мин";
 
 /**
  * The round of scenes (D-123, D-185): «Сегодня» is the wall's home and stands between every other scene:
@@ -90,8 +95,9 @@ export function carouselScenes(points: boolean, week = false, guest = false): Tv
 }
 
 /**
- * Какая заставка сейчас в круге — по часам, без таймера и без обмена с пультом: киоск и
- * пульт считают одно и то же число и сходятся. Граница — ровные три минуты от эпохи.
+ * Which scene of the round is on now — by the clock, with no timer and no exchange with the remote: the
+ * kiosk and the remote compute the same number and agree. The boundary is an even minute and a half from
+ * the epoch.
  */
 export function carouselScene(now: Date, points: boolean, week = false, guest = false): TvScene {
   const list = carouselScenes(points, week, guest);

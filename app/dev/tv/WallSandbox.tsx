@@ -57,6 +57,8 @@ export type WallCase =
   | "night"
   | "photos"
   | "team-many"
+  | "visit-now"
+  | "message-now"
   | MomentCase;
 
 const MIN = 60_000;
@@ -255,6 +257,13 @@ function boardFor(wallCase: WallCase, base: number, guest: boolean): TvBoard | n
 function overlayFor(wallCase: WallCase, base: number, guest: boolean): TvOverlay {
   const note = guest ? null : "Иванов, по поставкам бетона";
   const none = { visit: null, waiting: 0, message: null, messages: 0 };
+  // the first minute of a visitor and of a message: over the whole wall (D-185); the cases below are older — a plate
+  if (wallCase === "visit-now") {
+    return { ...none, visit: { id: "v2", status: "waiting", note, created_at: at(base, 0), answered_at: null }, waiting: 1 };
+  }
+  if (wallCase === "message-now") {
+    return { ...none, message: { id: "m2", note: guest ? null : "Звонил Ахметов, перезвоните", created_at: at(base, 0) }, messages: 1 };
+  }
   if (wallCase === "visit") {
     return { ...none, visit: { id: "v1", status: "waiting", note, created_at: at(base, -3), answered_at: null }, waiting: 1 };
   }
@@ -385,7 +394,7 @@ function useDemoStep(on: boolean, every = DEMO_STEP_MS): number {
  */
 export const WALKS = {
   scenes: ["face", "clock", "team", "calendar", "calendar-month", "rating", "rating-month", "photos", "moment-points", "focus", "task", "board-branches", "face"],
-  overlay: ["face", "visit", "face", "message", "wait", "message-long", "event", "focus", "visit", "focus"],
+  overlay: ["face", "visit-now", "visit", "face", "message-now", "message", "wait", "message-long", "event", "focus", "visit-now", "focus"],
   night: ["night", "face", "night", "focus", "night"],
   focus: ["focus", "focus-few", "focus", "focus-done", "task", "task-review", "task-done"],
   rating: ["rating", "rating-reorder", "rating", "rating-month"],
@@ -418,6 +427,11 @@ function newsOf(base: number, count: number): TvEvent[] {
   }));
 }
 
+/** A made-up client logo for `&logo=1`: a gold triangle mark and a word, like a real company's. */
+const SANDBOX_LOGO = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="120" viewBox="0 0 240 120"><rect width="120" height="120" rx="18" fill="#e9a23b"/><path d="M60 24 L96 92 H24 Z" fill="#1b1b1b"/><text x="132" y="78" font-family="sans-serif" font-size="44" font-weight="700" fill="#e9a23b">АРЛ</text></svg>',
+)}`;
+
 export function WallSandbox({
   wallCase,
   clock,
@@ -427,6 +441,9 @@ export function WallSandbox({
   walk = null,
   every = 4_000,
   lag = 0,
+  logo = false,
+  at: pinned = null,
+  zero = false,
 }: {
   wallCase: WallCase;
   clock: ClockStyle;
@@ -436,6 +453,11 @@ export function WallSandbox({
   walk?: string | null;
   every?: number;
   lag?: number;
+  logo?: boolean;
+  /** «15:20»: the wall's clock pinned to that time of today in Aqtobe. */
+  at?: string | null;
+  /** A day with nothing done yet: «Сегодня» greets instead of a number. */
+  zero?: boolean;
 }) {
   // on the minute: the fixtures are built on the server and again in the browser, and
   // they have to be the same fixtures for hydration
@@ -452,7 +474,13 @@ export function WallSandbox({
   const current: WallCase = reorder ? "rating" : busier ? "team" : walked;
   const arrived = useArrived(`${walkStep}`, route ? lag : 0);
   // the night case pins the clock to 23:10 in Aqtobe; every other case runs on the real one
-  const now = current === "night" || walk === "night" ? new Date(todayAt(base, 23, 10)) : live;
+  const [pinHour, pinMinute] = pinned ? pinned.split(":").map(Number) : [null, null];
+  const now =
+    current === "night" || walk === "night"
+      ? new Date(todayAt(base, 23, 10))
+      : pinHour !== null
+        ? new Date(new Date(todayAt(base, pinHour, pinMinute ?? 0)).getTime() + (live.getTime() % 60_000))
+        : live;
   // the scene data keeps its identity between renders, as query results do on the kiosk (TvFrame holds a scene by it)
   const data = useMemo(() => fixtures(base, guest), [base, guest]);
   const lines = [...newsOf(base, news), ...data.events].map((event) => lineOf(event, guest));
@@ -490,7 +518,8 @@ export function WallSandbox({
   );
   // the event notice needs the meeting exactly fifteen minutes out; elsewhere keep it clear
   const shown = current === "event" ? data.summary : { ...data.summary, events: data.summary.events.slice(1) };
-  const counted = news > 0 ? { ...shown, today: { ...shown.today, sent: shown.today.sent + news, done: shown.today.done + news } } : shown;
+  const shownToday = zero ? { ...shown, today: { sent: shown.today.sent, done: 0, in_work: shown.today.in_work }, week: [] } : shown;
+  const counted = news > 0 ? { ...shownToday, today: { ...shownToday.today, sent: shownToday.today.sent + news, done: shownToday.today.done + news } } : shownToday;
   const many = current === "team-many" ? bigTeam(counted, guest) : counted;
   const photos = useMemo(() => photoFixtures(base, guest), [base, guest]);
   const summary = busier
@@ -506,7 +535,7 @@ export function WallSandbox({
     <div className="h-dvh w-full overflow-hidden bg-bg" style={{ cursor: "default" }} data-demo-step={demo ? step : route ? walkStep : undefined}>
       <TvFrame
         company="Компания"
-        logoUrl={null}
+        logoUrl={logo ? SANDBOX_LOGO : null}
         now={now}
         guest={guest}
         scene={scene}

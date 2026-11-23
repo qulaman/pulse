@@ -1,11 +1,14 @@
+import { pluralRu } from "@/lib/tasks/status-text";
+
 import { tvTime, tvWeekday } from "./clock";
 import type { TvLine } from "./feed";
 import type { TvEventRow, TvSummary } from "./queries";
-import { phraseOf } from "./voice";
+import { formatPoints } from "./leaders";
+import { PHRASE_MAX, phraseOf } from "./voice";
 
 /**
  * The news line at the bottom of the wall (D-185): everything the screen tells about the company, as one tape —
- * the day's numbers, the next meetings, the latest events, the week's top. A pure function: the order and the words
+ * the next meetings, the latest events, the week's top and total (the day's numbers are on «Сегодня»). A pure function: the order and the words
  * are checked by a test, not by eye on the wall.
  *
  * An item is two words in different voices: `lead` (a time, «+50», «Топ недели») in its tone's colour and
@@ -25,15 +28,7 @@ export function tickerItems(lines: readonly TvLine[], summary: TvSummary | undef
   const items: TickerItem[] = [];
 
   if (summary) {
-    const { today } = summary;
-    if (today.sent + today.done + today.in_work > 0) {
-      items.push({
-        id: "today",
-        lead: "Сегодня",
-        text: `${today.sent} ${pluralOrders(today.sent)} · ${today.done} сделано · ${today.in_work} в работе`,
-        tone: "accent",
-      });
-    }
+    // the day's numbers live large on «Сегодня», every other turn of the round: the band does not repeat them
 
     // что впереди у всей компании: три ближайшие встречи, гостю — без названий (D-33)
     for (const event of (summary.events ?? []).slice(0, EVENTS_AHEAD)) {
@@ -57,21 +52,24 @@ export function tickerItems(lines: readonly TvLine[], summary: TvSummary | undef
   }
 
   if (summary?.points_enabled && summary.rating.length > 0) {
+    // first names only: three full names never fit the band's window whole
     const top = summary.rating
       .slice(0, 3)
-      .map((row) => (row.points === null ? row.name : `${row.name} ${row.points}`))
+      .map((row) => (row.points === null ? firstName(row.name) : `${firstName(row.name)} ${formatPoints(row.points)}`))
       .join(" · ");
     items.push({ id: "rating", lead: "Топ недели", text: top, tone: "gold" });
   }
 
   const week = summary?.week?.reduce((sum, day) => sum + day.done, 0) ?? 0;
   if (week > 0) {
-    items.push({ id: "week", lead: "За неделю", text: `сделано ${week}`, tone: "ok" });
+    items.push({ id: "week", lead: "За неделю", text: `готово ${week} ${pluralRu(week, ["дело", "дела", "дел"])}`, tone: "ok" });
   }
 
   if (summary?.points_enabled && summary.merch.length > 0) {
     const last = summary.merch[0]!;
-    items.push({ id: "merch", lead: "Награда", text: `${last.name} · ${last.title}`, tone: "gold" });
+    if (`${last.name} · ${last.title}`.length <= PHRASE_MAX) {
+      items.push({ id: "merch", lead: "Награда", text: `${last.name} · ${last.title}`, tone: "gold" });
+    }
   }
 
   return items;
@@ -95,21 +93,18 @@ function dayIndex(iso: string | Date): number {
   return Math.floor((ms + AQTOBE_OFFSET_MS) / DAY_MS);
 }
 
+/** «16:00 Планёрка, в переговорной» — the place only while the line stays short; no head count. */
 function meetingText(event: TvEventRow, now: Date): { lead: string; text: string } {
   const diff = dayIndex(event.starts_at) - dayIndex(now);
   const time = tvTime(new Date(event.starts_at));
   const lead = diff <= 0 ? time : `${diff === 1 ? "Завтра" : tvWeekday(new Date(event.starts_at))} ${time}`;
-  const parts = [event.title ?? "Мероприятие"];
-  if (event.location) parts.push(event.location);
-  parts.push(`${event.people} чел.`);
-  return { lead, text: parts.join(" · ") };
+  const title = event.title?.trim() || "Встреча";
+  const place = event.location?.trim() || null;
+  const withPlace = place ? `${title}, ${place}` : title;
+  return { lead, text: withPlace.length <= PHRASE_MAX ? withPlace : title };
 }
 
-function pluralOrders(count: number): string {
-  const mod100 = count % 100;
-  const mod10 = count % 10;
-  if (mod100 >= 11 && mod100 <= 14) return "поручений";
-  if (mod10 === 1) return "поручение";
-  if (mod10 >= 2 && mod10 <= 4) return "поручения";
-  return "поручений";
+function firstName(full: string): string {
+  return full.trim().split(/\s+/)[0] ?? full;
 }
+

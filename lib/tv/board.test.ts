@@ -43,11 +43,11 @@ describe("pageAt", () => {
 });
 
 describe("wallView и mapFits", () => {
-  it("карта — только до двенадцати ветвей и не пустая, иначе список", () => {
+  it("карта — только до шести ветвей и не пустая, иначе список (D-185)", () => {
     const items = (n: number) => Array.from({ length: n }, (_, i) => item(i + 1));
     expect(mapFits(0)).toBe(false);
-    expect(wallView({ view: "map", items: items(12) })).toBe("map");
-    expect(wallView({ view: "map", items: items(13) })).toBe("list");
+    expect(wallView({ view: "map", items: items(6) })).toBe("map");
+    expect(wallView({ view: "map", items: items(7) })).toBe("list");
     expect(wallView({ view: "map", items: [] })).toBe("list");
     expect(wallView({ view: "list", items: items(3) })).toBe("list");
   });
@@ -101,17 +101,18 @@ describe("isFresh", () => {
 });
 
 describe("tagOf и boardCountLine", () => {
-  it("пишет нейтрально: кому поручено и сдано ли", () => {
+  it("пишет нейтрально: кому поручено и готово ли", () => {
     expect(tagOf(item(1))).toBeNull();
     expect(tagOf(item(1, { assignee: "Марат" }))).toBe("→\u00a0Марат");
-    expect(tagOf(item(1, { assignee: "Марат", handed_done: true }))).toBe("→\u00a0Марат · сдано");
+    expect(tagOf(item(1, { assignee: "Марат", handed_done: true }))).toBe("→\u00a0Марат · готово");
   });
 
-  it("считает пункты и отмеченные", () => {
+  it("считает пункты и решённые — одной фразой через запятую", () => {
     expect(boardCountLine({ total: 0, done: 0 })).toBe("Пока пусто");
     expect(boardCountLine({ total: 5, done: 0 })).toBe("5 пунктов");
-    expect(boardCountLine({ total: 3, done: 2 })).toBe("3 пункта · 2 отмечено");
-    expect(boardCountLine({ total: 1, done: 1 })).toBe("1 пункт · 1 отмечен");
+    expect(boardCountLine({ total: 3, done: 2 })).toBe("3 пункта, 2 решено");
+    expect(boardCountLine({ total: 1, done: 1 })).toBe("1 пункт, 1 решён");
+    expect(boardCountLine({ total: 12, done: 5 })).toBe("12 пунктов, 5 решено");
   });
 });
 
@@ -153,14 +154,15 @@ describe("стадии поручений на стене (D-144)", () => {
     expect(stageOf("revoked")).toBeNull();
   });
 
-  it("puts the stage beside the name", () => {
+  it("puts the stage beside the name, in the wall's one vocabulary, lower case", () => {
     expect(tagOf(item(1, { assignee: "Марат", stage: "work" }))).toBe("→\u00a0Марат · в работе");
-    expect(tagOf(item(1, { assignee: "Марат", stage: "review" }))).toBe("→\u00a0Марат · на приёмке");
-    expect(tagOf(item(1, { assignee: "Марат", stage: "sent" }))).toBe("→\u00a0Марат · отправлено");
+    expect(tagOf(item(1, { assignee: "Марат", stage: "review" }))).toBe("→\u00a0Марат · на проверке");
+    expect(tagOf(item(1, { assignee: "Марат", stage: "sent" }))).toBe("→\u00a0Марат · поручено");
+    expect(tagOf(item(1, { assignee: "Марат", stage: "done" }))).toBe("→\u00a0Марат · готово");
     // a declined task: the name only
     expect(tagOf(item(1, { assignee: "Марат", stage: null }))).toBe("→\u00a0Марат");
-    // a base older than the client: «сдано» from handed_done
-    expect(tagOf(item(1, { assignee: "Марат", handed_done: true }))).toBe("→\u00a0Марат · сдано");
+    // a base older than the client: «готово» from handed_done
+    expect(tagOf(item(1, { assignee: "Марат", handed_done: true }))).toBe("→\u00a0Марат · готово");
     // a guest: no name, no tag at all
     expect(tagOf(item(1, { assignee: null, stage: "work" }))).toBeNull();
   });

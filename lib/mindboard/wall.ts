@@ -1,6 +1,6 @@
 import type { Note } from "@/lib/notes/queries";
 import type { HandedStage, TvBoardData, TvBoardLeaf } from "@/lib/tv/board";
-import { mapFits } from "@/lib/tv/board";
+import { MAP_MAX_POINTS, mapFits } from "@/lib/tv/board";
 import type { BoardView } from "@/lib/tv/state";
 
 import { hasContent, sketchFrom } from "./sketch";
@@ -55,6 +55,6 @@ export function wallBoardOf(
 /** What the preview says under the picture: the map asked for but too big for it — the wall draws the list. */
 export function wallNote(board: Pick<TvBoardData, "view" | "items">): string | null {
   if (board.items.length === 0) return "Пока пусто — пункты появятся, как только их скажут";
-  if (board.view === "map" && !mapFits(board.items.length)) return "Больше 12 пунктов — карта не поместится, стена покажет список";
+  if (board.view === "map" && !mapFits(board.items.length)) return `Больше ${MAP_MAX_POINTS} пунктов — карта не поместится, стена покажет список`;
   return null;
 }

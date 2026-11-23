@@ -38,10 +38,12 @@ const CASES: readonly WallCase[] = [
   "moment-merch",
   "moment-announce",
   "moment-long",
+  "visit-now",
+  "message-now",
 ];
 
 /**
- * /dev/tv?case=face|clock|team|calendar|calendar-month|calendar-empty|board|board-two|board-pages|board-hidden|board-branches|board-focus|board-map|board-map-focus|board-map-1…4|board-map-12|board-map-13|board-long|board-pages-branches|board-empty|focus|focus-few|focus-many|focus-done|focus-nopoints|focus-empty|rating|rating-month|rating-empty|task|task-review|task-done|carousel|visit|wait|message|message-long|event|night|photos|team-many|moment-points|moment-merch|moment-announce|moment-long[&clock=analog][&guest=1][&demo=focus|view|1][&tick=1]
+ * /dev/tv?case=face|clock|team|calendar|calendar-month|calendar-empty|board|board-two|board-pages|board-hidden|board-branches|board-focus|board-map|board-map-focus|board-map-1…4|board-map-12|board-map-13|board-long|board-pages-branches|board-empty|focus|focus-few|focus-many|focus-done|focus-nopoints|focus-empty|rating|rating-month|rating-empty|task|task-review|task-done|carousel|visit|wait|message|message-long|event|night|photos|team-many|moment-points|moment-merch|moment-announce|moment-long|visit-now|message-now[&clock=analog][&guest=1][&demo=focus|view|1][&tick=1]
  * — the office wall on fixtures (dev only): every scene and notice of D-96, the board of D-102 and the secretary's
  * message of D-116 without a kiosk,
  * a login or the shared database. Screenshots at 1920×1080 and 1280×720 come from here. `&demo=` walks the board by
@@ -61,9 +63,17 @@ export default async function TvSandboxPage({ searchParams }: { searchParams: Pr
   const walk = params.walk ?? null;
   const every = Number(params.every) > 0 ? Number(params.every) : 4_000;
   const lag = Number(params.lag) > 0 ? Number(params.lag) : 0;
+  // `&logo=1` — the client's logo in the channel mark and on the welcome; `&at=15:20` — the wall's clock
+  // pinned to that time of today in Aqtobe (the day's rhythm shows after noon); `&zero=1` — a day with nothing done yet
+  const logo = params.logo === "1";
+  const at = /^\d{1,2}:\d{2}$/.test(params.at ?? "") ? params.at! : null;
+  const zero = params.zero === "1";
   return (
     <WallSandbox
-      key={`${wallCase}-${clock}-${guest}-${demo}-${tick}-${walk}`}
+      key={`${wallCase}-${clock}-${guest}-${demo}-${tick}-${walk}-${logo}-${at}-${zero}`}
+      logo={logo}
+      at={at}
+      zero={zero}
       wallCase={wallCase}
       clock={clock}
       guest={guest}

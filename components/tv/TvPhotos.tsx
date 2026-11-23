@@ -21,16 +21,16 @@ const BLEED = "6px";
  * alone. React hoists the `<style>` and keeps one copy by `href`.
  */
 const DRIFT_CSS = `@keyframes tv-photo-drift { from { transform: scale(1); } to { transform: scale(1.05); } }
-.tv-photo-drift { animation: tv-photo-drift ${PHOTO_MS}ms linear both; transform-origin: 50% 50%; }
-@media (prefers-reduced-motion: reduce) { .tv-photo-drift { animation: none; } }`;
+.tv-photo-drift { animation: tv-photo-drift ${PHOTO_MS}ms linear both; transform-origin: 50% 50%; }`;
 
 type Loaded = { url: string; ratio: number };
 
 /**
  * «Фото» (D-185): photos from the reports of finished tasks, one at a time over the whole middle
  * of the wall, no head. A landscape fills the middle; a portrait stands on its half and the caption
- * takes the other. The caption — who, what, when it was handed in — sits on a dark plane at the
- * bottom left. Every photo is loaded before its turn (its shape is known by then, so the layout
+ * takes the other. The caption — who, what, when it was handed in — stands at the bottom left, in the main
+ * column of the wall's grid, over a still shade that darkens the photo's lower part across its whole width: no
+ * plate with an edge, the photo runs on behind the words. Every photo is loaded before its turn (its shape is known by then, so the layout
  * never jumps), the next one is decoded during the current one's fifteen seconds (unpacking a
  * photo never lands on the frame of the change), and the change is one fade: the old photo leaves,
  * then the new one comes. A photo not decoded by its turn waits: the one on the wall stays.
@@ -97,35 +97,51 @@ function Landscape({ photo, shown, now }: { photo: TvPhoto; shown: Loaded; now: 
         className="absolute h-[calc(var(--tv-y)*3+9vh)]"
         style={{ ...BLEED_BOX, bottom: "auto", background: STRIP }}
       />
-      <div
-        className="absolute bottom-0 max-w-[64%] pb-[var(--tv-gap)] pl-[calc(var(--tv-x)+6px)] pr-[6vh] pt-[3vh]"
-        style={{ left: `-${BLEED}`, background: PLANE }}
-      >
+      {/* the shade under the caption: the lower 40 % of the photo, darkening to 90 % at the band */}
+      <div aria-hidden className="absolute h-[40%]" style={{ ...BLEED_BOX, top: "auto", background: SHADE }} />
+      <div className="tv-split absolute inset-x-0 bottom-0 px-[var(--tv-x)] pb-[var(--tv-gap)]">
         <Caption photo={photo} now={now} size="plane" />
       </div>
     </>
   );
 }
 
+/**
+ * A portrait on the wall's grid (`.tv-split`): the photo's room runs from the screen's left edge to the side
+ * column, the photo stands in the middle of it at its own shape (a phone portrait is shown whole; wider than
+ * the room — cropped to it); the caption takes the side column, on the same line as every scene's second column.
+ */
 function Portrait({ photo, shown, now }: { photo: TvPhoto; shown: Loaded; now: Date }) {
   return (
-    <div className="absolute flex" style={BLEED_BOX}>
-      {/* the photo keeps its own shape up to half the wall: a phone portrait is shown whole */}
-      <div className="relative h-full max-w-[50%] shrink-0 overflow-hidden" style={{ aspectRatio: shown.ratio }}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- signed storage links, not static assets */}
-        <img src={shown.url} alt="" className="tv-photo-drift h-full w-full object-cover" />
+    <div className="tv-split absolute inset-x-0 bottom-0 px-[var(--tv-x)]" style={{ top: `-${BLEED}` }}>
+      <div className="relative flex min-w-0 justify-center overflow-hidden" style={{ marginLeft: `calc(-1 * var(--tv-x) - ${BLEED})` }}>
+        <div className="relative h-full max-w-full shrink-0 overflow-hidden" style={{ aspectRatio: shown.ratio }}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- signed storage links, not static assets */}
+          <img src={shown.url} alt="" className="tv-photo-drift h-full w-full object-cover" />
+        </div>
       </div>
-      {/* the other half is the caption's own: the wall itself is its plane, the words one step larger */}
-      <div className="flex min-w-0 flex-1 flex-col justify-end pb-[var(--tv-gap)] pl-[var(--tv-x)] pr-[calc(var(--tv-x)+6px)]">
+      {/* the side column is the caption's own: the wall itself is its plane, the words one step larger */}
+      <div className="flex min-w-0 flex-col justify-end pb-[var(--tv-gap)]">
         <Caption photo={photo} now={now} size="half" />
       </div>
     </div>
   );
 }
 
-/** The shade under the channel mark (still, never animated) and the caption's plane: the photo shows through. */
+/**
+ * The shades over a photo, still, never animated: under the channel mark at the top, under the caption at the
+ * bottom. The bottom one holds dark where the words stand and thins out above them — the photo shows through.
+ */
 const STRIP = "linear-gradient(to bottom, color-mix(in srgb, var(--bg) 72%, transparent), color-mix(in srgb, var(--bg) 40%, transparent) 45%, transparent)";
-const PLANE = "color-mix(in srgb, var(--bg) 82%, transparent)";
+const SHADE = `linear-gradient(to top, ${[
+  ["90%", "0%"],
+  ["88%", "40%"],
+  ["78%", "62%"],
+  ["54%", "80%"],
+  ["20%", "93%"],
+]
+  .map(([alpha, at]) => `color-mix(in srgb, var(--bg) ${alpha}, transparent) ${at}`)
+  .join(", ")}, transparent 100%)`;
 
 /** A portrait's half is tall: the title, one size up, takes the lines it needs — a task's title is a sentence at most. */
 const HALF_TITLE: CSSProperties = { color: "var(--tv-text)", fontWeight: 400, overflowWrap: "anywhere" };

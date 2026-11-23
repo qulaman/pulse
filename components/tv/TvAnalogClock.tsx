@@ -1,9 +1,8 @@
 "use client";
 
-import { useReducedMotion } from "motion/react";
 import { useState, useSyncExternalStore } from "react";
 
-import { aqtobeClock, handAngles } from "@/lib/tv/clock";
+import { aqtobeClock } from "@/lib/tv/clock";
 
 import s from "./tv.module.css";
 
@@ -14,8 +13,11 @@ import s from "./tv.module.css";
  * Стрелки крутит CSS: у каждой один оборот за свой цикл, фаза — отрицательной задержкой
  * от текущего времени. Ни одного ререндера в секунду, только compositor (перф-контракт
  * D-45). Раз в десять минут фаза пересчитывается заново (`key`), чтобы часы не уплывали за
- * месяцы без перезагрузки. При «уменьшить движение» стрелки рисует React по тику часов
- * киоска, а секундной нет.
+ * месяцы без перезагрузки.
+ *
+ * A clean dial (D-185): only the second hand has a tail, the hour and minute hands start at the centre;
+ * numerals at 12, 3, 6 and 9 and only on the large dial; the 12 tick is the same colour as the others
+ * (the wall's «сейчас» colour is on the second hand and nowhere else).
  */
 
 const HOUR_TICKS = Array.from({ length: 12 }, (_, i) => i);
@@ -43,7 +45,6 @@ export function TvAnalogClock({
   detailed?: boolean;
   className?: string;
 }) {
-  const reduced = useReducedMotion() ?? false;
   // the server and the browser would draw the hands a few hundred milliseconds apart and
   // hydration would trip over it: the hands appear after mount, the dial is there at once
   const mounted = useMounted();
@@ -84,20 +85,21 @@ export function TvAnalogClock({
           y1={detailed ? 8 : 10}
           x2="100"
           y2={i % 3 === 0 ? (detailed ? 24 : 26) : detailed ? 19 : 20}
-          stroke={i === 0 ? "var(--accent)" : "var(--text)"}
+          stroke="var(--text)"
           strokeWidth={i % 3 === 0 ? 4.5 : 3}
           strokeLinecap="round"
           transform={`rotate(${i * 30} 100 100)`}
         />
       ))}
       {detailed
-        ? ([3, 6, 9] as const).map((n) => {
+        ? ([12, 3, 6, 9] as const).map((n) => {
             const rad = ((n * 30 - 90) * Math.PI) / 180;
             return (
               <text
                 key={n}
-                x={100 + Math.cos(rad) * 66}
-                y={100 + Math.sin(rad) * 66}
+                // inside the long hour ticks with air between: a numeral never touches its tick
+                x={100 + Math.cos(rad) * 60}
+                y={100 + Math.sin(rad) * 60}
                 textAnchor="middle"
                 dominantBaseline="central"
                 fill="var(--text-muted)"
@@ -111,20 +113,19 @@ export function TvAnalogClock({
           })
         : null}
 
-      {!mounted ? null : reduced ? (
-        <StillHands now={now} />
-      ) : (
+      {!mounted ? null : (
         // remounted every ten minutes: the phase is taken afresh, the hands never drift
         <MovingHands key={phase} seconds={seconds} />
       )}
-      <circle cx="100" cy="100" r="6" fill={seconds && !reduced ? "var(--accent)" : "var(--text)"} />
+      <circle cx="100" cy="100" r="6" fill={seconds ? "var(--tv-live, var(--accent))" : "var(--text)"} />
       <circle cx="100" cy="100" r="2.4" fill="var(--bg)" />
     </svg>
   );
 }
 
-const HOUR_HAND = <line x1="100" y1="112" x2="100" y2="52" stroke="var(--text)" strokeWidth="8" strokeLinecap="round" />;
-const MINUTE_HAND = <line x1="100" y1="114" x2="100" y2="24" stroke="var(--text)" strokeWidth="5" strokeLinecap="round" />;
+// no tail: the hour and the minute hands start at the centre — only the seconds hand has a counterweight
+const HOUR_HAND = <line x1="100" y1="100" x2="100" y2="52" stroke="var(--text)" strokeWidth="8" strokeLinecap="round" />;
+const MINUTE_HAND = <line x1="100" y1="100" x2="100" y2="24" stroke="var(--text)" strokeWidth="5" strokeLinecap="round" />;
 
 /**
  * Стрелки, которые крутит CSS. Фаза снимается один раз при монтировании: задержку
@@ -144,22 +145,10 @@ function MovingHands({ seconds }: { seconds: boolean }) {
       <g className={s.hand} style={turn(3_600, delay.minute)}>{MINUTE_HAND}</g>
       {seconds ? (
         <g className={s.hand} style={turn(60, delay.second)}>
-          <line x1="100" y1="124" x2="100" y2="18" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" />
-          <circle cx="100" cy="124" r="4" fill="var(--accent)" />
+          <line x1="100" y1="124" x2="100" y2="18" stroke="var(--tv-live, var(--accent))" strokeWidth="2" strokeLinecap="round" />
+          <circle cx="100" cy="124" r="4" fill="var(--tv-live, var(--accent))" />
         </g>
       ) : null}
-    </>
-  );
-}
-
-/** «Уменьшить движение»: стрелки стоят и переставляются тиком часов киоска, без секундной. */
-function StillHands({ now }: { now: Date }) {
-  const angles = handAngles(now);
-  const at = (angle: number) => ({ transform: `rotate(${angle}deg)`, transformBox: "view-box" as const, transformOrigin: "100px 100px" });
-  return (
-    <>
-      <g style={at(angles.hour)}>{HOUR_HAND}</g>
-      <g style={at(angles.minute)}>{MINUTE_HAND}</g>
     </>
   );
 }

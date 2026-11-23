@@ -75,8 +75,8 @@ describe("wallBoardOf", () => {
 describe("wallNote", () => {
   it("says when the wall will not draw what was asked", () => {
     const items = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `p${i}`, text: "x", done: false, created_at: "", assignee: null, handed_done: false, children: [] }));
-    expect(wallNote({ view: "map", items: items(13) })).toMatch(/стена покажет список/);
-    expect(wallNote({ view: "map", items: items(12) })).toBeNull();
+    expect(wallNote({ view: "map", items: items(7) })).toMatch(/стена покажет список/);
+    expect(wallNote({ view: "map", items: items(6) })).toBeNull();
     expect(wallNote({ view: "list", items: items(30) })).toBeNull();
     expect(wallNote({ view: "list", items: [] })).toMatch(/Пока пусто/);
   });

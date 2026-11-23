@@ -21,9 +21,13 @@ export type OverlayBanner =
   | { kind: "visit"; id: string; title: string; note: string | null; since: string; more: number }
   | { kind: "message"; id: string; title: string; text: string | null; since: string; more: number }
   /** `minutes` counts down to the start; null — the meeting is starting now. */
-  | { kind: "event"; id: string; minutes: number | null; title: string; place: string | null };
+  | { kind: "event"; id: string; minutes: number | null; title: string; untitled: boolean; place: string | null };
 
-export type OverlayPill = { kind: "visit-wait"; id: string; text: string };
+/**
+ * The quiet plate under the channel mark: a visitor the director answered «подождёт», and — after
+ * their first minute over the whole wall — a visitor still waiting or a secretary's message (D-185).
+ */
+export type OverlayPill = { kind: "visit-wait" | "visit" | "message"; id: string; text: string };
 
 export type OverlayView = { banner: OverlayBanner | null; pill: OverlayPill | null };
 
@@ -31,6 +35,14 @@ export type OverlayView = { banner: OverlayBanner | null; pill: OverlayPill | nu
 export const EVENT_SOON_MIN = 15;
 /** Сколько надпись о мероприятии держится — минуту в начале окна и минуту на старте. */
 const EVENT_SHOW_MS = 60_000;
+/**
+ * A visitor or a message holds the whole wall for its first minute — the chime rings, the room
+ * looks up — then folds into the plate under the channel mark until it is answered (D-185): the
+ * clock, the band and the scene come back.
+ */
+export const FULL_MS = 60_000;
+/** A message longer than this does not fit the plate: the plate names it, the phone holds the words. */
+const PILL_TEXT_MAX = 56;
 
 /** «только что», «3 мин», «1 ч 5 мин» — сколько человек ждёт; то же слово, что у телефонов. */
 export const waited = waitedSince;
@@ -53,10 +65,10 @@ function eventBanner(events: readonly TvEventRow[], now: Date): OverlayBanner | 
     const title = event.title?.trim() || UNTITLED;
     if (at >= soonFrom && at < soonFrom + EVENT_SHOW_MS) {
       const minutes = Math.max(1, Math.ceil((start - at) / 60_000));
-      return { kind: "event", id: event.id, minutes, title, place: eventPlace(event) };
+      return { kind: "event", id: event.id, minutes, title, untitled: !event.title?.trim(), place: eventPlace(event) };
     }
     if (at >= start && at < start + EVENT_SHOW_MS) {
-      return { kind: "event", id: event.id, minutes: null, title, place: eventPlace(event) };
+      return { kind: "event", id: event.id, minutes: null, title, untitled: !event.title?.trim(), place: eventPlace(event) };
     }
   }
   return null;
@@ -68,11 +80,43 @@ function sentAgo(fromIso: string, now: Date): string {
   return ago === "только что" ? ago : `${ago} назад`;
 }
 
-export function overlayOf(overlay: TvOverlay | null | undefined, events: readonly TvEventRow[], now: Date): OverlayView {
+/**
+ * When the wall first saw each notice, by the kiosk's own clock (`TvScreen` keeps it). The first
+ * minute over the whole wall — and the chime — count from that moment, not from when the notice was
+ * made: a kiosk with a fast clock or one back from an outage still rings for a visitor. Without
+ * it (the sandbox) the minute counts from `created_at`.
+ */
+export type SeenAt = ReadonlyMap<string, number>;
+
+function fresh(id: string, createdAt: string, now: Date, seen: SeenAt | undefined): boolean {
+  // not stamped yet: the wall sees it this very moment
+  const from = seen ? (seen.get(id) ?? now.getTime()) : new Date(createdAt).getTime();
+  return now.getTime() - from < FULL_MS;
+}
+
+/**
+ * The notices to stamp as seen now. A visitor — the moment it appears. A message — only once no
+ * visitor holds the whole wall: a note that came in while a person stood at the door gets its own
+ * minute and its own chime after the visitor's, never lost behind it.
+ */
+export function noticesToStamp(overlay: TvOverlay | null | undefined, now: Date, seen: SeenAt): string[] {
+  const visit = overlay?.visit ?? null;
+  const message = overlay?.message ?? null;
+  const stamp: string[] = [];
+  let visitHolds = false;
+  if (visit?.status === "waiting") {
+    if (!seen.has(visit.id)) stamp.push(visit.id);
+    visitHolds = fresh(visit.id, visit.created_at, now, seen);
+  }
+  if (message && !seen.has(message.id) && !visitHolds) stamp.push(message.id);
+  return stamp;
+}
+
+export function overlayOf(overlay: TvOverlay | null | undefined, events: readonly TvEventRow[], now: Date, seen?: SeenAt): OverlayView {
   const visit = overlay?.visit ?? null;
   const message = overlay?.message ?? null;
 
-  if (visit?.status === "waiting") {
+  if (visit?.status === "waiting" && fresh(visit.id, visit.created_at, now, seen)) {
     return {
       banner: {
         kind: "visit",
@@ -86,27 +130,41 @@ export function overlayOf(overlay: TvOverlay | null | undefined, events: readonl
     };
   }
 
-  const pill: OverlayPill | null =
-    visit?.status === "wait"
-      ? { kind: "visit-wait", id: visit.id, text: `Посетитель ждёт ${waited(visit.created_at, now)}`.replace("ждёт только что", "ждёт") }
-      : null;
+  // a visitor past the first minute, or one the director asked to wait: the plate counts the waiting
+  const visitPill: OverlayPill | null = visit
+    ? {
+        kind: visit.status === "wait" ? "visit-wait" : "visit",
+        id: visit.id,
+        text: `Посетитель ждёт ${waited(visit.created_at, now)}`.replace("ждёт только что", "ждёт"),
+      }
+    : null;
 
   if (message) {
-    return {
-      banner: {
-        kind: "message",
-        id: message.id,
-        title: "Сообщение от секретаря",
-        // a guest in the office: the words stay on the director's phone (D-33)
-        text: message.note?.trim() || null,
-        since: sentAgo(message.created_at, now),
-        more: Math.max(0, (overlay?.messages ?? 1) - 1),
-      },
-      pill,
-    };
+    // a guest in the office: the words stay on the director's phone (D-33) — the notice and the
+    // chime still come, without the words
+    const text = message.note?.trim() || null;
+    if (fresh(message.id, message.created_at, now, seen)) {
+      return {
+        banner: {
+          kind: "message",
+          id: message.id,
+          title: "Сообщение от секретаря",
+          text: text ?? "Подробности — у вас в телефоне",
+          since: sentAgo(message.created_at, now),
+          more: Math.max(0, (overlay?.messages ?? 1) - 1),
+        },
+        pill: visitPill,
+      };
+    }
+    const messageText = text && text.length <= PILL_TEXT_MAX ? `Секретарь: ${text}` : "Сообщение — подробности у вас в телефоне";
+    // one plate: a person at the door first, and the plate still says a note is waiting
+    const pill: OverlayPill = visitPill
+      ? { ...visitPill, text: `${visitPill.text} · есть сообщение` }
+      : { kind: "message", id: message.id, text: messageText };
+    return { banner: eventBanner(events, now), pill };
   }
 
-  return { banner: eventBanner(events, now), pill };
+  return { banner: eventBanner(events, now), pill: visitPill };
 }
 
 /**

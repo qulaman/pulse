@@ -1,5 +1,6 @@
 import { pointLabel, sketchFrom, type Sketch } from "@/lib/mindboard/sketch";
 import { pluralRu } from "@/lib/tasks/status-text";
+import { stageWord } from "./words";
 
 import type { BoardView } from "./state";
 
@@ -15,7 +16,7 @@ import type { BoardView } from "./state";
  * done. No declines and no lateness — the wall never shames (D-45); those say only the name.
  */
 export type HandedStage = "sent" | "work" | "review" | "done";
-export const STAGE_WORDS: Record<HandedStage, string> = { sent: "отправлено", work: "в работе", review: "на приёмке", done: "сдано" };
+export const STAGE_WORDS: Record<HandedStage, string> = { sent: stageWord("sent"), work: stageWord("work"), review: stageWord("review"), done: stageWord("done") };
 export const HANDED_STAGES = Object.keys(STAGE_WORDS) as readonly HandedStage[];
 
 /** A task's status as the wall says it — the same rule as `tv_stage()` in the base. */
@@ -134,10 +135,11 @@ export const PAGE_MS = 20_000;
 export const FRESH_MS = 60_000;
 
 /**
- * Карта мыслей читается со стены, пока ветвей не больше двенадцати (по шесть на сторону).
- * Больше — стена рисует список, даже если пульт просил карту: мелкая карта хуже списка (D-121).
+ * A mind map reads from across the room up to six branches (D-185): past that the wall draws the
+ * list even when the remote asked for the map — a small map is worse than a list (D-121). The one
+ * limit for the remote, the phone's hint and the layout (`MAP_BRANCHES_MAX` in boardMap.ts).
  */
-export const MAP_MAX_POINTS = 12;
+export const MAP_MAX_POINTS = 6;
 
 /** Влезет ли доска картой — то же правило и на стене, и в подсказке пульта. */
 export function mapFits(points: number): boolean {
@@ -249,5 +251,5 @@ export function zoomedBranch(board: TvBoardData | null): { item: TvBoardItem; at
 export function boardCountLine(board: Pick<TvBoardData, "total" | "done">): string {
   if (board.total === 0) return "Пока пусто";
   const head = `${board.total} ${pluralRu(board.total, ["пункт", "пункта", "пунктов"])}`;
-  return board.done > 0 ? `${head} · ${board.done} ${pluralRu(board.done, ["отмечен", "отмечено", "отмечено"])}` : head;
+  return board.done > 0 ? `${head}, ${board.done} ${pluralRu(board.done, ["решён", "решено", "решено"])}` : head;
 }

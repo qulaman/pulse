@@ -1,4 +1,5 @@
 import { pluralRu } from "@/lib/tasks/status-text";
+import { STAGE } from "./words";
 
 import type { TvFocusEmployee, TvFocusTask } from "./queries";
 
@@ -25,12 +26,12 @@ const STAGE_OF: Record<string, StageKey> = {
   done: "done",
 };
 
-/** Neutral words in the present tense: what the order is now, not what happened to it. */
+/** Neutral words in the present tense, the wall's one vocabulary (`lib/tv/words.ts`). */
 export const STAGE_WORD: Record<StageKey, string> = {
-  new: "Новое",
-  work: "В работе",
-  review: "На проверке",
-  done: "Готово",
+  new: STAGE.sent,
+  work: STAGE.work,
+  review: STAGE.review,
+  done: STAGE.done,
 };
 
 /** A guest gets no title at all (D-33); for the team, an order without a title is just «Поручение». */
@@ -128,16 +129,16 @@ export type PathStep = {
 };
 
 const PATH: { key: PathStep["key"]; label: string }[] = [
-  { key: "posted", label: "Поставлено" },
-  { key: "work", label: "В работе" },
-  { key: "review", label: "На проверке" },
-  { key: "done", label: "Готово" },
+  { key: "posted", label: STAGE.sent },
+  { key: "work", label: STAGE.work },
+  { key: "review", label: STAGE.review },
+  { key: "done", label: STAGE.done },
 ];
 
 const PATH_AT: Record<StageKey, number> = { new: 0, work: 1, review: 2, done: 3 };
 
 /**
- * An order's path in big steps: «Поставлено → В работе → На проверке → Готово». A return for
+ * An order's path in big steps: «Поручено → В работе → На проверке → Готово». A return for
  * rework is «В работе» again: the «На проверке» step is ahead once more, with no word of its own (D-45).
  */
 export function taskPath(task: Pick<TvFocusTask, "status">): PathStep[] {

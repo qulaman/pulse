@@ -36,6 +36,7 @@ import {
   boardExtendTo,
   CALENDAR_VIEWS,
   calendarViewOf,
+  CAROUSEL_WORDS,
   carouselNext,
   carouselScenes,
   CLOCK_STYLES,
@@ -158,7 +159,7 @@ export function DeskScreen() {
   const sceneValue: SceneKey = round ? "round" : scene;
   const pickScene = (value: SceneKey) => {
     if (value === "round") {
-      if (!round || covered) show({ ...takeDown, carousel: true }, "Заставки меняются по кругу · раз в 3 мин");
+      if (!round || covered) show({ ...takeDown, carousel: true }, `Заставки меняются по кругу · ${CAROUSEL_WORDS}`);
       return;
     }
     if (round || scene !== value || covered) show({ ...takeDown, scene: value }, `Заставка: ${SCENE_LABEL[value].toLowerCase()}`);

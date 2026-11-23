@@ -8,13 +8,15 @@ import { shownRatio } from "@/lib/mindboard/sketch";
 import { BOARD_TITLE_GAP, wallText } from "@/lib/tv/board";
 import { COLUMN_GAP, textTop, type ListLayout, type ListRow, type ListTier, type TitleFit } from "@/lib/tv/boardList";
 
-import { Badge, clampStyle, DIM, DONE_TEXT, EASE, FreshGlow, LitPlate, vh } from "./TvBoardParts";
+import { Badge, clampStyle, DIM, DONE_TEXT, EASE, FreshGlow, LEAF_INK, LINE_INK, LitPlate, TagPlate, vh } from "./TvBoardParts";
 
 /**
- * «Список» доски на стене (D-102 §8, D-121): название крупно, пункты с номерами, подпункты —
- * точками под своим пунктом, мельче и с отступом. Кегль, колонки и страницы решает
- * `listLayout` по весу веток; здесь только те же числа в vh. Ведущий подсветил пункт —
- * он на подложке и чуть крупнее, остальные гаснут; страница — та, где он.
+ * The board's «Список» on the wall (D-102 §8, D-121, D-185): the title large, numbered points, sub-points
+ * as dots under their point, indented. Type size, columns and pages are chosen by `listLayout` by the
+ * weight of the branches, only from the wall's scale — a point `tv-body` or `tv-small`, a sub-point and
+ * «→ Марат» `tv-small`; here are only the same numbers in vh. The presenter lit a point — it sits on the
+ * «сейчас» mark (`.tv-now`) and a little larger, the others dim; the page is the one it is on. Without a
+ * presenter the same mark breathes for a minute on the point just said.
  */
 export const TvBoardList = memo(function TvBoardList({
   layout,
@@ -23,7 +25,6 @@ export const TvBoardList = memo(function TvBoardList({
   page,
   focus,
   fresh,
-  still,
 }: {
   layout: ListLayout;
   title: string;
@@ -32,7 +33,6 @@ export const TvBoardList = memo(function TvBoardList({
   focus: string | null;
   /** Свежие пункты и подпункты одной строкой id (`freshKey`). */
   fresh: string;
-  still: boolean;
 }) {
   const tier = layout.tier;
   const columns = layout.pages[Math.min(page, layout.pages.length - 1)] ?? [];
@@ -42,15 +42,15 @@ export const TvBoardList = memo(function TvBoardList({
   return (
     <div className="flex h-full flex-col" data-testid="tv-board-list" data-tier={tier.key} data-columns={layout.columns}>
       <h2
-        className="shrink-0 font-bold tracking-[-0.03em] [overflow-wrap:anywhere] [text-wrap:balance]"
-        style={{ fontSize: vh(heading.size), lineHeight: vh(heading.lh), ...clampStyle(heading.lines) }}
+        className="shrink-0 font-bold tracking-[-0.02em] [text-wrap:balance]"
+        style={{ fontSize: vh(heading.size), lineHeight: vh(heading.lh), ...clampStyle(heading.lines, heading.lh), color: "var(--tv-text)" }}
         data-testid="tv-board-title"
       >
         {title}
       </h2>
 
       {empty ? (
-        <Empty still={still} />
+        <Empty />
       ) : (
         <div className="relative min-h-0 flex-1" style={{ marginTop: vh(BOARD_TITLE_GAP) }}>
           <AnimatePresence mode="wait" initial={false}>
@@ -61,8 +61,8 @@ export const TvBoardList = memo(function TvBoardList({
               style={{ gridTemplateColumns: layout.columns === 2 ? "minmax(0,1fr) minmax(0,1fr)" : "minmax(0,1fr)", columnGap: vh(COLUMN_GAP) }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0, transition: { duration: 0.3 } }}
-              transition={{ duration: still ? 0 : 0.5, ease: EASE }}
+              exit={{ opacity: 0, transition: { duration: 0.25 } }}
+              transition={{ duration: 0.5, ease: EASE }}
               data-page={page}
             >
               {columns.map((column, index) => (
@@ -75,7 +75,6 @@ export const TvBoardList = memo(function TvBoardList({
                       lit={focus === row.item.id}
                       dim={focus !== null && focus !== row.item.id}
                       freshIds={freshIds}
-                      still={still}
                     />
                   ))}
                 </ol>
@@ -88,16 +87,15 @@ export const TvBoardList = memo(function TvBoardList({
   );
 });
 
-function Branch({ row, tier, lit, dim, freshIds, still }: { row: ListRow; tier: ListTier; lit: boolean; dim: boolean; freshIds: Set<string>; still: boolean }) {
+function Branch({ row, tier, lit, dim, freshIds }: { row: ListRow; tier: ListTier; lit: boolean; dim: boolean; freshIds: Set<string> }) {
   const { item } = row;
   const fresh = freshIds.has(item.id);
-  const radius = vh(tier.badge * 0.42);
   return (
     <motion.li
-      layout={still ? false : "position"}
-      initial={{ opacity: 0, y: still ? 0 : 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: still ? 0 : 0.5, ease: EASE }}
+      // a point said a moment ago rises into its place; the others stay where they are (no layout animation, D-185)
+      initial={{ opacity: 0, y: "1.6vh" }}
+      animate={{ opacity: 1, y: "0vh" }}
+      transition={{ duration: 0.5, ease: EASE }}
       className="relative"
       data-point={item.id}
       data-lit={lit || undefined}
@@ -108,24 +106,25 @@ function Branch({ row, tier, lit, dim, freshIds, still }: { row: ListRow; tier: 
         className="relative"
         style={{ transformOrigin: "left center" }}
         initial={false}
-        animate={{ opacity: dim ? DIM : 1, scale: lit && !still ? 1.02 : 1 }}
-        transition={{ duration: still ? 0 : 0.5, ease: EASE }}
+        animate={{ opacity: dim ? DIM : 1, scale: lit ? 1.02 : 1 }}
+        transition={{ duration: 0.5, ease: EASE }}
       >
-        <LitPlate on={lit} radius={radius} still={still} />
-        <AnimatePresence>{fresh ? <FreshGlow key="glow" radius={radius} still={still} /> : null}</AnimatePresence>
+        <LitPlate on={lit} />
+        <AnimatePresence>{fresh && !lit ? <FreshGlow key="glow" /> : null}</AnimatePresence>
         <div className="relative flex items-start" style={{ padding: `${vh(tier.padY)} ${vh(tier.padX)}`, gap: vh(tier.gap) }}>
-          <Badge n={row.n} done={item.done} size={tier.badge} lit={lit} />
+          <Badge n={row.n} done={item.done} size={tier.badge} />
           <div className="min-w-0 flex-1" style={{ paddingTop: vh(textTop(tier)) }}>
             <p
-              className="font-semibold tracking-[-0.015em] [overflow-wrap:anywhere] [text-wrap:pretty]"
-              style={{ fontSize: vh(tier.size), lineHeight: vh(tier.lh), ...clampStyle(row.lines), opacity: item.done ? DONE_TEXT : 1 }}
+              className="font-semibold tracking-[-0.01em] [text-wrap:pretty]"
+              style={{ fontSize: vh(tier.size), lineHeight: vh(tier.lh), ...clampStyle(row.lines, tier.lh), color: "var(--tv-text)", opacity: item.done ? DONE_TEXT : 1 }}
             >
               {wallText(item)}
             </p>
             {row.tag ? (
-              <p className="font-semibold" style={{ marginTop: vh(tier.tagTop), fontSize: vh(tier.tag), lineHeight: vh(tier.tagLh), color: "var(--accent)" }}>
-                {row.tag}
-              </p>
+              // the plate on a line of its own: whom it went to is never cut by the clamp of the words
+              <div className="flex" style={{ marginTop: vh(tier.tagTop) }}>
+                <TagPlate tag={row.tag} pad={tier.tagPad} done={item.done} />
+              </div>
             ) : null}
             {row.thumb > 0 && item.sketch ? (
               // the drawing in small (D-141); lit by the presenter, it opens over the whole wall
@@ -136,8 +135,7 @@ function Branch({ row, tier, lit, dim, freshIds, still }: { row: ListRow; tier: 
                   width: vh(row.thumb * shownRatio(item.sketch)),
                   height: vh(row.thumb),
                   borderRadius: vh(1.2),
-                  background: "color-mix(in srgb, var(--surface) 70%, transparent)",
-                  boxShadow: "inset 0 0 0 0.15vh color-mix(in srgb, var(--border) 85%, transparent)",
+                  background: "color-mix(in srgb, var(--surface) 70%, var(--bg))",
                   opacity: item.done ? DONE_TEXT + 0.1 : 1,
                 }}
                 data-testid="tv-board-thumb"
@@ -156,9 +154,7 @@ function Branch({ row, tier, lit, dim, freshIds, still }: { row: ListRow; tier: 
                     data-leaf={leaf.id}
                     data-done={leaf.done || undefined}
                   >
-                    <AnimatePresence>
-                      {freshIds.has(leaf.id) ? <FreshGlow key="glow" radius={vh(1)} still={still} inset={`${vh(-0.3)} ${vh(-1)}`} /> : null}
-                    </AnimatePresence>
+                    <AnimatePresence>{freshIds.has(leaf.id) ? <FreshGlow key="glow" inset={`${vh(-0.3)} ${vh(-1)}`} /> : null}</AnimatePresence>
                     <span
                       aria-hidden
                       className="relative shrink-0 rounded-full"
@@ -166,24 +162,25 @@ function Branch({ row, tier, lit, dim, freshIds, still }: { row: ListRow; tier: 
                         width: vh(tier.dot),
                         height: vh(tier.dot),
                         marginTop: vh((tier.subLh - tier.dot) / 2),
-                        background: leaf.done ? "var(--ok)" : "color-mix(in srgb, var(--accent) 75%, var(--text-muted))",
+                        background: leaf.done ? "color-mix(in srgb, var(--text-muted) 40%, var(--bg))" : LINE_INK,
                       }}
                     />
-                    <span
-                      className="relative min-w-0 flex-1 font-medium [overflow-wrap:anywhere] [text-wrap:pretty]"
-                      style={{
-                        fontSize: vh(tier.sub),
-                        lineHeight: vh(tier.subLh),
-                        ...clampStyle(lines),
-                        color: "color-mix(in srgb, var(--text) 86%, var(--text-muted))",
-                        opacity: leaf.done ? DONE_TEXT + 0.08 : 1,
-                      }}
-                    >
-                      {wallText(leaf)}
+                    <span className="relative min-w-0 flex-1">
+                      <span
+                        className="block font-medium [text-wrap:pretty]"
+                        style={{
+                          fontSize: vh(tier.sub),
+                          lineHeight: vh(tier.subLh),
+                          ...clampStyle(lines, tier.subLh),
+                          color: LEAF_INK,
+                          opacity: leaf.done ? DONE_TEXT + 0.08 : 1,
+                        }}
+                      >
+                        {wallText(leaf)}
+                      </span>
                       {tag ? (
-                        <span className="font-semibold" style={{ color: "var(--accent)" }}>
-                          {" "}
-                          {tag}
+                        <span className="flex" style={{ marginTop: vh(tier.tagTop) }}>
+                          <TagPlate tag={tag} pad={tier.tagPad} done={leaf.done} />
                         </span>
                       ) : null}
                     </span>
@@ -207,28 +204,22 @@ function Branch({ row, tier, lit, dim, freshIds, still }: { row: ListRow; tier: 
  * Пустая доска: где встанут пункты — показано тихими строками-заготовками, чтобы стена не
  * выглядела сломанной, пока директор диктует первый пункт.
  */
-function Empty({ still }: { still: boolean }) {
+function Empty() {
   return (
     <motion.div
       className="flex flex-1 flex-col justify-center gap-[2.6vh] pb-[4vh]"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ duration: still ? 0 : 0.6, delay: still ? 0 : 0.15, ease: EASE }}
+      transition={{ duration: 0.6, delay: 0.15, ease: EASE }}
       data-testid="tv-board-empty"
     >
       {[1, 2, 3].map((n) => (
         <div key={n} className="flex items-center gap-[2.6vh] px-[2.4vh]" style={{ opacity: n === 1 ? 1 : n === 2 ? 0.55 : 0.3 }}>
-          <span
-            aria-hidden
-            className="nums flex h-[6.2vh] w-[6.2vh] shrink-0 items-center justify-center rounded-full text-[3vh] font-bold"
-            style={{ color: "var(--accent)", boxShadow: "inset 0 0 0 0.2vh color-mix(in srgb, var(--accent) 45%, transparent)" }}
-          >
-            {n}
-          </span>
+          <Badge n={n} done={false} size={6.2} />
           {n === 1 ? (
-            <p className="text-[4vh] font-semibold leading-[5vh] text-muted">Пункты появятся здесь, как только их скажут</p>
+            <p className="tv-small font-semibold text-muted">Пункты появятся здесь, как только их скажут</p>
           ) : (
-            <span aria-hidden className="h-[1.6vh] rounded-full" style={{ width: n === 2 ? "46vh" : "30vh", background: "color-mix(in srgb, var(--border) 80%, transparent)" }} />
+            <span aria-hidden className="h-[1.6vh] rounded-full" style={{ width: n === 2 ? "46vh" : "30vh", background: "color-mix(in srgb, var(--text-muted) 30%, var(--bg))" }} />
           )}
         </div>
       ))}

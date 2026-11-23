@@ -1,16 +1,17 @@
+import { pluralRu } from "@/lib/tasks/status-text";
+
 import type { TvLine } from "./feed";
 
 /**
- * Что маскот говорит и чувствует на стене. Чистая функция: фраза и состояние лица
- * считаются из ленты и сводки, а не собираются по месту в компоненте.
+ * What the mascot says and feels on the wall. A pure function: the phrase and the face's state
+ * come from the feed and the summary, not assembled in the component.
  *
- * Два правила жёстче обычного, потому что это ТВ:
- *  - **никакого негатива** (D-45): на экране в кабинете лицо бывает спокойным, довольным
- *    или спящим — и никогда недовольным, встревоженным, зовущим. Отказы и просрочки сюда
- *    не доходят даже как событие (см. lib/tv/feed.ts);
- *  - **настоящее время вместо прошедшего**: «Марат берёт в работу», а не «взял» — имя не
- *    даёт рода, а настоящее время в русском по роду не согласуется (то же правило, что в
- *    lib/pulse/ether.ts, только здесь оно даёт живую речь, а не назывные подписи).
+ * Two rules stricter than usual, because this is the TV:
+ *  - **no negativity** (D-45): on the office screen the face is calm, speaking or asleep — never
+ *    displeased, alarmed or calling. Declines and overdue never reach it even as an event
+ *    (see lib/tv/feed.ts);
+ *  - **the name first, then a colon** (D-185): «Марат: в работе» — no verb has to agree with a
+ *    name (a name gives no gender) and no case has to bend it.
  */
 
 /**
@@ -42,28 +43,41 @@ function isNight(now: Date): boolean {
   return hour >= 22 || hour < 6;
 }
 
-/** Одна фраза о событии — и лицу, и бегущей строке, чтобы они не разошлись в словах. */
+/** A phrase of the band is read in passing: past this many letters the words are left out, not cut. */
+export const PHRASE_MAX = 48;
+
+/** The words fit the band whole, or the line goes without them — never «…» on the wall (D-185). */
+function fits(text: string | null, room: number): text is string {
+  return text !== null && text.length <= room;
+}
+
+/**
+ * One short phrase per event — for the face and for the band, so they never disagree (D-185).
+ * The name stands first with a colon: no verb has to agree with it (a name gives no gender) and no
+ * case has to bend it. An order's title stays off the wall until the director has accepted the
+ * work: a title is dictated for one person, not for the room (D-45).
+ */
 export function phraseOf(line: TvLine): string {
   const name = line.name;
   const title = line.detail;
   switch (line.kind) {
     case "task_sent":
-      return title ? `Новое поручение: ${title}` : `${name} — новое поручение`;
+      return `${name}: новое поручение`;
     case "task_accepted":
-      return `${name} берёт в работу`;
+      return `${name}: в работе`;
     case "task_review":
-      return `${name} сдаёт работу`;
+      return `${name}: работа на проверке`;
     case "task_done":
-      return `${name} — принято`;
+      return fits(title, PHRASE_MAX - name.length - 2) ? `${name}: ${title}` : `${name}: работа принята`;
     case "points":
-      return line.amount ? `${name} получает ${line.amount}` : `${name} получает очки`;
+      return line.amount ? `${name}: +${line.amount} ${pluralRu(line.amount, ["очко", "очка", "очков"])}` : `${name}: похвала`;
     case "announcement":
-      return title ? `Объявление: ${title}` : "Объявление для всех";
+      return fits(title, PHRASE_MAX - 12) ? `Объявление: ${title}` : "Новое объявление";
     case "merch":
-      return title ? `${name} забирает награду: ${title}` : `${name} забирает награду`;
+      return fits(title, PHRASE_MAX - name.length - 12) ? `${name}: награда «${title}»` : `${name}: новая награда`;
     case "event":
-      // гостю названия не досталось уже в данных (D-33) — лицо говорит обезличенно
-      return title ? `Скоро — «${title}»` : "Скоро — мероприятие";
+      // a guest gets no title from the base (D-33): the face names the meeting plainly
+      return fits(title, PHRASE_MAX - 7) ? `Скоро: ${title}` : "Скоро встреча";
   }
 }
 

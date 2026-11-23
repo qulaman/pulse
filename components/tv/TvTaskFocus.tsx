@@ -10,8 +10,9 @@ import { TvAvatar } from "./TvAvatar";
 
 /**
  * One order over the whole screen (D-123, look D-185): the director tapped «На экран» on the task screen — the wall
- * shows the order's title large, whose it is and what it is about, the path «Поставлено → В работе → На проверке → Готово»
- * with the current step, and photos from the order's report. Used when two people go over one order.
+ * shows, on its two-column grid, the order's title large, whose it is and what it is about in the main column,
+ * photos from the order's report in the side column, and the path «Поручено → В работе → На проверке → Готово» with
+ * the current step. Used when two people go over one order.
  *
  * Like the whole wall: not a word of the chat, no message counters, no log, no deadlines, no decline, no
  * «просрочено»; the base does not hand out a declined or revoked order, and the wall goes back on air (D-45).
@@ -21,11 +22,16 @@ import { TvAvatar } from "./TvAvatar";
 /** Up to three large photos on the right: one, two side by side, or one big and two stacked. */
 const PHOTOS = 3;
 
+/** A tick before a step, with a narrow no-break space: the four steps with their ticks and arrows keep one line across the wall. */
+const TICK = "✓\u202f";
+
+/** The director's words a step quieter than the title, still white: grey body text does not read across a room. */
+const BODY_COLOR = "color-mix(in srgb, var(--text) 80%, transparent)";
+
 export function TvTaskFocus({ focus, photos = [] }: { focus: TvTaskFocusData; remainingMs: number; now: Date; photos?: TvPhoto[] }) {
   const steps = useMemo(() => taskPath(focus.task), [focus.task]);
   const shots = focus.guest ? [] : photos.slice(0, PHOTOS);
   const person = focus.employee;
-  const done = stageOf(focus.task.status) === "done";
   // a guest gets no words of the director's from the base (D-33)
   const body = focus.guest ? null : focus.task.body?.trim() || null;
 
@@ -34,13 +40,10 @@ export function TvTaskFocus({ focus, photos = [] }: { focus: TvTaskFocusData; re
 
   return (
     <div className="tv-box" data-testid="tv-task" data-stage={stageOf(focus.task.status) ?? undefined}>
-      <div
-        className="grid min-h-0 flex-1 gap-x-[8vh]"
-        style={{ gridTemplateColumns: across ? "minmax(0, 1fr) minmax(0, 0.9fr)" : "minmax(0, 1fr) auto" }}
-      >
-        {/* the order: its title and whose it is; kept clear of the channel mark in the top right corner */}
-        <section className="flex min-h-0 min-w-0 max-w-[96vh] flex-col gap-[var(--tv-gap)]">
-          <h2 className="tv-title max-h-[3lh] overflow-hidden [overflow-wrap:anywhere]" style={{ color: "var(--tv-text)" }}>
+      <div className="tv-split flex-1">
+        {/* the order: its title, whose it is, what it is about */}
+        <section className="flex min-h-0 min-w-0 flex-col gap-[var(--tv-gap)]">
+          <h2 className="tv-title max-h-[3lh] overflow-hidden break-words" style={{ color: "var(--tv-text)" }}>
             {taskTitle(focus.task)}
           </h2>
           {person ? (
@@ -51,41 +54,34 @@ export function TvTaskFocus({ focus, photos = [] }: { focus: TvTaskFocusData; re
               </p>
             </div>
           ) : null}
-          {/* what the order is about, in the director's words: five lines at most and only whole lines —
-              lines that do not fit flow into a second column, which the box clips (no ellipsis, no half line) */}
+          {/* the director's words: three whole lines at most — the fourth is not drawn, no ellipsis */}
           {body ? (
-            <div
-              // a pixel over five lines: rounding must not push the fifth line out; a line may stand alone
-              className="tv-body min-h-0 max-h-[calc(5lh+1px)] flex-1 overflow-hidden"
-              style={{ columnWidth: "400vh", columnGap: "10vh", columnFill: "auto", widows: 1, orphans: 1 }}
-            >
-              <p className="text-muted [overflow-wrap:anywhere]">{body}</p>
-            </div>
+            <p className="tv-body max-h-[3lh] overflow-hidden break-words" style={{ color: BODY_COLOR }}>
+              {body}
+            </p>
           ) : null}
         </section>
 
         {/* the channel mark owns the top right corner: the photos or the way start below it */}
-        <section className="min-h-0 min-w-0 pt-[8vh]">{across ? <Photos photos={shots} /> : <Path steps={steps} done={done} vertical />}</section>
+        <section className="min-h-0 min-w-0 pt-[8vh]">{across ? <Photos photos={shots} /> : <Path steps={steps} vertical />}</section>
       </div>
 
-      {across ? <Path steps={steps} done={done} vertical={false} /> : null}
+      {across ? <Path steps={steps} vertical={false} /> : null}
     </div>
   );
 }
 
 /**
- * The way of the order in four big steps. The current one stands on a plane of the scene's colour and
- * reads as «now», the passed ones in plain text, the ones ahead quiet. Accepted — the plane is green:
- * the one good-news colour of the wall. Across the bottom (under photos) the steps go with arrows and
- * the plane hangs into the margin, so the words keep the grid's edge; as a column on the right they
- * stand one under another, a step larger.
+ * The way of the order in four big steps, in the wall's one grammar: the passed ones quiet with a tick, the
+ * current one on the «now» plate (`.tv-now`, the same as the meeting under way and the point under discussion),
+ * the ones ahead dim. Across the bottom (under photos) the steps go with arrows and the words keep the grid's
+ * edge — only the current step has the plate's padding; as a column on the right every step has it, and the
+ * plate spans the column.
  */
-function Path({ steps, done, vertical }: { steps: PathStep[]; done: boolean; vertical: boolean }) {
-  const tone = done ? "var(--ok)" : "var(--accent)";
-  const size = vertical ? "tv-lead" : "tv-body";
+function Path({ steps, vertical }: { steps: PathStep[]; vertical: boolean }) {
   return (
     <ol
-      className={vertical ? "flex flex-col items-start gap-y-[1.6vh]" : "ml-[-2.4vh] flex flex-wrap items-center gap-x-[1.6vh] gap-y-[1vh]"}
+      className={vertical ? "flex flex-col gap-y-[1.6vh]" : "flex flex-nowrap items-center gap-x-[1.6vh]"}
       data-testid="tv-task-steps"
     >
       {steps.map((step, index) => (
@@ -96,19 +92,19 @@ function Path({ steps, done, vertical }: { steps: PathStep[]; done: boolean; ver
             </li>
           ) : null}
           <li
-            className={`${size} whitespace-nowrap rounded-[1.4vh] px-[2.4vh] py-[1.2vh]`}
-            // the weight inline: `.tv-lead` sets its own and would win over a utility class
+            className={`tv-body whitespace-nowrap py-[1.2vh] ${step.state === "now" ? "tv-now px-[2.4vh]" : vertical ? "px-[2.4vh]" : ""}`}
             style={
               step.state === "now"
-                ? { background: `color-mix(in srgb, ${tone} 26%, var(--bg))`, color: "var(--tv-text)", fontWeight: 600 }
+                ? { color: "var(--tv-text)", fontWeight: 600 }
                 : step.state === "passed"
-                  ? { color: "var(--tv-text)", fontWeight: 400 }
-                  : { color: "var(--text-muted)", opacity: 0.6, fontWeight: 400 }
+                  ? { color: "var(--text-muted)" }
+                  : { color: "var(--text-muted)", opacity: 0.5 }
             }
             data-state={step.state}
             aria-current={step.state === "now" ? "step" : undefined}
           >
-            {step.label}
+            {/* a passed step is done with; the last step reached is done too */}
+            {step.state === "passed" || (step.state === "now" && step.key === "done") ? `${TICK}${step.label}` : step.label}
           </li>
         </Fragment>
       ))}

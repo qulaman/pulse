@@ -4,54 +4,47 @@ import { AnimatePresence, motion } from "motion/react";
 import { memo, useMemo } from "react";
 
 import { mapText, wallText } from "@/lib/tv/board";
-import type { MapBranch, MapLayout, MapLeaf } from "@/lib/tv/boardMap";
+import { MAP_TAG, type MapBranch, type MapLayout, type MapLeaf } from "@/lib/tv/boardMap";
 
-import { Badge, clampStyle, DIM, DONE_TEXT, EASE, FreshGlow, LitPlate, vh } from "./TvBoardParts";
-
-/**
- * «Карта» доски на стене (D-121): название — узел в центре, пункты — ветви справа и слева
- * на плавных лентах, подпункты — листья у своей ветви. Где что стоит, считает `mapLayout`
- * (всё в vh внутри поля); здесь узлы стоят на своих местах через transform, а связи каждой
- * ветви — своим слоем SVG под ними, размером со свой охват. Новая ветвь вырастает
- * (opacity + scale), соседи переезжают transform'ом; слой связей при перестройке сменяется
- * прозрачностью. Ведущий подсветил ветвь — она на подложке и чуть крупнее, остальные с их
- * связями и листьями гаснут; гаснут слои целиком (композитор), SVG на кадрах не перерисовывается.
- */
+import { Badge, clampStyle, DIM, DONE_TEXT, EASE, FreshGlow, LEAF_INK, LINE_INK, LitPlate, TagPlate, vh } from "./TvBoardParts";
 
 /**
- * Оттенки ветвей — акцент и его приглушённые тона, по кругу (DESIGN §2: один акцент, не
- * радуга). Отмеченная ветвь — нейтральная.
+ * The board's «Карта» on the wall (D-121, D-185): the title is a node in the centre, points are branches
+ * right and left on smooth ribbons, sub-points are leaves by their branch. No more than six branches
+ * (`MAP_BRANCHES_MAX`), no text smaller than `tv-small`, no line thinner than 0.4 vh. Nodes are quiet planes
+ * with no frames or shadows, links are neutral: the map has no rainbow of hues, green is only the branch
+ * under discussion (`.tv-now`) and the «→ Марат» plates. Where everything stands is computed by `mapLayout`
+ * (all in vh inside the field); here the nodes stand in their places via transform, and the links of each
+ * branch are their own SVG layer under them, as large as their reach. A new branch grows
+ * (opacity + scale), the neighbours move by transform; on a rebuild the links layer is swapped by
+ * opacity. The presenter lit a branch — it is on a backing plate and a little larger, the others with their
+ * links and leaves dim; whole layers dim (compositor), the SVG is not redrawn on frames.
  */
-const TONES = [
-  "var(--accent)",
-  "color-mix(in srgb, var(--accent) 62%, var(--text))",
-  "var(--accent-2)",
-  "color-mix(in srgb, var(--accent) 55%, var(--text-muted))",
-] as const;
 
-const toneOf = (branch: MapBranch) => (branch.item.done ? "var(--text-muted)" : TONES[branch.tone]);
+/** The planes of the map: the title a step lighter than the branches, both flat — no ring, no shadow, no gradient. */
+const CENTER_PLANE = "color-mix(in srgb, var(--surface-2) 88%, var(--bg))";
+const NODE_PLANE = "color-mix(in srgb, var(--surface) 78%, var(--bg))";
+const DONE_DOT = "color-mix(in srgb, var(--text-muted) 40%, var(--bg))";
 
 export const TvBoardMap = memo(function TvBoardMap({
   layout,
   title,
   focus,
   fresh,
-  still,
 }: {
   layout: MapLayout;
   title: string;
   focus: string | null;
   fresh: string;
-  still: boolean;
 }) {
   const freshIds = useMemo(() => new Set(fresh ? fresh.split(",") : []), [fresh]);
-  const glide = { duration: still ? 0 : 0.6, ease: EASE };
+  const glide = { duration: 0.6, ease: EASE };
   const { center } = layout;
 
   return (
     <div className="relative mx-auto" style={{ width: vh(layout.width), height: vh(layout.height) }} data-testid="tv-board-map" data-tier={layout.tier.key}>
       {layout.branches.map((branch) => (
-        <Links key={branch.item.id} branch={branch} layout={layout} dim={focus !== null && focus !== branch.item.id} still={still} />
+        <Links key={branch.item.id} branch={branch} layout={layout} dim={focus !== null && focus !== branch.item.id} />
       ))}
 
       {/* the title in the middle */}
@@ -62,17 +55,15 @@ export const TvBoardMap = memo(function TvBoardMap({
           height: vh(center.rect.h),
           padding: `0 ${vh(center.padX)}`,
           borderRadius: vh(layout.tier.centerRadius),
-          background:
-            "radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 60%), var(--surface-2)",
-          boxShadow: "inset 0 0 0 0.22vh color-mix(in srgb, var(--accent) 55%, transparent), 0 2vh 6vh rgba(0, 0, 0, 0.42)",
+          background: CENTER_PLANE,
         }}
         initial={false}
         animate={{ x: vh(center.rect.x), y: vh(center.rect.y) }}
         transition={glide}
       >
         <h2
-          className="font-bold tracking-[-0.025em] [overflow-wrap:anywhere] [text-wrap:balance]"
-          style={{ fontSize: vh(center.size), lineHeight: vh(center.lh), ...clampStyle(center.lines) }}
+          className="font-bold tracking-[-0.02em] [text-wrap:balance]"
+          style={{ fontSize: vh(center.size), lineHeight: vh(center.lh), ...clampStyle(center.lines, center.lh), color: "var(--tv-text)" }}
           data-testid="tv-board-title"
         >
           {title}
@@ -89,20 +80,17 @@ export const TvBoardMap = memo(function TvBoardMap({
             lit={focus === branch.item.id}
             dim={focus !== null && focus !== branch.item.id}
             fresh={freshIds.has(branch.item.id)}
-            still={still}
           />
         ))}
         {layout.branches.flatMap((branch) =>
-          branch.leaves.map((leaf, index) => (
+          branch.leaves.map((leaf) => (
             <Leaf
               key={leaf.leaf?.id ?? `${branch.item.id}-more`}
               leaf={leaf}
               branch={branch}
               layout={layout}
-              index={index}
               dim={focus !== null && focus !== branch.item.id}
               fresh={leaf.leaf !== null && freshIds.has(leaf.leaf.id)}
-              still={still}
             />
           )),
         )}
@@ -117,9 +105,8 @@ export const TvBoardMap = memo(function TvBoardMap({
  * анимация композитора, а общий SVG на всю карту перерисовывался бы каждый кадр полсекунды.
  * Геометрия изменилась (новая ветвь, лист) — старый слой тает под новым.
  */
-const Links = memo(function Links({ branch, layout, dim, still }: { branch: MapBranch; layout: MapLayout; dim: boolean; still: boolean }) {
+const Links = memo(function Links({ branch, layout, dim }: { branch: MapBranch; layout: MapLayout; dim: boolean }) {
   const { tier } = layout;
-  const tone = toneOf(branch);
   const box = branch.links;
   const geometry = branch.path + branch.leaves.map((leaf) => leaf.path).join("");
   return (
@@ -132,19 +119,19 @@ const Links = memo(function Links({ branch, layout, dim, still }: { branch: MapB
         initial={{ opacity: 0 }}
         animate={{ opacity: dim ? DIM * 0.8 : branch.item.done ? 0.55 : 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: still ? 0 : 0.5, ease: EASE }}
+        transition={{ duration: 0.5, ease: EASE }}
       >
         <svg className="block h-full w-full overflow-visible" viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`}>
-          <path d={branch.path} style={{ fill: tone, fillOpacity: 0.78 }} />
+          <path d={branch.path} style={{ fill: LINE_INK }} />
           {branch.leaves.map((leaf, index) => (
             <g key={index}>
               {/* opaque, not translucent: the stems of one branch share their spine and must not stack up brighter */}
-              <path d={leaf.path} style={{ fill: "none", stroke: `color-mix(in srgb, ${tone} 55%, var(--bg))`, strokeWidth: tier.stem, strokeLinecap: "round", strokeLinejoin: "round" }} />
+              <path d={leaf.path} style={{ fill: "none", stroke: LINE_INK, strokeWidth: tier.stem, strokeLinecap: "round", strokeLinejoin: "round" }} />
               <circle
                 cx={leaf.dotX}
                 cy={leaf.dotY}
                 r={tier.dot}
-                style={leaf.leaf ? { fill: leaf.leaf.done ? "var(--ok)" : tone } : { fill: "var(--bg)", stroke: tone, strokeWidth: tier.stem * 0.8 }}
+                style={leaf.leaf ? { fill: leaf.leaf.done ? DONE_DOT : LINE_INK } : { fill: "var(--bg)", stroke: LINE_INK, strokeWidth: tier.stem }}
               />
             </g>
           ))}
@@ -155,10 +142,9 @@ const Links = memo(function Links({ branch, layout, dim, still }: { branch: MapB
 });
 
 // memo: the spotlight moves from branch to branch and redraws those two, not the whole map
-const Branch = memo(function Branch({ branch, layout, lit, dim, fresh, still }: { branch: MapBranch; layout: MapLayout; lit: boolean; dim: boolean; fresh: boolean; still: boolean }) {
+const Branch = memo(function Branch({ branch, layout, lit, dim, fresh }: { branch: MapBranch; layout: MapLayout; lit: boolean; dim: boolean; fresh: boolean }) {
   const { tier } = layout;
   const { rect, item } = branch;
-  const tone = toneOf(branch);
   const radius = vh(tier.radius);
   const x = vh(rect.x);
   const y = vh(rect.y);
@@ -167,9 +153,9 @@ const Branch = memo(function Branch({ branch, layout, lit, dim, fresh, still }: 
       className="absolute left-0 top-0"
       style={{ width: vh(rect.w), height: vh(rect.h) }}
       // a new branch grows out of its link; the others slide to their new places
-      initial={{ x, y, opacity: 0, scale: still ? 1 : 0.7 }}
-      animate={{ x, y, opacity: dim ? DIM : 1, scale: lit && !still ? 1.04 : 1 }}
-      transition={{ duration: still ? 0 : 0.55, ease: EASE }}
+      initial={{ x, y, opacity: 0, scale: 0.7 }}
+      animate={{ x, y, opacity: dim ? DIM : 1, scale: lit ? 1.04 : 1 }}
+      transition={{ duration: 0.55, ease: EASE }}
       data-point={item.id}
       data-side={branch.side}
       data-lit={lit || undefined}
@@ -178,29 +164,26 @@ const Branch = memo(function Branch({ branch, layout, lit, dim, fresh, still }: 
     >
       <div
         className="relative flex h-full items-center"
-        style={{
-          padding: `0 ${vh(tier.padX)}`,
-          gap: vh(tier.gap),
-          borderRadius: radius,
-          background: `color-mix(in srgb, ${tone} 12%, var(--surface))`,
-          boxShadow: `inset 0 0 0 0.18vh color-mix(in srgb, ${tone} 36%, transparent)`,
-        }}
+        style={{ padding: `0 ${vh(tier.padX)}`, gap: vh(tier.gap), borderRadius: radius, background: NODE_PLANE }}
       >
-        <LitPlate on={lit} radius={radius} still={still} />
-        <AnimatePresence>{fresh ? <FreshGlow key="glow" radius={radius} still={still} /> : null}</AnimatePresence>
-        <Badge n={branch.n} done={item.done} size={tier.badge} lit={lit} tone={tone} />
-        <p
-          className="relative min-w-0 flex-1 font-semibold tracking-[-0.015em] [overflow-wrap:anywhere] [text-wrap:pretty]"
-          style={{ fontSize: vh(tier.size), lineHeight: vh(tier.lh), ...clampStyle(branch.lines), opacity: item.done ? DONE_TEXT + 0.1 : 1 }}
-        >
-          {mapText(item)}
+        <LitPlate on={lit} radius={radius} />
+        <AnimatePresence>{fresh && !lit ? <FreshGlow key="glow" radius={radius} /> : null}</AnimatePresence>
+        <span className="relative">
+          <Badge n={branch.n} done={item.done} size={tier.badge} />
+        </span>
+        <div className="relative min-w-0 flex-1">
+          <p
+            className="font-semibold tracking-[-0.01em] [text-wrap:pretty]"
+            style={{ fontSize: vh(tier.size), lineHeight: vh(tier.lh), ...clampStyle(branch.lines, tier.lh), color: "var(--tv-text)", opacity: item.done ? DONE_TEXT + 0.1 : 1 }}
+          >
+            {mapText(item)}
+          </p>
           {branch.tag ? (
-            <span className="font-semibold" style={{ color: "var(--accent)" }}>
-              {" "}
-              {branch.tag}
-            </span>
+            <div className="flex" style={{ marginTop: vh(tier.tagTop) }}>
+              <TagPlate tag={branch.tag} pad={MAP_TAG.pad} done={item.done} />
+            </div>
           ) : null}
-        </p>
+        </div>
       </div>
     </motion.div>
   );
@@ -210,18 +193,14 @@ const Leaf = memo(function Leaf({
   leaf,
   branch,
   layout,
-  index,
   dim,
   fresh,
-  still,
 }: {
   leaf: MapLeaf;
   branch: MapBranch;
   layout: MapLayout;
-  index: number;
   dim: boolean;
   fresh: boolean;
-  still: boolean;
 }) {
   const { tier } = layout;
   const x = vh(leaf.rect.x);
@@ -233,34 +212,33 @@ const Leaf = memo(function Leaf({
     <motion.div
       className="absolute left-0 top-0"
       style={{ width: vh(leaf.rect.w), height: vh(leaf.rect.h), transformOrigin: right ? "left center" : "right center" }}
-      initial={{ x, y, opacity: 0, scale: still ? 1 : 0.85 }}
+      initial={{ x, y, opacity: 0, scale: 0.85 }}
       animate={{ x, y, opacity: dim ? DIM : done ? 0.55 : 1, scale: 1 }}
-      transition={{ duration: still ? 0 : 0.55, delay: still ? 0 : 0.05 * index, ease: EASE }}
+      transition={{ duration: 0.55, ease: EASE }}
       data-leaf={leaf.leaf?.id ?? "more"}
     >
       <AnimatePresence>
-        {fresh ? <FreshGlow key="glow" radius={vh(1)} still={still} inset={`${vh(-0.3)} ${vh(-0.8)}`} /> : null}
+        {fresh ? <FreshGlow key="glow" radius={vh(1)} inset={`${vh(-0.3)} ${vh(-0.8)}`} /> : null}
       </AnimatePresence>
-      <p
-        className={`relative font-medium [overflow-wrap:anywhere] [text-wrap:pretty] ${leaf.leaf ? "" : "text-muted"}`}
-        style={{
-          fontSize: vh(tier.leaf),
-          lineHeight: vh(tier.leafLh),
-          ...clampStyle(leaf.lines),
-          paddingLeft: right ? inner : 0,
-          paddingRight: right ? 0 : inner,
-          textAlign: right ? "left" : "right",
-          color: leaf.leaf ? "color-mix(in srgb, var(--text) 86%, var(--text-muted))" : undefined,
-        }}
-      >
-        {leaf.leaf ? wallText(leaf.leaf) : `+ ещё ${leaf.more}`}
+      <div className="relative flex flex-col" style={{ paddingLeft: right ? inner : 0, paddingRight: right ? 0 : inner, alignItems: right ? "flex-start" : "flex-end" }}>
+        <p
+          className={`font-medium [text-wrap:pretty] ${leaf.leaf ? "" : "text-muted"}`}
+          style={{
+            fontSize: vh(tier.leaf),
+            lineHeight: vh(tier.leafLh),
+            ...clampStyle(leaf.lines, tier.leafLh),
+            textAlign: right ? "left" : "right",
+            color: leaf.leaf ? LEAF_INK : undefined,
+          }}
+        >
+          {leaf.leaf ? wallText(leaf.leaf) : `+ ещё ${leaf.more}`}
+        </p>
         {leaf.tag ? (
-          <span className="font-semibold" style={{ color: "var(--accent)" }}>
-            {" "}
-            {leaf.tag}
-          </span>
+          <div className="flex" style={{ marginTop: vh(tier.tagTop) }}>
+            <TagPlate tag={leaf.tag} pad={MAP_TAG.pad} done={done} />
+          </div>
         ) : null}
-      </p>
+      </div>
     </motion.div>
   );
 });

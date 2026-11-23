@@ -1,21 +1,22 @@
 "use client";
 
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 
 import { SketchView } from "@/components/mindboard/SketchView";
 import { litPoint, wallText, type TvBoardData } from "@/lib/tv/board";
+import { TV_TYPE } from "@/lib/tv/boardList";
 
-import { Badge, EASE } from "./TvBoardParts";
+import { Badge, clampStyle, EASE } from "./TvBoardParts";
 
 /**
  * A drawing over the whole wall (D-141 amendment): the presenter lit a point with a drawing —
  * or the director pressed «Во весь экран» on its card — and the drawing takes the whole screen,
- * over the ticker, the board and the footer; its number and words in the corner. The next step
- * of the presenter gives the board back. A visitor's notice still stands above it (TvOverlay).
- * The same layer sits in the wall's miniature on the phone (WallPreview). Opacity only (D-45).
+ * over the ticker, the board and the footer; its number and words above it, at `tv-body` in two lines
+ * at most, no ellipsis (D-185). The next step of the presenter gives the board back. A visitor's notice
+ * still stands above it (TvOverlay). The same layer sits in the wall's miniature on the phone
+ * (WallPreview). Opacity only (D-45).
  */
 export function TvSketchFull({ board }: { board: TvBoardData | null }) {
-  const still = useReducedMotion() ?? false;
   const lit = litPoint(board);
   const item = lit?.item;
   const at = lit?.at ?? -1;
@@ -30,14 +31,19 @@ export function TvSketchFull({ board }: { board: TvBoardData | null }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: still ? 0 : 0.35, ease: EASE }}
+          transition={{ duration: 0.35, ease: EASE }}
           data-testid="tv-board-sketch"
           data-point={item.id}
         >
-          <div className="flex shrink-0 items-center gap-[2vh]" style={{ height: "6.4vh" }}>
-            <Badge n={at + 1} done={item.done} size={5.6} lit />
-            <p className="min-w-0 flex-1 truncate text-[4.4vh] font-semibold leading-[5.6vh] tracking-[-0.015em]">{wallText(item)}</p>
-            <span className="nums shrink-0 text-[3vh] font-semibold leading-[4vh] text-muted">
+          <div className="flex shrink-0 items-start gap-[2vh]">
+            <Badge n={at + 1} done={item.done} size={6.2} />
+            <p
+              className="tv-body min-w-0 flex-1 pt-[0.3vh] font-semibold tracking-[-0.01em]"
+              style={{ ...clampStyle(2, TV_TYPE.body.lh), color: "var(--tv-text)" }}
+            >
+              {wallText(item)}
+            </p>
+            <span className="tv-small tv-num shrink-0 pt-[0.9vh] font-semibold text-muted">
               {at + 1} / {board?.items.length ?? 0}
             </span>
           </div>

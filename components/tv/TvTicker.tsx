@@ -1,7 +1,6 @@
 "use client";
 
 import { memo, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { useReducedMotion } from "motion/react";
 
 import type { TickerItem, TickerTone } from "@/lib/tv/ticker";
 import {
@@ -87,7 +86,6 @@ const Run = memo(function Run({ items, runRef, echo }: { items: TickerItem[]; ru
  * it, and in the morning it rolls on from there.
  */
 export function TvTicker({ items, paused = false }: { items: TickerItem[]; paused?: boolean }) {
-  const reduced = useReducedMotion() ?? false;
   const [tape, setTape] = useState(() => tapeOf(items));
   // one run's width and the window's, from the ResizeObserver: how many copies the track needs
   const [room, setRoom] = useState({ run: 0, view: 0 });
@@ -162,7 +160,7 @@ export function TvTicker({ items, paused = false }: { items: TickerItem[]; pause
       const next = latest.current;
       const now = placed.current;
       const animation = trackRef.current ? tapeAnimation(trackRef.current) : null;
-      if (reduced || !now || !animation) {
+      if (!now || !animation) {
         setTape(tapeOf(next));
         return;
       }
@@ -181,7 +179,7 @@ export function TvTicker({ items, paused = false }: { items: TickerItem[]; pause
       window.clearTimeout(first);
       window.clearInterval(timer);
     };
-  }, [busy, reduced]);
+  }, [busy]);
 
   if (empty) return null;
 
@@ -192,8 +190,9 @@ export function TvTicker({ items, paused = false }: { items: TickerItem[]; pause
       aria-live="off"
       // края растворяются, а не обрезаются: строка выезжает из ничего и уходит в ничто
       style={{
-        maskImage: "linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent)",
-        WebkitMaskImage: "linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent)",
+        // a wide, still fade at both ends: the words come in and leave softly, never cut at a letter
+        maskImage: "linear-gradient(90deg, transparent, #000 6vh, #000 calc(100% - 6vh), transparent)",
+        WebkitMaskImage: "linear-gradient(90deg, transparent, #000 6vh, #000 calc(100% - 6vh), transparent)",
       }}
     >
       <div
@@ -242,7 +241,7 @@ function sameGeometry(a: TapeGeometry, b: TapeGeometry): boolean {
   return near(a.run, b.run) && near(a.leadWidth, b.leadWidth) && sameSpans(a.spans, b.spans) && sameSpans(a.lead, b.lead);
 }
 
-/** The tape's own CSS animation — none under reduced motion. */
+/** The tape's own CSS animation. */
 function tapeAnimation(track: HTMLElement): Animation | null {
   return track.getAnimations().find((animation) => "animationName" in animation) ?? null;
 }
