@@ -3,7 +3,10 @@
 import { motion } from "motion/react";
 
 import { stepTime } from "@/components/tasks/list/TaskList";
-import type { Step } from "@/lib/tasks/overview";
+import { isWorking } from "@/lib/tasks/lifecycle";
+import { timeLeft, type Step } from "@/lib/tasks/overview";
+import type { TaskWithPeople } from "@/lib/tasks/queries";
+import { TONE_VAR } from "@/lib/tasks/tone";
 
 const COLOR: Record<Step["state"], string> = {
   done: "var(--accent)",
@@ -20,16 +23,24 @@ const STAGGER = 0.09;
 /** The ring round the station the task waits at: how much of the time to the deadline is gone. */
 export type PathClock = { used: number; color: string };
 
+/** How much of the time to the deadline is gone — the ring of the station the work waits at. */
+export function pathClockOf(task: TaskWithPeople, now: Date): PathClock | null {
+  if (!task.deadline || !isWorking(task.status)) return null;
+  const left = timeLeft(task, now);
+  return left.used === null ? null : { used: left.used, color: TONE_VAR[left.tone] };
+}
+
 const RING = 26;
 const RING_STROKE = 2.5;
 const RING_R = (RING - RING_STROKE) / 2;
 
 /**
- * The life of the task on its own screen (D-187): the four stations of `stepsOf` as a line that
- * draws itself, the stations passed pop in with a tick, the one the task waits at breathes — and,
+ * The life of the task on its own screen and on the open cards of the lists (D-187): the four
+ * stations of `stepsOf` as a line that draws itself, the stations passed pop in with a tick, the
+ * one the task waits at breathes — and,
  * when there is a deadline, wears a ring that fills as its time runs out (amber in the last day,
  * full and red once it is behind). That ring is the «сколько осталось» the screen used to say in a
- * line of its own under the buttons; the date itself is the capsule's. A station that changes its
+ * line of its own under the buttons; the date itself is the capsule's, or the card head's. A station that changes its
  * state while the screen is open plays its entrance again. Transform and opacity only, but the
  * ring's arc (one small path).
  */

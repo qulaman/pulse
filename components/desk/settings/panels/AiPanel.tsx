@@ -29,6 +29,7 @@ const CONVENTION_LABEL: Record<string, string> = {
   end_of_day: "Конец дня",
   end_of_week: "Конец недели",
   this_week: "На неделе",
+  end_of_month: "Конец месяца",
   day_default: "День без времени",
   weekday_default: "День недели без времени",
 };
@@ -70,6 +71,7 @@ function ConventionsTable({ rows, saved, onChange }: { rows: Convention[]; saved
             <span className="min-w-0 text-[14px] leading-5">
               {label}
               {row.day === "friday" ? <span className="block text-[12px] leading-4 text-muted">пятница этой недели</span> : null}
+              {row.day === "month_end" ? <span className="block text-[12px] leading-4 text-muted">последний рабочий день месяца</span> : null}
             </span>
             <TextInput label={`${label}: как говорите`} value={row.phrase} width="100%" placeholder="как говорите, через «/»" onChange={(phrase) => onChange(index, { phrase })} />
             <TimeInput label={`${label}: время`} value={row.time} onChange={(time) => onChange(index, { time })} />

@@ -16,7 +16,8 @@ import { isOverdue, wordText } from "@/lib/tasks/status-text";
 
 import { Icon, type IconName } from "../icons";
 import { QuickAnswers } from "../director/QuickAnswers";
-import { CardFoot, CardHead, CardShell, Stepper } from "./TaskList";
+import { pathClockOf, TaskPath } from "../detail/TaskPath";
+import { CardFoot, CardHead, CardShell } from "./TaskList";
 
 /** On a card the verbs are short: «Передать» fits a third of a phone, «Переназначить» does not. */
 const LABEL: Record<DeskAction, string> = {
@@ -89,7 +90,9 @@ export function allActionsFor(task: { status: TaskWithPeople["status"] }, { requ
 /**
  * The buttons of the open card: the keys of D-80 without «Открыть» (the thread has its own
  * link) and «Ответить» (a question has its own chips); a card left with one button takes
- * the next allowed action, so «Передать» stands next to «Продлить» on a question too.
+ * the next allowed action, so «Передать» stands next to «Продлить» on a question too. The
+ * desk's buttons are these; the phone's list and the task's screen take `listKeysFor` and
+ * `screenKeysFor` (D-187), where the deadline is pressed where it is said.
  */
 export function cardKeysFor(task: TaskWithPeople, flags: CardFlags, now: Date): DeskAction[] {
   const keys: DeskAction[] = keysFor(task, {
@@ -106,28 +109,41 @@ export function cardKeysFor(task: TaskWithPeople, flags: CardFlags, now: Date): 
   return keys;
 }
 
+/** A task the director may still move whose «when» is on the card: a deadline, or «срочно» (D-187). */
+export function whenDoorOf(task: { status: TaskWithPeople["status"]; deadline: string | null; priority?: string | null }): boolean {
+  const movable = task.status === "scheduled" || isWorking(task.status);
+  return movable && (Boolean(task.deadline) || task.priority === "high");
+}
+
 /**
- * The buttons of the task's own screen (D-187): the deadline is its capsule there, so «Срок»
- * leaves the row — but for a late task, where a new date IS the move («Перенести»); «Отозвать»
- * lives in «⋯», a step away from a slip of the thumb. Two keys of the rest fill the row.
+ * The phone's keys where the deadline has a door of its own (D-187): «Отозвать» lives in «Ещё»
+ * / «⋯», a step away from a slip of the thumb; «Срок» leaves the row while the deadline can be
+ * pressed where it is said — but for a late task, where a new date IS the move («Перенести»).
+ * The move the task waits for stays first; the rest come in one order on every task
+ * («Напомнить» before «Передать»), however the row was filled.
  */
-export function screenKeysFor(task: TaskWithPeople, flags: CardFlags, now: Date): DeskAction[] {
+function keysWithDoor(task: TaskWithPeople, flags: CardFlags, now: Date, door: boolean): DeskAction[] {
   const overdue = isOverdue(task, now);
-  const off = (key: DeskAction) => key === "open" || key === "answer" || key === "revoke" || key === "remove" || (key === "extend" && !overdue);
-  const keys: DeskAction[] = keysFor(task, {
-    question: flags.question,
-    request: flags.request,
-    suggestion: flags.suggestion,
-    overdue,
-    waiting: isWaiting(task, now),
-  }).filter((key) => !off(key));
+  const off = (key: DeskAction) => key === "open" || key === "answer" || key === "revoke" || key === "remove" || (key === "extend" && door && !overdue);
+  const row = keysFor(task, { question: flags.question, request: flags.request, suggestion: flags.suggestion, overdue, waiting: isWaiting(task, now) });
+  const keys = row.filter((key) => !off(key));
   const all = allActionsFor(task, flags);
   for (const action of all) {
     if (keys.length >= 2) break;
     if (!off(action) && !keys.includes(action)) keys.push(action);
   }
-  // one order on every task: «Напомнить» before «Передать», however the row was filled
-  return keys.sort((a, b) => all.indexOf(a) - all.indexOf(b));
+  const lead = row[0] !== undefined && keys[0] === row[0] ? keys.slice(0, 1) : [];
+  return [...lead, ...keys.slice(lead.length).sort((a, b) => all.indexOf(a) - all.indexOf(b))];
+}
+
+/** The open card of the phone's «Задачи»: the head's «when» is the door when there is one. */
+export function listKeysFor(task: TaskWithPeople, flags: CardFlags, now: Date): DeskAction[] {
+  return keysWithDoor(task, flags, now, whenDoorOf(task));
+}
+
+/** The task's own screen: its capsule is always the door (the director's empty slot included). */
+export function screenKeysFor(task: TaskWithPeople, flags: CardFlags, now: Date): DeskAction[] {
+  return keysWithDoor(task, flags, now, true);
 }
 
 /** On the task's own screen a late task's new date is a verb, not the noun of the list. */
@@ -300,8 +316,15 @@ export function DirectorTaskCard({
   const suggestion = task.status === "declined" ? (row?.suggestion ?? null) : null;
   const flags: CardFlags = { question: Boolean(question), request: Boolean(request), suggestion: Boolean(suggestion) };
   const unread = row ? hasUnread(row, meId) : false;
-  const keys = cardKeysFor(task, flags, now);
+  const keys = listKeysFor(task, flags, now);
   const more = allActionsFor(task, flags).filter((action) => !keys.includes(action));
+  const move: DeskAction = request ? "retime" : "extend";
+  const whenDoor = whenDoorOf(task)
+    ? {
+        label: task.deadline ? `Сдать ${humanAqtobe(new Date(task.deadline), now)}. Изменить` : "Срочно, время не названо. Назначить",
+        onPress: () => onAction(move, task),
+      }
+    : null;
   const closed = task.status === "done" || task.status === "revoked";
   const last = row?.last_message ?? null;
   const lastText = last ? wordText(last) : "";
@@ -320,6 +343,7 @@ export function DirectorTaskCard({
       testId="sent-task"
       status={task.status}
       reacted={reacted}
+      whenDoor={whenDoor}
       head={
         <CardHead
           task={task}
@@ -369,7 +393,8 @@ export function DirectorTaskCard({
       </div>
 
       <div className="mt-4">
-        <Stepper steps={stepsOf(task, now)} now={now} deadline={task.deadline} />
+        {/* the date is the head's; the steps say how much of the time is gone (D-187) */}
+        <TaskPath steps={stepsOf(task, now)} now={now} clock={pathClockOf(task, now)} />
       </div>
 
       {/* D-32: until it is accepted, the push receipt in words — «не открывал с 9:14» */}
@@ -379,7 +404,7 @@ export function DirectorTaskCard({
         </div>
       ) : null}
 
-      <DirectorKeys keys={keys} reason={reason} request={request} suggestion={suggestion} now={now} onPress={(key) => onAction(key, task)} />
+      <DirectorKeys keys={keys} reason={reason} request={request} suggestion={suggestion} now={now} onPress={(key) => onAction(key, task)} labels={whenDoor ? SCREEN_LABEL : undefined} />
 
       {canReact ? <ReactionBar taskId={task.id} pointsEnabled={pointsEnabled} className="mt-3" /> : null}
 

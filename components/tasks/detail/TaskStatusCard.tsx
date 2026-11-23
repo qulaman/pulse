@@ -15,15 +15,14 @@ import { humanAqtobe } from "@/lib/ai/time";
 import { shortName } from "@/lib/people/names";
 import type { ReactionCode } from "@/lib/points/reactions";
 import type { TaskDetailModel } from "@/lib/tasks/detail-model";
-import { isWorking } from "@/lib/tasks/lifecycle";
-import { closedAtOf, stepsOf, timeLeft } from "@/lib/tasks/overview";
+import { closedAtOf, stepsOf } from "@/lib/tasks/overview";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import type { DeskAction } from "@/lib/tasks/reasons";
 import { reworkBannerText, TEXT, wordText } from "@/lib/tasks/status-text";
 import { TONE_VAR } from "@/lib/tasks/tone";
 
 import { DeadlineCapsule } from "./DeadlineCapsule";
-import { TaskPath, type PathClock } from "./TaskPath";
+import { pathClockOf, TaskPath } from "./TaskPath";
 import { WordBubble } from "./WordBubble";
 
 /**
@@ -118,7 +117,7 @@ export function TaskStatusCard({
       <div className="mt-4">
         {/* the date is the capsule's; the path says how much of the time is gone (D-187). The holder
             reads a new one as «Ждёт вас», not «В работе» (D-173) */}
-        <TaskPath steps={stepsOf(task, now, { declinedAt: model.declinedAt, forAssignee: mine })} now={now} clock={clockOf(task, now)} />
+        <TaskPath steps={stepsOf(task, now, { declinedAt: model.declinedAt, forAssignee: mine })} now={now} clock={pathClockOf(task, now)} />
       </div>
 
       {/* what waits on this task: the employee's question, a refusal, a return, a recall */}
@@ -213,13 +212,6 @@ function Person({ name, short }: { name: string; short: boolean }) {
       <span className="truncate text-text/90">{short ? shortName(name) : name}</span>
     </span>
   );
-}
-
-/** How much of the time to the deadline is gone — the ring of the station the work waits at. */
-function clockOf(task: TaskWithPeople, now: Date): PathClock | null {
-  if (!task.deadline || !isWorking(task.status)) return null;
-  const left = timeLeft(task, now);
-  return left.used === null ? null : { used: left.used, color: TONE_VAR[left.tone] };
 }
 
 /**

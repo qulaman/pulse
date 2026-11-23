@@ -15,7 +15,8 @@ import { TEXT, wordText } from "@/lib/tasks/status-text";
 
 import { Icon } from "../icons";
 import { EmployeeKeys, type EmployeeAction } from "./EmployeeKeys";
-import { CardFoot, CardHead, CardShell, Stepper } from "./TaskList";
+import { pathClockOf, TaskPath } from "../detail/TaskPath";
+import { CardFoot, CardHead, CardShell } from "./TaskList";
 
 /**
  * A card of «Мои дела». Closed: the state mark, the title, «when», the state. Open: what
@@ -57,6 +58,12 @@ export function EmployeeTaskCard({
   // my own request for time, still waiting for the director (D-128); a new task has none to wait on
   const request = row?.time_request && isWorking(task.status) && task.status !== "sent" ? row.time_request : null;
   const suggested = task.status === "declined" ? shortName(row?.suggestion?.name) : undefined;
+  // the deadline of work in hand asks for more time from where it stands (D-187) — not while a
+  // request already waits, and a new task's «возьму, но к …» is the same sheet
+  const whenDoor =
+    task.deadline && isWorking(task.status) && !row?.time_request
+      ? { label: `Сдать ${humanAqtobe(new Date(task.deadline), now)}. Попросить больше времени`, onPress: () => onAction("time", task) }
+      : null;
 
   return (
     <CardShell
@@ -67,6 +74,7 @@ export function EmployeeTaskCard({
       testId="my-task"
       status={task.status}
       reacted={Boolean(reaction)}
+      whenDoor={whenDoor}
       head={
         <CardHead
           task={task}
@@ -82,7 +90,8 @@ export function EmployeeTaskCard({
       <div className="pl-[34px]">
         {task.body ? <p className="whitespace-pre-line text-[15px] leading-[21px] text-text/85">{task.body}</p> : null}
         <p className={`${task.body ? "mt-2" : ""} text-[13px] leading-[18px] text-muted`}>
-          {author ? `Поручил ${author} · ` : ""}
+          {/* who gave it is the only other side of the assignee's own order: the name says it (D-187) */}
+          {author ? `${author} · ` : ""}
           <span className="nums">{humanAqtobe(new Date(task.created_at), now)}</span>
         </p>
 
@@ -116,7 +125,7 @@ export function EmployeeTaskCard({
 
       <div className="mt-4">
         {/* the holder's own steps: a new one «Ждёт вас», not «В работе» (D-173) */}
-        <Stepper steps={stepsOf(task, now, { forAssignee: true })} now={now} deadline={task.deadline} />
+        <TaskPath steps={stepsOf(task, now, { forAssignee: true })} now={now} clock={pathClockOf(task, now)} />
       </div>
 
       <CardFoot href={`/tasks/${task.id}`} />

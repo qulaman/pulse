@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { conventionFor, TIME_PARTS, type Convention, type TimePart } from "./conventions";
-import { aqtobeDateAt, aqtobeIsoWeekday, atAqtobe, toAqtobeIso } from "./time";
+import { aqtobeDateAt, aqtobeIsoWeekday, aqtobeWall, atAqtobe, toAqtobeIso } from "./time";
 
 /**
  * Time as the model hears it (task 026): a symbolic reference, never an ISO. The model says
@@ -53,6 +53,9 @@ const EVENT_DAY_TIME = { hours: 9, minutes: 0 };
 const EVENT_DAY_CONFIDENCE = 0.5;
 // Parts of the day after noon: «в шесть вечера» said as "06:00" is 18:00.
 const AFTERNOON_PARTS = new Set<TimePart>(["after_lunch", "evening", "end_of_day"]);
+// Parts that name a day, not a time of it: an hour said with them is read as with no part at all
+// («до конца месяца к пяти» is 17:00, D-187).
+const DAY_PARTS = new Set<TimePart>(["end_of_week", "this_week", "end_of_month"]);
 
 interface Clock {
   hours: number;
@@ -75,18 +78,32 @@ export function daytime(clock: Clock, part: TimePart | null): Clock {
   if (clock.hours >= 1 && clock.hours <= 11 && part !== null && AFTERNOON_PARTS.has(part)) {
     return { ...clock, hours: clock.hours + 12 };
   }
-  if (clock.hours >= 1 && clock.hours <= 7 && part === null) return { ...clock, hours: clock.hours + 12 };
+  if (clock.hours >= 1 && clock.hours <= 7 && (part === null || DAY_PARTS.has(part))) return { ...clock, hours: clock.hours + 12 };
   return clock;
 }
 
 const clamp01 = (value: number) => (Number.isFinite(value) ? Math.min(Math.max(value, 0), 1) : 0);
+
+/** The last Monday-to-Friday day of the Aqtobe month `shift` months from now's, at the clock. */
+function monthEnd(now: Date, shift: number, clock: Clock): Date | null {
+  const wall = aqtobeWall(now);
+  const year = wall.getUTCFullYear();
+  const month = wall.getUTCMonth() + shift;
+  let day = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const weekday = new Date(Date.UTC(year, month, day)).getUTCDay();
+  if (weekday === 0) day -= 2;
+  else if (weekday === 6) day -= 1;
+  const last = new Date(Date.UTC(year, month, day));
+  return aqtobeDateAt(last.getUTCFullYear(), last.getUTCMonth() + 1, last.getUTCDate(), clock.hours, clock.minutes);
+}
 
 /**
  * TimeRef → an instant, or null when nothing usable was named.
  * - a weekday is the nearest such day ahead; today counts while its moment is still ahead;
  * - only a time or a part, no day: today, or the next such moment once today's has passed
  *   (eval a-015: «до девяти утра» said at 10:00 is tomorrow 09:00);
- * - a part takes its time (and, for the week, Friday) from the company's convention row;
+ * - a part takes its time (and, for the week, Friday; for the month, its last working day) from
+ *   the company's convention row;
  *   a day without a time — `day_default`, a weekday without a time — `weekday_default`;
  *   a meeting without a time — 09:00 at 0.5 (D-78);
  * - confidence = min(the model's, the convention row's); a named clock time keeps the model's;
@@ -127,7 +144,11 @@ export function resolveTimeRef(
   }
 
   let at: Date | null;
-  if (dateMatch && row?.day !== "friday") {
+  if (row?.day === "month_end") {
+    // «до конца месяца» (D-187): this month's last working day, or next month's once it has passed
+    at = monthEnd(now, 0, clock);
+    if (at && at.getTime() <= now.getTime()) at = monthEnd(now, 1, clock);
+  } else if (dateMatch && row?.day !== "friday") {
     at = aqtobeDateAt(Number(dateMatch[1]), Number(dateMatch[2]), Number(dateMatch[3]), clock.hours, clock.minutes);
   } else if (dayShift !== null && row?.day !== "friday") {
     at = atAqtobe(now, dayShift, clock.hours, clock.minutes);

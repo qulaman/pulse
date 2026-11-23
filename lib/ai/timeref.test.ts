@@ -35,7 +35,8 @@ describe("resolveTimeRef: the four date failures of the base run", () => {
 });
 
 describe("resolveTimeRef: every convention", () => {
-  it.each(TIME_PARTS.map((part) => [part]))("%s takes its row's time, day and confidence", (part) => {
+  // the month's end is its own day whatever day was named — its own case below
+  it.each(TIME_PARTS.filter((part) => part !== "end_of_month").map((part) => [part]))("%s takes its row's time, day and confidence", (part) => {
     const row = DEFAULT_CONVENTIONS.find((r) => r.key === part)!;
     // tomorrow is Friday, so the week's rows and the day's rows meet on the 14th
     expect(at({ day: "tomorrow", part })).toEqual({
@@ -49,6 +50,21 @@ describe("resolveTimeRef: every convention", () => {
     expect(at({ day: "after_tomorrow", part: "end_of_week" })?.iso).toBe("2026-08-14T18:00:00+05:00");
     // on Saturday the nearest Friday is the next one
     expect(at({ part: "end_of_week" }, new Date("2026-08-15T11:00:00+05:00"))?.iso).toBe("2026-08-21T18:00:00+05:00");
+  });
+
+  it("«до конца месяца» — the month's last working day, 18:00 (D-187)", () => {
+    // 31.08.2026 is a Monday
+    expect(at({ part: "end_of_month" })).toMatchObject({ iso: "2026-08-31T18:00:00+05:00", confidence: 0.6 });
+    // 28.02.2027 is a Sunday: Friday the 26th
+    expect(at({ part: "end_of_month" }, new Date("2027-02-03T10:00:00+05:00"))?.iso).toBe("2027-02-26T18:00:00+05:00");
+    // 31.10.2026 is a Saturday: Friday the 30th
+    expect(at({ part: "end_of_month" }, new Date("2026-10-05T10:00:00+05:00"))?.iso).toBe("2026-10-30T18:00:00+05:00");
+    // said after the last working day's evening — the next month's
+    expect(at({ part: "end_of_month" }, new Date("2026-08-31T19:00:00+05:00"))?.iso).toBe("2026-09-30T18:00:00+05:00");
+    // a clock time named with it keeps the day and takes the time; a bare «к пяти» is the afternoon
+    expect(at({ part: "end_of_month", time: "12:00" })?.iso).toBe("2026-08-31T12:00:00+05:00");
+    expect(at({ part: "end_of_month", time: "05:00" })?.iso).toBe("2026-08-31T17:00:00+05:00");
+    expect(at({ part: "end_of_week", time: "05:00" })?.iso).toBe("2026-08-14T17:00:00+05:00");
   });
 
   it("a day without a time — day_default; a weekday without a time — weekday_default", () => {

@@ -2,7 +2,7 @@
 
 import { AnimatePresence, LayoutGroup, LayoutGroupContext, motion } from "motion/react";
 import Link from "next/link";
-import { useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { aqtobeDay, humanAqtobe } from "@/lib/ai/time";
 import { springs } from "@/lib/design/tokens";
@@ -10,7 +10,7 @@ import { useNow } from "@/lib/useNow";
 import { haptic } from "@/lib/haptics";
 import { shortName, initialsOf } from "@/lib/people/names";
 
-import type { Section, Step } from "@/lib/tasks/overview";
+import type { Section } from "@/lib/tasks/overview";
 import { isOverdue, SHORT_STATUS, TEXT, type TaskStatus } from "@/lib/tasks/status-text";
 import { deadlineToneOf, TONE_VAR, type Tone } from "@/lib/tasks/tone";
 
@@ -202,6 +202,59 @@ export function SectionHead({ title, tone, count }: { title: string; tone: Tone;
  * body under a hairline. The article animates its own size, the head and the body only
  * their position — framer corrects them for the parent's scale, so text never stretches.
  */
+/**
+ * The frame that makes an open card's «when» a button (D-187): laid over the head's words where
+ * they stand (layout offsets, so the card's own spring does not skew it), in their colour — the
+ * frame that appears as the card opens is the sign it can be pressed. A sibling of the head's
+ * toggle, never inside it.
+ */
+type DoorBox = { left: number; top: number; width: number; height: number; color: string };
+
+const sameBox = (x: DoorBox | null, y: DoorBox) =>
+  x !== null && x.left === y.left && x.top === y.top && x.width === y.width && x.height === y.height && x.color === y.color;
+
+function WhenDoor({ taskId, label, onPress }: { taskId: string; label: string; onPress: () => void }) {
+  const self = useRef<HTMLButtonElement>(null);
+  const [box, setBox] = useState<DoorBox | null>(null);
+  // the head is the door's own parent: its ref is set before this effect, a parent's ref is not yet
+  const measure = useCallback(() => {
+    const root = self.current?.parentElement;
+    const when = root?.querySelector<HTMLElement>("[data-card-when]");
+    if (!root || !when) return;
+    let left = 0;
+    let top = 0;
+    for (let node: HTMLElement | null = when; node && node !== root; node = node.offsetParent as HTMLElement | null) {
+      left += node.offsetLeft;
+      top += node.offsetTop;
+    }
+    const words = (when.firstElementChild as HTMLElement | null) ?? when;
+    const next = { left: left - 8, top: top - 4, width: when.offsetWidth + 16, height: when.offsetHeight + 8, color: getComputedStyle(words).color };
+    setBox((was) => (sameBox(was, next) ? was : next));
+  }, []);
+  // after every render of the open card: a new date or a deadline gone red moves the words, not the
+  // head (one card is open at a time; the state is set only when the frame really moved)
+  useLayoutEffect(measure);
+  useLayoutEffect(() => {
+    const root = self.current?.parentElement;
+    if (!root) return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [measure]);
+  return (
+    <button
+      ref={self}
+      type="button"
+      onClick={onPress}
+      aria-label={label}
+      data-deadline-target={taskId}
+      data-testid="card-deadline"
+      className="absolute rounded-full border transition-[transform,background-color] duration-150 ease-out after:absolute after:-inset-[9px] after:content-[''] active:scale-[0.95] active:bg-[color-mix(in_srgb,currentColor_10%,transparent)]"
+      style={box ? { ...box, borderColor: "color-mix(in srgb, currentColor 35%, transparent)" } : { visibility: "hidden" }}
+    />
+  );
+}
+
 export function CardShell({
   id,
   open,
@@ -213,6 +266,7 @@ export function CardShell({
   status,
   headData,
   reacted = false,
+  whenDoor = null,
 }: {
   id: string;
   open: boolean;
@@ -226,6 +280,11 @@ export function CardShell({
   headData?: Record<`data-${string}`, string>;
   /** The director reacted to this task (D-133): the card wears a gold outline. */
   reacted?: boolean;
+  /**
+   * The «when» of an open card is the deadline's door, as on the task's screen (D-187): a frame
+   * over the head's own words — they neither move nor wrap anew — that opens the deadline sheet.
+   */
+  whenDoor?: { label: string; onPress: () => void } | null;
 }) {
   // The body stays out of the column's layout group: leaving it, a node that has faded out
   // would dirty every card (the group's remove, then its forceRender) — a second measuring
@@ -244,7 +303,7 @@ export function CardShell({
       className="task-card relative scroll-mb-[150px] scroll-mt-[120px] overflow-hidden"
       style={{ borderRadius: 18 }}
     >
-      <motion.div layout="position" transition={CARD_SPRING}>
+      <motion.div layout="position" transition={CARD_SPRING} className="relative">
         <button
           type="button"
           aria-expanded={open}
@@ -256,6 +315,7 @@ export function CardShell({
         >
           {head}
         </button>
+        {open && whenDoor ? <WhenDoor taskId={id} label={whenDoor.label} onPress={whenDoor.onPress} /> : null}
       </motion.div>
       {/* Closing, the body leaves the flow at once (popLayout) and fades inside the shrinking
           card, which clips it — never an empty, still-tall box around the head */}
@@ -375,7 +435,11 @@ export function CardHead({
           >
             {task.title}
           </span>
-          {when ? <span className="nums mt-[2px] shrink-0 text-[13px] font-medium leading-[18px]">{when}</span> : null}
+          {when ? (
+            <span data-card-when className="nums mt-[2px] shrink-0 text-[13px] font-medium leading-[18px]">
+              {when}
+            </span>
+          ) : null}
         </span>
         <span className="mt-1 flex items-center gap-1.5 text-[13px] leading-[18px] text-muted">
           {person ? (
@@ -426,14 +490,6 @@ export function CardHead({
 /* Steps                                                                       */
 /* -------------------------------------------------------------------------- */
 
-const STEP_COLOR: Record<Step["state"], string> = {
-  done: "var(--accent)",
-  current: "var(--accent)",
-  todo: "var(--border)",
-  warn: "var(--warn)",
-  bad: "var(--danger)",
-};
-
 /** A station's time, short: «9:41» today, «вчера», «пн», «21.09» — the order matters more than the minute. */
 export function stepTime(iso: string, now: Date): string {
   const date = new Date(iso);
@@ -441,63 +497,6 @@ export function stepTime(iso: string, now: Date): string {
   const text = humanAqtobe(date, now);
   if (days === 0) return text.replace(/^сегодня /, "");
   return text.replace(/ \d{2}:\d{2}$/, "");
-}
-
-/**
- * The life of the task as four stations on a line (a parcel tracker): what happened, when,
- * and where it is stuck. The current station carries the deadline when there is one.
- */
-export function Stepper({ steps, now, deadline }: { steps: readonly Step[]; now: Date; deadline: string | null }) {
-  return (
-    <ol className="grid grid-cols-4" data-testid="task-steps">
-      {steps.map((step, index) => {
-        const next = steps[index + 1];
-        const color = STEP_COLOR[step.state];
-        // the line runs lit only between two stations the task has passed
-        const joined = Boolean(next) && step.state === "done" && next.state !== "todo";
-        const reached = step.state !== "todo";
-        const pending = step.state === "current" || step.state === "warn" || step.state === "bad";
-        // the station the task waits at carries the deadline — the employee's, so not the review
-        const due = pending && !step.at && deadline && step.key !== "closed" ? deadline : null;
-        const late = due ? new Date(due).getTime() < now.getTime() : false;
-        const time = step.at ? stepTime(step.at, now) : due ? `${late ? "срок" : "до"} ${stepTime(due, now)}` : "";
-        return (
-          <li key={step.key} className="relative flex min-w-0 flex-col items-center text-center">
-            {next ? (
-              <span
-                aria-hidden
-                className="absolute left-1/2 top-[6px] h-[2px] w-full rounded-full"
-                style={{ background: joined ? STEP_COLOR.done : "var(--border)", opacity: joined ? 0.55 : 0.7 }}
-              />
-            ) : null}
-            <span
-              aria-hidden
-              className="relative flex h-[14px] w-[14px] items-center justify-center rounded-full"
-              style={{
-                background: reached && !pending ? color : "var(--surface)",
-                border: `2px solid ${reached ? color : "var(--border)"}`,
-                boxShadow: pending ? `0 0 0 4px color-mix(in srgb, ${color} 18%, transparent)` : undefined,
-              }}
-            >
-              {pending ? <span className="h-[5px] w-[5px] rounded-full" style={{ background: color }} /> : null}
-            </span>
-            <span
-              className={`mt-1.5 max-w-full truncate px-0.5 text-[12px] leading-4 ${pending ? "font-semibold" : ""}`}
-              style={{ color: pending ? color : reached ? "var(--text)" : "var(--text-muted)" }}
-            >
-              {step.label}
-            </span>
-            <span
-              className="nums mt-0.5 h-[14px] max-w-full truncate px-0.5 text-[11px] leading-[14px]"
-              style={{ color: late ? "var(--danger)" : "var(--text-muted)" }}
-            >
-              {time}
-            </span>
-          </li>
-        );
-      })}
-    </ol>
-  );
 }
 
 /**

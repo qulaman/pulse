@@ -18,6 +18,7 @@ export const TIME_PARTS = [
   "end_of_day",
   "end_of_week",
   "this_week",
+  "end_of_month",
 ] as const;
 export type TimePart = (typeof TIME_PARTS)[number];
 
@@ -36,8 +37,11 @@ export const ConventionSchema = z.object({
   phrase: z.string().trim().max(120),
   /** The time of day the key resolves to, Asia/Aqtobe. */
   time: z.string().regex(CLOCK),
-  /** `friday` — the nearest Friday («к концу недели»); `same` — the day that was named. */
-  day: z.enum(["same", "friday"]),
+  /**
+   * `friday` — the nearest Friday («к концу недели»); `month_end` — the month's last working day
+   * («до конца месяца», D-187); `same` — the day that was named.
+   */
+  day: z.enum(["same", "friday", "month_end"]),
   /** The deadline confidence when this row fires; below 0.8 the director sees a yellow chip. */
   confidence: z.number().min(0).max(1).default(0.7),
 });
@@ -53,6 +57,7 @@ export const DEFAULT_CONVENTIONS: Convention[] = [
   { key: "end_of_day", phrase: "до конца дня / к концу дня", time: "18:00", day: "same", confidence: 0.7 },
   { key: "end_of_week", phrase: "к концу недели / до конца недели", time: "18:00", day: "friday", confidence: 0.6 },
   { key: "this_week", phrase: "на неделе", time: "18:00", day: "friday", confidence: 0.5 },
+  { key: "end_of_month", phrase: "к концу месяца / до конца месяца", time: "18:00", day: "month_end", confidence: 0.6 },
   // D-52 open point closed as data: a day without a time is the end of that working day.
   { key: "day_default", phrase: "сегодня / завтра / послезавтра без времени", time: "18:00", day: "same", confidence: 0.5 },
   { key: "weekday_default", phrase: "к пятнице / в понедельник — день недели без времени", time: "09:00", day: "same", confidence: 0.6 },
@@ -127,6 +132,7 @@ const PART_GLOSS: Record<TimePart, string> = {
   end_of_day: "конец рабочего дня",
   end_of_week: "конец недели",
   this_week: "в течение недели",
+  end_of_month: "конец месяца",
 };
 
 /** The «слова → part» list of the prompt's «Время» section; times stay out — code applies them. */
