@@ -47,3 +47,12 @@ describe("screenMove (D-184)", () => {
     expect(screenMove("/desk/today", "/settings", director)).toBe("none");
   });
 });
+
+describe("a step through time", () => {
+  it("goes next to a later date and back to an earlier one", async () => {
+    const { stepType } = await import("./motion");
+    expect(stepType("2026-11-20", "2026-11-27")).toBe("desk-step-next");
+    expect(stepType("2026-11-20", "2026-10-30")).toBe("desk-step-prev");
+    expect(stepType("2026-11-20", "2026-11-20")).toBeUndefined();
+  });
+});

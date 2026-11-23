@@ -52,45 +52,63 @@
 }
 
 /* the old screen goes quickly and does not compete; the new one comes from where the move points */
+/* the new screen comes over the old one, which stays whole under it until it is covered: the
+   screen has its own ground, so the picture never thins in between — a fade-out before the fade-in
+   let the page's darker ground through for a tenth of a second, a blink (measured: −18 % light) */
+::view-transition-old(.desk-section-down),
+::view-transition-old(.desk-section-up),
+::view-transition-old(.desk-swap),
+::view-transition-old(.desk-deeper),
+::view-transition-old(.desk-back),
+::view-transition-new(.desk-section-down),
+::view-transition-new(.desk-section-up),
+::view-transition-new(.desk-swap),
+::view-transition-new(.desk-deeper),
+::view-transition-new(.desk-back) {
+  mix-blend-mode: normal;
+}
 ::view-transition-old(.desk-section-down),
 ::view-transition-old(.desk-section-up),
 ::view-transition-old(.desk-swap) {
-  animation: var(--vt-out) ease-in both vt-fade-out;
+  animation: none;
 }
 ::view-transition-new(.desk-section-down) {
   --vt-from-y: var(--vt-shift);
-  animation: var(--vt-in) var(--vt-ease) var(--vt-in-delay) both vt-rise;
+  animation: var(--vt-in) var(--vt-ease) both vt-rise;
 }
 ::view-transition-new(.desk-section-up) {
   --vt-from-y: calc(var(--vt-shift) * -1);
-  animation: var(--vt-in) var(--vt-ease) var(--vt-in-delay) both vt-rise;
+  animation: var(--vt-in) var(--vt-ease) both vt-rise;
 }
 ::view-transition-new(.desk-swap) {
-  animation: var(--vt-in) var(--vt-ease) var(--vt-in-delay) both vt-fade-in;
+  animation: var(--vt-in) var(--vt-ease) both vt-fade-in;
 }
 
-/* into a thing and out of it: across, as a page is turned */
+/* into a thing and out of it: across, as a page is turned — the old page gives way a little, still
+   whole, the new one comes over it */
 ::view-transition-old(.desk-deeper) {
   --vt-to-x: calc(var(--vt-slide) * -0.5);
-  animation: var(--vt-out) ease-in both vt-leave;
+  animation: var(--vt-in) var(--vt-ease) both vt-give-way;
 }
 ::view-transition-new(.desk-deeper) {
   --vt-from-x: var(--vt-slide);
-  animation: var(--vt-in) var(--vt-ease) var(--vt-in-delay) both vt-arrive;
+  animation: var(--vt-in) var(--vt-ease) both vt-arrive;
 }
 ::view-transition-old(.desk-back) {
   --vt-to-x: calc(var(--vt-slide) * 0.5);
-  animation: var(--vt-out) ease-in both vt-leave;
+  animation: var(--vt-in) var(--vt-ease) both vt-give-way;
 }
 ::view-transition-new(.desk-back) {
   --vt-from-x: calc(var(--vt-slide) * -1);
-  animation: var(--vt-in) var(--vt-ease) var(--vt-in-delay) both vt-arrive;
+  animation: var(--vt-in) var(--vt-ease) both vt-arrive;
 }
 
 /* a part of the screen that moves on its own belongs to the screen's picture when the screen takes
-   part: it is drawn inside it and cut by its box, as the screen's scroll cuts it (nested groups) */
+   part: it is drawn inside it and cut by its box, as the screen's scroll cuts it (nested groups).
+   Only into the screen, by its name: «nearest» put it, when the screen stays (a switch, a pick), into
+   the page's own picture, which React keeps hidden — the part vanished for the whole move, a blink */
 #desk-main * {
-  view-transition-group: nearest;
+  view-transition-group: desk-screen;
 }
 ::view-transition-group-children(desk-screen) {
   overflow: clip;
@@ -98,25 +116,43 @@
 
 /* ---- a switch inside the screen: «Сетка» / «Список», a view, a tab ------------------------------ */
 
-/* the screen holds still around it; what changed on it besides (the switch's own pill) fades across */
-::view-transition-old(.desk-frame) {
-  animation: var(--vt-in) ease both vt-fade-out;
+/* a part that changes inside the screen moves as its whole picture — a scrolled list's too — and the
+   screen is not named then (a named part takes no click: the tabs must take the next one at once).
+   So the layer of the transition loses the strip above the screen (its box — DeskShell's
+   useScreenEdge): nothing lies over the top bar; the navigation and the panel keep their side.
+   In viewport units, not percents: the layer's own box is empty, and a percent of it is zero */
+html:active-view-transition-type(desk-switch, desk-step-next, desk-step-prev, desk-pick)::view-transition {
+  clip-path: polygon(
+    0 0,
+    var(--desk-main-left, 0px) 0,
+    var(--desk-main-left, 0px) var(--desk-main-top, 0px),
+    var(--desk-main-right, 100vw) var(--desk-main-top, 0px),
+    var(--desk-main-right, 100vw) 0,
+    100vw 0,
+    100vw 100vh,
+    0 100vh
+  );
 }
-::view-transition-new(.desk-frame) {
-  animation: var(--vt-in) ease both vt-fade-in;
+
+/* every face that changes into another in its place (a part, a step) cross-fades by
+   adding light: the two faces' opacities always sum to one, so what is the same in both stays as
+   bright as it was. The browser draws them over each other («normal») unless told — and two faces
+   at 19 % and 81 % drawn so let a sixth of the page's darker ground through: a blink */
+::view-transition-old(.desk-switch-swap),
+::view-transition-new(.desk-switch-swap),
+::view-transition-old(.desk-pick-swap),
+::view-transition-new(.desk-pick-swap),
+::view-transition-old(.desk-slide-next),
+::view-transition-new(.desk-slide-next),
+::view-transition-old(.desk-slide-prev),
+::view-transition-new(.desk-slide-prev) {
+  mix-blend-mode: plus-lighter;
 }
-/* the old face of the switched part goes at once, the new one rises a little into its place */
-::view-transition-old(.desk-switch-out) {
-  animation: var(--vt-out) ease-in both vt-fade-out;
-}
-::view-transition-new(.desk-switch-in) {
-  --vt-from-y: 8px;
-  animation: var(--vt-in) var(--vt-ease) var(--vt-in-delay) both vt-rise;
-}
-/* one part that stays and changes what is in it — a tab of «Задачи», the list of «Заметки», a note
-   on its paper («desk-pick-swap»): its box grows or shrinks to the new height and the two faces
-   cross-fade together, so the part's own ground (a card, the paper) never thins in between; the
-   pictures keep their own size, never stretched */
+
+/* one part that stays and changes what is in it — a tab or a view («Сетка» / «Список», «Сводка» /
+   «Табель», «Сейчас» / «История»), the list of «Заметки», a note on its paper, the thing in the
+   panel («desk-pick-swap»): its box grows or shrinks to the new height and the two faces cross-fade
+   together; the pictures keep their own size, never stretched */
 ::view-transition-group(.desk-switch-swap),
 ::view-transition-group(.desk-pick-swap) {
   animation-duration: var(--vt-in);
@@ -142,6 +178,41 @@
   animation: var(--vt-in) ease both vt-fade-in;
 }
 
+/* a step through time (a week, a month, a day of «Сводка»): the part keeps its box, the old face
+   slides out the way the step goes and the new one comes in from the other side, cut by the box */
+::view-transition-group(.desk-slide-next),
+::view-transition-group(.desk-slide-prev) {
+  animation-duration: var(--vt-in);
+  animation-timing-function: var(--vt-ease);
+}
+::view-transition-image-pair(.desk-slide-next),
+::view-transition-image-pair(.desk-slide-prev) {
+  overflow: clip;
+}
+::view-transition-old(.desk-slide-next),
+::view-transition-new(.desk-slide-next),
+::view-transition-old(.desk-slide-prev),
+::view-transition-new(.desk-slide-prev) {
+  inline-size: auto;
+  block-size: auto;
+}
+::view-transition-old(.desk-slide-next) {
+  --vt-to-x: calc(var(--vt-slide) * -1);
+  animation: var(--vt-in) var(--vt-ease) both vt-leave;
+}
+::view-transition-new(.desk-slide-next) {
+  --vt-from-x: var(--vt-slide);
+  animation: var(--vt-in) var(--vt-ease) both vt-arrive;
+}
+::view-transition-old(.desk-slide-prev) {
+  --vt-to-x: var(--vt-slide);
+  animation: var(--vt-in) var(--vt-ease) both vt-leave;
+}
+::view-transition-new(.desk-slide-prev) {
+  --vt-from-x: calc(var(--vt-slide) * -1);
+  animation: var(--vt-in) var(--vt-ease) both vt-arrive;
+}
+
 /* ---- the right-hand panel (DeskShell, components/desk/ui/DeskPanel.tsx) ------------------------- */
 
 /* it comes in from the right edge and leaves there; the screen beside it takes its new width at once */
@@ -151,15 +222,8 @@
 ::view-transition-old(.desk-panel-out) {
   animation: 160ms ease-in both vt-panel-out;
 }
-/* what it shows changes in place — another task, another request: the old goes at once, the new
-   comes the short way from the right */
-::view-transition-old(.desk-pick-out) {
-  animation: var(--vt-out) ease-in both vt-fade-out;
-}
-::view-transition-new(.desk-pick-in) {
-  --vt-from-x: 10px;
-  animation: var(--vt-in) var(--vt-ease) var(--vt-in-delay) both vt-arrive;
-}
+/* what it shows changes in place — another task, another request: one face into the other
+   («desk-pick-swap» above) */
 
 /* ---- one thing in two places: a person's circle and name from the tile or the card to the page -- */
 
@@ -184,6 +248,23 @@
   block-size: 100%;
 }
 
+/* a title from its row to the panel's head and back (a task, a board, a meeting): it travels at its
+   own size — the one-line row and the large head differ too much to stretch one into the other — and
+   the two faces cross-fade on the way */
+::view-transition-group(.desk-morph-title) {
+  animation-duration: var(--vt-morph);
+  animation-timing-function: var(--vt-ease);
+}
+::view-transition-image-pair(.desk-morph-title) {
+  animation: var(--vt-morph) var(--vt-ease) both vt-via-blur;
+}
+::view-transition-old(.desk-morph-title),
+::view-transition-new(.desk-morph-title) {
+  inline-size: auto;
+  block-size: auto;
+  animation-duration: var(--vt-morph);
+}
+
 /* ---- «Команда»: the card under the row opens, the rows under it make room ---------------------- */
 
 ::view-transition-new(.desk-card-in) {
@@ -195,17 +276,6 @@
 ::view-transition-group(.desk-move) {
   animation-duration: 230ms;
   animation-timing-function: var(--vt-ease);
-}
-
-/* ---- «уменьшить движение»: the same changes, at once ------------------------------------------- */
-
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*),
-  ::view-transition-image-pair(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation: none !important;
-  }
 }
 
 @keyframes vt-fade-out {
@@ -227,6 +297,11 @@
 @keyframes vt-leave {
   to {
     opacity: 0;
+    transform: translateX(var(--vt-to-x, -12px));
+  }
+}
+@keyframes vt-give-way {
+  to {
     transform: translateX(var(--vt-to-x, -12px));
   }
 }
@@ -257,5 +332,24 @@
   from {
     opacity: 0;
     transform: translateY(-8px) scale(0.99);
+  }
+}
+
+/* ---- the other sheet (D-159): it spreads from the theme button over the page as a circle ------- */
+
+html.desk-theme-turn::view-transition-old(root),
+html.desk-theme-turn::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+html.desk-theme-turn::view-transition-new(root) {
+  animation: 460ms var(--vt-ease) both vt-theme-spread;
+}
+@keyframes vt-theme-spread {
+  from {
+    clip-path: circle(0 at var(--vt-theme-x, 50%) var(--vt-theme-y, 0));
+  }
+  to {
+    clip-path: circle(var(--vt-theme-r, 150vmax) at var(--vt-theme-x, 50%) var(--vt-theme-y, 0));
   }
 }

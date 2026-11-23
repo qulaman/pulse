@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, ViewTransition, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, ViewTransition, type ReactNode, type RefObject } from "react";
 
 import { DeskAddress } from "@/components/desk/DeskAddress";
 import { DeskScope } from "@/components/desk/DeskScope";
@@ -93,11 +93,32 @@ function useScreenMove(pathname: string, role: DeskRole): [ScreenMove, () => voi
 }
 
 /**
- * A switch inside the screen (a view, a tab, `writeDeskAddress(…, { type: "desk-switch" })`): the
- * screen takes part as a still frame, so the pictures of what changed are cut by its box — a list
- * scrolled under the top bar does not spill over it while it fades (app/desk/transitions.css).
+ * The screen's box on the page, for app/desk/transitions.css (D-184): a part that changes inside the
+ * screen (a switch, a step, the thing open) moves as a whole picture — of a scrolled list too — and
+ * the strip above the screen cuts it, so it never lies over the top bar. The screen itself is not
+ * named for these moves (a named part takes no click), so the cut sits on the transition's layer.
+ * Every move of the box here changes its size (the navigation folds, the panel comes, the window).
  */
-const HOLD_FOR_SWITCH = { "desk-switch": "desk-frame", default: "none" };
+function useScreenEdge(main: RefObject<HTMLElement | null>) {
+  useLayoutEffect(() => {
+    const node = main.current;
+    if (!node) return;
+    const style = document.documentElement.style;
+    const mark = () => {
+      const box = node.getBoundingClientRect();
+      style.setProperty("--desk-main-left", `${box.left}px`);
+      style.setProperty("--desk-main-top", `${box.top}px`);
+      style.setProperty("--desk-main-right", `${box.right}px`);
+    };
+    mark();
+    const watch = new ResizeObserver(mark);
+    watch.observe(node);
+    return () => {
+      watch.disconnect();
+      for (const name of ["--desk-main-left", "--desk-main-top", "--desk-main-right"]) style.removeProperty(name);
+    };
+  }, [main]);
+}
 
 /** How long «G» waits for the section's letter; once its card of letters is up, longer — it is being read. */
 const CHORD_MS = 1200;
@@ -446,6 +467,7 @@ export function DeskShell({ me, role, brand, navFolded = false, children }: { me
   const grid = useRef<HTMLDivElement>(null);
   const main = useRef<HTMLElement>(null);
   const [move, played] = useScreenMove(pathname, role);
+  useScreenEdge(main);
   const navWidth = folded ? NAV_ICONS : NAV_WIDE;
   const toggleNav = () => writeNavFolded(!folded);
   useDeskSurface();
@@ -507,9 +529,9 @@ export function DeskShell({ me, role, brand, navFolded = false, children }: { me
                 {/* `isolate`: the screen's light (DeskLight) sits under the content, inside the screen.
                     The screen moves as one picture of its own box when the address leaves it (D-184):
                     the navigation and the top bar stay live, the scroll offset does not travel. A
-                    switch inside it («desk-switch») keeps the box still and holds the parts that move
-                    inside it, cut by its edges. */}
-                <ViewTransition name="desk-screen" update={move === "none" ? HOLD_FOR_SWITCH : move} default="none" onUpdate={played}>
+                    switch inside it moves only its own part: a named part takes no click while it
+                    moves, and the tabs and the toolbar must take the next one at once. */}
+                <ViewTransition name="desk-screen" update={move} default="none" onUpdate={played}>
                   <main ref={main} id="desk-main" className="relative isolate min-h-0 flex-1 overflow-y-auto">
                     {allowed ? <DeskLinks className="contents">{children}</DeskLinks> : null}
                   </main>

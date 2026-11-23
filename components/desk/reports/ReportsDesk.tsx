@@ -1,9 +1,10 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { Download, Printer } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useRef, useState, ViewTransition } from "react";
+import { useEffect, useRef, useState, ViewTransition } from "react";
 
 import { useDeskParams, writeDeskAddress } from "@/components/desk/DeskAddress";
 import { useDeskScope } from "@/components/desk/DeskScope";
@@ -15,10 +16,10 @@ import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SearchField, SegmentTabs, Toolbar } from "@/components/desk/ui/Toolbar";
 import { Button } from "@/components/ui/Button";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
-import { SWITCH_IN, SWITCH_OUT } from "@/lib/desk/motion";
+import { stepType, SWITCH_OR_STEP } from "@/lib/desk/motion";
 import { askFromOf } from "@/lib/daily-report/due";
 import { addDaysYmd } from "@/lib/daily-report/format";
-import { useTeamDailyReportDay } from "@/lib/daily-report/queries";
+import { hasTeamDailyReportDay, prefetchTeamDailyReportDay, useTeamDailyReportDay } from "@/lib/daily-report/queries";
 import { nowHm, todayYmd, type Ymd } from "@/lib/datetime/calendar";
 import { dayFileName, daySheet, daySheetTitle, tabelFileName, tabelSheet, tabelSheetTitle, toCsv } from "@/lib/desk/report-export";
 import {
@@ -104,6 +105,14 @@ export function ReportsDesk() {
 
   const companyId = me.data?.companyId;
   const day = useTeamDailyReportDay(date, companyId, hydrated && tab === "day" && !off);
+  // the days on both sides, loaded ahead: a step of days slides in with its reports there (D-184)
+  const queryClient = useQueryClient();
+  const asksDays = hydrated && tab === "day" && !off && Boolean(companyId);
+  useEffect(() => {
+    if (!asksDays) return;
+    void prefetchTeamDailyReportDay(queryClient, addDaysYmd(date, -1));
+    if (addDaysYmd(date, 1) <= today) void prefetchTeamDailyReportDay(queryClient, addDaysYmd(date, 1));
+  }, [asksDays, queryClient, date, today]);
   const tabel = useTabel(range.from, range.to, today, hydrated && tab === "tabel" && Boolean(companyId) && !off);
 
   /**
@@ -122,7 +131,9 @@ export function ReportsDesk() {
     if (url === `${pathname}${window.location.search}`) return;
     const switched = next.tab !== undefined && next.tab !== tab;
     const picked = !switched && next.person !== undefined && next.person !== openId && Boolean(next.person && openId);
-    writeDeskAddress(url, { push: !replace, type: switched ? "desk-switch" : picked ? "desk-pick" : undefined, burst: replace });
+    // a day of «Сводка» already here slides the way the step goes; one still to load changes at once
+    const stepped = !switched && !picked && tab === "day" && next.day && next.day !== date && hasTeamDailyReportDay(queryClient, next.day) ? stepType(date, next.day) : undefined;
+    writeDeskAddress(url, { push: !replace, type: switched ? "desk-switch" : picked ? "desk-pick" : stepped, burst: replace });
   };
   const setDay = (next: Ymd, replace = false) => go({ day: next > today ? today : next }, replace);
   const setPeriod = (next: TabelPeriod, replace = false) => go({ period: next }, replace);
@@ -266,7 +277,7 @@ export function ReportsDesk() {
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-3.5" data-testid="desk-reports">
           {/* «Сводка» and «Табель» swap as two pictures (D-184) */}
-          <ViewTransition key={tab} enter={SWITCH_IN} exit={SWITCH_OUT} default="none">
+          <ViewTransition update={SWITCH_OR_STEP} default="none">
             {tab === "day" ? (
               <SummaryView
                 day={day.data}

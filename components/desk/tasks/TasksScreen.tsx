@@ -504,6 +504,7 @@ function TasksView({
     group,
     archiveTab,
     panelOpen: panel.isOpen,
+    openId,
     picked,
     avatars,
     goneIds,

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { motion } from "motion/react";
 import { useLayoutEffect, useRef, useState, type MouseEvent } from "react";
 import { flushSync } from "react-dom";
 
@@ -155,7 +156,10 @@ function Entry({
   const hours = hoursText(row.hours);
   const face = <Face person={{ id: row.user_id, full_name: row.full_name, avatar_url: row.avatar_url }} size={words ? 32 : 24} />;
   return (
-    <li
+    // a new report rises at the top (`data-rise`), the ones under it slide down to make room (D-184)
+    <motion.li
+      layout="position"
+      transition={{ type: "tween", duration: 0.23, ease: [0.2, 0.8, 0.2, 1] }}
       className="rep-day-entry"
       data-testid="desk-ledger-entry"
       data-row-key={row.user_id}
@@ -204,7 +208,7 @@ function Entry({
         </>
       )}
       <Stamp report={report} now={now} />
-    </li>
+    </motion.li>
   );
 }
 

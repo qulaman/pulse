@@ -21,7 +21,7 @@ import { useShortcuts, type Shortcut } from "@/components/desk/ui/Shortcuts";
 import { SegmentTabs, Toolbar } from "@/components/desk/ui/Toolbar";
 import { When } from "@/components/desk/ui/When";
 import { Button } from "@/components/ui/Button";
-import { SWITCH_IN, SWITCH_OUT } from "@/lib/desk/motion";
+import { SWITCH_SWAP } from "@/lib/desk/motion";
 import { humanAqtobe } from "@/lib/ai/time";
 import { reachOf, splitEther, type Reach } from "@/lib/desk/ether";
 import { formatNum } from "@/lib/desk/format";
@@ -396,7 +396,7 @@ export function EtherDesk() {
       ) : null}
 
       {/* «Объявления» and «Хорошие новости» swap as two pictures (D-184) */}
-      <ViewTransition key={shown} enter={SWITCH_IN} exit={SWITCH_OUT} default="none">
+      <ViewTransition update={SWITCH_SWAP} default="none">
         {shown === "news" ? (
           <NewsCards news={news} now={now} director={director} onRemove={(id) => removeEvent.mutate(id)} />
         ) : rows.length === 0 ? (

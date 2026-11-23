@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { flushSync } from "react-dom";
 
 /**
  * The desk's two sheets (D-159): dark by default, light on request, kept per browser — the head
@@ -63,6 +64,43 @@ const theme = storedChoice<DeskTheme>(DESK_THEME_KEY, parseDeskTheme, "dark");
 
 export function writeDeskTheme(value: DeskTheme): void {
   theme.write(value);
+}
+
+/**
+ * The other sheet spreads from `at` (the button pressed) over the whole page as a circle (D-184):
+ * one view transition of the page's own picture — the old sheet stays under, the new one grows
+ * over it (app/desk/transitions.css, `html.desk-theme-turn`). Without View Transitions or without
+ * a point the sheet changes at once.
+ */
+let turns = 0;
+
+export function switchDeskTheme(value: DeskTheme, at?: { x: number; y: number }): void {
+  const doc = document as Document & { startViewTransition?: (update: () => void) => { finished: Promise<void> } };
+  if (!at || !doc.startViewTransition) {
+    writeDeskTheme(value);
+    return;
+  }
+  const root = document.documentElement;
+  const reach = Math.hypot(Math.max(at.x, window.innerWidth - at.x), Math.max(at.y, window.innerHeight - at.y));
+  root.style.setProperty("--vt-theme-x", `${Math.round(at.x)}px`);
+  root.style.setProperty("--vt-theme-y", `${Math.round(at.y)}px`);
+  root.style.setProperty("--vt-theme-r", `${Math.ceil(reach)}px`);
+  root.classList.add("desk-theme-turn");
+  // the sheet is the shell's attribute, set in its layout effect: drawn before the new picture is taken
+  const turn = doc.startViewTransition(() => flushSync(() => writeDeskTheme(value)));
+  // a second press cuts this turn short: only the latest one takes the circle's class off
+  turns += 1;
+  const mine = turns;
+  void turn.finished.finally(() => {
+    if (mine === turns) root.classList.remove("desk-theme-turn");
+  });
+}
+
+/** The centre of an element on screen — where the other sheet starts from. */
+export function centreOf(element: Element | null): { x: number; y: number } | undefined {
+  if (!element) return undefined;
+  const box = element.getBoundingClientRect();
+  return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
 }
 
 export function useDeskTheme(): DeskTheme {

@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { clampPanel, PANEL_DEFAULT, PANEL_MAX, PANEL_MIN } from "@/lib/desk/frame";
-import { PICK_IN, PICK_OUT } from "@/lib/desk/motion";
+import { PANEL_PICK } from "@/lib/desk/motion";
 
 /** One thing asking for the panel: a node given to `open`, or an `InPanel` rendering into it (`id` — that `InPanel`'s own). */
 type Claim = { id: string; key: string; onClose?: () => void; node?: ReactNode };
@@ -151,8 +151,9 @@ export function useDeskPanel(): DeskPanelApi {
  * the panel — with the screen's own state and handlers, never a stale copy. `panelKey` names what
  * is open; × and Esc call `onClose`, which should unmount this (a screen drops its `?id` there).
  * Another `panelKey` is the same place in the stack showing another thing: drawn in the same
- * commit, the old thing going and the new one coming when the screen's write says `desk-pick`
- * (`PICK_IN`, `PICK_OUT` of lib/desk/motion.ts).
+ * commit, the old thing changing into the new one in place when the screen's write says
+ * `desk-pick` (`PANEL_PICK` of lib/desk/motion.ts); the content under the boundary is keyed by
+ * `panelKey`, so another thing starts with its own state.
  */
 export function InPanel({ panelKey, onClose, children }: { panelKey: string; onClose: () => void; children: ReactNode }) {
   const api = useContext(PanelContext);
@@ -176,8 +177,10 @@ export function InPanel({ panelKey, onClose, children }: { panelKey: string; onC
   }, [rename, id, panelKey]);
   if (!api?.host || api.topId !== id) return null;
   return createPortal(
-    <ViewTransition key={panelKey} enter={PICK_IN} exit={PICK_OUT} default="none">
-      <div data-panel-item="">{children}</div>
+    <ViewTransition update={PANEL_PICK} default="none">
+      <div key={panelKey} data-panel-item="">
+        {children}
+      </div>
     </ViewTransition>,
     api.host,
   );

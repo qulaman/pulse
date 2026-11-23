@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { Fragment, type MouseEvent, type ReactNode } from "react";
 
 import { EmptyState } from "@/components/desk/ui/EmptyState";
@@ -62,10 +63,13 @@ import { Aside, BlockLink, DAY_ROW } from "./home/parts";
 export function WorkList({ children, testId }: { children: ReactNode; testId?: string }) {
   return (
     <div className="desk-list" data-testid={testId}>
-      {children}
+      {/* a row that came fades in, one that went fades out and the rest close up (D-184) */}
+      <AnimatePresence initial={false}>{children}</AnimatePresence>
     </div>
   );
 }
+
+const ROW_MOVE = { type: "tween", duration: 0.23, ease: [0.2, 0.8, 0.2, 1] } as const;
 
 /**
  * One row of a work list: the whole row opens, its buttons are its own, a right click is its menu.
@@ -92,12 +96,19 @@ export function WorkRow({
   testId?: string;
   rowKey?: string;
 }) {
+  // a row on its way out is no longer the list's: its key and test id go while it fades
+  const present = useIsPresent();
   return (
-    <div
+    <motion.div
+      layout="position"
+      transition={ROW_MOVE}
+      initial={{ opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, transition: { duration: 0.14, ease: "easeIn" } }}
       role="button"
       tabIndex={0}
-      data-testid={testId}
-      data-row-key={rowKey}
+      data-testid={present ? testId : undefined}
+      data-row-key={present ? rowKey : undefined}
       data-cursor={cursor ? "" : undefined}
       aria-current={chosen ? "true" : undefined}
       onClick={(event) => {
@@ -115,7 +126,7 @@ export function WorkRow({
       className={`desk-row group/row relative flex cursor-pointer flex-col justify-center focus-visible:outline-none ${twoLines ? "py-1" : "py-[3px]"}`}
     >
       {children}
-    </div>
+    </motion.div>
   );
 }
 
@@ -267,7 +278,7 @@ export function Decisions({
             </WorkRow>
           ))}
           {moreTasks > 0 ? (
-            <Link href="/desk/inbox" prefetch className="desk-row flex items-center text-[13px] leading-4 text-muted hover:text-text">
+            <Link key="more-tasks" href="/desk/inbox" prefetch className="desk-row flex items-center text-[13px] leading-4 text-muted hover:text-text">
               …ещё {moreTasks} — разобрать по одной
             </Link>
           ) : null}
@@ -275,7 +286,7 @@ export function Decisions({
             <ExtraRow key={extra.key} extra={extra} compact={compact} />
           ))}
           {moreExtras > 0 ? (
-            <Link href="/desk/settings/points" prefetch className="desk-row flex items-center text-[13px] leading-4 text-muted hover:text-text">
+            <Link key="more-extras" href="/desk/settings/points" prefetch className="desk-row flex items-center text-[13px] leading-4 text-muted hover:text-text">
               …ещё {moreExtras} — в «Очках и магазине»
             </Link>
           ) : null}

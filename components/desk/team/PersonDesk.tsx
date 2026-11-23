@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState, ViewTransition, type ReactNode } from "re
 
 import { useDeskParams, writeDeskAddress } from "@/components/desk/DeskAddress";
 import { useDeskScope } from "@/components/desk/DeskScope";
+import { Morph } from "@/components/desk/ui/Morph";
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { MenuButton, type MenuItem } from "@/components/desk/ui/Menu";
@@ -60,7 +61,7 @@ import { PersonEditor } from "./PersonEditor";
 import { PersonStats } from "./PersonStats";
 import { RemoveDialog, type RemoveMode } from "./RemoveDialog";
 import { addressOf, AVAILABILITY_TONE, GridBone, LoadFailed, loadWords, roleLine, StateWord, tidy } from "./shared";
-import { Morph, TileFace, tileState } from "./TeamGrid";
+import { TileFace, tileState } from "./TeamGrid";
 
 const OPEN: TaskStatus[] = ["scheduled", "sent", "accepted", "in_progress", "rework"];
 const CLOSED: TaskStatus[] = ["done", "declined", "revoked"];

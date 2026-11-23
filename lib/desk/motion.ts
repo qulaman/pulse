@@ -44,16 +44,25 @@ export function screenMove(from: string, to: string, order: readonly string[]): 
 
 /**
  * The classes of a part of a screen that moves with a change inside the screen (D-184), by the
- * transition type its write carries (`writeDeskAddress(…, { type })`):
- * - `desk-switch` — a view or a tab: one part leaves and another comes (`SWITCH_IN` / `SWITCH_OUT`
- *   on a keyed boundary), or one part changes what is in it (`SWITCH_SWAP` on a boundary that stays);
- * - `desk-pick` — another thing open: the panel's content, a note on its paper (`PICK_*`).
+ * transition type its write carries (`writeDeskAddress(…, { type })`). A part stays one boundary —
+ * no `key` — whatever it shows, so its old and new faces are one pair and cross-fade by adding
+ * their light (app/desk/transitions.css): a pair of two boundaries, one going and one coming, let
+ * the page's ground through in between — a blink.
+ * - `desk-switch` — a view or a tab (`SWITCH_SWAP`);
+ * - `desk-pick` — another thing open: the panel's content (`PANEL_PICK`), a note on its paper, the
+ *   side of the calendar (`PICK_SWAP`);
+ * - `desk-step-next` / `desk-step-prev` — a step through time: a week, a month, a day of «Сводка»
+ *   slides the way it goes (`SWITCH_OR_STEP`).
  * Anything else that changes the part leaves it still.
  */
-export const SWITCH_IN = { "desk-switch": "desk-switch-in", default: "none" };
-export const SWITCH_OUT = { "desk-switch": "desk-switch-out", default: "none" };
 export const SWITCH_SWAP = { "desk-switch": "desk-switch-swap", default: "none" };
-export const PICK_IN = { "desk-pick": "desk-pick-in", default: "none" };
-export const PICK_OUT = { "desk-pick": "desk-pick-out", default: "none" };
+export const SWITCH_OR_STEP = { "desk-switch": "desk-switch-swap", "desk-step-next": "desk-slide-next", "desk-step-prev": "desk-slide-prev", default: "none" };
+export const PANEL_PICK = { "desk-pick": "desk-pick-swap", default: "none" };
 /** A pane that holds the open thing and also changes with a tab: a note on its paper. */
 export const PICK_SWAP = { "desk-pick": "desk-pick-swap", "desk-switch": "desk-switch-swap", default: "none" };
+
+/** The transition type of a step from `from` to `to` (dates or months as text): later — next. */
+export function stepType(from: string, to: string): "desk-step-next" | "desk-step-prev" | undefined {
+  if (from === to) return undefined;
+  return to > from ? "desk-step-next" : "desk-step-prev";
+}

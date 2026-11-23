@@ -13,6 +13,7 @@ import {
   type RefObject,
 } from "react";
 
+import { Morph } from "@/components/desk/ui/Morph";
 import { Popover } from "@/components/desk/ui/Popover";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
@@ -783,14 +784,19 @@ function HourEvent({
           {tier === "bar" ? null : tier === "line" ? (
             // one line: the title, its hour after it only when both fit — what does not fit wraps out of sight
             <span className="flex h-4 w-full flex-wrap items-baseline gap-x-1.5 overflow-hidden">
-              <span className="cal-event-title max-w-full truncate text-[12px] font-semibold leading-4">{event.title}</span>
+              {/* the title flies into the side when the meeting opens there, and back (D-184) */}
+              <Morph part="event" id={event.id} off={open}>
+                <span className="cal-event-title max-w-full truncate text-[12px] font-semibold leading-4">{event.title}</span>
+              </Morph>
               <When className="cal-event-time shrink-0 text-[11px] leading-4">{hhmm(event.starts_at)}</When>
             </span>
           ) : (
             <>
-              <span className="cal-event-title w-full text-[12px] font-semibold leading-4" style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: titleLines, overflow: "hidden" }}>
-                {event.title}
-              </span>
+              <Morph part="event" id={event.id} off={open}>
+                <span className="cal-event-title w-full text-[12px] font-semibold leading-4" style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: titleLines, overflow: "hidden" }}>
+                  {event.title}
+                </span>
+              </Morph>
               {titleOnly ? null : (
                 <span className="cal-event-time w-full truncate text-[11px] leading-[14px]">
                   <When>{clock}</When>

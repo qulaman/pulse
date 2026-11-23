@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 
 import { Face } from "@/components/desk/ui/Face";
@@ -84,10 +85,17 @@ type RowProps = {
   onOpen: (id: string) => void;
 };
 
+const ROW_MOVE = { type: "tween", duration: 0.23, ease: [0.2, 0.8, 0.2, 1] } as const;
+
 function Person({ row, note, end, select }: { row: TeamDayRow; note?: ReactNode; end?: ReactNode; select: RowProps }) {
   const selected = select.selectedId === row.user_id;
   return (
-    <li
+    <motion.li
+      layout="position"
+      transition={ROW_MOVE}
+      initial={{ opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, transition: { duration: 0.14, ease: "easeIn" } }}
       className="rep-day-person"
       data-row-key={row.user_id}
       data-selected={selected ? "" : undefined}
@@ -106,7 +114,7 @@ function Person({ row, note, end, select }: { row: TeamDayRow; note?: ReactNode;
         {note ? <span className="rep-day-person-note">{note}</span> : null}
       </span>
       {end}
-    </li>
+    </motion.li>
   );
 }
 
@@ -120,7 +128,10 @@ function Group({ kind, title, count, action, children }: { kind: "pending" | "mi
         </h3>
         {action}
       </div>
-      <ul className="rep-day-people">{children}</ul>
+      <ul className="rep-day-people">
+        {/* one who handed in leaves «Ждём», the rest close up; the last one takes the section along (D-184) */}
+        <AnimatePresence initial={false}>{children}</AnimatePresence>
+      </ul>
     </section>
   );
 }

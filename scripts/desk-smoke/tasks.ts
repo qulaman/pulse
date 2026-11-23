@@ -534,10 +534,13 @@ async function checkPanelMoves(ctx: Ctx) {
   record(
     "задачи (D-184): панель въезжает, задача меняется на месте, Esc — уезжает; ни один переход не оборван",
     came.some((run) => run.names.includes("vt-panel-in")) &&
-      swapped.some((run) => run.names.includes("vt-arrive")) &&
+      swapped.some((run) => run.names.includes("vt-fade-in")) &&
       gone &&
       left.some((run) => run.names.includes("vt-panel-out")) &&
       !all.some(cutShort),
     `въезд ${vtNames(came) || "—"} · смена ${vtNames(swapped) || "—"} · Esc ${vtNames(left) || "—"}`,
   );
+  // the task's title flies from its row into the panel's head and back
+  const flies = (runs: typeof came) => runs.some((run) => run.groups.some((group) => group.startsWith("desk-task-")));
+  record("задачи (D-184): название летит из строки в панель, при смене и по Esc — обратно", flies(came) && flies(swapped) && flies(left), `въезд ${flies(came)} · смена ${flies(swapped)} · Esc ${flies(left)}`);
 }

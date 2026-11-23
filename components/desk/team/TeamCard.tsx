@@ -4,6 +4,7 @@ import { BellOff, CalendarOff, Phone, X } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { Morph } from "@/components/desk/ui/Morph";
 import { MenuButton, type MenuItem } from "@/components/desk/ui/Menu";
 import { SegmentTabs } from "@/components/desk/ui/Toolbar";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
@@ -22,7 +23,7 @@ import { CardFacts, PushBlock } from "./PersonDesk";
 import { OpenTasks } from "./PersonPeek";
 import { PersonEditor } from "./PersonEditor";
 import { loadWords, tidy } from "./shared";
-import { Morph, TileFace, tileState } from "./TeamGrid";
+import { TileFace, tileState } from "./TeamGrid";
 
 /** The card's three faces: the numbers, the data (read or edited), the open work. */
 export type CardTab = "stats" | "data" | "tasks";

@@ -3,7 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
 import { CalendarRange, ChevronLeft, ChevronRight, Diamond, MonitorUp, Plus } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, ViewTransition, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, ViewTransition, type ReactNode } from "react";
 
 import { useDeskParams, writeDeskAddress } from "@/components/desk/DeskAddress";
 import { useDeskScope } from "@/components/desk/DeskScope";
@@ -19,7 +19,7 @@ import type { Tone } from "@/components/desk/ui/tone";
 import { Button } from "@/components/ui/Button";
 import { Bone } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
-import { PICK_SWAP, SWITCH_IN, SWITCH_OUT } from "@/lib/desk/motion";
+import { PICK_SWAP, stepType, SWITCH_OR_STEP } from "@/lib/desk/motion";
 import { noticeOfEdit, ymdOfEvent } from "@/lib/calendar/agenda";
 import { canMove, MOVE_HOLD_MS, moveDraft } from "@/lib/calendar/move";
 import { DESK_WORDS, useEditEvent } from "@/lib/calendar/mutations";
@@ -119,9 +119,10 @@ export function DeskCalendar() {
   /**
    * The address holds what is on screen: steps replace it, a change of view is a step back can undo.
    * Through the desk's address (D-184): the week and the month swap as two pictures, the side
-   * changes in place for a meeting or a day; a step of weeks changes at once.
+   * changes in place for a meeting or a day, a step of weeks or months slides the way it goes (a held
+   * arrow — at once).
    */
-  const go = (next: { d?: Ymd; view?: CalendarView; deadlines?: boolean; day?: Ymd | null; e?: string | null }, push = false) => {
+  const go = (next: { d?: Ymd; view?: CalendarView; deadlines?: boolean; day?: Ymd | null; e?: string | null }, push = false, fromKeys = false) => {
     // from the address as it is now, not as drawn: a step may still wait for its transition
     const query = new URLSearchParams(window.location.search);
     const set = (name: string, value: string | null) => (value === null ? query.delete(name) : query.set(name, value));
@@ -133,8 +134,11 @@ export function DeskCalendar() {
     const text = query.toString();
     const url = text ? `${pathname}?${text}` : pathname;
     const switched = next.view !== undefined && next.view !== view;
+    // a step only when the week or the month on screen changes: a date inside it does not slide
+    const target = !switched && next.d !== undefined ? daysOf(view, next.d, monthOf(next.d))[0] : undefined;
+    const stepped = target !== undefined && target !== first ? stepType(first, target) : undefined;
     const picked = !switched && next.d === undefined && (next.e !== undefined || next.day !== undefined);
-    writeDeskAddress(url, { push, type: switched ? "desk-switch" : picked ? "desk-pick" : undefined });
+    writeDeskAddress(url, { push, type: switched ? "desk-switch" : (stepped ?? (picked ? "desk-pick" : undefined)), burst: fromKeys });
   };
 
   // seven to forty-two day strings: cheaper to draw again than to remember
@@ -283,13 +287,13 @@ export function DeskCalendar() {
     // the holds live in a ref: one listener for the page's life
   }, []);
 
-  const step = (delta: -1 | 1) => {
+  const step = (delta: -1 | 1, fromKeys = false) => {
     setQuick(null);
-    if (view === "week") return go({ d: addDays(anchor, delta * 7), day: null, e: null });
+    if (view === "week") return go({ d: addDays(anchor, delta * 7), day: null, e: null }, false, fromKeys);
     const next = addMonths(month, delta);
     const todayParts = parseYmd(today)!;
     // today when the month has it, its first day otherwise — as the phone's arrows do
-    go({ d: todayParts.year === next.year && todayParts.month === next.month ? today : ymdOf(next.year, next.month, 1), day: null, e: null });
+    go({ d: todayParts.year === next.year && todayParts.month === next.month ? today : ymdOf(next.year, next.month, 1), day: null, e: null }, false, fromKeys);
   };
   /** Shift+←/→: the day looked at moves along the week (the grid widens it). */
   const stepDay = (delta: -1 | 1) => {
@@ -316,7 +320,7 @@ export function DeskCalendar() {
       }
       return false;
     }
-    if (arrow) step(code === "ArrowLeft" ? -1 : 1);
+    if (arrow) step(code === "ArrowLeft" ? -1 : 1, true);
     else if (code === "KeyT") go({ d: today, day: null });
     else if (code === "KeyW") setView(isSecretary && view === "week" ? "month" : "week");
     else if (code === "KeyM" && isDirector) setView("month");
@@ -354,28 +358,6 @@ export function DeskCalendar() {
   };
   const title = view === "week" ? weekTitle(first, last) : monthTitle(month);
 
-  // another week slides in from the side it lies on, another view rises into place; the data are
-  // already drawn under it — the motion never holds the grid back (principle 1a)
-  const stage = useRef<HTMLDivElement>(null);
-  const shown = useRef<{ view: CalendarView; first: Ymd } | null>(null);
-  useLayoutEffect(() => {
-    const was = shown.current;
-    shown.current = { view, first };
-    const node = stage.current;
-    if (!was || !node || (was.view === view && was.first === first)) return;
-    if (typeof node.animate !== "function" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const frames =
-      was.view !== view
-        ? [
-            { opacity: 0, transform: "translateY(10px) scale(0.995)" },
-            { opacity: 1, transform: "none" },
-          ]
-        : [
-            { opacity: 0.35, transform: `translateX(${compareYmd(first, was.first) > 0 ? 28 : -28}px)` },
-            { opacity: 1, transform: "none" },
-          ];
-    node.animate(frames, { duration: was.view !== view ? 280 : 220, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" });
-  }, [view, first]);
 
   const sideStatus = upcoming.isError && !upcoming.data ? "error" : upcoming.isLoading && !upcoming.data ? "loading" : "ready";
   const sideOpen = openId ? { id: openId, event: opened.data ?? null, missing } : null;
@@ -503,9 +485,9 @@ export function DeskCalendar() {
 
       {/* the grid and, beside it, the day or the open meeting; the shell's own panel takes the side's place */}
       <div className="cal-layout grid items-start gap-6">
-        <div ref={stage} className="min-w-0">
-          {/* the week and the month swap as two pictures (D-184) */}
-          <ViewTransition key={view} enter={SWITCH_IN} exit={SWITCH_OUT} default="none">
+        <div className="min-w-0">
+          {/* the week and the month swap as two pictures, a step slides the way it goes (D-184) */}
+          <ViewTransition update={SWITCH_OR_STEP} default="none">
             {grid}
           </ViewTransition>
         </div>

@@ -11,7 +11,7 @@ import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SegmentTabs } from "@/components/desk/ui/Toolbar";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
-import { SWITCH_IN, SWITCH_OUT } from "@/lib/desk/motion";
+import { SWITCH_SWAP } from "@/lib/desk/motion";
 import { assignableRoles } from "@/lib/people/access";
 import { useSavePhoto } from "@/lib/people/card-queries";
 import { cleanPhone } from "@/lib/people/phone";
@@ -176,41 +176,42 @@ export function NewPersonDesk() {
           <Bone h={360} />
           <Bone h={300} />
         </SkeletonGroup>
-      ) : tab === "list" ? (
-        <ViewTransition key="list" enter={SWITCH_IN} exit={SWITCH_OUT} default="none">
-          <BulkPeople editor={me.data.role} people={people.data ?? []} onBusy={setBusy} />
-        </ViewTransition>
       ) : (
-        <ViewTransition key="one" enter={SWITCH_IN} exit={SWITCH_OUT} default="none">
-          <PersonEditor
-            mode="create"
-            draftKey="new"
-            initial={deskDraftOf(null)}
-            roles={assignableRoles(me.data.role, null)}
-            managers={(people.data ?? []).filter((p) => p.is_active && (p.role === "manager" || p.role === "director"))}
-            roster={(people.data ?? []).filter((p) => p.is_active && p.role !== "tv")}
-            everyone={(people.data ?? []).filter((p) => p.role !== "tv")}
-            pending={create.isPending || savePhoto.isPending}
-            onCancel={() => router.push("/desk/team")}
-            onSubmit={async (draft, photo) => {
-              const email = (draft.email ?? "").trim().toLowerCase() || null;
-              const password = email ? (draft.password ?? "") : null;
-              const { id } = await create.mutateAsync({
-                ...(email && password ? { email, password } : {}),
-                full_name: draft.full_name.trim(),
-                role: draft.role,
-                position: draft.position.trim() || undefined,
-                phone: cleanPhone(draft.phone) ?? undefined,
-                aliases: splitAliases(draft.aliases),
-                manager_id: draft.manager_id,
-              });
-              handOver(id, { email, password });
-              // the person exists from here on: a photo that fails says so and is added on the card
-              if (me.data) await savePhoto.mutateAsync({ id, companyId: me.data.companyId, photo }).catch(() => undefined);
-              router.replace(`/desk/team/${id}`);
-            }}
-            preview={(view) => <CardPreview view={view} managers={(people.data ?? []).filter((p) => p.is_active)} />}
-          />
+        // one form or the list: one picture changing in place (D-184)
+        <ViewTransition update={SWITCH_SWAP} default="none">
+          {tab === "list" ? (
+            <BulkPeople editor={me.data.role} people={people.data ?? []} onBusy={setBusy} />
+          ) : (
+            <PersonEditor
+              mode="create"
+              draftKey="new"
+              initial={deskDraftOf(null)}
+              roles={assignableRoles(me.data.role, null)}
+              managers={(people.data ?? []).filter((p) => p.is_active && (p.role === "manager" || p.role === "director"))}
+              roster={(people.data ?? []).filter((p) => p.is_active && p.role !== "tv")}
+              everyone={(people.data ?? []).filter((p) => p.role !== "tv")}
+              pending={create.isPending || savePhoto.isPending}
+              onCancel={() => router.push("/desk/team")}
+              onSubmit={async (draft, photo) => {
+                const email = (draft.email ?? "").trim().toLowerCase() || null;
+                const password = email ? (draft.password ?? "") : null;
+                const { id } = await create.mutateAsync({
+                  ...(email && password ? { email, password } : {}),
+                  full_name: draft.full_name.trim(),
+                  role: draft.role,
+                  position: draft.position.trim() || undefined,
+                  phone: cleanPhone(draft.phone) ?? undefined,
+                  aliases: splitAliases(draft.aliases),
+                  manager_id: draft.manager_id,
+                });
+                handOver(id, { email, password });
+                // the person exists from here on: a photo that fails says so and is added on the card
+                if (me.data) await savePhoto.mutateAsync({ id, companyId: me.data.companyId, photo }).catch(() => undefined);
+                router.replace(`/desk/team/${id}`);
+              }}
+              preview={(view) => <CardPreview view={view} managers={(people.data ?? []).filter((p) => p.is_active)} />}
+            />
+          )}
         </ViewTransition>
       )}
       </div>

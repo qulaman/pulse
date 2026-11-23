@@ -1,5 +1,6 @@
 "use client";
 
+import { Morph } from "@/components/desk/ui/Morph";
 import type { Column } from "@/components/desk/ui/DataGrid";
 import type { MenuItem } from "@/components/desk/ui/Menu";
 import { When } from "@/components/desk/ui/When";
@@ -38,6 +39,8 @@ export type TaskColumnsInput = {
   group: string;
   archiveTab: boolean;
   panelOpen: boolean;
+  /** The task open in the panel: its title flies there and back (D-184). */
+  openId: string | null;
   picked: ReadonlySet<string>;
   avatars: ReadonlyMap<string, string | null>;
   goneIds: ReadonlySet<string>;
@@ -69,6 +72,7 @@ export function taskColumns({
   group,
   archiveTab,
   panelOpen,
+  openId,
   picked,
   avatars,
   goneIds,
@@ -189,7 +193,10 @@ export function taskColumns({
               <StatusGlyph status={task.status} overdue={isOverdue(task, now)} size={16} />
             </span>
             <span className="flex min-w-0 items-baseline gap-2" title={under ? `${task.title}\n${under}` : task.title}>
-              <span className={`min-w-0 shrink truncate font-medium ${closedRow(task) ? "text-text/70" : ""}`}>{task.title}</span>
+              {/* the title flies into the panel's head while the task is open there (D-184) */}
+              <Morph part="task" id={task.id} off={panelOpen && openId === task.id}>
+                <span className={`min-w-0 shrink truncate font-medium ${closedRow(task) ? "text-text/70" : ""}`}>{task.title}</span>
+              </Morph>
               {under ? <span className="tasks-under min-w-0 max-w-[45%] shrink-[2] truncate text-[13px] text-muted">{under}</span> : null}
             </span>
             {task.recurrence_rule_id ? (

@@ -226,7 +226,7 @@ export function SummaryView({
     if (!known) return;
     const ids = held.map((row) => row.user_id);
     setSeen({ date: known.date, ids: new Set([...known.ids, ...ids]), risen: new Set(ids) });
-    view?.querySelector("[data-testid='desk-ledger']")?.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    view?.querySelector("[data-testid='desk-ledger']")?.scrollIntoView({ block: "start", behavior: "smooth" });
   };
 
   const holiday = holidays.includes(day.date);

@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 import { useMemo, useState, ViewTransition } from "react";
 
 import { useDirectorDoor } from "@/components/desk/calendar/DirectorBusyLine";
@@ -8,7 +8,7 @@ import { DeskPage } from "@/components/desk/ui/PageTitle";
 import { useSettled } from "@/components/desk/ui/SideNav";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
-import { SWITCH_IN, SWITCH_OUT } from "@/lib/desk/motion";
+import { SWITCH_SWAP } from "@/lib/desk/motion";
 import { isActive, useErrands, useSecretaries, useSecretaryActions, waitedFor, type Errand } from "@/lib/errands/queries";
 import { etaLeftMin, etaLine, sceneOf } from "@/lib/errands/scene";
 import { shortName } from "@/lib/people/names";
@@ -82,7 +82,6 @@ export function SecretaryErrands({ meId, openId, onOpen, history }: { meId: stri
   const visits = useVisits();
   const catalogue = useSecretaryActions();
   const secretaries = useSecretaries();
-  const still = useReducedMotion();
   const rows = errands.data ?? NO_ERRANDS;
   const actions = catalogue.data ?? NO_ACTIONS;
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
@@ -141,7 +140,7 @@ export function SecretaryErrands({ meId, openId, onOpen, history }: { meId: stri
       <StoikaHead meId={meId} history={history} count={loading ? 0 : queue.length} now={now} settled={settled} />
       {settled ? <AwayBand meId={meId} now={now} /> : null}
       {/* the queue and «История» swap as two pictures (D-184) */}
-      <ViewTransition key={history ? "history" : "queue"} enter={SWITCH_IN} exit={SWITCH_OUT} default="none">
+      <ViewTransition update={SWITCH_SWAP} default="none">
         {history ? (
           <ErrandHistory viewer="secretary" meId={meId} openId={openId} onOpen={onOpen} now={now} pointsOn={false} catalogue={actions} />
         ) : (
@@ -171,7 +170,7 @@ export function SecretaryErrands({ meId, openId, onOpen, history }: { meId: stri
                   <Colleague key={person.id} id={person.id} name={person.full_name} rows={theirs} now={now} catalogue={actions} onOpen={onOpen} />
                 ))}
                 {loading || failed ? null : (
-                  <motion.div layout={still ? false : "position"}>
+                  <motion.div layout="position">
                     {busy ? <DayTally day={day} /> : <DayJournal day={day} now={now} catalogue={actions} openId={openId} onOpen={onOpen} />}
                   </motion.div>
                 )}

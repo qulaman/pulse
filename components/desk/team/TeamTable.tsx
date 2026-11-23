@@ -28,7 +28,7 @@ import { useTeamDailyReportDay } from "@/lib/daily-report/queries";
 import type { TeamDayRow } from "@/lib/daily-report/types";
 import { todayYmd } from "@/lib/datetime/calendar";
 import { pointsTone } from "@/lib/desk/format";
-import { SWITCH_IN, SWITCH_OUT } from "@/lib/desk/motion";
+import { SWITCH_SWAP } from "@/lib/desk/motion";
 import { useCompanySettings } from "@/lib/dictionary-queries";
 import { canChangeAccess, canEditPerson, canResetLogin, type Who } from "@/lib/people/access";
 import { usePhones, useSetWorking } from "@/lib/people/card-queries";
@@ -548,9 +548,8 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
     if (view !== "grid" || opening.current === openId) return;
     opening.current = openId;
     if (!openId) return;
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const frame = requestAnimationFrame(() =>
-      document.querySelector<HTMLElement>('[data-testid="team-card"]')?.scrollIntoView({ block: "nearest", behavior: still ? "auto" : "smooth" }),
+      document.querySelector<HTMLElement>('[data-testid="team-card"]')?.scrollIntoView({ block: "nearest", behavior: "smooth" }),
     );
     return () => cancelAnimationFrame(frame);
   }, [openId, view]);
@@ -663,7 +662,7 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
       </Toolbar>}
       {failed ? null : (
         // «Сетка» and «Список» swap as two pictures, only when the switch is pressed (D-184)
-        <ViewTransition key={view} enter={SWITCH_IN} exit={SWITCH_OUT} default="none">
+        <ViewTransition update={SWITCH_SWAP} default="none">
           {loading ? (
             view === "grid" ? (
               <TilesBone />

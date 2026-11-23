@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
+import { Morph } from "@/components/desk/ui/Morph";
 import { MoreMenu } from "@/components/desk/ui/IconButton";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { Kbd } from "@/components/desk/ui/Kbd";
@@ -390,9 +391,12 @@ export function DeskBoard() {
   ) : (
     <Tooltip label="Переименовать" keys={["F2"]} side="bottom" className="flex min-w-0 max-w-full">
       <h1 className="min-w-0 max-w-full">
-        <button type="button" onClick={() => setRenaming(true)} className="board-title block max-w-full truncate text-left hover:text-text/85" data-testid="desk-board-title" title={board.title}>
-          {board.title}
-        </button>
+        {/* the title came from its tile in the gallery and goes back there (D-184) */}
+        <Morph part="board" id={board.id}>
+          <button type="button" onClick={() => setRenaming(true)} className="board-title block max-w-full truncate text-left hover:text-text/85" data-testid="desk-board-title" title={board.title}>
+            {board.title}
+          </button>
+        </Morph>
       </h1>
     </Tooltip>
   );

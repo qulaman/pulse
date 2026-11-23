@@ -13,7 +13,7 @@ import { useSettled } from "@/components/desk/ui/SideNav";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { MessageButton, VisitorButton } from "@/components/visits/VisitorButton";
 import { goPhoneView } from "@/lib/desk/device";
-import { otherDeskTheme, useDeskTheme, writeDeskTheme } from "@/lib/desk/theme";
+import { centreOf, otherDeskTheme, switchDeskTheme, useDeskTheme } from "@/lib/desk/theme";
 import { DESK_PROFILE, type DeskRole } from "@/lib/desk/routes";
 import { shortName, useNamesKey } from "@/lib/people/names";
 import { ROLE_LABEL } from "@/lib/people/queries";
@@ -34,7 +34,8 @@ function MeMenu({ fullName, role, folded, onToggleNav }: { fullName: string; rol
     { key: "profile", label: "Профиль", hint: "G P", onSelect: () => router.push(DESK_PROFILE) },
     { key: "keys", label: "Клавиши", hint: "?", onSelect: openShortcuts },
     ...(onToggleNav ? [{ key: "fold", label: folded ? "Развернуть навигацию" : "Свернуть навигацию", hint: "[", onSelect: onToggleNav }] : []),
-    { key: "theme", label: THEME_WORD[otherDeskTheme(theme)], onSelect: () => writeDeskTheme(otherDeskTheme(theme)) },
+    // from the menu the other sheet spreads from the theme button beside it (D-184)
+    { key: "theme", label: THEME_WORD[otherDeskTheme(theme)], onSelect: () => switchDeskTheme(otherDeskTheme(theme), centreOf(document.querySelector('[data-testid="desk-theme"]'))) },
     "separator",
     { key: "phone", label: <span data-testid="phone-view">Телефонная версия</span>, onSelect: () => goPhoneView(homeForRole(role)) },
   ];
@@ -82,7 +83,7 @@ function ThemeButton() {
       <button
         type="button"
         aria-label={THEME_WORD[next]}
-        onClick={() => writeDeskTheme(next)}
+        onClick={(event) => switchDeskTheme(next, centreOf(event.currentTarget))}
         data-testid="desk-theme"
         data-next={next}
         className="desk-focus flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"

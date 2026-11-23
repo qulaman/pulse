@@ -1,7 +1,6 @@
 "use client";
 
 import { History, Radio } from "lucide-react";
-import { MotionConfig } from "motion/react";
 import { useEffect, useMemo, useState, ViewTransition } from "react";
 
 import { useDeskParams } from "@/components/desk/DeskAddress";
@@ -11,7 +10,7 @@ import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SegmentTabs } from "@/components/desk/ui/Toolbar";
 import { Bone } from "@/components/ui/Skeleton";
-import { SWITCH_IN, SWITCH_OUT } from "@/lib/desk/motion";
+import { SWITCH_SWAP } from "@/lib/desk/motion";
 import { useErrandLink } from "@/lib/errands/mutations";
 import { usePendingErrands } from "@/lib/errands/pending";
 import { isActive, useErrandHistory, useSecretaries, useSecretaryActions, type Errand } from "@/lib/errands/queries";
@@ -181,101 +180,99 @@ export function DirectorErrands({ meId, openId, onOpen }: { meId: string; openId
   ]);
 
   return (
-    <MotionConfig reducedMotion="user">
-      <DeskPage>
-        <PageTitle
-          title="Заявки"
-          actions={
-            <SegmentTabs<View>
-              aria-label="Вид"
-              value={view}
-              onChange={switchView}
-              items={[
-                {
-                  value: "now",
-                  label: (
-                    <span className="inline-flex items-center gap-1.5">
-                      <Radio size={14} strokeWidth={2.25} aria-hidden />
-                      Сейчас
-                    </span>
-                  ),
-                  count: live > 0 ? live : undefined,
-                },
-                {
-                  value: "history",
-                  label: (
-                    <span className="inline-flex items-center gap-1.5">
-                      <History size={14} strokeWidth={2.25} aria-hidden />
-                      История
-                    </span>
-                  ),
-                },
-              ]}
-            />
-          }
-        />
-        {/* «Сейчас» and «История» swap as two pictures (D-184) */}
-        <ViewTransition key={view} enter={SWITCH_IN} exit={SWITCH_OUT} default="none">
-          {view === "now" ? (
-            <div className="pult-frame">
-              <div className="pult" data-still={still ? "" : undefined} data-testid="desk-errands-pult">
-                <div className="pult-main">
-                  {loading ? <PultBandBone /> : failed ? <LoadFailedHero busy={history.isFetching} onRetry={() => void history.refetch()} /> : <PultBand band={band} facts={facts} />}
-                  {/* a failed read says it once, in the band: no section, no zero under it — the visitors still wait */}
-                  {loading ? null : <WaitList items={waits} now={now} meId={meId} catalogue={actions} openId={openId} fresh={fresh} onOpen={onOpen} onCancel={cancel} />}
-                  {ready ? (
-                    <>
-                      {trips.length > 0 || leaving.length > 0 || pending > 0 ? (
-                        <section className="pult-section" data-testid="desk-errands-now" aria-label="В пути">
-                          <SectionLabel count={trips.length + pending}>В пути</SectionLabel>
-                          <TripBoard trips={trips} leaving={leaving} now={now} meId={meId} catalogue={actions} openId={openId} fresh={fresh} onOpen={onOpen} onCancel={cancel} />
-                        </section>
-                      ) : null}
-                      <DoneList title="Только что" rows={recent} now={now} catalogue={actions} pointsOn={pointsEnabled} openId={openId} fresh={freshDone} onOpen={onOpen} onAgain={asks.again} testId="desk-errands-recent" />
-                      <DoneList
-                        title="Сегодня"
-                        rows={earlier.slice(0, DAY_ROWS)}
-                        more={earlier.length - Math.min(earlier.length, DAY_ROWS)}
-                        quiet
-                        now={now}
-                        catalogue={actions}
-                        pointsOn={pointsEnabled}
-                        openId={openId}
-                        fresh={NOTHING_NEW}
-                        onOpen={onOpen}
-                        onAgain={asks.again}
-                        onHistory={() => switchView("history")}
-                        testId="desk-errands-today"
-                      />
-                    </>
-                  ) : loading ? (
-                    <TripsBone />
-                  ) : null}
-                </div>
-                <div className="pult-side">
-                  <Keypad asks={asks} alarmLive={alarms.length > 0} />
-                </div>
+    <DeskPage>
+      <PageTitle
+        title="Заявки"
+        actions={
+          <SegmentTabs<View>
+            aria-label="Вид"
+            value={view}
+            onChange={switchView}
+            items={[
+              {
+                value: "now",
+                label: (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Radio size={14} strokeWidth={2.25} aria-hidden />
+                    Сейчас
+                  </span>
+                ),
+                count: live > 0 ? live : undefined,
+              },
+              {
+                value: "history",
+                label: (
+                  <span className="inline-flex items-center gap-1.5">
+                    <History size={14} strokeWidth={2.25} aria-hidden />
+                    История
+                  </span>
+                ),
+              },
+            ]}
+          />
+        }
+      />
+      {/* «Сейчас» and «История» swap as two pictures (D-184) */}
+      <ViewTransition update={SWITCH_SWAP} default="none">
+        {view === "now" ? (
+          <div className="pult-frame">
+            <div className="pult" data-still={still ? "" : undefined} data-testid="desk-errands-pult">
+              <div className="pult-main">
+                {loading ? <PultBandBone /> : failed ? <LoadFailedHero busy={history.isFetching} onRetry={() => void history.refetch()} /> : <PultBand band={band} facts={facts} />}
+                {/* a failed read says it once, in the band: no section, no zero under it — the visitors still wait */}
+                {loading ? null : <WaitList items={waits} now={now} meId={meId} catalogue={actions} openId={openId} fresh={fresh} onOpen={onOpen} onCancel={cancel} />}
+                {ready ? (
+                  <>
+                    {trips.length > 0 || leaving.length > 0 || pending > 0 ? (
+                      <section className="pult-section" data-testid="desk-errands-now" aria-label="В пути">
+                        <SectionLabel count={trips.length + pending}>В пути</SectionLabel>
+                        <TripBoard trips={trips} leaving={leaving} now={now} meId={meId} catalogue={actions} openId={openId} fresh={fresh} onOpen={onOpen} onCancel={cancel} />
+                      </section>
+                    ) : null}
+                    <DoneList title="Только что" rows={recent} now={now} catalogue={actions} pointsOn={pointsEnabled} openId={openId} fresh={freshDone} onOpen={onOpen} onAgain={asks.again} testId="desk-errands-recent" />
+                    <DoneList
+                      title="Сегодня"
+                      rows={earlier.slice(0, DAY_ROWS)}
+                      more={earlier.length - Math.min(earlier.length, DAY_ROWS)}
+                      quiet
+                      now={now}
+                      catalogue={actions}
+                      pointsOn={pointsEnabled}
+                      openId={openId}
+                      fresh={NOTHING_NEW}
+                      onOpen={onOpen}
+                      onAgain={asks.again}
+                      onHistory={() => switchView("history")}
+                      testId="desk-errands-today"
+                    />
+                  </>
+                ) : loading ? (
+                  <TripsBone />
+                ) : null}
+              </div>
+              <div className="pult-side">
+                <Keypad asks={asks} alarmLive={alarms.length > 0} />
               </div>
             </div>
-          ) : (
-            <div className="pult-frame">
-              <ErrandHistory
-                viewer="director"
-                meId={meId}
-                openId={openId}
-                onOpen={onOpen}
-                now={now}
-                pointsOn={pointsEnabled}
-                catalogue={actions}
-                // a failed read shows no zeros: the thirty days are not drawn over nothing
-                aside={loading ? <StatsBone /> : failed ? null : <ErrandStats rows={rows} now={now} catalogue={actions} several={people.length > 1} />}
-              />
-            </div>
-          )}
-        </ViewTransition>
-        <ErrandPanel rows={rows} openId={openId} viewer="director" meId={meId} now={now} catalogue={actions} pointsOn={pointsEnabled} />
-      </DeskPage>
-    </MotionConfig>
+          </div>
+        ) : (
+          <div className="pult-frame">
+            <ErrandHistory
+              viewer="director"
+              meId={meId}
+              openId={openId}
+              onOpen={onOpen}
+              now={now}
+              pointsOn={pointsEnabled}
+              catalogue={actions}
+              // a failed read shows no zeros: the thirty days are not drawn over nothing
+              aside={loading ? <StatsBone /> : failed ? null : <ErrandStats rows={rows} now={now} catalogue={actions} several={people.length > 1} />}
+            />
+          </div>
+        )}
+      </ViewTransition>
+      <ErrandPanel rows={rows} openId={openId} viewer="director" meId={meId} now={now} catalogue={actions} pointsOn={pointsEnabled} />
+    </DeskPage>
   );
 }
 

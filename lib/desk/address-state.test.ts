@@ -46,3 +46,14 @@ describe("the desk's address against Next's", () => {
     expect(remember(list, "k15")).toHaveLength(WRITES_KEPT);
   });
 });
+
+describe("Back and Forward replay the step", () => {
+  it("a tab or a view is a switch, the thing open is a pick, a step of days is nothing", async () => {
+    const { moveBetween } = await import("./address-state");
+    expect(moveBetween("tab=day", "tab=tabel&month=2026-11")).toBe("desk-switch");
+    expect(moveBetween("view=list&p=1", "p=1")).toBe("desk-switch");
+    expect(moveBetween("n=1", "n=2")).toBe("desk-pick");
+    expect(moveBetween("day=2026-11-20&person=a", "day=2026-11-20")).toBe("desk-pick");
+    expect(moveBetween("day=2026-11-19", "day=2026-11-20")).toBeUndefined();
+  });
+});

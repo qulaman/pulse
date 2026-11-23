@@ -3,6 +3,7 @@
 import { ClipboardCheck, ClipboardX, Sparkles, ListChecks, BellOff } from "lucide-react";
 import { useLayoutEffect, useRef, useState, ViewTransition, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 
+import { Morph } from "@/components/desk/ui/Morph";
 import type { Group } from "@/components/desk/ui/DataGrid";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import type { TeamDayRow } from "@/lib/daily-report/types";
@@ -62,22 +63,6 @@ export function TileFace({ person, size, state }: { person: Pick<Person, "id" | 
         </span>
       )}
     </span>
-  );
-}
-
-/**
- * One person's circle or name in several places at once in the eye (D-184): the tile, the card
- * under the row and the person's page carry the same name, so a move between them flies the one
- * thing across instead of hiding one and showing the other. A name may stand on one element at a
- * time — two at once and the browser drops the whole transition — so the tile gives its circle up
- * while its card is open (`off`). The `key` makes that a remount, and a remount is what pairs: the
- * circle drops from the tile into the card and goes back up when the card closes.
- */
-export function Morph({ part, id, off = false, children }: { part: "face" | "name"; id: string; off?: boolean; children: ReactNode }) {
-  return (
-    <ViewTransition key={off ? "off" : "on"} name={off ? undefined : `desk-${part}-${id}`} share={part === "name" ? "desk-morph-text" : "desk-morph"} default="none">
-      {children}
-    </ViewTransition>
   );
 }
 

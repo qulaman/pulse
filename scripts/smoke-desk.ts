@@ -124,10 +124,25 @@ async function checkShell(ctx: Ctx) {
   // the switch of the sheet (D-159): dark by default, a press and back, nothing saved but in this browser
   const themeOf = () => page.evaluate(() => document.documentElement.dataset.deskTheme);
   const themeAtStart = await themeOf();
-  await page.getByTestId("desk-theme").click();
+  // the other sheet spreads from the button as a circle (D-184): one transition of the page's picture
+  // (a string: tsx would add its own helpers to a function the page does not have)
+  const spreads = () =>
+    page.evaluate(`new Promise((resolve) => {
+      const at = performance.now();
+      const look = () => {
+        const circle = document.getAnimations().some((a) => a.animationName === "vt-theme-spread");
+        if (circle || performance.now() - at > 600) resolve(circle);
+        else requestAnimationFrame(look);
+      };
+      look();
+    })`) as Promise<boolean>;
+  const [spreadOn] = await Promise.all([spreads(), page.getByTestId("desk-theme").click()]);
+  await page.waitForTimeout(600);
   const themeSwitched = await themeOf();
   await page.getByTestId("desk-theme").click();
+  await page.waitForTimeout(600);
   record("тема: тёмная по умолчанию, кнопка переключает туда и обратно", themeAtStart === "dark" && themeSwitched === "light" && (await themeOf()) === "dark", `${themeAtStart} → ${themeSwitched}`);
+  record("тема (D-184): другая тема расходится кругом от кнопки", spreadOn, spreadOn ? "круг" : "сразу");
   record("боковая навигация директора: двенадцать разделов и профиль", nav === 13, `ссылок ${nav}`);
 
   // the profile is a computer's account page: a label on the left, its control on the right (D-154 wave 3)

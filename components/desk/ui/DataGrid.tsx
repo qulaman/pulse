@@ -1,6 +1,7 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { AnimatePresence, motion, useIsPresent, type HTMLMotionProps } from "motion/react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 
 import { TONE_VAR, type Tone } from "@/components/desk/ui/tone";
 
@@ -46,6 +47,34 @@ type SortState = { key: string; dir: 1 | -1 } | null;
 const HIGHLIGHT_MS = 1200;
 
 /**
+ * Rows move into their new places instead of jumping (D-184): a row that came fades in, one that
+ * left fades out while the rest close up, a row that changed its group or its place travels there.
+ * Only a small change moves — a search or a filter that swaps the table changes it at once — and
+ * only in a table this long: a longer one changes at once too.
+ */
+const MOVE_AT_MOST = 12;
+const MOVE_LINES_UP_TO = 150;
+const MOVE = { type: "tween", duration: 0.23, ease: [0.2, 0.8, 0.2, 1] } as const;
+const COME = { opacity: 0, y: -6 };
+const STAY = { opacity: 1, y: 0, transition: { duration: 0.19, ease: [0.2, 0.8, 0.2, 1] } } as const;
+const GO = { opacity: 0, transition: { duration: 0.14, ease: "easeIn" } } as const;
+const GONE_AT_ONCE = { opacity: 0, transition: { duration: 0 } } as const;
+/** How a line leaves, read when it leaves (`custom`): with the move, or at once when the table swaps. */
+const LINE = { gone: (moving: boolean) => (moving ? GO : GONE_AT_ONCE) };
+
+/**
+ * One line of the body. While it leaves it is no longer the table's: its key and test id go, so the
+ * selected row's scroll and a count of the rows find only the lines that stay.
+ */
+function GridLine({ rowKey, testId, ...rest }: HTMLMotionProps<"div"> & { rowKey?: string; testId?: string }) {
+  const present = useIsPresent();
+  return <motion.div {...rest} data-row-key={present ? rowKey : undefined} data-testid={present ? testId : undefined} data-leaving={present ? undefined : ""} />;
+}
+
+/** One line of the table's body: a group's title or a row. */
+type Line<T> = { kind: "group"; key: string; group: Group<T> } | { kind: "row"; key: string; row: T; index: number };
+
+/**
  * The desk's table (D-153 §3): a sticky head, one sortable column at a time (a click on its
  * title, again — the other way), group titles as full-width rows in the language of the phone's
  * `Section`, a selected row with a focus ring, ↑/↓ while the table has focus, Enter or a double
@@ -78,6 +107,32 @@ export function DataGrid<T>({
     return all.map((group) => ({ ...group, rows: [...group.rows].sort((a, b) => compare(a, b) * sort.dir) }));
   }, [groups, rows, columns, sort]);
   const flat = useMemo(() => shownGroups.flatMap((group) => (group.collapsed ? [] : group.rows)), [shownGroups]);
+
+  // the body as one list of lines, so a row that changes its group is the same line moving
+  const lines = useMemo<Line<T>[]>(
+    () =>
+      shownGroups.flatMap((group): Line<T>[] =>
+        group.rows.length === 0
+          ? []
+          : [
+              ...(group.title ? [{ kind: "group" as const, key: `group:${group.key}`, group }] : []),
+              ...(group.collapsed ? [] : group.rows.map((row, index) => ({ kind: "row" as const, key: rowKey(row), row, index }))),
+            ],
+      ),
+    [shownGroups, rowKey],
+  );
+  // how much changed since the last order: a small change moves, a big one is drawn at once
+  const order = lines.map((line) => line.key).join("|");
+  const [seen, setSeen] = useState<{ order: string; keys: ReadonlySet<string>; moving: boolean }>(() => ({ order, keys: new Set(lines.map((line) => line.key)), moving: false }));
+  let moving = seen.moving;
+  if (seen.order !== order) {
+    const keys = new Set(lines.map((line) => line.key));
+    let changed = 0;
+    for (const key of keys) if (!seen.keys.has(key)) changed += 1;
+    for (const key of seen.keys) if (!keys.has(key)) changed += 1;
+    moving = changed <= MOVE_AT_MOST && lines.length <= MOVE_LINES_UP_TO;
+    setSeen({ order, keys, moving });
+  }
 
   // the glow plays once per change, then the row is plain again
   const [glow, setGlow] = useState<string | null>(null);
@@ -170,13 +225,23 @@ export function DataGrid<T>({
           );
         })}
       </div>
-      <div ref={body} role="rowgroup">
-        {shownGroups.map((group) =>
-          group.rows.length === 0 ? null : (
-            <Fragment key={group.key}>
-              {group.title ? (
-                <div
+      <div ref={body} role="rowgroup" className="relative">
+        <AnimatePresence initial={false} mode="popLayout" custom={moving}>
+          {lines.map((line) => {
+            if (line.kind === "group") {
+              const group = line.group;
+              return (
+                <GridLine
+                  key={line.key}
                   role="row"
+                  layout={moving ? "position" : false}
+                  layoutDependency={order}
+                  transition={MOVE}
+                  initial={moving ? COME : false}
+                  animate={STAY}
+                  variants={LINE}
+                  custom={moving}
+                  exit="gone"
                   className="desk-grid-group flex items-center gap-2 border-b border-border/70 bg-bg/40 px-3 pb-1.5 pt-3"
                   style={group.tone ? ({ "--group-tone": TONE_VAR[group.tone] } as CSSProperties) : undefined}
                 >
@@ -202,46 +267,52 @@ export function DataGrid<T>({
                     </>
                   )}
                   <span className="nums text-[12px] leading-4 text-muted/70">{group.rows.length}</span>
-                </div>
-              ) : null}
-              {(group.collapsed ? [] : group.rows).map((row, index) => {
-                const key = rowKey(row);
-                const selected = key === selectedKey;
-                const tone = rowTone?.(row);
-                return (
+                </GridLine>
+              );
+            }
+            const { row, index, key } = line;
+            const selected = key === selectedKey;
+            const tone = rowTone?.(row);
+            return (
+              <GridLine
+                key={key}
+                role="row"
+                aria-selected={selected}
+                rowKey={key}
+                testId="desk-row"
+                data-glow={glow === key ? "" : undefined}
+                layout={moving ? "position" : false}
+                layoutDependency={order}
+                transition={MOVE}
+                initial={moving ? COME : false}
+                animate={STAY}
+                variants={LINE}
+                custom={moving}
+                exit="gone"
+                className="desk-row relative grid min-h-[40px] cursor-default items-center border-b border-border/50 last:border-b-0"
+                // `--i`: the row's place, for a list that rises into place in order (D-174)
+                style={{ gridTemplateColumns: template, "--i": Math.min(index, 14) } as CSSProperties}
+                onClick={(event) => {
+                  onSelect?.(row);
+                  // the row's own buttons and links keep their click
+                  if (onRowClick && !(event.target as Element).closest("button, a, input, select, textarea, label")) onRowClick(row);
+                }}
+                onDoubleClick={() => onActivate?.(row)}
+              >
+                {tone ? <span aria-hidden className="absolute inset-y-1 left-0 w-[3px] rounded-r-full" style={{ background: TONE_VAR[tone] }} /> : null}
+                {columns.map((column) => (
                   <div
-                    key={key}
-                    role="row"
-                    aria-selected={selected}
-                    data-row-key={key}
-                    data-testid="desk-row"
-                    data-glow={glow === key ? "" : undefined}
-                    className="desk-row relative grid min-h-[40px] cursor-default items-center border-b border-border/50 last:border-b-0"
-                    // `--i`: the row's place, for a list that rises into place in order (D-174)
-                    style={{ gridTemplateColumns: template, "--i": Math.min(index, 14) } as CSSProperties}
-                    onClick={(event) => {
-                      onSelect?.(row);
-                      // the row's own buttons and links keep their click
-                      if (onRowClick && !(event.target as Element).closest("button, a, input, select, textarea, label")) onRowClick(row);
-                    }}
-                    onDoubleClick={() => onActivate?.(row)}
+                    key={column.key}
+                    role="gridcell"
+                    className={`min-w-0 px-3 py-2 text-[14px] leading-5 ${column.align === "right" ? "text-right" : column.align === "center" ? "text-center" : ""}`}
                   >
-                    {tone ? <span aria-hidden className="absolute inset-y-1 left-0 w-[3px] rounded-r-full" style={{ background: TONE_VAR[tone] }} /> : null}
-                    {columns.map((column) => (
-                      <div
-                        key={column.key}
-                        role="gridcell"
-                        className={`min-w-0 px-3 py-2 text-[14px] leading-5 ${column.align === "right" ? "text-right" : column.align === "center" ? "text-center" : ""}`}
-                      >
-                        {column.render(row)}
-                      </div>
-                    ))}
+                    {column.render(row)}
                   </div>
-                );
-              })}
-            </Fragment>
-          ),
-        )}
+                ))}
+              </GridLine>
+            );
+          })}
+        </AnimatePresence>
       </div>
     </div>
   );

@@ -81,3 +81,11 @@ export function watchServerTrips(page: Page): () => number {
 export const vtWords = (runs: VtRun[]) => runs.map((run) => `[${run.groups.filter((g) => !g.startsWith("_t_") && g !== "root").map((g) => g.replace(/-[0-9a-f-]{36}$/, "")).join(" ")}${cutShort(run) ? " оборван" : ""}]`).join(" ");
 /** The desk's own keyframes of each run, for a record's detail: `[vt-panel-in] [vt-fade-out vt-arrive]`. */
 export const vtNames = (runs: VtRun[]) => runs.map((run) => `[${[...new Set(run.names)].join(" ")}${cutShort(run) ? " оборван" : ""}]`).join(" ");
+
+/**
+ * Waits for the view transition playing now to end (D-184): a part that moves takes no click until
+ * then, so a step that presses something right after a switch waits for it. A string — see VT_PROBE.
+ */
+export async function settled(page: Page): Promise<void> {
+  await page.waitForFunction("!document.activeViewTransition", undefined, { timeout: 3_000 }).catch(() => undefined);
+}

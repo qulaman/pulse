@@ -61,3 +61,21 @@ export const WRITES_KEPT = 8;
 export function remember(list: readonly string[], key: string): string[] {
   return [...list.filter((k) => k !== key), key].slice(-WRITES_KEPT);
 }
+
+/** Names that switch a part of the screen (a tab, a view) and that pick the thing open in it. */
+const SWITCH_NAMES = ["tab", "view"];
+const PICK_NAMES = ["id", "e", "n", "p", "person"];
+
+/**
+ * The transition type of a move between two queries of one screen — Back and Forward through the
+ * browser's history play what the step played forward: another tab or view — `desk-switch`,
+ * another thing open — `desk-pick`, anything else — nothing.
+ */
+export function moveBetween(from: string, to: string): "desk-switch" | "desk-pick" | undefined {
+  const a = new URLSearchParams(from);
+  const b = new URLSearchParams(to);
+  const changed = (name: string) => a.get(name) !== b.get(name);
+  if (SWITCH_NAMES.some(changed)) return "desk-switch";
+  if (PICK_NAMES.some(changed)) return "desk-pick";
+  return undefined;
+}

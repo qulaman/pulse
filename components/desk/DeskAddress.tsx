@@ -3,7 +3,7 @@
 import { usePathname, useSearchParams } from "next/navigation";
 import { addTransitionType, createContext, startTransition, useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 
-import { addressKey, followNext, remember, splitAddress, wrote, type DeskAddressState } from "@/lib/desk/address-state";
+import { addressKey, followNext, moveBetween, remember, splitAddress, wrote, type DeskAddressState } from "@/lib/desk/address-state";
 
 /**
  * The desk's address as React state (D-184). Next carries an address written with
@@ -37,6 +37,12 @@ function forget(key: string) {
   if (written.includes(key)) written = written.filter((k) => k !== key);
 }
 
+/** What the desk shows now — Back and Forward compare the entry they reach with it. */
+let shown = { path: "", search: "" };
+function showing(path: string, search: string) {
+  shown = { path, search };
+}
+
 const AddressContext = createContext<URLSearchParams | null>(null);
 
 /** The shell's half: holds the address for every screen under it. */
@@ -61,15 +67,52 @@ export function DeskAddress({ children }: { children: ReactNode }) {
   const seenNow = now.seen;
   useLayoutEffect(() => forget(seenNow), [seenNow]);
 
-  // Back or Forward to an entry the desk wrote: Next coming back with it is taken as catching up,
-  // so the desk reads the address itself
+  const nowPath = now.path;
+  const nowSearch = now.search;
+  useLayoutEffect(() => showing(nowPath, nowSearch), [nowPath, nowSearch]);
+
+  // Back and Forward inside the screen (D-184) replay the step they undo — a tab swaps, a thing in
+  // the panel changes in place (`moveBetween`). Next takes a traversal in on the Navigation API's
+  // `navigate` and commits it at once, without a transition; so the desk marks the entry as its own
+  // on that same event, ahead of Next (capture): Next coming back with it is only noted, and the desk
+  // plays the change itself on `popstate`. Without the Navigation API — at once.
   useEffect(() => {
+    const nav = (window as Window & { navigation?: EventTarget }).navigation;
+    const ahead = (event: Event) => {
+      const going = event as Event & { navigationType?: string; destination?: { url: string } };
+      if (going.navigationType !== "traverse" || !going.destination) return;
+      const url = new URL(going.destination.url);
+      if (url.pathname === shown.path) markWritten(addressKey(url.pathname, url.search.slice(1)));
+    };
     const back = () => {
       const { pathname, search } = window.location;
-      setAddress((was) => (was.path === pathname && was.search !== search.slice(1) ? { ...was, search: search.slice(1) } : was));
+      const text = search.slice(1);
+      if (pathname !== shown.path) return;
+      markWritten(addressKey(pathname, text));
+      // the step's look from what is drawn; whether to step at all — against the state still queued
+      // (a write held behind a playing transition), so the screen always ends where the address is
+      const type = moveBetween(shown.search, text);
+      const step = () => setAddress((was) => (was.path === pathname && was.search !== text ? { ...was, search: text } : was));
+      if (!type) {
+        step();
+        return;
+      }
+      // React renders a transition started inside `popstate` at once and without a view transition:
+      // the step starts a task later, out of the event — Next's arrival is only noted meanwhile
+      setTimeout(() =>
+        startTransition(() => {
+          addTransitionType(type);
+          step();
+        }),
+      );
     };
+    // capture: ahead of Next, which takes a traversal in on `navigate` already
+    nav?.addEventListener("navigate", ahead, { capture: true });
     window.addEventListener("popstate", back);
-    return () => window.removeEventListener("popstate", back);
+    return () => {
+      nav?.removeEventListener("navigate", ahead, { capture: true });
+      window.removeEventListener("popstate", back);
+    };
   }, []);
 
   const params = useMemo(() => new URLSearchParams(now.search), [now.search]);

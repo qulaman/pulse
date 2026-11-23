@@ -3,6 +3,7 @@
 import { Ban, CalendarClock, Check, CircleCheck, CircleX, Clock, Ellipsis, Hourglass, MessageCircleQuestion, Repeat, RotateCcw, Send, TriangleAlert, Undo2, X } from "lucide-react";
 import { useState, type CSSProperties, type ReactNode } from "react";
 
+import { Morph } from "@/components/desk/ui/Morph";
 import { useAvatars } from "@/components/desk/ui/Face";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { Menu } from "@/components/desk/ui/Menu";
@@ -194,9 +195,9 @@ function Path({ desk, now }: { desk: DeskTask; now: Date }) {
  * stage; the title; the fields a director changes with one click (the deadline: a popover with
  * the quick choices and a month); the receipt (principle 8), the repeat, how much time is left or how
  * the work came in, and the path in four steps. `large` — the stack of «Разобрать», whose headline
- * says the stage and the hand-in.
+ * says the stage and the hand-in; `fly` — the panel, where the title arrives from its row (D-184).
  */
-export function TaskHead({ desk, now, large = false, scope }: { desk: DeskTask; now: Date; large?: boolean; scope?: () => Element | null }) {
+export function TaskHead({ desk, now, large = false, scope, fly = false }: { desk: DeskTask; now: Date; large?: boolean; scope?: () => Element | null; fly?: boolean }) {
   const task = desk.task as TaskWithPeople;
   const stage = stageOf(task, desk.reason, now);
   const closed = task.status === "done" || task.status === "revoked";
@@ -235,7 +236,14 @@ export function TaskHead({ desk, now, large = false, scope }: { desk: DeskTask; 
           </span>
         )}
       </div>
-      <h2 className={`desk-task-title tasks-title mt-2 [overflow-wrap:anywhere] ${large ? "text-[28px] leading-8" : "text-[21px] leading-[26px]"}`}>{task.title}</h2>
+      {/* `fly` — the panel: the title comes from the task's row and goes back to it (D-184) */}
+      {fly ? (
+        <Morph part="task" id={task.id}>
+          <h2 className={`desk-task-title tasks-title mt-2 [overflow-wrap:anywhere] ${large ? "text-[28px] leading-8" : "text-[21px] leading-[26px]"}`}>{task.title}</h2>
+        </Morph>
+      ) : (
+        <h2 className={`desk-task-title tasks-title mt-2 [overflow-wrap:anywhere] ${large ? "text-[28px] leading-8" : "text-[21px] leading-[26px]"}`}>{task.title}</h2>
+      )}
 
       <dl className="tasks-fields mt-3 grid grid-cols-[76px_minmax(0,1fr)] gap-x-3 gap-y-1" data-testid="desk-task-fields">
         <Field

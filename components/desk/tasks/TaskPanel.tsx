@@ -150,7 +150,7 @@ export function TaskPanel({
         </div>
       ) : null}
 
-      <TaskHead desk={desk} now={now} scope={scope} />
+      <TaskHead desk={desk} now={now} scope={scope} fly />
       <TaskFacts desk={desk} now={now} onWords={() => focusReply(root.current)} />
 
       <div className="tasks-keys mt-4 border-t border-text pt-3">

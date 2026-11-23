@@ -1,6 +1,6 @@
 "use client";
 
-import { keepPreviousData, useMutation, useMutationState, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useMutationState, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo } from "react";
 
 import { toast } from "@/components/ui/Toast";
@@ -276,6 +276,19 @@ export function useSubmitWaiting(): boolean {
     (last.status === "pending" && isNetworkError(last.failureReason)) ||
     (last.status === "error" && isNetworkError(last.error))
   );
+}
+
+/** The team's day loaded ahead (D-184): a step of days slides in with its reports already there. */
+export function prefetchTeamDailyReportDay(client: QueryClient, date: Ymd): Promise<void> {
+  return client.prefetchQuery({
+    queryKey: dailyReportKeys.teamDay(date),
+    queryFn: () => read<TeamDay>(createBrowserSupabase().rpc(DAILY_REPORT_RPC.teamDay, { p_date: date })),
+  });
+}
+
+/** Whether the team's day is already here — a step to it may slide, one still to load changes at once. */
+export function hasTeamDailyReportDay(client: QueryClient, date: Ymd): boolean {
+  return client.getQueryData(dailyReportKeys.teamDay(date)) !== undefined;
 }
 
 /**

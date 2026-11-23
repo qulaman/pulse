@@ -9,7 +9,7 @@
  */
 import type { Page } from "playwright";
 
-import { injected, open, record, skip, type Ctx } from "./shared";
+import { injected, open, record, settled, skip, type Ctx } from "./shared";
 
 /** A desk dialog: in the middle of the window, clear of its edges. */
 async function centred(page: Page, testId: string): Promise<{ ok: boolean; detail: string }> {
@@ -277,6 +277,8 @@ export async function checkNotes(ctx: Ctx) {
     await page.getByTestId("seg-trash").click();
     const card = page.getByTestId("note-trashed").filter({ hasText: words });
     const inBin = await card.waitFor({ timeout: 8_000 }).then(() => true, () => false);
+    // the list swaps as a transition: its rows take a click once it has played (D-184)
+    await settled(page);
     if (inBin) {
       await card.getByRole("button", { name: "Удалить навсегда" }).click({ force: true });
       await page.getByTestId("desk-purge-confirm").click();

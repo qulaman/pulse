@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AlignLeft, CalendarClock, Diamond, MapPin, Pencil, Repeat, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
+import { Morph } from "@/components/desk/ui/Morph";
 import { IconButton } from "@/components/desk/ui/IconButton";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
@@ -605,7 +606,10 @@ function Meeting({
         </div>
       </div>
 
-      <h2 className="mt-2 text-[20px] font-semibold leading-[26px] [overflow-wrap:anywhere]">{event.title}</h2>
+      {/* the title came from the meeting's block in the week (D-184) */}
+      <Morph part="event" id={event.id}>
+        <h2 className="mt-2 text-[20px] font-semibold leading-[26px] [overflow-wrap:anywhere]">{event.title}</h2>
+      </Morph>
       <p className="cal-side-when mt-1 flex items-center gap-1.5 text-[13px] leading-[18px] text-muted">
         <CalendarClock aria-hidden size={14} strokeWidth={2} className="cal-side-icon shrink-0" />
         <When>
