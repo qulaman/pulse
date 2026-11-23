@@ -49,6 +49,14 @@ const RISE: Record<"prev" | "current" | "next", TargetAndTransition> = {
  */
 const LEAVE: TargetAndTransition = { opacity: 0, scale: 0.96, y: 10, zIndex: 4, transition: { duration: 0.18, ease: "easeOut", zIndex: { duration: 0 } } };
 
+/** A card thrown by a swipe: its move has already landed, the throw is the way it leaves (principle 1a). */
+const THROW: Record<"up" | "down", TargetAndTransition> = {
+  up: { y: -560, opacity: 0, rotate: -6, zIndex: 4, transition: { duration: 0.22, ease: "easeIn", zIndex: { duration: 0 } } },
+  down: { y: 560, opacity: 0, rotate: 4, zIndex: 4, transition: { duration: 0.22, ease: "easeIn", zIndex: { duration: 0 } } },
+};
+
+type Thrown = { id: string; dir: "up" | "down" } | null;
+
 /**
  * The finger that held the card is still down when «Все действия» slides up, and its release
  * would press whatever the sheet has just put under it — «Настоять» on a refusal (found live,
@@ -194,7 +202,14 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
   const [open, setOpen] = useState<BoardTask | null>(null);
 
   // ---- gestures on the top card ---------------------------------------------------------
-  const [flying, setFlying] = useState<{ id: string; dir: "up" | "down" } | null>(null);
+  // the card a swipe threw: AnimatePresence hands it to the leaving card, which flies off in that direction
+  const [thrown, setThrown] = useState<Thrown>(null);
+  // a card that stays in the deck after its move (postponed behind the next one) must not keep the
+  // mark and fly off later: the mark lives just past the throw
+  const throwCard = (next: NonNullable<Thrown>) => {
+    setThrown(next);
+    setTimeout(() => setThrown((was) => (was === next ? null : was)), 400);
+  };
   const onDragEnd = useCallback(
     (_event: unknown, info: PanInfo) => {
       if (!current) return;
@@ -219,19 +234,14 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
           return;
         }
         haptic(15);
-        setFlying({ id, dir: "up" });
-        // the card has flown: the move lands in every list now, with «Отменить» on its toast (D-139)
-        setTimeout(() => {
-          setFlying(null);
-          primary.run();
-        }, 220);
+        // the move lands in every list at once, with «Отменить» on its toast (D-139); the card that
+        // leaves the deck because of it flies up on the way out
+        throwCard({ id, dir: "up" });
+        primary.run();
       } else if (y > ACT_PX) {
         haptic(8);
-        setFlying({ id, dir: "down" });
-        setTimeout(() => {
-          setFlying(null);
-          setPostponed((list) => [...list.filter((other) => other !== id), id]);
-        }, 220);
+        throwCard({ id, dir: "down" });
+        setPostponed((list) => [...list.filter((other) => other !== id), id]);
       }
     },
     [actions, current, items.length, safeIndex],
@@ -277,11 +287,10 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
       <div ref={stackRef} className="relative grid grid-cols-[minmax(0,1fr)]" style={{ touchAction: "pan-y" }}>
         {/* popLayout: a card that leaves is lifted out of the stack at once, so the deck's height
             and the next card do not wait for its fade */}
-        <AnimatePresence mode="popLayout">
+        <AnimatePresence mode="popLayout" custom={thrown} onExitComplete={() => setThrown(null)}>
         {roles.map(({ item, role }) => {
           const id = keyOf(item);
           const isCurrent = role === "current";
-          const fly = flying && item.kind === "task" && flying.id === item.task.id ? flying.dir : null;
           return (
             <motion.div
               key={id}
@@ -290,22 +299,20 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
               // thrown from the face when the deck arrives: from above, small, then settling into the
               // stack; a card uncovered later (a swipe, a card that left) rises from behind
               initial={arrived ? (role === "prev" ? { ...RISE.prev, x: prevX } : RISE[role]) : { y: -180, scale: 0.4, opacity: 0 }}
-              // a flown card has already gone (swipe up or down); one that leaves by itself sinks
-              exit={fly ? { opacity: 0, transition: { duration: 0 } } : LEAVE}
+              // a thrown card flies off the way the swipe went (AnimatePresence passes the latest
+              // `thrown` to a leaving card); one that leaves by itself sinks
+              variants={{ gone: (last: Thrown) => (last && last.id === id ? THROW[last.dir] : LEAVE) }}
+              exit="gone"
               animate={
-                fly === "up"
-                  ? { y: -560, opacity: 0, rotate: -6, transition: { duration: 0.22, ease: "easeIn" } }
-                  : fly === "down"
-                    ? { y: 560, opacity: 0, rotate: 4, transition: { duration: 0.22, ease: "easeIn" } }
-                    : role === "prev"
-                      ? { ...RISE.prev, x: prevX }
-                      : role === "next"
-                        ? { x: 0, y: 12, scale: 0.94, opacity: 0.7, rotate: 0 }
-                        : { x: 0, y: 0, scale: 1, opacity: 1, rotate: 0 }
+                role === "prev"
+                  ? { ...RISE.prev, x: prevX }
+                  : role === "next"
+                    ? { x: 0, y: 12, scale: 0.94, opacity: 0.7, rotate: 0 }
+                    : { x: 0, y: 0, scale: 1, opacity: 1, rotate: 0 }
               }
               // a card is a thing: it lands in the stack without a wobble (D-166)
               transition={{ ...springs.object, delay: role === "next" ? 0.06 : 0 }}
-              drag={isCurrent && !fly}
+              drag={isCurrent}
               dragDirectionLock
               dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
               dragElastic={0.9}

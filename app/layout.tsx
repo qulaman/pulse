@@ -3,6 +3,7 @@ import { Golos_Text } from "next/font/google";
 import localFont from "next/font/local";
 
 import { AppUpdate } from "@/components/AppUpdate";
+import { ArrivalLayer } from "@/components/auth/ArrivalLayer";
 import { MascotPower } from "@/components/brand/MascotPower";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { OutboxReplay } from "@/components/OutboxReplay";
@@ -134,6 +135,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <QueryProvider>
           {children}
           <ToastHost />
+          {/* the company's pass after a code sign-in plays over the screen that loads (D-135) */}
+          <ArrivalLayer />
           {/* a company's day, not the developers' console (D-157) */}
           <NotOnOps>
             <OfflineBanner />

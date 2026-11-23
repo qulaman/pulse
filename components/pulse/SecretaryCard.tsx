@@ -81,8 +81,8 @@ export function SecretaryCard({
     <div ref={self} style={{ transform: shift ? `translateY(${shift}px)` : undefined, transition: "transform 200ms var(--ease-out)" }}>
     <motion.div
       initial={{ opacity: 0, y: 22, scale: 0.9 }}
-      // the look first, the buttons after it: the delay is the two faces turning
-      animate={{ opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 420, damping: 30, delay: 0.34 } }}
+      // the buttons come almost with the look: the faces turn while they rise, nobody waits for it
+      animate={{ opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 420, damping: 30, delay: 0.1 } }}
       exit={{ opacity: 0, y: 14, scale: 0.94, transition: { duration: 0.16 } }}
       style={{ transformOrigin: "80% 100%" }}
       className="pointer-events-auto relative w-[min(92vw,360px)]"

@@ -4,7 +4,8 @@ import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, 
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { Arrival, type ArrivalBrand } from "@/components/auth/Arrival";
+import type { ArrivalBrand } from "@/components/auth/Arrival";
+import { playArrival } from "@/components/auth/ArrivalLayer";
 import { Mascot } from "@/components/brand/Mascot";
 import { PulseMark } from "@/components/brand/PulseMark";
 import { StillLogo } from "@/components/ui/StillLogo";
@@ -33,7 +34,6 @@ export function LoginForm({ brand }: { brand: LoginBrand }) {
   const [mode, setMode] = useState<"code" | "email">("code");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [arrived, setArrived] = useState<ArrivalBrand | null>(null);
 
   // what the phone kept for offline was the previous person's (D-127): the sign-in screen —
   // where every sign-out lands — forgets it
@@ -83,7 +83,11 @@ export function LoginForm({ brand }: { brand: LoginBrand }) {
           error={error}
           setPending={setPending}
           setError={setError}
-          onSignedIn={(company) => (company ? setArrived(company) : enter())}
+          onSignedIn={(company) => {
+            // the company's pass plays above the screens while home loads under it
+            if (company) playArrival({ from: brand, to: company });
+            enter();
+          }}
         />
       ) : (
         <EmailForm pending={pending} error={error} setPending={setPending} setError={setError} onSignedIn={enter} />
@@ -104,7 +108,6 @@ export function LoginForm({ brand }: { brand: LoginBrand }) {
           : "Доступ выдаёт директор компании. Забыл пароль — попроси его сбросить"}
       </p>
 
-      {arrived ? <Arrival from={brand} to={arrived} onDone={enter} /> : null}
     </main>
   );
 }

@@ -32,9 +32,10 @@ const LATE_MARK = "есть просроченные";
 /**
  * How long after a move the card buttons ignore taps (D-173). The next card opens ~0.3 s after
  * «Принял» with its own first button where the finger was: a newcomer's second tap (nothing seemed
- * to happen) must not open «Что сделано?» for another order. No deliberate next move comes this fast.
+ * to happen) must not open «Что сделано?» for another order. Half a second covers the card's ~0.3 s
+ * arrival with room to spare and no longer swallows a deliberate next «Принял» in a row.
  */
-const TAP_GUARD_MS = 900;
+const TAP_GUARD_MS = 500;
 
 /**
  * «Мои дела» (D-83): the same screen shape as the director's «Задачи» — a status screen
