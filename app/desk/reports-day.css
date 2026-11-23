@@ -802,27 +802,3 @@ html[data-surface="desk"][data-journal] {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"][data-journal] {
-    .rep-day-band,
-    .rep-day-pill,
-    .rep-day-entry,
-    .rep-day-entry::after,
-    .rep-day-person::after,
-    .rep-day-share i,
-    .rep-day-roll-body {
-      animation: none !important;
-    }
-    .rep-day-entry,
-    .rep-day-person,
-    .rep-day-remind,
-    .rep-day-pill,
-    .rep-day-strip-toggle,
-    .rep-day-strip-chevron,
-    .rep-day-band-go,
-    .rep-day-share i,
-    .rep-day[data-stale] .rep-day-cols {
-      transition: none;
-    }
-  }
-}

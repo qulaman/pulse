@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutGroup, motion, MotionConfig } from "motion/react";
+import { LayoutGroup, motion } from "motion/react";
 import { useState, type CSSProperties } from "react";
 
 import { PersonFace } from "@/components/people/PeoplePicker";
@@ -147,36 +147,34 @@ function DayPeople({ day }: { day: TeamDay }) {
   }
 
   return (
-    <MotionConfig reducedMotion="user">
-      <LayoutGroup>
-        <div className="mt-1 flex flex-col gap-2" data-testid="team-day-people">
-          {groups.map((group) => (
-            <div key={group.state} className="flex flex-col gap-2">
-              <motion.div layout="position" transition={CARD_SPRING}>
-                <SectionHead title={STATE_TITLE[group.state]} tone={STATE_TONE[group.state]} count={group.rows.length} />
-              </motion.div>
-              {group.rows.map((row) => {
-                const open = openId === row.user_id;
-                return (
-                  <motion.div key={row.user_id} layout="position" transition={CARD_SPRING}>
-                    <CardShell
-                      id={`person-${row.user_id}`}
-                      open={open}
-                      closed={row.state === "away" || row.state === "off"}
-                      onToggle={() => setOpenId(open ? null : row.user_id)}
-                      head={<PersonHead row={row} />}
-                      testId="team-day-person"
-                    >
-                      <PersonBody row={row} />
-                    </CardShell>
-                  </motion.div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      </LayoutGroup>
-    </MotionConfig>
+    <LayoutGroup>
+      <div className="mt-1 flex flex-col gap-2" data-testid="team-day-people">
+        {groups.map((group) => (
+          <div key={group.state} className="flex flex-col gap-2">
+            <motion.div layout="position" transition={CARD_SPRING}>
+              <SectionHead title={STATE_TITLE[group.state]} tone={STATE_TONE[group.state]} count={group.rows.length} />
+            </motion.div>
+            {group.rows.map((row) => {
+              const open = openId === row.user_id;
+              return (
+                <motion.div key={row.user_id} layout="position" transition={CARD_SPRING}>
+                  <CardShell
+                    id={`person-${row.user_id}`}
+                    open={open}
+                    closed={row.state === "away" || row.state === "off"}
+                    onToggle={() => setOpenId(open ? null : row.user_id)}
+                    head={<PersonHead row={row} />}
+                    testId="team-day-person"
+                  >
+                    <PersonBody row={row} />
+                  </CardShell>
+                </motion.div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </LayoutGroup>
   );
 }
 

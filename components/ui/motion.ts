@@ -43,10 +43,9 @@ const EASE_OUT = "cubic-bezier(0.2, 0, 0, 1)";
  * before paint): each one that moved starts from its old place and glides to its new one.
  * Transform only, on the compositor (WAAPI, added on top of any transform of its own);
  * what stays put — a sheet's bottom, a fixed bar — is left alone, and so is everything far
- * below the screen. Under reduced motion it does nothing.
+ * below the screen.
  */
 export function measureBelow(anchor: Element): () => void {
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return () => {};
   // closing moves things up by up to a panel's height: those a screen below may arrive in view
   const reach = window.innerHeight * 2;
   const items: [HTMLElement, number][] = [];

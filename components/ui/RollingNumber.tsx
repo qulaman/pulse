@@ -10,7 +10,7 @@ import { useState, type CSSProperties } from "react";
  * Only a rise rolls. A fall changes at once, standing still: a penalty plays nothing, and someone
  * else's minus on the rating or the wall is not lit up (D-45). `rollDown` lets a fall roll too —
  * one's own balance in the shop after an order. The number is shown the moment it comes; the roll
- * plays over it (principle 1a). Under «уменьшить движение» the number just changes. The first
+ * plays over it (principle 1a). The roll plays whatever the system's motion setting says. The first
  * render is the same on the server and the client: the plain number, nothing rolling yet.
  */
 
@@ -49,7 +49,7 @@ export function RollingNumber({
       locales="ru-RU"
       format={FORMAT}
       animated={last.rolls}
-      respectMotionPreference
+      respectMotionPreference={false}
       className={className}
       style={style ? { ...SNUG, ...style } : SNUG}
     />

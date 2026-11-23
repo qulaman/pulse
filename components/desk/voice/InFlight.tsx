@@ -44,7 +44,7 @@ export function InFlight() {
       {recording ? (
         <>
           <div className="flex items-center gap-3 text-accent">
-            <span aria-hidden className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-current motion-reduce:animate-none" />
+            <span aria-hidden className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-current" />
             <LevelBars height={36} bar={5} gap={4} />
             <span className="text-[14px] leading-5 text-muted">{pinned ? "Скажите, что сделать и к какому сроку" : "Скажите, кому, что и к какому сроку"}</span>
           </div>

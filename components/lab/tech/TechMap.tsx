@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useInView, useReducedMotion } from "motion/react";
+import { motion, useInView } from "motion/react";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { MiniCard, type Mark, type MarkTone } from "@/components/lab/pitch/parts";
@@ -94,7 +94,6 @@ export function TechMap() {
   const [epoch, setEpoch] = useState(0);
   const box = useRef<HTMLDivElement>(null);
   const inView = useInView(box, { amount: 0.25 });
-  const still = useReducedMotion() ?? false;
   const running = inView && !paused;
 
   const script = SCRIPTS.find((s) => s.key === scriptKey) ?? SCRIPTS[0];
@@ -266,7 +265,7 @@ export function TechMap() {
                     strokeLinejoin="round"
                     strokeLinecap="round"
                     vectorEffect="non-scaling-stroke"
-                    initial={{ opacity: fresh && !still ? 0 : 0.85 }}
+                    initial={{ opacity: fresh ? 0 : 0.85 }}
                     animate={{ opacity: 0.85 }}
                     transition={{ duration: FLIGHT, ease: "easeOut" }}
                   />
@@ -295,7 +294,7 @@ export function TechMap() {
             </div>
 
             {/* the packet fades as it lands, so the node's name stays readable */}
-            {flies && !still ? (
+            {flies ? (
               <motion.div
                 key={`${script.key}:${index}:${epoch}`}
                 aria-hidden

@@ -210,14 +210,3 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .said,
-  .w,
-  .after {
-    animation: none;
-  }
-
-  .ghost {
-    display: none;
-  }
-}

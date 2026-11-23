@@ -788,17 +788,3 @@ html[data-surface="desk"][data-journal] {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  :root[data-surface="desk"][data-journal][data-graphite] {
-    .cal-chip {
-      animation: none !important;
-    }
-    .cal-win-pill,
-    .cal-win-free {
-      transition: none;
-    }
-    .cal-win-pill:hover {
-      transform: none;
-    }
-  }
-}

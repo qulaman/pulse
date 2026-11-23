@@ -25,9 +25,7 @@ import type { MascotSeason } from "@/lib/mascot/season";
  *   ?n=8                                        frames per row
  *   ?size=96                                    the face's size; the cells grow with it
  *   ?live                                       let everything play instead
- * Once every column is held, `main[data-ready]` is set — `pnpm smoke:mascot` waits for it. The
- * static frames of «уменьшить движение» are the same page under an emulated
- * `prefers-reduced-motion: reduce` (DevTools → Rendering, or `REDUCED=1 pnpm smoke:mascot`).
+ * Once every column is held, `main[data-ready]` is set — `pnpm smoke:mascot` waits for it.
  */
 
 type Row = { key: string; label: string; dur: number; draw: () => ReactNode; w: number; h: number };

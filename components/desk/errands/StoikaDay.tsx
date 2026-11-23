@@ -176,10 +176,10 @@ export function DayTally({ day }: { day: DayClosed }) {
 /**
  * «Готово»: the request's icon flies from its row into the tally (D-175 motion) — a copy of the
  * tile on top of the page, transform and opacity only; the count rolls once the list says so.
- * Nothing flies under «уменьшить движение» or when the tally is not on the screen.
+ * Nothing flies when the tally is not on the screen.
  */
 export function flyToToday(from: Element | null, scene: DeskScene) {
-  if (!from || typeof window === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  if (!from || typeof window === "undefined") return;
   const target = document.querySelector(`[data-tally-scene="${scene}"]`) ?? document.querySelector("[data-tally-total]");
   if (!target) return;
   const a = from.getBoundingClientRect();

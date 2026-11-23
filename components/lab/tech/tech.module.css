@@ -74,9 +74,3 @@
   opacity: 0.4;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .fill, .ring, .line, .press { animation: none; }
-  .fill { transform: scaleX(1); }
-  .ring { opacity: 0; }
-  .row { transition: none; }
-}

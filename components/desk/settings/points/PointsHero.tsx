@@ -131,7 +131,7 @@ function Leaders() {
 
 /**
  * The figure counts up from zero when the hero first shows, then rolls on every rise (RollingNumber:
- * a fall just changes; still under «уменьшить движение»).
+ * a fall just changes).
  */
 function Count({ value, className }: { value: number; className?: string }) {
   const [shown, setShown] = useState(0);

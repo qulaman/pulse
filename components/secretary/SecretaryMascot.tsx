@@ -424,8 +424,6 @@ export function SecretaryMascot({
             {/* the siren's beams go behind the head; the light itself sits on the crown, over the band */}
             {alarm && detailed ? <SirenBeams /> : null}
             <path d="M32 4 C47 4 59 16 59 31 C59 47 47 60 32 60 C17 60 5 49 5 33 C5 18 17 4 32 4 Z" fill={SECRETARY_TONE} />
-            {/* the tints of a still drawing are fill-opacity, here and in the room: «уменьшить движение»
-                sets opacity 1 on everything around the body (globals.css) and made this gleam a white patch */}
             <ellipse cx="24" cy="18" rx="9" ry="5" fill="#ffffff" fillOpacity="0.14" />
 
             {/* the bow tie: the receptionist's sign, under the chin */}

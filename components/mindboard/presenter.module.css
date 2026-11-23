@@ -7,7 +7,6 @@
  * light edge, blur and drop, so the two read as one family and never as a web toolbar.
  *
  * Motion: transform and opacity only; the glass, the glows and the shadows are static.
- * Under prefers-reduced-motion nothing travels (the component drops its offsets too).
  */
 
 /* ---- the meeting's progress on the remote's display: a dot per point ---------------- */
@@ -252,11 +251,3 @@
   color: var(--text-muted);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .pip,
-  .disc,
-  .disc:active:not(:disabled),
-  .start:active .disc {
-    transition: none;
-  }
-}

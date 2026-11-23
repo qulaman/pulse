@@ -4,7 +4,7 @@
  * Feel rules: a key is a face sitting in a dark well; pressing it drops the face by
  * 3px (transform only) and nothing else moves. Glows are static box-shadows that change
  * colour, never animate (DESIGN §2 perf contract); the only animation is the LED blink,
- * an opacity pulse, and it stops under prefers-reduced-motion.
+ * an opacity pulse.
  */
 
 .body {
@@ -361,14 +361,3 @@
   line-height: 14px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .blink {
-    animation: none;
-    opacity: 0.7;
-  }
-  .face,
-  .knob,
-  .gaugeFill {
-    transition: none;
-  }
-}

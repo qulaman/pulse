@@ -57,7 +57,7 @@ import { Block, LoadFailed, useBoxWidth } from "./shared";
  * a failed one says so in its place and the rest still shows; nothing happened yet — words, never a
  * row of zeros. Motion (app/desk/person-stats.css): the tiles rise in, the figures count up from
  * zero, the week line draws itself, the ring sweeps, the days of reports pop in — ≤ 900 ms, transform,
- * opacity and stroke only, still under «уменьшить движение». Colour only where it means something:
+ * opacity and stroke only. Colour only where it means something:
  * green done and handed in, red late and missed, amber waiting, orange points, the pen's turquoise
  * for the one line.
  */

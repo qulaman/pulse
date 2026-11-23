@@ -1,6 +1,5 @@
 "use client";
 
-import { useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { keepsHands } from "@/components/brand/hands";
@@ -50,7 +49,7 @@ function pick(pool: readonly MascotAct[], last: MascotAct | null): MascotAct {
  * clipboard comes into that hand — two hands, never three (components/brand/hands.ts).
  *
  * Nothing runs per frame: one timer between acts, one to clear the act, and the act itself is
- * CSS. Under prefers-reduced-motion there are no acts at all — they carry no information.
+ * CSS.
  */
 export function useMascotActs(
   state: MascotState,
@@ -60,7 +59,6 @@ export function useMascotActs(
   /** the employee carries the stack of orders: a called act is drawn round it (components/brand/hands.ts) */
   holding = false,
 ): { act: MascotAct | null; play: (act: MascotAct) => void } {
-  const reduced = useReducedMotion() === true;
   const [shown, setShown] = useState<{ act: MascotAct; called: boolean; on: MascotState } | null>(null);
   const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const last = useRef<MascotAct | null>(null);
@@ -92,7 +90,7 @@ export function useMascotActs(
     [],
   );
 
-  const pool = enabled && !reduced ? POOLS[state]?.filter((act) => !skip.includes(act)) : undefined;
+  const pool = enabled ? POOLS[state]?.filter((act) => !skip.includes(act)) : undefined;
   // calm and happy share one pool: going from one to the other does not restart the wait
   const poolKey = pool?.join(",") ?? "";
 
@@ -119,9 +117,9 @@ export function useMascotActs(
 
   const play = useCallback(
     (act: MascotAct) => {
-      if (!reduced) show(act, true);
+      show(act, true);
     },
-    [reduced, show],
+    [show],
   );
 
   // a called act that meets a job holding its hand is over: dropped for good, so a quick turn back

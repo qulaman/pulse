@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
-import { motion, useIsPresent, useReducedMotion } from "motion/react";
+import { motion, useIsPresent } from "motion/react";
 
 import { SLEEP_COLOR } from "@/components/brand/Mascot";
 import { DreamFlight, TOUCHES, type DreamId, DREAMS } from "@/components/pulse/DreamOrbit";
@@ -67,10 +67,6 @@ function useArea(anchor: RefObject<HTMLDivElement | null>): { hx: number; hy: nu
  * simulates a new flight for every dream (lib/idle/flight.ts). The dust takes the flight to
  * work out its own wake. Nothing runs per frame — after a dream starts, JS sleeps.
  *
- * Under `prefers-reduced-motion` there is no dream: it carries no state the director needs,
- * so the right amount of it is none. The team stays, still (D-118): who is at work and what
- * waits for the director is exactly the state he needs.
- *
  * Memoised (D-178): a tap on the face or a ball renders the board again, and the scene — the
  * whole team on the director's screen — only when what it is given changes.
  */
@@ -103,12 +99,10 @@ export const IdleScene = memo(function IdleScene({
   /** the card of somebody at work opened or closed (D-118): the face looks at him meanwhile */
   onLook?: (pick: Pick | null) => void;
 }) {
-  const reduced = useReducedMotion() ?? false;
   // a screen nobody has touched for minutes sleeps without dreams: the flight is the costliest thing
   // on it, and nobody is watching (D-119)
   const deep = useDeepRest();
-  const playing = active && !reduced;
-  const dreaming = playing && quiet && !deep;
+  const dreaming = active && quiet && !deep;
   const anchor = useRef<HTMLDivElement>(null);
   const area = useArea(anchor);
   const [dream, setDream] = useState<{ id: DreamId; key: number; seed: number } | null>(null);
@@ -154,7 +148,6 @@ export const IdleScene = memo(function IdleScene({
               dream={dream}
               chase={chase}
               picked={picked}
-              still={reduced}
               onPick={onPick}
               onLook={onLook}
               allHref={team.allHref}

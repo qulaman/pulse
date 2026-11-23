@@ -333,17 +333,3 @@ html[data-surface="desk"][data-journal] {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"][data-journal] {
-    .ether-card,
-    .ether-news-card,
-    .ether-meter > i,
-    .ether-ring-fill,
-    .ether-people > li {
-      animation: none !important;
-    }
-    .ether-card:hover {
-      transform: none;
-    }
-  }
-}

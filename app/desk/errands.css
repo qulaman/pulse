@@ -421,16 +421,3 @@ html[data-surface="desk"][data-journal] {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"][data-journal] {
-    .errands-siren,
-    .errands-figure-tile,
-    .errands-steps > li,
-    .errands-step-dot::after,
-    [data-testid="visit-card"],
-    [data-testid="visit-ask-card"],
-    [data-testid="message-ask-card"] {
-      animation: none !important;
-    }
-  }
-}

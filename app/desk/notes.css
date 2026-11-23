@@ -692,15 +692,3 @@ html[data-surface="desk"] .nb {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"] .nb {
-    .nb-hearing-dot {
-      animation: none;
-    }
-    .nb-row,
-    .nb-capture,
-    .nb-bar-button {
-      transition: none;
-    }
-  }
-}

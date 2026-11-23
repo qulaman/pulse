@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, LayoutGroup, motion, MotionConfig } from "motion/react";
+import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { useMemo, useState, type ReactNode } from "react";
 
 import { EventCard } from "@/components/calendar/EventCard";
@@ -168,61 +168,59 @@ export function CalendarView({ nav, now, meId, isDirector, upcoming, events, loa
       {loading ? (
         <CalendarListBone />
       ) : (
-        <MotionConfig reducedMotion="user">
-          <LayoutGroup>
-            <div className="relative mt-1 flex flex-col gap-2">
-              <AnimatePresence initial={false} mode="popLayout">
-                {rows.map((row) => (
-                  <motion.div
-                    key={row.key}
-                    layout="position"
-                    transition={CARD_SPRING}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0, transition: { duration: 0.14 } }}
-                  >
-                    {row.kind === "head" ? (
-                      <DayHead
-                        title={dayTitle(row.ymd, today)}
-                        count={row.count}
-                        first={row.first}
-                        today={row.ymd === today}
-                        onToday={row.first && row.ymd !== today ? nav.goToday : undefined}
-                      />
-                    ) : row.kind === "card" ? (
-                      <EventCard
-                        event={row.event}
-                        now={now}
-                        meId={meId}
-                        isDirector={isDirector}
-                        open={openId === row.event.id}
-                        onToggle={() => toggle(row.event.id)}
-                        onSaved={onSaved}
-                      />
-                    ) : row.kind === "now" ? (
-                      <NowLine time={hhmm(now.toISOString())} />
-                    ) : row.kind === "more" ? (
-                      <button
-                        type="button"
-                        onClick={() => setPage({ day: nav.selected, limit: limit + PAGE })}
-                        className="mt-1 min-h-[44px] w-full rounded-[14px] border border-border/70 text-[14px] font-medium leading-5 text-muted active:bg-surface"
-                      >
-                        Показать ещё · {row.left}
-                      </button>
-                    ) : (
-                      <FreeDay
-                        past={compareYmd(row.ymd, today) < 0}
-                        isDirector={isDirector}
-                        hint={isDirector && events.length === 0}
-                        onAdd={() => setCreating(true)}
-                      />
-                    )}
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
-          </LayoutGroup>
-        </MotionConfig>
+        <LayoutGroup>
+          <div className="relative mt-1 flex flex-col gap-2">
+            <AnimatePresence initial={false} mode="popLayout">
+              {rows.map((row) => (
+                <motion.div
+                  key={row.key}
+                  layout="position"
+                  transition={CARD_SPRING}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0, transition: { duration: 0.14 } }}
+                >
+                  {row.kind === "head" ? (
+                    <DayHead
+                      title={dayTitle(row.ymd, today)}
+                      count={row.count}
+                      first={row.first}
+                      today={row.ymd === today}
+                      onToday={row.first && row.ymd !== today ? nav.goToday : undefined}
+                    />
+                  ) : row.kind === "card" ? (
+                    <EventCard
+                      event={row.event}
+                      now={now}
+                      meId={meId}
+                      isDirector={isDirector}
+                      open={openId === row.event.id}
+                      onToggle={() => toggle(row.event.id)}
+                      onSaved={onSaved}
+                    />
+                  ) : row.kind === "now" ? (
+                    <NowLine time={hhmm(now.toISOString())} />
+                  ) : row.kind === "more" ? (
+                    <button
+                      type="button"
+                      onClick={() => setPage({ day: nav.selected, limit: limit + PAGE })}
+                      className="mt-1 min-h-[44px] w-full rounded-[14px] border border-border/70 text-[14px] font-medium leading-5 text-muted active:bg-surface"
+                    >
+                      Показать ещё · {row.left}
+                    </button>
+                  ) : (
+                    <FreeDay
+                      past={compareYmd(row.ymd, today) < 0}
+                      isDirector={isDirector}
+                      hint={isDirector && events.length === 0}
+                      onAdd={() => setCreating(true)}
+                    />
+                  )}
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        </LayoutGroup>
       )}
 
       {isDirector ? (

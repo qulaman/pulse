@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 import { useRef } from "react";
 
 import { useDockSpace } from "@/components/ui/dock";
@@ -34,7 +34,6 @@ export function HandOutBar({
   onSend: () => void;
   onCancel: () => void;
 }) {
-  const reduce = useReducedMotion();
   // the bottom toasts stand above the bar, not over «Поручить» (D-142)
   const dock = useRef<HTMLDivElement>(null);
   useDockSpace(dock);
@@ -45,7 +44,7 @@ export function HandOutBar({
       ref={dock}
       className={`above-tabbar ${p.dock}`}
       style={{ bottom: "calc(var(--tabbar-space) + 8px)" }}
-      initial={{ opacity: 0, y: reduce ? 0 : 14 }}
+      initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.22, ease: [0.2, 0, 0, 1] }}
     >

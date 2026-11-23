@@ -1,6 +1,5 @@
 "use client";
 
-import { useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
 import { SEC_ACT_MS, type SecretaryAct } from "@/components/secretary/SecretaryMascot";
@@ -38,8 +37,7 @@ function arrivedToday(today: string): boolean {
  * The one-shots of the secretary's face (D-97). Called ones — «есть!» when a request is taken
  * (`acceptKey`), the hearts of a thank-you (`thanksKey`) — play whenever their key moves. Idle
  * ones play only at rest (`idle`): every 20–40 s a small thing at the desk, the first morning
- * visit begins with the arrival. Under prefers-reduced-motion there are no idle acts; the
- * called ones still show, their keyframes are cut by the global rule.
+ * visit begins with the arrival.
  */
 export function useSecretaryActs({
   idle,
@@ -52,8 +50,6 @@ export function useSecretaryActs({
   acceptKey: number;
   thanksKey: number;
 }): SecretaryAct | null {
-  const reduced = useReducedMotion() === true;
-
   // called acts: a key that moved since the last render starts its act (adjusted during render)
   const [keys, setKeys] = useState({ acceptKey, thanksKey });
   const [called, setCalled] = useState<{ act: SecretaryAct; n: number } | null>(null);
@@ -70,7 +66,7 @@ export function useSecretaryActs({
   // idle acts: one timer between acts, one to clear the act; nothing runs per frame
   const [shown, setShown] = useState<SecretaryAct | null>(null);
   const last = useRef<SecretaryAct | null>(null);
-  const on = idle && daypart !== "night" && !reduced;
+  const on = idle && daypart !== "night";
   const pool = daypart === "evening" ? EVENING : DAY;
   const poolKey = on ? pool.join(",") : "";
   const morning = daypart === "morning";

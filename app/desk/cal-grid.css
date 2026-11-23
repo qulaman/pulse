@@ -517,24 +517,3 @@ html[data-surface="desk"][data-journal] {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"][data-journal] {
-    .cal-cols,
-    .cal-now,
-    .cal-now-dot,
-    .cal-now-week,
-    .cal-now-time,
-    .cal-gone {
-      transition: none;
-    }
-    .cal-event,
-    .cal-ghost {
-      animation: none !important;
-    }
-    .cal-event:hover,
-    .cal-event[data-open],
-    .cal-mark:hover {
-      transform: none;
-    }
-  }
-}

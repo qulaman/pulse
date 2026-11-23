@@ -92,9 +92,3 @@
   transition: transform 90ms linear;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .ecgWindow { display: none; }
-  .ecgDim { opacity: 0.75; }
-  .tickerTrack { animation: none; }
-  .segFill { transition: none; }
-}

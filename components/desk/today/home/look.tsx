@@ -10,7 +10,7 @@ import { initialsOf } from "@/lib/idle/people";
  * own ink, live things breathe (a meeting on now, a visitor at the door, a request nobody took),
  * shares are drawn as meters that fill, a new row rises into its place. The inks are the sheet's
  * own (journal.css): only the pen, the pencil, green, blue, violet and orange — bright and flat.
- * Everything moves by transform and opacity and stands still under «уменьшить движение».
+ * Everything moves by transform and opacity.
  */
 
 export type Ink = "pen" | "pencil" | "ok" | "sky" | "violet" | "gold" | "muted";

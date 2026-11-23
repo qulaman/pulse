@@ -415,7 +415,7 @@ export function PropsBehind({ state, pose, side }: Props) {
       {/* the wind-up of a throw: the card in the hand behind the head, only its top over the crown
           — `sending`, and the employee's «Сдал» (under the body, so the head hides the rest) */}
       {state === "sending" && detailed ? (
-        <g data-still="hide" style={{ transformOrigin: "42px 12px", animation: "mascot-throw-card-back 1.2s linear infinite", opacity: 0 }}>
+        <g style={{ transformOrigin: "42px 12px", animation: "mascot-throw-card-back 1.2s linear infinite", opacity: 0 }}>
           <rect x="34" y="5" width="17" height="12" rx="3" fill="var(--surface)" stroke={COLOR.sending} strokeWidth="1.5" />
           <path d="M37.5 9.5h10M37.5 13h6" stroke={COLOR.sending} strokeWidth="1.2" strokeLinecap="round" />
           <ellipse cx="36" cy="5.6" rx="3" ry="2.6" fill={handFill(COLOR.sending)} />
@@ -587,7 +587,6 @@ export function PropsOnBody({
                   strokeWidth="1.9"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  data-still="show"
                   style={{ transformBox: "fill-box", transformOrigin: "35% 70%", animation: `mascot-tick-${row + 1} 3.6s ease-out infinite`, opacity: 0 }}
                 />
               </g>

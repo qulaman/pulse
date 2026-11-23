@@ -888,21 +888,3 @@ html[data-surface="desk"][data-journal] {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"][data-journal] {
-    .pts-view,
-    .pts-hero-figure,
-    .pts-chart-bar,
-    .pts-leader,
-    .pts-balance-bar,
-    .pts-ring-arc,
-    .pts-dispute,
-    .pts-item,
-    .award-list {
-      animation: none !important;
-    }
-    .pts-item:hover {
-      transform: none;
-    }
-  }
-}

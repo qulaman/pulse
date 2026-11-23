@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useMotionValue, useReducedMotion, useSpring } from "motion/react";
+import { motion, useMotionValue, useSpring } from "motion/react";
 import {
   memo,
   useCallback,
@@ -190,10 +190,8 @@ export const MascotLever = memo(function MascotLever({
   // the give under the finger: a motion value, not state — a pointer move must not re-render the face
   const pull = useMotionValue(0);
   const give = useSpring(pull, GIVE_SPRING);
-  // a finger (or a button) is down on the face — a hovering mouse moves nothing; nor does anything
-  // under «уменьшить движение»
+  // a finger (or a button) is down on the face — a hovering mouse moves nothing
   const pressed = useRef(false);
-  const still = useReducedMotion() ?? false;
 
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdFired = useRef(false);
@@ -244,7 +242,7 @@ export const MascotLever = memo(function MascotLever({
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
       if (busy || !voice) return;
-      pressed.current = !still;
+      pressed.current = true;
       event.currentTarget.setPointerCapture(event.pointerId);
       start.current = { x: event.clientX, y: event.clientY };
       holdFired.current = false;
@@ -262,7 +260,7 @@ export const MascotLever = memo(function MascotLever({
         bumpUses();
       }, HOLD_MS);
     },
-    [busy, clearHold, startVoice, voice, pin, setHeld, still],
+    [busy, clearHold, startVoice, voice, pin, setHeld],
   );
 
   const onPointerMove = useCallback(

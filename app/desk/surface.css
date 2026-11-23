@@ -82,16 +82,6 @@ html[data-surface="desk"] .desk-progress {
   from { transform: translateX(-100%); }
   to { transform: translateX(300%); }
 }
-@media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"] [data-sheet]:not([data-testid="sketch-pad"]),
-  html[data-surface="desk"] .desk-dialog {
-    animation-duration: 1ms !important;
-  }
-  html[data-surface="desk"] .desk-row[data-glow],
-  html[data-surface="desk"] .desk-progress {
-    animation: none;
-  }
-}
 
 /* ---- the desk's language, second pass (D-154) ------------------------------------------------
    The light of a screen's state (components/desk/ui/Light.tsx): the phone's sky in a quiet
@@ -122,11 +112,6 @@ html[data-surface="desk"] .desk-command {
 html[data-surface="desk"] .desk-command:focus-within {
   border-color: color-mix(in srgb, var(--accent) 75%, var(--border));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
-}
-@media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"] .desk-light-layer {
-    transition: none;
-  }
 }
 
 /* ---- the desk's frame, third pass (D-154 wave 3) ----------------------------------------------
@@ -235,9 +220,4 @@ html[data-surface="desk"] .desk-switch:active:not(:disabled) .desk-switch-knob {
 }
 html[data-surface="desk"] .desk-switch[aria-checked="true"]:active:not(:disabled) .desk-switch-knob {
   transform: translateX(15px);
-}
-@media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"] .desk-switch-knob {
-    transition: none;
-  }
 }

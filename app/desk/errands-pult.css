@@ -1267,29 +1267,3 @@ html[data-surface="desk"][data-journal] {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"][data-journal] {
-    .pult-live,
-    .pult-alarm-tile[data-live]::after,
-    .pult-trip[data-finished],
-    .pult-done[data-arrived],
-    .pult-thanked[data-pop] svg,
-    .pult-track[data-advanced] .team-face,
-    .pult-track[data-advanced] .pult-node-dot,
-    .pult-key-window > i,
-    .pult-day,
-    .pult-bar > i {
-      animation: none !important;
-    }
-    .pult-alarm-tile[data-live]::after {
-      opacity: 0.8;
-    }
-    .pult-track-line > i,
-    .pult-door-left > i,
-    .pult-key,
-    .pult-move,
-    .pult-thank {
-      transition: none !important;
-    }
-  }
-}

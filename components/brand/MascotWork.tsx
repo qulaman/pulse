@@ -87,7 +87,7 @@ const CARD_ORIGIN = `${CARD_AT.x}px ${CARD_AT.y}px`;
  */
 export function CallCard({ color, detailed }: { color: string; detailed: boolean }) {
   return (
-    <g data-prop="call-card" data-still="show" style={{ transformOrigin: "46px 2px", animation: "mascot-call-mark 1.9s cubic-bezier(0.3, 0, 0.2, 1) infinite", opacity: 0 }}>
+    <g data-prop="call-card" style={{ transformOrigin: "46px 2px", animation: "mascot-call-mark 1.9s cubic-bezier(0.3, 0, 0.2, 1) infinite", opacity: 0 }}>
       {detailed ? (
         <CardOverHead badge="new" stroke={color} />
       ) : (
@@ -566,7 +566,7 @@ export function WorkActOver({ act, flip = false }: { act: string } & ActHands) {
 export function WorkActUnder({ act, body, flip = false }: { act: string; body: string } & ActHands) {
   if (act !== "handover") return null;
   return (
-    <g data-still="hide" style={{ transformOrigin: "42px 12px", animation: "mascot-throw-card-back 1.2s linear both", opacity: 0 }}>
+    <g style={{ transformOrigin: "42px 12px", animation: "mascot-throw-card-back 1.2s linear both", opacity: 0 }}>
       <g transform={`translate(42.5 11)${turned(flip)}`}>
         <CardShape badge="done" stroke="var(--ok)" />
       </g>

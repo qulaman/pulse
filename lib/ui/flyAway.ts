@@ -5,7 +5,7 @@
  * landing (principle 1a). The layer takes no taps: a second tap under a flight still lands.
  *
  * Transform and opacity only, by WAAPI on the compositor; the layer removes itself when the last
- * copy is out. Under «уменьшить движение» nothing flies.
+ * copy is out.
  */
 
 type Box = { left: number; top: number; width: number; height: number };
@@ -14,10 +14,6 @@ type Box = { left: number; top: number; width: number; height: number };
 const HOLD = 0.5;
 /** The shadow of a copy lifted off the page. */
 const LIFTED = "0 18px 40px rgba(0, 0, 0, 0.45)";
-
-function motionWanted(): boolean {
-  return !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-}
 
 /** A layer for `count` copies over the screen; it goes when the last one has landed. */
 function openLayer(count: number, z: number): { layer: HTMLDivElement; landed: () => void } {
@@ -84,7 +80,7 @@ export function flyAway(
   const restore = () => {
     for (const node of nodes) node.style.visibility = "";
   };
-  if (nodes.length === 0 || !motionWanted()) return restore;
+  if (nodes.length === 0) return restore;
 
   const { layer, landed } = openLayer(nodes.length, z);
   nodes.forEach((node, i) => {
@@ -224,7 +220,7 @@ export function flyInto(
   const from = node.getBoundingClientRect();
   const to = target.getBoundingClientRect();
   // nothing to fly from or into: a card or a face that is not on the screen
-  if (!motionWanted() || from.width === 0 || from.height === 0 || to.width === 0 || to.height === 0) {
+  if (from.width === 0 || from.height === 0 || to.width === 0 || to.height === 0) {
     onLand?.();
     return;
   }

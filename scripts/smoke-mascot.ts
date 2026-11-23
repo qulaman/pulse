@@ -5,11 +5,10 @@
  * a hand shows up as the list of rows it touched, with the old and the new picture on disk.
  *   pnpm smoke:mascot              compare with the baseline (APP_URL, default http://localhost:3000)
  *   UPDATE=1 pnpm smoke:mascot     take the baseline (after a change you meant)
- *   REDUCED=1 pnpm smoke:mascot    the same under prefers-reduced-motion: the still frames
  *   SETS=sec,desk                  only these sets (drop-states, drop-acts, sec, desk, transitions, jobs,
  *                                  job-acts — the jobs of the open balls: taken up, switched, put down, and
  *                                  every act that moves a hand over every job that holds one)
- * Pictures live in .smoke-ui/mascot/<motion|reduced>/{baseline,current}/<set>/<row>.png.
+ * Pictures live in .smoke-ui/mascot/motion/{baseline,current}/<set>/<row>.png.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -18,9 +17,8 @@ import { chromium, type Page } from "playwright";
 import { APP_URL } from "./lib/smoke";
 
 const UPDATE = process.env.UPDATE === "1";
-const REDUCED = process.env.REDUCED === "1";
 const SETS = (process.env.SETS ?? "drop-states,drop-acts,sec,desk,transitions,jobs,job-acts").split(",");
-const ROOT = join(process.cwd(), ".smoke-ui", "mascot", REDUCED ? "reduced" : "motion");
+const ROOT = join(process.cwd(), ".smoke-ui", "mascot", "motion");
 /** A pixel counts as changed past this much on any channel; a row, past this many pixels. */
 const CHANNEL = 24;
 const PIXELS = 12;
@@ -60,7 +58,6 @@ async function diffPixels(page: Page, a: Buffer, b: Buffer): Promise<number> {
 async function main() {
   const browser = await chromium.launch({ channel: "chrome" });
   const page = await browser.newPage({ viewport: { width: 2000, height: 1200 }, deviceScaleFactor: 1, colorScheme: "dark" });
-  if (REDUCED) await page.emulateMedia({ reducedMotion: "reduce" });
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   // a blank page of its own decodes the pictures, away from the sheet being measured

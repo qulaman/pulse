@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type CSSProperties } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 
 import { PulseMark } from "@/components/brand/PulseMark";
 import { StillLogo } from "@/components/ui/StillLogo";
@@ -15,10 +15,9 @@ const DURATION_MS = 700;
  * «Из продукта — в свою компанию» (D-135): the code told the server whose company this is, and
  * the screen shows it on the way in — the product's mark shrinks away, the company's logo and
  * name come up in the company's accent. The session is already set when this plays, nothing
- * waits on it (principle 1a); under «уменьшить движение» the app simply opens.
+ * waits on it (principle 1a).
  */
 export function Arrival({ from, to, onDone }: { from: { name: string }; to: ArrivalBrand; onDone: () => void }) {
-  const reduce = useReducedMotion();
   // the parent re-renders while this plays: the timer must not restart with a new callback
   const latest = useRef(onDone);
   useEffect(() => {
@@ -26,11 +25,10 @@ export function Arrival({ from, to, onDone }: { from: { name: string }; to: Arri
   });
 
   useEffect(() => {
-    const timer = window.setTimeout(() => latest.current(), reduce ? 0 : DURATION_MS);
+    const timer = window.setTimeout(() => latest.current(), DURATION_MS);
     return () => window.clearTimeout(timer);
-  }, [reduce]);
+  }, []);
 
-  if (reduce) return null;
   const sameBrand = from.name === to.name && to.name === "Pulse";
 
   return (

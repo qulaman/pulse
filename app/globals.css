@@ -321,9 +321,6 @@ h1 { letter-spacing: -0.025em; }
    gold, the light goes out and the circle floats back down. Transform and opacity only, and
    everything that differs per person arrives as a custom property. The one thing that runs all
    the time is the turn of a ring. */
-@media (prefers-reduced-motion: reduce) {
-  .crew-anim { animation: none !important; }
-}
 [data-still] .crew-anim { animation: none !important; }
 /* deep sleep: nobody has touched the board for a while, the rings stop where they are */
 [data-asleep] .crew-anim { animation-play-state: paused !important; }
@@ -617,7 +614,6 @@ html[data-surface="desk"] .sheet-overlay {
    with a click handler, and that is what iOS lights up). */
 html, button, a[href] { -webkit-tap-highlight-color: transparent; }
 
-
 /* landing (app/page.tsx): one orchestrated entrance, then only a breathing glow */
 @keyframes hero-in {
   from { opacity: 0; transform: translateY(6px); }
@@ -648,50 +644,6 @@ html, button, a[href] { -webkit-tap-highlight-color: transparent; }
 @keyframes voice-countdown {
   from { stroke-dashoffset: 0; }
   to { stroke-dashoffset: 113; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-
-  /* The net above is a backstop, not the whole answer: «Капля» says what she is doing
-     through the props around the head (waves, dots, the note, the cards, the z-s, the
-     drops), and every one of them is revealed by its own keyframes from opacity 0. With
-     motion removed they would all vanish and every state would read as the same blob.
-     So the movement goes and the meaning stays: each prop holds its readable frame. */
-  .mascot > g:not([data-face]),
-  .mascot > g:not([data-face]) * {
-    animation: none !important;
-    opacity: 1 !important;
-  }
-  /* the net shortens animations but not their delays: a job's prop waits PROP_DELAY for the old
-     prop of the same hand to leave (D-178) — with nothing moving there is nothing to wait for */
-  .mascot * {
-    animation-delay: 0s !important;
-  }
-  /* the one prop with no readable still frame: confetti at rest is a heap on the crown (it sits in
-     the Linger that fades it out, so not a direct child) */
-  .mascot g[data-confetti],
-  .mascot g[data-confetti] * {
-    opacity: 0 !important;
-  }
-  /* a copy that only exists in motion (the card behind the head on the wind-up) is no still frame;
-     a prop inside the body whose readable frame is «there» (the ticks on the board, the card over
-     the head of a calling face) is shown still */
-  .mascot g[data-still="hide"],
-  .mascot g[data-still="hide"] * {
-    opacity: 0 !important;
-  }
-  .mascot g[data-still="show"],
-  .mascot path[data-still="show"] {
-    animation: none !important;
-    opacity: 1 !important;
-  }
 }
 
 /* the only places a caret belongs */
@@ -734,9 +686,6 @@ html[data-tabbar="folded"] .above-tabbar { translate: 0 var(--tabbar-fold-drop);
    does not shrink for the keyboard, so the bar's own --kb (useKeyboardDock, lib/ui/keyboard.ts)
    says how far above the window's bottom the keyboard's top stands */
 html[data-tabbar="away"] .above-tabbar { translate: 0 calc(var(--tabbar-space) - var(--kb, 0px)); transition: none; }
-@media (prefers-reduced-motion: reduce) {
-  .above-tabbar { transition: none; }
-}
 
 .seg {
   border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);

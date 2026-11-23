@@ -1,6 +1,6 @@
 "use client";
 
-import { animate, motion, PresenceContext, useMotionValue, useReducedMotion, type Transition } from "motion/react";
+import { animate, motion, PresenceContext, useMotionValue, type Transition } from "motion/react";
 import { memo, useContext, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
 
 import { springs } from "@/lib/design/tokens";
@@ -46,7 +46,6 @@ const POP = { type: "spring", stiffness: 300, damping: 22 } as const;
 const STAGGER_S = 0.04;
 /** Into the head: quicker than out and gathering speed, as anything leaving does (D-166). */
 const DIVE: Transition = { duration: 0.2, ease: [0.4, 0, 1, 1] };
-const AT_ONCE: Transition = { duration: 0 };
 /** Inside the head: at the face's middle, no size, behind the face. */
 const INSIDE = { x: 0, y: 0, scale: 0, opacity: 0 };
 
@@ -112,7 +111,7 @@ const ICON: Record<OrbitId, ReactNode> = {
  * face's middle while the row comes out of it, each ball from the middle to its place, one after
  * another; back, the reverse. At rest the ring stays inside the head, so a tap on the face lets the
  * balls out of it and the «Дела» raised at rest brings the row straight out of the head, never a
- * full ring flashing first. Under «уменьшить движение» everything is at once.
+ * full ring flashing first.
  *
  * The root is a point at the face's middle; `rowTop` is how far below it the row's top is.
  *
@@ -162,7 +161,6 @@ const RING_BALL: CSSProperties = { position: "absolute", left: 0, top: 0, transl
 
 const Ring = memo(function Ring({ balls, radius, hidden, onPick }: { balls: OrbitBall[]; radius: number; hidden: boolean; onPick: (ball: OrbitBall) => void }) {
   const hydrated = useHydrated();
-  const still = useReducedMotion() ?? false;
   // The ring hidden in the sleeping head is drawn only once the page has hydrated. Its balls and
   // counts come from data, and data that lands between the server's HTML and the hydration of this
   // page (a query another part of the screen already started) made React throw the page's HTML
@@ -176,20 +174,20 @@ const Ring = memo(function Ring({ balls, radius, hidden, onPick }: { balls: Orbi
     animation: `${name} ${ORBIT_S * TURNS}s linear infinite`,
     animationPlayState: hidden ? "paused" : "running",
   });
-  const gone = { ...INSIDE, transition: still ? AT_ONCE : DIVE };
+  const gone = { ...INSIDE, transition: DIVE };
   return (
     // a point at the face's middle turns, each ball turns back round its own middle: the labels stay
     // upright, and framer only moves the balls along their spokes
     <div className="absolute left-0 top-0 h-0 w-0" style={orbit("orbit-spin")} data-testid="orbit" data-mode="ring" data-hidden={hidden ? "1" : "0"}>
       {balls.map((ball, i) => {
         const angle = -Math.PI / 2 + (i * 2 * Math.PI) / n;
-        const delay = still ? 0 : i * STAGGER_S;
+        const delay = i * STAGGER_S;
         const out = {
           x: Math.round(Math.cos(angle) * radius * 10) / 10,
           y: Math.round(Math.sin(angle) * radius * 10) / 10,
           scale: 1,
           opacity: 1,
-          transition: still ? AT_ONCE : { default: { ...SPRING, delay }, scale: { ...POP, delay }, opacity: { duration: 0.12, delay } },
+          transition: { default: { ...SPRING, delay }, scale: { ...POP, delay }, opacity: { duration: 0.12, delay } },
         };
         return (
           <motion.div key={ball.id} className="absolute left-0 top-0 h-0 w-0" initial={INSIDE} animate={hidden ? gone : out} exit={gone}>
@@ -206,11 +204,10 @@ const Ring = memo(function Ring({ balls, radius, hidden, onPick }: { balls: Orbi
 const Row = memo(function Row({ balls, activeId, top, onPick }: { balls: OrbitBall[]; activeId: OrbitId | null; top: number; onPick: (ball: OrbitBall) => void }) {
   // a card remembered open stands as it was left: nothing comes out of the head (D-167, D-178)
   const emerge = useContext(PresenceContext)?.initial !== false;
-  const still = useReducedMotion() ?? false;
   return (
     <div className="absolute left-0 flex gap-2" style={{ top, translate: "-50% 0" }} data-testid="orbit" data-mode="row" data-hidden="0">
       {balls.map((ball, i) => (
-        <RowBall key={ball.id} ball={ball} index={i} emerge={emerge && !still} still={still} active={activeId === ball.id} onPick={onPick} />
+        <RowBall key={ball.id} ball={ball} index={i} emerge={emerge} active={activeId === ball.id} onPick={onPick} />
       ))}
     </div>
   );
@@ -225,14 +222,12 @@ const RowBall = memo(function RowBall({
   ball,
   index,
   emerge,
-  still,
   active,
   onPick,
 }: {
   ball: OrbitBall;
   index: number;
   emerge: boolean;
-  still: boolean;
   active: boolean;
   onPick: (ball: OrbitBall) => void;
 }) {
@@ -266,7 +261,7 @@ const RowBall = memo(function RowBall({
       // into the head: where it was read on the way out of it (D-178) — read here, between one ball
       // starting its dive and the next, it laid the page out again for every ball, in the closing tap's
       // own frame. A row that stood from the first render (a card remembered open) reads it now
-      variants={{ gone: () => ({ ...(head.current ?? headFrom(self.current)), scale: 0, opacity: 0, transition: still ? AT_ONCE : DIVE }) }}
+      variants={{ gone: () => ({ ...(head.current ?? headFrom(self.current)), scale: 0, opacity: 0, transition: DIVE }) }}
       exit="gone"
     >
       <Ball ball={ball} active={active} hidden={false} onPick={onPick} />

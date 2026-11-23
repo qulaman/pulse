@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 
 import { Button } from "@/components/ui/Button";
 import { dayLineOf, wallHm, type BusySpan, type Door, type DoorHold } from "@/lib/desk/busy";
@@ -115,7 +115,6 @@ export function DoorCard({
   meId: string;
   compact: boolean;
 }) {
-  const still = useReducedMotion();
   const transition = useErrandActions();
   if (!door) {
     // the first answer is on its way: the card's place is kept, the queue under it does not jump
@@ -140,7 +139,7 @@ export function DoorCard({
 
   return (
     <motion.section
-      layout={!still}
+      layout
       transition={FOLD}
       className="stoika-door"
       data-state={door.state}
@@ -150,7 +149,7 @@ export function DoorCard({
       style={{ borderRadius: compact ? 12 : 14 }}
     >
       {compact ? (
-        <motion.div key="strip" layout={still ? false : "position"} className="stoika-door-strip" initial={still ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.18, delay: 0.08 }}>
+        <motion.div key="strip" layout="position" className="stoika-door-strip" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.18, delay: 0.08 }}>
           <DoorLamp state={door.state} size={10} />
           <p className="min-w-0 flex-1 truncate">
             <b className="stoika-door-strip-title">{TITLE[door.state]}</b>
@@ -159,7 +158,7 @@ export function DoorCard({
           {open}
         </motion.div>
       ) : (
-        <motion.div key="big" layout={still ? false : "position"} className="stoika-door-big" initial={still ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.18, delay: 0.08 }}>
+        <motion.div key="big" layout="position" className="stoika-door-big" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.18, delay: 0.08 }}>
           <div className="stoika-door-head">
             <DoorLamp state={door.state} />
             <div className="min-w-0 flex-1">

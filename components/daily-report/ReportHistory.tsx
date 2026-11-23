@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutGroup, motion, MotionConfig } from "motion/react";
+import { LayoutGroup, motion } from "motion/react";
 import { useState } from "react";
 
 import { CARD_SPRING, CardShell } from "@/components/tasks/list/TaskList";
@@ -26,28 +26,26 @@ export function ReportHistory({ items, now }: { items: readonly DailyReport[]; n
   }
 
   return (
-    <MotionConfig reducedMotion="user">
-      <LayoutGroup>
-        <div className="flex flex-col gap-2" data-testid="report-history">
-          {items.map((report) => {
-            const open = openId === report.report_date;
-            return (
-              <motion.div key={report.report_date} layout="position" transition={CARD_SPRING}>
-                <CardShell
-                  id={`report-${report.report_date}`}
-                  open={open}
-                  closed={report.status === "missed"}
-                  onToggle={() => setOpenId(open ? null : report.report_date)}
-                  head={<HistoryHead report={report} now={now} />}
-                >
-                  <HistoryBody report={report} />
-                </CardShell>
-              </motion.div>
-            );
-          })}
-        </div>
-      </LayoutGroup>
-    </MotionConfig>
+    <LayoutGroup>
+      <div className="flex flex-col gap-2" data-testid="report-history">
+        {items.map((report) => {
+          const open = openId === report.report_date;
+          return (
+            <motion.div key={report.report_date} layout="position" transition={CARD_SPRING}>
+              <CardShell
+                id={`report-${report.report_date}`}
+                open={open}
+                closed={report.status === "missed"}
+                onToggle={() => setOpenId(open ? null : report.report_date)}
+                head={<HistoryHead report={report} now={now} />}
+              >
+                <HistoryBody report={report} />
+              </CardShell>
+            </motion.div>
+          );
+        })}
+      </div>
+    </LayoutGroup>
   );
 }
 

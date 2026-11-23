@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion, MotionConfig } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useRef, useState, type CSSProperties } from "react";
 
@@ -183,87 +183,85 @@ export function ReportDueRowView({
   );
 
   return (
-    <MotionConfig reducedMotion="user">
-      <div
-        className={`relative flex flex-col py-2 pl-3 pr-2 transition-[border-color,box-shadow] duration-300 ${box.className}`}
-        style={box.style}
-        data-testid="report-due"
-        data-state={look}
-        data-one-tap={due.oneTap ? "" : undefined}
-      >
-        <div className="flex min-h-[48px] items-center gap-2">
-          <Link
-            href="/report"
-            className="relative flex min-h-[48px] min-w-0 flex-1 items-center gap-3 rounded-[12px] transition-transform duration-[120ms] active:scale-[0.99]"
-            data-testid="report-due-open"
-          >
-            <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] transition-colors duration-300" style={TILE[look]}>
-              {due.submitted ? <ReportDoneIcon /> : <ReportIcon />}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em]">{title}</span>
-              <span className="mt-0.5 block truncate text-[13px] leading-[18px] text-muted">{sub}</span>
-            </span>
-            <HapticSwitch />
-          </Link>
-          <span className="flex shrink-0 items-center">
-            <AnimatePresence initial={false} mode="popLayout">
-              {side}
-            </AnimatePresence>
+    <div
+      className={`relative flex flex-col py-2 pl-3 pr-2 transition-[border-color,box-shadow] duration-300 ${box.className}`}
+      style={box.style}
+      data-testid="report-due"
+      data-state={look}
+      data-one-tap={due.oneTap ? "" : undefined}
+    >
+      <div className="flex min-h-[48px] items-center gap-2">
+        <Link
+          href="/report"
+          className="relative flex min-h-[48px] min-w-0 flex-1 items-center gap-3 rounded-[12px] transition-transform duration-[120ms] active:scale-[0.99]"
+          data-testid="report-due-open"
+        >
+          <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] transition-colors duration-300" style={TILE[look]}>
+            {due.submitted ? <ReportDoneIcon /> : <ReportIcon />}
           </span>
-        </div>
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em]">{title}</span>
+            <span className="mt-0.5 block truncate text-[13px] leading-[18px] text-muted">{sub}</span>
+          </span>
+          <HapticSwitch />
+        </Link>
+        <span className="flex shrink-0 items-center">
+          <AnimatePresence initial={false} mode="popLayout">
+            {side}
+          </AnimatePresence>
+        </span>
+      </div>
 
-        {/* the evening: the actions get a line of their own, the main one wide under the thumb */}
-        <AnimatePresence initial={false}>
-          {actionsLine ? (
-            <motion.div
-              key="actions"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1, transition: springs.object }}
-              exit={{ height: 0, opacity: 0, transition: { duration: 0.16, ease: [0.4, 0, 1, 1] } }}
-              className="overflow-hidden"
-            >
-              <div className="flex items-center gap-2 pb-0.5 pt-2">
-                {due.oneTap || justSent ? (
-                  <>
-                    <Link href="/report" className={`${EDIT_LINK} px-3`} data-testid="report-due-edit">
-                      {/* before the hand-in it opens the form to add words; after — to change them */}
-                      {justSent || due.submitted ? "Изменить ›" : "Написать ›"}
-                      <HapticSwitch />
-                    </Link>
-                    <span className="relative flex flex-1">
-                      <AnimatePresence initial={false} mode="popLayout">
-                        {justSent ? (
-                          <motion.span key="done" {...SWAP} className={`${DONE_PILL} flex-1`} data-testid="report-due-sent">
-                            <Icon name="check" size={16} />
-                            Сдан
-                          </motion.span>
-                        ) : (
-                          <motion.span key="send" {...SWAP} className="flex flex-1">
-                            <Button block onClick={onSubmit} data-testid="report-due-send">
-                              Сдать
-                            </Button>
-                          </motion.span>
-                        )}
-                      </AnimatePresence>
-                    </span>
-                  </>
-                ) : (
-                  <Link href="/report" className={`${LINK_BUTTON} btn-primary flex-1 text-bg`} data-testid="report-due-write">
-                    Написать отчёт ›
+      {/* the evening: the actions get a line of their own, the main one wide under the thumb */}
+      <AnimatePresence initial={false}>
+        {actionsLine ? (
+          <motion.div
+            key="actions"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1, transition: springs.object }}
+            exit={{ height: 0, opacity: 0, transition: { duration: 0.16, ease: [0.4, 0, 1, 1] } }}
+            className="overflow-hidden"
+          >
+            <div className="flex items-center gap-2 pb-0.5 pt-2">
+              {due.oneTap || justSent ? (
+                <>
+                  <Link href="/report" className={`${EDIT_LINK} px-3`} data-testid="report-due-edit">
+                    {/* before the hand-in it opens the form to add words; after — to change them */}
+                    {justSent || due.submitted ? "Изменить ›" : "Написать ›"}
                     <HapticSwitch />
                   </Link>
-                )}
-              </div>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+                  <span className="relative flex flex-1">
+                    <AnimatePresence initial={false} mode="popLayout">
+                      {justSent ? (
+                        <motion.span key="done" {...SWAP} className={`${DONE_PILL} flex-1`} data-testid="report-due-sent">
+                          <Icon name="check" size={16} />
+                          Сдан
+                        </motion.span>
+                      ) : (
+                        <motion.span key="send" {...SWAP} className="flex flex-1">
+                          <Button block onClick={onSubmit} data-testid="report-due-send">
+                            Сдать
+                          </Button>
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  </span>
+                </>
+              ) : (
+                <Link href="/report" className={`${LINK_BUTTON} btn-primary flex-1 text-bg`} data-testid="report-due-write">
+                  Написать отчёт ›
+                  <HapticSwitch />
+                </Link>
+              )}
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
-        {/* the points rise from where «Сдать» was and melt away inside the row */}
-        <div className="pointer-events-none absolute bottom-2 right-2 h-0 w-[160px]">
-          <PointsPop pop={pop} />
-        </div>
+      {/* the points rise from where «Сдать» was and melt away inside the row */}
+      <div className="pointer-events-none absolute bottom-2 right-2 h-0 w-[160px]">
+        <PointsPop pop={pop} />
       </div>
-    </MotionConfig>
+    </div>
   );
 }

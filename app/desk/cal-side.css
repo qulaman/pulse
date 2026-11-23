@@ -483,24 +483,3 @@ html[data-surface="desk"][data-journal] {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  :root[data-surface="desk"][data-journal][data-graphite] {
-    .cal-side,
-    .cal-side-meeting,
-    .cal-side-ask,
-    .cal-side-chip,
-    .cal-side-chip::before,
-    .cal-side-live::before,
-    .cal-side-progress i,
-    .cal-side-answers,
-    .cal-side-person,
-    .cal-side-confirm {
-      animation: none !important;
-    }
-    .cal-side-running,
-    .cal-side-running:hover {
-      transition: none;
-      transform: none;
-    }
-  }
-}

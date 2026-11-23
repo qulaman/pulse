@@ -320,16 +320,3 @@ html[data-surface="desk"] {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"] {
-    .team-card,
-    .team-card-body,
-    .team-tile-pulse,
-    .team-tile-badge {
-      animation: none;
-    }
-    .team-tile:hover {
-      transform: none;
-    }
-  }
-}

@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, LayoutGroup, LayoutGroupContext, motion, MotionConfig } from "motion/react";
+import { AnimatePresence, LayoutGroup, LayoutGroupContext, motion } from "motion/react";
 import Link from "next/link";
 import { useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -136,51 +136,49 @@ export function TaskColumn<T extends { id: string }>({
   if (total === 0) return <>{empty}</>;
 
   return (
-    <MotionConfig reducedMotion="user">
-      <LayoutGroup>
-        <div className="relative flex flex-col gap-2">
-          <AnimatePresence initial={false} mode="popLayout">
-            {rows.map((row) =>
-              row.kind === "head" ? (
-                <motion.div
-                  key={row.key}
-                  data-group={row.section.key}
-                  layout="position"
-                  transition={CARD_SPRING}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                >
-                  <SectionHead title={row.section.title} tone={row.section.tone} count={row.section.tasks.length} />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key={row.key}
-                  layout="position"
-                  transition={CARD_SPRING}
-                  initial={{ opacity: 0, scale: 0.97 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.16 } }}
-                >
-                  {renderCard(row.task)}
-                </motion.div>
-              ),
-            )}
-          </AnimatePresence>
-          {total > drawn ? (
-            <motion.div layout="position" transition={CARD_SPRING} className="pt-2">
-              <button
-                type="button"
-                onClick={() => setLimit((value) => value + PAGE)}
-                className="flex min-h-[44px] w-full items-center justify-center rounded-[14px] border border-border/70 text-[14px] font-semibold text-muted transition-colors duration-[120ms] active:bg-surface"
+    <LayoutGroup>
+      <div className="relative flex flex-col gap-2">
+        <AnimatePresence initial={false} mode="popLayout">
+          {rows.map((row) =>
+            row.kind === "head" ? (
+              <motion.div
+                key={row.key}
+                data-group={row.section.key}
+                layout="position"
+                transition={CARD_SPRING}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
               >
-                Показать ещё <span className="nums ml-1.5">{Math.min(PAGE, total - drawn)}</span>
-              </button>
-            </motion.div>
-          ) : null}
-        </div>
-      </LayoutGroup>
-    </MotionConfig>
+                <SectionHead title={row.section.title} tone={row.section.tone} count={row.section.tasks.length} />
+              </motion.div>
+            ) : (
+              <motion.div
+                key={row.key}
+                layout="position"
+                transition={CARD_SPRING}
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.16 } }}
+              >
+                {renderCard(row.task)}
+              </motion.div>
+            ),
+          )}
+        </AnimatePresence>
+        {total > drawn ? (
+          <motion.div layout="position" transition={CARD_SPRING} className="pt-2">
+            <button
+              type="button"
+              onClick={() => setLimit((value) => value + PAGE)}
+              className="flex min-h-[44px] w-full items-center justify-center rounded-[14px] border border-border/70 text-[14px] font-semibold text-muted transition-colors duration-[120ms] active:bg-surface"
+            >
+              Показать ещё <span className="nums ml-1.5">{Math.min(PAGE, total - drawn)}</span>
+            </button>
+          </motion.div>
+        ) : null}
+      </div>
+    </LayoutGroup>
   );
 }
 

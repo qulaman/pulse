@@ -480,8 +480,3 @@ body:has(.page-sky:not([data-tone="none"]):not([data-tone="iris"])) .status-scre
   transition: opacity var(--t-instant) var(--ease-out);
 }
 .head-btn[data-live] .head-btn-led { opacity: 1; }
-@media (prefers-reduced-motion: reduce) {
-  .page-sky, .page-sky-blob, .nav-bar-glass, .nav-bar-title, .nav-bar-actions, .page-head-title,
-  .page-head-eyebrow, .page-head-state, .page-head-sub { animation: none !important; }
-  .page-sky-layer, .page-head-state, .nav-bar-glass, .nav-bar-title, .nav-bar-actions, .head-btn, .head-btn:active { transition: none; }
-}

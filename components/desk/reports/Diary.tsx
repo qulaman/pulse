@@ -67,8 +67,6 @@ export type DiaryProps = {
 /** The person's reports for the month on screen — the hook's own key, patched after a move. */
 const personKey = (userId: string, from: Ymd, to: Ymd) => ["daily-report", "team", "person", userId, from, to] as const;
 
-const reducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
-
 /**
  * «Дневник» (D-183): one person's daily reports in the desk's right-hand panel, the same for «День»
  * and «Табель». The head — the face, the name, where they are, and the moves after reading:
@@ -125,7 +123,7 @@ export function Diary({ userId, focus, today, onDay }: DiaryProps) {
     if (!data || !shown || !list.current || answered.current === ask.n) return;
     answered.current = ask.n;
     const node = list.current.querySelector<HTMLElement>(`[data-testid="desk-diary-entry"][data-day="${ask.day}"]`);
-    node?.scrollIntoView({ block: "nearest", behavior: reducedMotion() ? "auto" : "smooth" });
+    node?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [ask, data, shown]);
 
   const ring = (day: Ymd) => {

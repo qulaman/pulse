@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useRef, useState } from "react";
 
@@ -81,7 +81,6 @@ export function EventRow({
   onOpen: (event: CalendarEvent) => void;
 }) {
   const respond = useRespondEvent(meId);
-  const still = useReducedMotion();
   // answered on this row: the quiet line stays while the panel is open; the server saying no
   // puts the invitation back (the mutation restores it), and the buttons with it
   const [answered, setAnswered] = useState(false);
@@ -108,8 +107,8 @@ export function EventRow({
     );
   };
 
-  const arrive = still ? { duration: 0 } : springs.object;
-  const leave = still ? { duration: 0 } : LEAVE;
+  const arrive = springs.object;
+  const leave = LEAVE;
 
   return (
     <div

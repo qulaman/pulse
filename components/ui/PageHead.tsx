@@ -177,8 +177,7 @@ export function PageHead({
     };
   }, [glass]);
 
-  // the D-113 thresholds: the fallback where scroll timelines are missing, and the state
-  // under reduced motion
+  // the D-113 thresholds: the fallback where scroll timelines are missing
   useEffect(() => {
     const barNode = bar.current;
     const marks = [edge.current, titleEnd.current];

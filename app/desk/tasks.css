@@ -1533,39 +1533,3 @@ html[data-surface="desk"][data-journal] {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  :root[data-surface="desk"][data-journal][data-graphite] {
-    [data-desk-tasks] [role="rowgroup"] > [role="row"],
-    [data-desk-tasks] .desk-row[data-glow]::before,
-    [data-desk-tasks] .desk-row-moves,
-    [data-desk-tasks] .tasks-pick svg,
-    .tasks-bulk,
-    .tasks-bulk-n,
-    .tasks-step-bar,
-    .tasks-step-dot,
-    .tasks-step-dot::before,
-    .tasks-callout,
-    .tasks-next,
-    .tasks-msg,
-    .tasks-event,
-    [data-testid="reaction-bar"] [data-reaction] > span,
-    .tasks-progress-track > i::after,
-    .tasks-card,
-    .tasks-inbox-thread,
-    .tasks-queue .desk-list > li,
-    .tasks-done [data-testid="desk-empty"] > span[aria-hidden],
-    .tasks-entity,
-    .tasks-confirm[data-sending] .tasks-entity,
-    .tasks-urgent[data-on] > span[aria-hidden] {
-      animation: none;
-    }
-    .tasks-done [data-testid="desk-empty"] > span[aria-hidden] path {
-      animation: none;
-      stroke-dashoffset: 0;
-    }
-    [data-testid="reaction-bar"] [data-reaction]:hover > span,
-    .tasks-photo :is(a, .skeleton):hover img {
-      transform: none;
-    }
-  }
-}

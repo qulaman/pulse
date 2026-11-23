@@ -10,10 +10,10 @@ import { Tooltip } from "@/components/desk/ui/Tooltip";
  * The desk's square of an icon (D-177): 32×32, the icon 16, its words and key in a hover hint —
  * one button for the «⋯» of a row, the pin of a note, the bin of a card, instead of a hand-drawn
  * copy in every section. Muted at rest, the ink under the mouse, red under the mouse for «danger»;
- * `pressed` keeps it lit (a pin that is on). Pressing gives a small squeeze, off under reduced motion.
+ * `pressed` keeps it lit (a pin that is on). Pressing gives a small squeeze.
  */
 const SQUARE =
-  "desk-icon-button desk-focus flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] transition-[background-color,color,scale] duration-[120ms] ease-linear hover:bg-surface-2 active:scale-[.92] active:duration-[70ms] disabled:pointer-events-none disabled:opacity-40 motion-reduce:transition-none motion-reduce:active:scale-100";
+  "desk-icon-button desk-focus flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] transition-[background-color,color,scale] duration-[120ms] ease-linear hover:bg-surface-2 active:scale-[.92] active:duration-[70ms] disabled:pointer-events-none disabled:opacity-40";
 
 function tint(tone: "default" | "danger", pressed: boolean) {
   if (pressed) return "bg-surface-2 text-accent";

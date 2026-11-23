@@ -1,7 +1,7 @@
 "use client";
 
 import { useIsMutating, useQueryClient } from "@tanstack/react-query";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useRef, useState, type ReactNode } from "react";
 
 import { Key, Lcd, LcdDim } from "@/components/ui/device/Device";
@@ -249,10 +249,8 @@ const DRAFT_PILL = 56;
 
 function PresenterCapsule({ boardId, points, now }: { boardId: string; points: readonly PresenterPoint[]; now: Date }) {
   const presenter = usePresenter(boardId, points, now);
-  const reduce = useReducedMotion();
   const draft = useIngestStore((state) => state.stage === "confirm");
   const shown = presenter.onWall && presenter.stage.kind !== "empty";
-  const lift = reduce ? 0 : 14;
   // the bottom toasts stand above the capsule, not over ◀ ▶ (D-142)
   const dock = useRef<HTMLDivElement>(null);
   useDockSpace(dock, shown);
@@ -267,14 +265,14 @@ function PresenterCapsule({ boardId, points, now }: { boardId: string; points: r
           ref={dock}
           className={`above-tabbar ${p.dock}`}
           style={{ bottom: `calc(var(--tabbar-space) + ${8 + (draft ? DRAFT_PILL : 0)}px)` }}
-          initial={{ opacity: 0, y: lift }}
+          initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: lift }}
+          exit={{ opacity: 0, y: 14 }}
           transition={{ duration: 0.22, ease: [0.2, 0, 0, 1] }}
         >
           <div className={p.capsule} role="group" aria-label="Ведущий" data-testid="presenter-board">
             {presenter.stage.kind === "empty" ? null : (
-              <CapsuleBody stage={presenter.stage} presenter={presenter} reduce={reduce === true} />
+              <CapsuleBody stage={presenter.stage} presenter={presenter} />
             )}
           </div>
         </motion.div>
@@ -286,11 +284,9 @@ function PresenterCapsule({ boardId, points, now }: { boardId: string; points: r
 function CapsuleBody({
   stage,
   presenter,
-  reduce,
 }: {
   stage: Exclude<PresenterStage, { kind: "empty" }>;
   presenter: ReturnType<typeof usePresenter>;
-  reduce: boolean;
 }) {
   const pill = presenterPill(stage);
   const tick = () => haptic(10);
@@ -316,7 +312,7 @@ function CapsuleBody({
   }
 
   const point = stage.kind === "point" ? stage : null;
-  const shift = reduce ? 0 : 10 * presenter.direction;
+  const shift = 10 * presenter.direction;
 
   return (
     <>
@@ -339,7 +335,7 @@ function CapsuleBody({
         onClick={() => {
           // the card of the point on this screen, if it is drawn (components/mindboard/PointCard)
           const card = point ? document.querySelector(`[data-point-id="${point.point.id}"]`) : null;
-          card?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
+          card?.scrollIntoView({ behavior: "smooth", block: "center" });
         }}
       >
         <AnimatePresence mode="popLayout" initial={false}>

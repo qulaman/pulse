@@ -81,7 +81,7 @@ function ToastItem({ item, node }: { item: Toast; node: (el: HTMLDivElement | nu
   // the bar runs out with the button's time, from the moment the toast was raised: the render
   // that raised it may have taken a while, the time did not wait for it. WAAPI on the
   // compositor, not a CSS animation: the entrance's `fromNextFrame` holds the toast's own
-  // animations, never this one, and reduced motion keeps it — it is a clock, not a flourish
+  // animations, never this one — it is a clock, not a flourish
   useLayoutEffect(() => {
     const bar = timer.current;
     if (!bar) return;
@@ -155,7 +155,6 @@ export function ToastHost() {
   useKeyboardDock(lowStack, toasts.some((toast) => toast.action), { cover: false });
 
   useLayoutEffect(() => {
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const next = new Map<number, number>();
     for (const [id, el] of nodes.current) {
       const top = el.offsetTop;
@@ -163,7 +162,7 @@ export function ToastHost() {
       const was = tops.current.get(id);
       // a new toast arrives with the action that raised it, usually the heaviest render of the tap
       if (was === undefined) el.getAnimations().forEach(fromNextFrame);
-      if (still || was === undefined || was === top) continue;
+      if (was === undefined || was === top) continue;
       // the ones below glide into the room a toast left on the object spring, like any thing (D-166)
       const glide = objectMotion();
       fromNextFrame(

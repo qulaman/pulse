@@ -223,7 +223,7 @@ export function DictationMic({
         data-testid={testId}
         data-recording="0"
         data-stage={stage}
-        className={`desk-focus flex ${box} shrink-0 items-center justify-center rounded-full bg-accent text-bg transition-[filter,scale] duration-[120ms] hover:brightness-110 active:scale-[.94] active:duration-[70ms] motion-reduce:transition-none motion-reduce:active:scale-100`}
+        className={`desk-focus flex ${box} shrink-0 items-center justify-center rounded-full bg-accent text-bg transition-[filter,scale] duration-[120ms] hover:brightness-110 active:scale-[.94] active:duration-[70ms]`}
         style={{ boxShadow: "0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent), 0 6px 18px -8px color-mix(in srgb, var(--accent) 80%, transparent)" }}
       >
         <MicGlyph size={size === 36 ? 18 : 16} />

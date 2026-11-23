@@ -416,13 +416,6 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  :root[data-surface="desk"] :is(.desk-alarm, .desk-alarm-strip),
-  :root[data-surface="desk"] :is(.desk-alarm, .desk-alarm-strip)::before {
-    animation: none !important;
-  }
-}
-
 @media print {
   :root[data-surface="desk"] :is(.desk-alarm, .desk-alarm-strip) {
     display: none !important;

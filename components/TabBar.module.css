@@ -3,7 +3,7 @@
    Contract: the capsule, the thumb, the icons and the words move by transform and opacity
    only; the glass (backdrop blur) and the glows are static and never animated. The fold
    is one scale of the whole capsule around its bottom edge, so nothing inside is squashed
-   and no layout runs while it plays. Under prefers-reduced-motion everything snaps. */
+   and no layout runs while it plays. */
 
 .spacer {
   flex-shrink: 0;
@@ -254,15 +254,3 @@
   animation: badge-pop 420ms var(--ease-out);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .capsule,
-  .thumb,
-  .pill,
-  .icon,
-  .label {
-    transition: none;
-  }
-  .badgePop {
-    animation: none;
-  }
-}

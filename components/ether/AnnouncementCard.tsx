@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 import { useState } from "react";
 
 import { AudioOriginal } from "@/components/tasks/AudioOriginal";
@@ -177,11 +177,9 @@ export function AnnouncementCard({
  * the ack already written. It keeps the button's height, so the card does not move.
  */
 function AckedMark({ fresh }: { fresh: boolean }) {
-  const still = useReducedMotion();
-  const plays = fresh && !still;
   return (
     <span className="relative inline-flex min-h-[44px] items-center px-3" data-testid="ether-acked">
-      {plays ? (
+      {fresh ? (
         <motion.span
           aria-hidden
           className="absolute inset-0 rounded-[12px]"
@@ -194,14 +192,14 @@ function AckedMark({ fresh }: { fresh: boolean }) {
       <motion.span
         className="relative inline-flex items-center gap-1.5 text-[14px] font-semibold leading-[18px]"
         style={{ color: "var(--ok)" }}
-        initial={plays ? { scale: 0.7, opacity: 0 } : false}
+        initial={fresh ? { scale: 0.7, opacity: 0 } : false}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ scale: springs.alive, opacity: { duration: 0.12 } }}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <motion.path
             d="M5 12.5l4.5 4.5L19 7.5"
-            initial={plays ? { pathLength: 0 } : false}
+            initial={fresh ? { pathLength: 0 } : false}
             animate={{ pathLength: 1 }}
             transition={{ duration: 0.3, delay: 0.08, ease: [0.2, 0, 0, 1] }}
           />

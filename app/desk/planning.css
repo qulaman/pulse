@@ -610,23 +610,3 @@ html[data-surface="desk"][data-journal] {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  :root[data-surface="desk"][data-journal][data-graphite] {
-    .screen-bezel,
-    .screen-now,
-    .screen-cartridge,
-    .screen-scene,
-    .screen-visit,
-    .screen-card,
-    .screen-ring-left {
-      animation: none !important;
-    }
-    .screen-scene:hover {
-      transform: none;
-    }
-    .screen-ring-left,
-    button.screen-switch[role="switch"] > span {
-      transition: none;
-    }
-  }
-}

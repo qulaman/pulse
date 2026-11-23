@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, CheckCheck, Clock3, MessageCircleQuestion, PenLine, Siren, Timer } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 
 import { useDeskPanel } from "@/components/desk/ui/DeskPanel";
@@ -604,7 +604,6 @@ export function QueueList({
   const link = useErrandLink();
   const panel = useDeskPanel();
   const back = useBackOnTake(meId);
-  const still = useReducedMotion();
   const secretaries = useSecretaries();
   const myName = secretaries.data?.find((person) => person.id === meId)?.full_name ?? "";
   const alarming = (errand: Errand) => errand.status === "sent" && sceneOf(errand, catalogue) === "security";
@@ -740,8 +739,8 @@ export function QueueList({
   });
 
   const isChosen = (id: string) => current?.errand.id === id;
-  const glide = still ? false : ("position" as const);
-  const leave = still ? undefined : { opacity: 0, scale: 0.98, transition: { duration: 0.12 } };
+  const glide = "position" as const;
+  const leave = { opacity: 0, scale: 0.98, transition: { duration: 0.12 } };
 
   return (
     <>

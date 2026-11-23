@@ -188,7 +188,7 @@ export function Assistant({ said, lines, children }: Props) {
   });
   useEffect(() => {
     if (!ghost) return;
-    // the ghost goes on its animation's end; this is the net under it (reduced motion has no animation)
+    // the ghost goes on its animation's end; this is the net under it
     const timer = setTimeout(() => setGhost((g) => (g === ghost ? null : g)), 400);
     return () => clearTimeout(timer);
   }, [ghost]);

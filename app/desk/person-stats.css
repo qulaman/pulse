@@ -377,12 +377,3 @@ html[data-surface="desk"][data-journal] {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"][data-journal] {
-    .ps-tile,
-    .ps-tile * {
-      animation: none !important;
-      transition: none !important;
-    }
-  }
-}

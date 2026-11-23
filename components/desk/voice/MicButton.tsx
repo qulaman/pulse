@@ -110,7 +110,7 @@ export function RecordingPill({
       data-recording="1"
       className={`desk-focus flex h-8 shrink-0 items-center gap-2 border border-accent px-2.5 text-accent transition-colors duration-[120ms] hover:bg-accent/10 ${className}`}
     >
-      <span aria-hidden className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-current motion-reduce:animate-none" />
+      <span aria-hidden className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-current" />
       {clock}
       {level}
       <span className="text-[13px] font-semibold leading-4">Готово</span>

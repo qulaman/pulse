@@ -124,8 +124,7 @@ export function PeopleNow({
     if (shown.current === chosenId) return;
     shown.current = chosenId;
     if (!chosenId) return;
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    sheet.current?.scrollIntoView({ block: "nearest", behavior: still ? "auto" : "smooth" });
+    sheet.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [chosenId]);
 
   const tiles = (list: readonly PersonRow[], testId?: string) => (

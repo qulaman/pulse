@@ -1118,19 +1118,6 @@ html[data-surface="desk"] {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  :root[data-surface="desk"][data-journal][data-graphite] {
-    [data-testid="desk-panel"],
-    [data-testid="desk-panel"] .no-bar > .contents > *,
-    .desk-pop,
-    .desk-row::after,
-    .desk-grid .desk-row,
-    .pointer-events-none.fixed.z-\[80\] {
-      animation: none !important;
-    }
-  }
-}
-
 /* ---- on paper: black on white whatever the screen's face — the journal's print tokens sit one step
    lower than the dark ones above and lost to them (D-183) --------------------------------------- */
 @media print {

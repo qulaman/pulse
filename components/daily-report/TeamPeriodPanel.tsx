@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutGroup, motion, MotionConfig } from "motion/react";
+import { LayoutGroup, motion } from "motion/react";
 import { useMemo, useRef, useState, type CSSProperties } from "react";
 
 import { PersonFace } from "@/components/people/PeoplePicker";
@@ -212,53 +212,51 @@ function PeriodPeople({ rows }: { rows: readonly TeamPeriodRow[] }) {
         })}
       </div>
 
-      <MotionConfig reducedMotion="user">
-        <LayoutGroup>
-          <ul className="flex flex-col gap-2">
-            {sorted.map((row) => {
-              const open = openId === row.user_id;
-              return (
-                <motion.li key={row.user_id} layout="position" transition={CARD_SPRING} className="task-card overflow-hidden" style={{ borderRadius: 16 }}>
-                  <button
-                    type="button"
-                    aria-expanded={open}
-                    onClick={() => setOpenId(open ? null : row.user_id)}
-                    className={`${GRID} min-h-[56px] w-full px-3.5 py-2 text-left transition-transform duration-[120ms] active:scale-[0.99]`}
-                    data-testid="team-period-person"
-                  >
-                    <span className="flex min-w-0 items-center gap-2.5">
-                      <PersonFace person={row} size={32} />
-                      <span className="min-w-0">
-                        <span className="block truncate text-[15px] leading-5">{shortName(row.full_name)}</span>
-                        <span className="nums block truncate text-[12px] leading-4 text-muted">
-                          {row.submitted} из {row.submitted + row.missed}
-                        </span>
+      <LayoutGroup>
+        <ul className="flex flex-col gap-2">
+          {sorted.map((row) => {
+            const open = openId === row.user_id;
+            return (
+              <motion.li key={row.user_id} layout="position" transition={CARD_SPRING} className="task-card overflow-hidden" style={{ borderRadius: 16 }}>
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  onClick={() => setOpenId(open ? null : row.user_id)}
+                  className={`${GRID} min-h-[56px] w-full px-3.5 py-2 text-left transition-transform duration-[120ms] active:scale-[0.99]`}
+                  data-testid="team-period-person"
+                >
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <PersonFace person={row} size={32} />
+                    <span className="min-w-0">
+                      <span className="block truncate text-[15px] leading-5">{shortName(row.full_name)}</span>
+                      <span className="nums block truncate text-[12px] leading-4 text-muted">
+                        {row.submitted} из {row.submitted + row.missed}
                       </span>
                     </span>
-                    <span className="nums text-right text-[15px] font-semibold leading-5" style={{ color: rateColor(row.submit_rate) }}>
-                      {percentText(row.submit_rate)}
-                    </span>
-                    <span className="nums text-right text-[15px] leading-5">{row.avg_hours === null ? "—" : hoursText(row.avg_hours).replace(" ч", "")}</span>
-                    <span className="nums text-right text-[15px] leading-5">
-                      {row.handed_over}
-                      <span className="text-muted">/{row.closed}</span>
-                    </span>
-                  </button>
-                  {open ? (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1, transition: { duration: 0.2, delay: 0.06 } }}
-                      className="border-t border-border/60 px-3.5 pb-3.5 pt-3"
-                    >
-                      <PersonNumbers row={row} />
-                    </motion.div>
-                  ) : null}
-                </motion.li>
-              );
-            })}
-          </ul>
-        </LayoutGroup>
-      </MotionConfig>
+                  </span>
+                  <span className="nums text-right text-[15px] font-semibold leading-5" style={{ color: rateColor(row.submit_rate) }}>
+                    {percentText(row.submit_rate)}
+                  </span>
+                  <span className="nums text-right text-[15px] leading-5">{row.avg_hours === null ? "—" : hoursText(row.avg_hours).replace(" ч", "")}</span>
+                  <span className="nums text-right text-[15px] leading-5">
+                    {row.handed_over}
+                    <span className="text-muted">/{row.closed}</span>
+                  </span>
+                </button>
+                {open ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1, transition: { duration: 0.2, delay: 0.06 } }}
+                    className="border-t border-border/60 px-3.5 pb-3.5 pt-3"
+                  >
+                    <PersonNumbers row={row} />
+                  </motion.div>
+                ) : null}
+              </motion.li>
+            );
+          })}
+        </ul>
+      </LayoutGroup>
       <p className="mt-2 px-1 text-[12px] leading-4 text-muted">Часы — в среднем за сданный день; задачи — сдано / принято</p>
     </div>
   );

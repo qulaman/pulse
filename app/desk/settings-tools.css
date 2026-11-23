@@ -434,18 +434,3 @@ html[data-surface="desk"][data-journal] {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"][data-journal] {
-    .dict-strip,
-    .dict-addbar,
-    .dict-verdict-icon,
-    .dict-budget-fill,
-    .dict-suggest-item,
-    .dict-pill,
-    .dict-heard-bar::after,
-    .lab-tab,
-    .data-sheet {
-      animation: none !important;
-    }
-  }
-}

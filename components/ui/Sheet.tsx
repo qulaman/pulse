@@ -107,7 +107,6 @@ function useSheetDrag({
     let drag: { id: number; via: "touch" | "pointer"; y0: number; base: number; height: number; shown: number; moves: [number, number][] } | null = null;
 
     const free = () => document.documentElement.getAttribute("data-surface") !== "desk" && ready.current === true;
-    const still = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     const begin = (id: number, via: "touch" | "pointer", y: number, at: number) => {
       // a spring-back still under way: the sheet is picked up where it is drawn
@@ -134,7 +133,7 @@ function useSheetDrag({
       const dim = Number(overlay.style.opacity || 1);
       dialog.style.translate = "";
       overlay.style.opacity = "";
-      if (still() || Math.abs(from) < 0.5) return;
+      if (Math.abs(from) < 0.5) return;
       const { ms, easing } = objectMotion();
       springing = [
         dialog.animate([{ translate: `0 ${from}px` }, { translate: "0 0" }], { duration: ms, easing }),

@@ -202,8 +202,7 @@ export function SectionTabs({ sections, label }: { sections: PageSectionLink[]; 
             aria-current={on ? "location" : undefined}
             onClick={(event) => {
               event.preventDefault();
-              const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-              document.getElementById(section.id)?.scrollIntoView({ block: "start", behavior: still ? "auto" : "smooth" });
+              document.getElementById(section.id)?.scrollIntoView({ block: "start", behavior: "smooth" });
             }}
           >
             {on ? <motion.span layoutId="section-tab-plate" className="section-tab-plate" transition={TAB_GLIDE} aria-hidden /> : null}

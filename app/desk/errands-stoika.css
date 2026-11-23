@@ -1068,21 +1068,3 @@ html[data-surface="desk"][data-journal] {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"][data-journal] {
-    .stoika-ticket,
-    .stoika-ticket::after,
-    .stoika-ticket-tile::before,
-    .stoika-ticket-tile > .errands-tile,
-    .stoika-row,
-    .stoika-label-face,
-    .stoika-heart > svg {
-      animation: none !important;
-    }
-    .stoika-lamp,
-    .stoika-cap,
-    .stoika-second {
-      transition: none !important;
-    }
-  }
-}

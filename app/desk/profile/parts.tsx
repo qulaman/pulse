@@ -99,8 +99,7 @@ export function ProfileNav({ sections }: { sections: ProfileSection[] }) {
             onClick={(event) => {
               event.preventDefault();
               const node = document.getElementById(section.id);
-              const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-              node?.scrollIntoView({ block: "start", behavior: still ? "auto" : "smooth" });
+              node?.scrollIntoView({ block: "start", behavior: "smooth" });
             }}
           >
             {on ? <motion.span layoutId="profile-nav-plate" className="profile-nav-plate" transition={GLIDE} aria-hidden /> : null}

@@ -1,6 +1,6 @@
 "use client";
 
-import { animate, motion, useInView, useReducedMotion } from "motion/react";
+import { animate, motion, useInView } from "motion/react";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
@@ -28,21 +28,19 @@ export function Reveal({ children, delay = 0, className }: { children: ReactNode
   );
 }
 
-/** A number that counts up once it is on screen; under reduced motion it simply stands there. */
+/** A number that counts up once it is on screen. */
 export function CountUp({ to, decimals = 0, prefix = "", suffix = "" }: { to: number; decimals?: number; prefix?: string; suffix?: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   const seen = useInView(ref, { once: true, amount: 0.6 });
-  const still = useReducedMotion();
   const [value, setValue] = useState(0);
 
   useEffect(() => {
-    if (!seen || still) return;
+    if (!seen) return;
     const controls = animate(0, to, { duration: 1.3, ease: [0.2, 0, 0, 1], onUpdate: setValue });
     return () => controls.stop();
-  }, [seen, still, to]);
+  }, [seen, to]);
 
-  const shown = still ? to : value;
-  const text = shown.toLocaleString("ru-RU", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  const text = value.toLocaleString("ru-RU", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   return (
     <span ref={ref} className="nums">
       {prefix}

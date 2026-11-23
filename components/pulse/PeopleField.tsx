@@ -52,8 +52,7 @@ function signOf(tasks: CrewTask[]): string {
  * other, and that is the whole story of the screen.
  *
  * The dream over them brushes the team (D-77). Nobody touching the screen for three minutes
- * stops the rings (the battery of a board left open); `still` — `prefers-reduced-motion` —
- * shows the same team without any motion at all, since it carries the state of the work.
+ * stops the rings (the battery of a board left open).
  */
 export function PeopleField({
   members,
@@ -64,7 +63,6 @@ export function PeopleField({
   dream,
   chase,
   picked = null,
-  still = false,
   onPick,
   onLook,
   allHref,
@@ -82,8 +80,6 @@ export function PeopleField({
   chase?: Chase | null;
   /** the id of the idler picked on this screen; the screen keeps it, this layer draws it */
   picked?: string | null;
-  /** no motion at all: the circles, the rings and the badges stand still */
-  still?: boolean;
   /** a tap on an idler: that person, or null when the picked one is tapped again */
   onPick?: (pick: Pick | null) => void;
   /** a lit one's card opened or closed: the face looks at him meanwhile */
@@ -155,7 +151,7 @@ export function PeopleField({
   const [flights, setFlights] = useState<Map<string, Flight>>(() => new Map());
   const [landed, setLanded] = useState<Set<string>>(() => new Set());
   if (known?.seats !== layout.seats) {
-    if (known && !still) {
+    if (known) {
       const started: [string, Flight][] = [];
       for (const { member, look } of crew) {
         const was = known.busy.get(member.id);
@@ -318,7 +314,6 @@ export function PeopleField({
       data-testid="people-field"
       data-busy={busyCount}
       data-idle={crew.length - busyCount}
-      data-still={still ? "" : undefined}
       data-asleep={asleep ? "" : undefined}
     >
       {wake ? <style>{wake.css}</style> : null}

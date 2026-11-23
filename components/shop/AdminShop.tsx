@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 
@@ -26,11 +26,9 @@ function Chevron() {
 
 /**
  * The blocks come in as a staircase: the only motion on the screen, transform and opacity only,
- * 40 ms apart. Under `prefers-reduced-motion` the blocks simply stand in place.
+ * 40 ms apart.
  */
 function Reveal({ index, children }: { index: number; children: ReactNode }) {
-  const reduced = useReducedMotion();
-  if (reduced) return <>{children}</>;
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}

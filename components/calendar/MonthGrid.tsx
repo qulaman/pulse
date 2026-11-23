@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
 import { useRef } from "react";
 
 import { useGlideOn } from "@/components/ui/motion";
@@ -57,7 +57,6 @@ function weekCells(selected: Ymd): Cell[][] {
  * a sideways swipe step by what is shown. A new page slides in from the side it came from.
  */
 export function MonthGrid({ nav, today, marks, now }: Props) {
-  const reduce = useReducedMotion();
   const touch = useRef<{ x: number; y: number } | null>(null);
   const box = useRef<HTMLElement>(null);
   // folding changes the grid by five rows: the list under it glides that way instead of jumping
@@ -118,7 +117,7 @@ export function MonthGrid({ nav, today, marks, now }: Props) {
 
       <motion.div
         key={pageKey}
-        initial={reduce || nav.direction === 0 ? false : { opacity: 0, x: nav.direction * 22 }}
+        initial={nav.direction === 0 ? false : { opacity: 0, x: nav.direction * 22 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
         className="mt-1"

@@ -18,11 +18,6 @@ export const SHRINK_OUT = "mascot-shrink-out 0.2s cubic-bezier(0.4, 0, 1, 1) bot
  */
 export const ACT_OUT = "mascot-shrink-out 0.16s cubic-bezier(0.4, 0, 1, 1) both";
 
-/** «Уменьшить движение»: nothing is played out, a prop simply goes. Read at the moment it goes. */
-function reducedMotion(): boolean {
-  return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
-}
-
 /**
  * A prop of a face that leaves instead of blinking out (D-119): the clipboard when the ball
  * closes, the stack when the last order is handed in, the room when a request comes in. While
@@ -39,7 +34,7 @@ export function Linger({ show, out = PROP_OUT, origin = "50% 100%", children }: 
   // adjusted during render, not in an effect: the exit starts in the same paint as the change
   if (show !== was) {
     setWas(show);
-    setLeaving(!show && kept !== null && !reducedMotion());
+    setLeaving(!show && kept !== null);
   }
   if (show && children !== kept) setKept(children);
   if (!show && !leaving) return null;

@@ -982,16 +982,3 @@ html[data-surface="desk"][data-journal] {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"][data-journal] .desk-row[data-glow],
-  html[data-surface="desk"][data-journal] .desk-crew-card,
-  html[data-surface="desk"][data-journal] .desk-crew-card-body,
-  html[data-surface="desk"][data-journal] .desk-tile,
-  html[data-surface="desk"][data-journal] .desk-tile::after,
-  html[data-surface="desk"][data-journal] .desk-live::after,
-  html[data-surface="desk"][data-journal] .desk-meter > i,
-  html[data-surface="desk"][data-journal] .desk-rise,
-  html[data-surface="desk"][data-journal] .desk-spin {
-    animation: none;
-  }
-}

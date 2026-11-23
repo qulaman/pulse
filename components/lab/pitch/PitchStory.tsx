@@ -1,6 +1,5 @@
 "use client";
 
-import { MotionConfig } from "motion/react";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 
@@ -21,7 +20,7 @@ import { VoiceDemo } from "./VoiceDemo";
  */
 export function PitchStory() {
   return (
-    <MotionConfig reducedMotion="user">
+    <>
       <Hero />
       <Problem />
       <HowItWorks />
@@ -31,7 +30,7 @@ export function PitchStory() {
       <Business />
       <Progress />
       <Finale />
-    </MotionConfig>
+    </>
   );
 }
 

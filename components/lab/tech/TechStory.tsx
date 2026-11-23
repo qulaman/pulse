@@ -1,6 +1,5 @@
 "use client";
 
-import { MotionConfig } from "motion/react";
 import type { ReactNode } from "react";
 
 import { CountUp, EcgLine, Reveal } from "@/components/lab/pitch/parts";
@@ -17,12 +16,12 @@ import { TechMap } from "./TechMap";
  */
 export function TechStory() {
   return (
-    <MotionConfig reducedMotion="user">
+    <>
       <Hero />
       <MapSection />
       <Isolation />
       <Stack />
-    </MotionConfig>
+    </>
   );
 }
 

@@ -547,11 +547,6 @@ html[data-surface="desk"][data-journal] {
     box-shadow: 0 0 0 1px var(--rule);
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .rep-tabel[data-stale] .rep-tabel-sheet {
-      transition: none;
-    }
-  }
 }
 
 /* ---- on paper: the табель landscape A4 with the file's short words and the legend, «Сводка»

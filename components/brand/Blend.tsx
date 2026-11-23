@@ -26,11 +26,6 @@ function timeAt({ curve: [x1, y1, x2, y2] }: Timing, progress: number): number {
   return bezier(x1, x2, low);
 }
 
-/** Read at the moment of the change, like Linger: under «уменьшить движение» there is no mid-pose to carry. */
-function reducedMotion(): boolean {
-  return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
-}
-
 function matrixOf(element: Element): DOMMatrix {
   const value = getComputedStyle(element).transform;
   return value && value !== "none" ? new DOMMatrix(value) : new DOMMatrix();
@@ -115,7 +110,7 @@ export class Blend extends Component<{
     if (previous.k === this.props.k) return null;
     const self = this.node.current;
     const inner = self?.firstElementChild;
-    if (!self || !inner || reducedMotion()) return null;
+    if (!self || !inner) return null;
     // a second change before the first one's blend has started: that blend is part of the body too
     this.play();
     // a blend still under way is part of where the body is now

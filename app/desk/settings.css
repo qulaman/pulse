@@ -743,21 +743,3 @@ html[data-surface="desk"][data-journal] {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"][data-journal] {
-    .set-card,
-    .set-row-mark,
-    .set-check-tick,
-    .set-chip,
-    .set-errand-chip,
-    .set-dayline-on,
-    .set-savebar,
-    .set-savebar-dot {
-      animation: none !important;
-    }
-    .set-dayline-on,
-    .set-link-arrow {
-      transition: none !important;
-    }
-  }
-}

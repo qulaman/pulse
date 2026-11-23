@@ -73,7 +73,7 @@ export function MascotOverlays({ state, pose, side }: { state: MascotState; pose
       {/* celebrating: the confetti goes up off the crown, opens out and falls */}
       <Linger show={state === "celebrating" && detailed} out={FADE_OUT}>
         {state === "celebrating" && detailed ? (
-          <g data-confetti>
+          <g>
             {CONFETTI.map((bit, index) => (
               <rect
                 key={index}

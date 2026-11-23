@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, MotionConfig, Reorder } from "motion/react";
+import { AnimatePresence, Reorder } from "motion/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { NoteIcon } from "@/components/notes/icons";
@@ -221,9 +221,8 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
     shownSpot.current = spot;
     const typing = document.activeElement instanceof HTMLTextAreaElement || document.activeElement instanceof HTMLInputElement;
     if (typing) return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     // the card itself: its scroll margins keep it clear of the head and of the capsule over the tab bar
-    document.querySelector<HTMLElement>(`article[data-task-id="${spot}"]`)?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+    document.querySelector<HTMLElement>(`article[data-task-id="${spot}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [spot, ready]);
 
   const summary = boardSummary(rows);
@@ -505,7 +504,7 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
           </span>
         </div>
       ) : (
-        <MotionConfig reducedMotion="user">
+        <>
           {handing ? (
             <p className="mt-4 px-1 text-[13px] leading-[18px] text-muted" data-testid="hand-out-hint">
               Тап по пункту — кому его поручить. Потом «Поручить» внизу — уйдут все сразу
@@ -551,7 +550,7 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
               })}
             </AnimatePresence>
           </Reorder.Group>
-        </MotionConfig>
+        </>
       )}
 
       {branches.length > 1 && accordion.openId === null && !handing ? (
@@ -716,9 +715,8 @@ function BoardTitle({
       node.focus({ preventScroll: true });
       return;
     }
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    node.scrollIntoView({ block: "center", behavior: still ? "auto" : "smooth" });
-    const timer = setTimeout(() => node.focus({ preventScroll: true }), still ? 0 : FOCUS_AFTER_GLIDE_MS);
+    node.scrollIntoView({ block: "center", behavior: "smooth" });
+    const timer = setTimeout(() => node.focus({ preventScroll: true }), FOCUS_AFTER_GLIDE_MS);
     return () => clearTimeout(timer);
   }, [editing]);
 

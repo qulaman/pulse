@@ -195,7 +195,6 @@ function TabPanel({ id, active, move, children }: { id: SettingsTab; active: boo
   useLayoutEffect(() => {
     const node = ref.current;
     if (!active || !node || move.n === 0) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     node.animate(
       [
         { opacity: 0, transform: `translateX(${move.dir * 24}px)` },

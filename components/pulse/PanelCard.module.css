@@ -48,12 +48,6 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .afterCard {
-    animation: none;
-  }
-}
-
 /* the top edge fades only once something has gone up under it — never a fade over the first line */
 .scroll[data-scrolled] {
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22px);

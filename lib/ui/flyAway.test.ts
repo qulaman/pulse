@@ -92,10 +92,9 @@ describe("arcFrames arrivesAs", () => {
 describe("flyInto", () => {
   type Flight = { frames: Keyframe[]; timing: KeyframeAnimationOptions; shadow: string | undefined };
 
-  /** The least of a page a flight needs: a layer on <body>, a copy that animates, a media query. */
-  function stage(reduce = false) {
+  /** The least of a page a flight needs: a layer on <body>, a copy that animates. */
+  function stage() {
     const flights: Flight[] = [];
-    vi.stubGlobal("window", { matchMedia: () => ({ matches: reduce }) });
     vi.stubGlobal("document", {
       createElement: () => ({ style: {}, setAttribute() {}, appendChild() {}, remove() {} }),
       body: { appendChild() {} },
@@ -135,13 +134,5 @@ describe("flyInto", () => {
     expect(flights[0].shadow).toBeUndefined();
     expect(flights[0].timing.duration).toBe(650);
     expect(endScale(flights[0])).toBeCloseTo(0.86, 3);
-  });
-
-  it("flies nothing under «уменьшить движение» and lands at once", () => {
-    const { flights, node, target } = stage(true);
-    const onLand = vi.fn();
-    flyInto(node, target, { lifted: false, arrivesAs: 0.86, onLand });
-    expect(flights).toHaveLength(0);
-    expect(onLand).toHaveBeenCalledOnce();
   });
 });

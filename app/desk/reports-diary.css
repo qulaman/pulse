@@ -451,13 +451,3 @@ html[data-surface="desk"] {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"] {
-    .rep-diary-cell,
-    .rep-diary-entry,
-    .rep-diary-task {
-      animation: none;
-      transition: none;
-    }
-  }
-}

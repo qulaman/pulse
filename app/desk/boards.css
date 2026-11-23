@@ -779,19 +779,3 @@ html[data-surface="desk"][data-journal][data-graphite] {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"][data-journal] {
-    .boards-tile,
-    .boards-tile-sheet,
-    .boards-hero-sheet,
-    .boards-new-plate,
-    .board-face {
-      animation: none !important;
-      transition: none !important;
-    }
-    .boards-tile-sheet:hover,
-    .boards-hero-sheet:hover {
-      transform: none;
-    }
-  }
-}

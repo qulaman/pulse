@@ -403,7 +403,7 @@ function useThumb(thumb: RefObject<HTMLSpanElement | null>, index: number) {
     shown.current = index;
     el.style.setProperty("--i", String(index));
     const pad = el.firstElementChild;
-    if (!pad || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!pad) return;
     stretching.current?.cancel();
     stretching.current = pad.animate(stretchKeyframes(travel), { duration: THUMB_MS, easing: "linear" });
   }, [thumb, index]);
@@ -562,8 +562,7 @@ export function TabBar({ role, lab = false }: { role: TabRole; lab?: boolean }) 
                     if (pathname === tab.href) {
                       // the tab of this very screen takes it back to the top, as on every phone
                       event.preventDefault();
-                      const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-                      window.scrollTo({ top: 0, behavior: still ? "auto" : "smooth" });
+                      window.scrollTo({ top: 0, behavior: "smooth" });
                       return;
                     }
                     if (i !== index) setTapped(i);

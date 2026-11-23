@@ -14,8 +14,7 @@ const FLIGHT_MS = 650;
  * (`face-pill`) flies along an arc into the points under the name in the header
  * (`data-points-target`, `HeaderPoints`). The pill itself stays by the face; the counter rolls when
  * the balance comes, not when the copy lands (principle 1a). The flight is the app's one flight of
- * copies, `flyInto`: under «уменьшить движение», or with no counter on the screen (a secretary's
- * header), nothing flies. Renders nothing; `arrival` is the key of `usePointsArrival`, the one the
+ * copies, `flyInto`: with no counter on the screen (a secretary's header), nothing flies. Renders nothing; `arrival` is the key of `usePointsArrival`, the one the
  * coin plays on.
  */
 export const PointsFlight = memo(function PointsFlight({ arrival }: { arrival: number }) {

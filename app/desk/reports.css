@@ -19,12 +19,6 @@ html[data-surface="desk"][data-journal] {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"][data-journal] .reports-stepper-title {
-    animation: none;
-  }
-}
-
 /* ==========================================================================================
    «Профиль» (D-174, app/desk/profile/*): an account page as settings read on Vercel — the page's
    own contents on the left, following the scroll; a card a subject on the right with its title,
@@ -532,20 +526,6 @@ html[data-surface="desk"][data-journal] {
 @keyframes profile-dot {
   from {
     transform: scale(0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"][data-journal] {
-    .profile-card,
-    .profile-fields,
-    .profile-saved,
-    .profile-mode[data-on] .profile-mode-dot::after {
-      animation: none;
-    }
-    .profile-link:hover svg {
-      transform: none;
-    }
   }
 }
 
@@ -1447,33 +1427,3 @@ html[data-surface="desk"][data-journal] {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"][data-journal] {
-    .person-hero,
-    .person-hero-face,
-    .person-section-body,
-    .person-hero-stats > *,
-    .login-issued,
-    .login-qr,
-    .login-landed,
-    .login-landed-mark,
-    .login-waiting-dot,
-    .newp-aside,
-    .newp-step,
-    .newp-step-mark svg,
-    .newp-check[data-state="ok"] .newp-check-mark svg {
-      animation: none;
-    }
-    .person-facts > a:hover,
-    .person-report:hover .person-report-arrow,
-    .person-section-move:hover svg {
-      transform: none;
-    }
-    .login-timer > span,
-    .bulk-progress > span,
-    .profile button[role="switch"],
-    .profile button[role="switch"] > span {
-      transition: none;
-    }
-  }
-}

@@ -8,8 +8,8 @@
  * main thread busy every frame (4.4 s of 10 at CPU ×4); a bee's wings at 0.09 s did the same for a
  * whole dream. Folded, the motion is the same — the same stops, the same easing on every segment —
  * but the boundary comes once a minute (the team) or once a dream (the dream's figures), and the main
- * thread sleeps (0.04 s of 10). It stays a CSS animation, so `prefers-reduced-motion`, `[data-still]`
- * and the deep rest's `[data-asleep]` stop it exactly as before.
+ * thread sleeps (0.04 s of 10). It stays a CSS animation, so `[data-still]` and the deep rest's
+ * `[data-asleep]` stop it.
  *
  * A loop is written as one cycle of stops; `loop(name, cycleMs, rest)` gives the `animation` value
  * with the iteration as long as its folded cycles. The keyframes go into the page once, as one
