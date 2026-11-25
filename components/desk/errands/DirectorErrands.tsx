@@ -245,6 +245,13 @@ export function DirectorErrands({ meId, openId, onOpen }: { meId: string; openId
                       onHistory={() => switchView("history")}
                       testId="desk-errands-today"
                     />
+                    {/* a calm day on a wide screen: the thirty days of «История» under the band rather than
+                        an empty board; the keypad stays on the right (D-175, owner 2026-11-25) */}
+                    {waits.length + trips.length + leaving.length + pending + recent.length + earlier.length === 0 ? (
+                      <div className="pult-calm" data-testid="desk-errands-calm-stats">
+                        <ErrandStats rows={rows} now={now} catalogue={actions} several={people.length > 1} figures={false} />
+                      </div>
+                    ) : null}
                   </>
                 ) : loading ? (
                   <TripsBone />

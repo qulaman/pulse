@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 
 import { IconButton } from "@/components/desk/ui/IconButton";
-import { Kbd } from "@/components/desk/ui/Kbd";
 import { Menu, type MenuItem } from "@/components/desk/ui/Menu";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { When } from "@/components/desk/ui/When";
@@ -82,11 +81,7 @@ function Hint({ tab, empty }: { tab: string; empty: boolean }) {
     return (
       <Quiet
         title="Запишите мысль — её видите только вы"
-        hint={
-          <>
-            Строка слева: <Kbd>Enter</Kbd> — записать, <Kbd>V</Kbd> — сказать голосом. С любого экрана — <Kbd>Alt N</Kbd>.
-          </>
-        }
+        hint="Напишите строкой слева или скажите в микрофон — с любого экрана тоже можно, клавиши — по «?»."
       />
     );
   }
@@ -95,11 +90,7 @@ function Hint({ tab, empty }: { tab: string; empty: boolean }) {
   return (
     <Quiet
       title="Выберите заметку слева"
-      hint={
-        <>
-          <Kbd>↑</Kbd> <Kbd>↓</Kbd> — по списку, <Kbd>N</Kbd> — новая мысль, <Kbd>V</Kbd> — сказать.
-        </>
-      }
+      hint="Её текст, напоминание и что с ней сделать — здесь."
     />
   );
 }
@@ -631,7 +622,7 @@ function Converted({ note }: { note: Note }) {
           </Link>
         ) : (
           <Link href="/desk/ether" className="nb-bar-link desk-focus">
-            Объявления
+            Эфир
             <span aria-hidden>›</span>
           </Link>
         )}

@@ -85,7 +85,7 @@ export function addressOf(person: Person): string {
 
 /**
  * How far under the middle of the face the assistant's own words reach. While the microphone
- * is open a pill with the stage and the timer hangs right under the head, and «веди вверх,
+ * is open a pill with the stage and the timer hangs right under the head, and «ведите вверх,
  * чтобы отменить» under that (components/pulse/MascotLever.tsx): the box of the face is 76 px
  * of it and the two lines another 50. The floor starts below all of that — the first row used
  * to stand on those words exactly while the director was talking (владелец, 2026-09-18).
@@ -134,7 +134,9 @@ export function hashOf(id: string, salt: number): number {
  * `hx`/`hy` — half the play area, px from the middle of the face. `wide`/`reach` — how far the
  * rows may stand, when that is further: the area is cut short so a flying dream never clips the
  * edge of the screen, and a circle that stands still needs no such room — on a short phone
- * that margin is a whole row of people.
+ * that margin is a whole row of people. `skirt` — how far under the middle of the face the
+ * floor starts: the words under the head (`SKIRT`), or further when the screen keeps more there
+ * (Пульс's «Сказать · Написать» under the resting face).
  */
 export function teamField({
   people,
@@ -142,12 +144,14 @@ export function teamField({
   hy,
   wide,
   reach,
+  skirt = SKIRT,
 }: {
   people: { id: string; fullName: string; busy: boolean }[];
   hx: number;
   hy: number;
   wide?: number;
   reach?: number;
+  skirt?: number;
 }): TeamLayout {
   const size = sizeFor(people.length);
   const spacing = spacingFor(size);
@@ -187,7 +191,7 @@ export function teamField({
   );
   const bottom = rows(
     ordered.filter((p) => !p.busy),
-    SKIRT + 14 + edge,
+    skirt + 14 + edge,
     height - edge,
   );
   return { seats, overflow: { top, bottom }, size, spacing };

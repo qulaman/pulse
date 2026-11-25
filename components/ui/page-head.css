@@ -361,7 +361,9 @@ body:has(.page-sky:not([data-tone="none"]):not([data-tone="iris"])) .status-scre
 }
 /* a long title shrinks to one line (34 → 26 px, `FitTitle`) and only then wraps */
 /* before the browser has measured (a hard load), a long title ends in «…» instead of running under the buttons */
-.page-head-title[data-fit] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* the clip would cut the head's soft shade at the title's box — a dark patch with sharp edges on a bright sky:
+   the shade is the title's filter instead, drawn after the clip (the same shade as `.page-head` text-shadow) */
+.page-head-title[data-fit] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: none; filter: drop-shadow(0 1px 14px rgb(0 0 0 / 0.32)); }
 .page-head-title[data-fit][data-wrap] { white-space: normal; line-height: 32px; }
 .page-head-state {
   display: flex;

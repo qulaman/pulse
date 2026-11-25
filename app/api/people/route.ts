@@ -77,7 +77,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
         return apiError(409, "email_exists", "Такая почта уже зарегистрирована");
       }
       console.error("createUser failed:", message);
-      return apiError(502, "auth_failed", "Не удалось создать вход, попробуй ещё раз");
+      return apiError(502, "auth_failed", "Не удалось создать вход, попробуйте ещё раз");
     }
 
     // Spoken forms (D-54): the form usually sends them; an API client may not.
@@ -105,7 +105,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       const winner = inserted.error.code === "23505" ? await madeBefore(service, profile.companyId, body.client_request_id) : null;
       if (winner) return apiOk({ id: winner, aliases: [], namesakes: [] });
       console.error("profile insert failed:", inserted.error.message);
-      return apiError(502, "profile_failed", "Не удалось создать профиль, попробуй ещё раз");
+      return apiError(502, "profile_failed", "Не удалось создать профиль, попробуйте ещё раз");
     }
 
     // the card stands without it: a phone can be typed again

@@ -94,6 +94,7 @@ export function useEmployeeControls({
     <>
       <AskSheet
         open={sheet?.name === "ask"}
+        task={sheetTask}
         onClose={() => setSheet(null)}
         onSubmit={(text) => {
           if (!sheetTask) return;

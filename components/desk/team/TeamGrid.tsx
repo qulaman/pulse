@@ -22,28 +22,48 @@ export type TileFacts = {
   /** null — no points game, or not this person's (the director, the wall) */
   balance: number | null;
   push?: Health;
+  /** A task of theirs not taken past the grace or with pushes that do not reach (lib/tasks/attention.ts). */
+  stale?: boolean;
 };
 
-/** The state of a person as their circle's ring says it — the colours of «Задачи». */
-export type TileState = "gone" | "away" | "late" | "review" | "work" | "free" | "quiet";
+/**
+ * The state of a person as their circle's ring says it — the product's one map of state colours
+ * (D-194, lib/tasks/tone.ts): green only for work somebody has taken; a task given and not
+ * taken yet is grey (`waiting`), amber once nobody has taken it for half an hour or the pushes do not
+ * reach (`stale`) — never green, whatever the brand.
+ */
+export type TileState = "gone" | "away" | "late" | "review" | "stale" | "work" | "waiting" | "free" | "quiet";
 
-export function tileState(person: Person, load: Load | undefined, crew: boolean): TileState {
+export function tileState(person: Person, load: Load | undefined, crew: boolean, stale = false): TileState {
   if (!person.is_active) return "gone";
   if (!crew) return "quiet";
   if (person.availability !== "active") return "away";
   if ((load?.overdue ?? 0) > 0) return "late";
   if ((load?.review ?? 0) > 0) return "review";
-  if ((load?.active ?? 0) > 0) return "work";
+  if (stale) return "stale";
+  const active = load?.active ?? 0;
+  if (active - (load?.waiting ?? 0) > 0) return "work";
+  if (active > 0) return "waiting";
   return "free";
 }
 
+/** The tone of a state's words and chips — the ring's colour (lib/tasks/tone.ts). */
+export function stateTone(state: TileState): "danger" | "warn" | "ok" | "muted" {
+  if (state === "late") return "danger";
+  if (state === "review" || state === "stale") return "warn";
+  if (state === "work") return "ok";
+  return "muted";
+}
+
 const STATE_WORD: Record<TileState, string> = {
-  gone: "ушёл из команды",
+  gone: "больше не в команде",
   away: "не на месте",
   late: "есть просрочка",
-  review: "работа ждёт приёмки",
+  review: "работа ждёт проверки",
+  stale: "задачу не приняли",
   work: "в работе",
-  free: "свободен",
+  waiting: "задача ещё не принята",
+  free: "дел нет",
   quiet: "",
 };
 
@@ -90,7 +110,7 @@ function PersonTile({
   onClick: () => void;
   onDouble: () => void;
 }) {
-  const state = tileState(person, facts.load, crew);
+  const state = tileState(person, facts.load, crew, facts.stale);
   const position = person.position && person.position.toLowerCase() !== ROLE_LABEL[person.role].toLowerCase() ? person.position : ROLE_LABEL[person.role];
   const active = facts.load?.active ?? 0;
   const overdue = facts.load?.overdue ?? 0;
@@ -126,11 +146,11 @@ function PersonTile({
       <span className="team-tile-name" title={person.full_name}>
         {person.full_name}
       </span>
-      <span className="team-tile-role">{person.is_active ? (person.availability !== "active" && person.role !== "tv" ? (person.availability === "vacation" ? "в отпуске" : "на больничном") : position) : "ушёл"}</span>
+      <span className="team-tile-role">{person.is_active ? (person.availability !== "active" && person.role !== "tv" ? (person.availability === "vacation" ? "в отпуске" : "на больничном") : position) : "не в команде"}</span>
       {director && crew && person.is_active ? (
         <span className="team-tile-facts">
           {active > 0 ? (
-            <span className="team-fact" data-tone={overdue > 0 ? "danger" : "ok"} title={loadWords(facts.load)}>
+            <span className="team-fact" data-tone={stateTone(state)} title={loadWords(facts.load)}>
               <ListChecks size={13} strokeWidth={2.25} aria-hidden />
               <span className="nums">{active}</span>
             </span>

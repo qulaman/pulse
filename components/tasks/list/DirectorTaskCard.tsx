@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/Button";
 import { humanAqtobe } from "@/lib/ai/time";
 import { shortName } from "@/lib/people/names";
 import { hasUnread, type BoardTask } from "@/lib/pulse/board";
-import { isWaiting, keysFor, type DeskAction, type DeskReason } from "@/lib/tasks/reasons";
+import { isStaleUnaccepted } from "@/lib/tasks/attention";
+import { BLIND_NUDGE_HINT, firstMoveOf, isWaiting, keysBesideCall, keysFor, type DeskAction, type DeskReason, type FirstMove } from "@/lib/tasks/reasons";
 import { isWorking, untilWords, type Suggestion, type TimeRequest } from "@/lib/tasks/lifecycle";
 import { REASON_TONE, REASON_WORD, statusWord, stepsOf } from "@/lib/tasks/overview";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
@@ -174,15 +175,20 @@ export function wideLabelOf(key: DeskAction, request: TimeRequest | null, sugges
   return null;
 }
 
-/** The buttons of a task — the same row on the card and on the task's own screen. */
+/**
+ * The buttons of a task — the same row on the card and on the task's own screen.
+ * `reach` — the holder's pushes do not reach them (`firstMoveOf`): «Позвонить» takes the reminder's place and
+ * stands first, or, with no number known, «Напомнить» stays with the honest line under it.
+ */
 export function DirectorKeys({
-  keys,
+  keys: given,
   reason,
   request,
   suggestion,
   now,
   onPress,
   labels,
+  reach = null,
 }: {
   keys: DeskAction[];
   reason: DeskReason | null;
@@ -192,9 +198,12 @@ export function DirectorKeys({
   onPress: (key: DeskAction) => void;
   /** A screen's own words for a key (the task's screen says «Перенести»). */
   labels?: Partial<Record<DeskAction, string>>;
+  reach?: FirstMove;
 }) {
-  if (keys.length === 0) return null;
-  const wide = wideLabelOf(keys[0]!, request, suggestion, now);
+  const call = reach?.kind === "call" ? reach : null;
+  const keys = call ? keysBesideCall(given) : given;
+  if (keys.length === 0 && !call) return null;
+  const wide = !call && keys.length > 0 ? wideLabelOf(keys[0]!, request, suggestion, now) : null;
   const rest = wide ? keys.slice(1) : keys;
   const button = (key: DeskAction, index: number, label: string, cols: number) => {
     const primary = index === 0 && isPrimaryKey(key, reason);
@@ -212,15 +221,35 @@ export function DirectorKeys({
       </Button>
     );
   };
+  const cols = rest.length + (call ? 1 : 0);
   const grid = (list: DeskAction[], offset: number) => (
-    <div className={`grid gap-2 ${list.length === 3 ? "grid-cols-3" : list.length === 2 ? "grid-cols-2" : "grid-cols-1"}`}>
-      {list.map((key, index) => button(key, index + offset, key === "remove" ? "Удалить" : (labels?.[key] ?? LABEL[key]), list.length))}
+    <div className={`grid gap-2 ${cols === 3 ? "grid-cols-3" : cols === 2 ? "grid-cols-2" : "grid-cols-1"}`}>
+      {call ? (
+        <Button
+          key="call"
+          data-testid="task-action-call"
+          variant="secondary"
+          className="!px-2 whitespace-nowrap !text-[14px]"
+          icon={cols < 3 ? <Icon name="phone" size={16} /> : undefined}
+          onClick={() => {
+            window.location.href = `tel:${call.tel}`;
+          }}
+        >
+          Позвонить
+        </Button>
+      ) : null}
+      {list.map((key, index) => button(key, index + offset, key === "remove" ? "Удалить" : (labels?.[key] ?? LABEL[key]), cols))}
     </div>
   );
   return (
     <div className="mt-4 flex flex-col gap-2">
       {wide ? <div className="grid">{button(keys[0]!, 0, wide, 1)}</div> : null}
-      {rest.length > 0 ? grid(rest, wide ? 1 : 0) : null}
+      {rest.length > 0 || call ? grid(rest, (wide ? 1 : 0) + (call ? 1 : 0)) : null}
+      {reach?.kind === "blind" ? (
+        <p className="text-center text-[13px] leading-[18px] text-warn" data-testid="task-blind-nudge">
+          {BLIND_NUDGE_HINT}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -292,6 +321,8 @@ export function DirectorTaskCard({
   reacted = false,
   canReact = false,
   pointsEnabled = false,
+  noPush,
+  phone = null,
 }: {
   task: TaskWithPeople;
   /** The board row: question, refusal reason, last word, read cursor. Closed tasks have none. */
@@ -303,13 +334,18 @@ export function DirectorTaskCard({
   onToggle: () => void;
   onAction: (action: DeskAction, task: TaskWithPeople) => void;
   onAnswer: (task: TaskWithPeople, text: string | null, deadlineIso?: string) => void;
-  onMore: (task: TaskWithPeople) => void;
+  /** «Ещё» with the keys the card already shows, so the sheet does not offer them twice */
+  onMore: (task: TaskWithPeople, shown?: readonly DeskAction[]) => void;
   showPerson?: boolean;
   /** The director's reaction is on this task (D-133): the card wears a gold outline. */
   reacted?: boolean;
   /** The reaction row under the keys: handed in or accepted, or already reacted to. */
   canReact?: boolean;
   pointsEnabled?: boolean;
+  /** Whose pushes do not reach them (`noPushIds`): the card turns amber and offers a call (`firstMoveOf`). */
+  noPush?: ReadonlySet<string>;
+  /** The holder's phone, when the company has it. */
+  phone?: string | null;
 }) {
   const question = row?.question ?? null;
   const request = row?.time_request && isWorking(task.status) ? row.time_request : null;
@@ -317,6 +353,7 @@ export function DirectorTaskCard({
   const flags: CardFlags = { question: Boolean(question), request: Boolean(request), suggestion: Boolean(suggestion) };
   const unread = row ? hasUnread(row, meId) : false;
   const keys = listKeysFor(task, flags, now);
+  const reach = firstMoveOf(task, keys, { noPush, phone });
   const more = allActionsFor(task, flags).filter((action) => !keys.includes(action));
   const move: DeskAction = request ? "retime" : "extend";
   const whenDoor = whenDoorOf(task)
@@ -329,10 +366,14 @@ export function DirectorTaskCard({
   const last = row?.last_message ?? null;
   const lastText = last ? wordText(last) : "";
   const lastName = last ? (last.sender_id === meId ? "Вы" : (task.assignee?.full_name ?? "Сотрудник")) : "";
-  // the queue's own word leads the row: «на приёмке», «отказ», «просрочена» say what to do;
+  // the queue's own word leads the row: «на проверке», «отказ», «просрочена» say what to do;
   // a question keeps the stage and adds its own flag
   const word = reason && reason !== "question" ? REASON_WORD[reason] : statusWord(task, "director", now);
-  const wordTone = reason && reason !== "question" ? REASON_TONE[reason] : task.status === "sent" && !isOverdue(task, now) ? "accent" : undefined;
+  // «не принята» is grey while it is fresh and amber once nobody has taken it for half an hour —
+  // never the brand colour, which a client may have green (D-194); amber at once when the holder's
+  // pushes do not reach them — nobody can tell them about it
+  const stale = isStaleUnaccepted(task, now) || (task.status === "sent" && Boolean(noPush?.has(task.assignee_id)));
+  const wordTone = reason && reason !== "question" ? REASON_TONE[reason] : task.status === "sent" && !isOverdue(task, now) ? (stale ? "warn" : "muted") : undefined;
 
   return (
     <CardShell
@@ -355,6 +396,7 @@ export function DirectorTaskCard({
           question={Boolean(question)}
           unread={unread && !question}
           closed={closed}
+          attention={stale}
         />
       }
     >
@@ -404,7 +446,16 @@ export function DirectorTaskCard({
         </div>
       ) : null}
 
-      <DirectorKeys keys={keys} reason={reason} request={request} suggestion={suggestion} now={now} onPress={(key) => onAction(key, task)} labels={whenDoor ? SCREEN_LABEL : undefined} />
+      <DirectorKeys
+        keys={keys}
+        reason={reason}
+        request={request}
+        suggestion={suggestion}
+        now={now}
+        onPress={(key) => onAction(key, task)}
+        labels={whenDoor ? SCREEN_LABEL : undefined}
+        reach={reach}
+      />
 
       {canReact ? <ReactionBar taskId={task.id} pointsEnabled={pointsEnabled} className="mt-3" /> : null}
 
@@ -414,7 +465,7 @@ export function DirectorTaskCard({
           more.length > 0 ? (
             <button
               type="button"
-              onClick={() => onMore(task)}
+              onClick={() => onMore(task, keys)}
               data-testid="task-more"
               className="flex min-h-[40px] items-center gap-1.5 rounded-[10px] px-2 text-[14px] font-semibold text-muted transition-colors duration-[120ms] active:bg-white/[0.05]"
             >

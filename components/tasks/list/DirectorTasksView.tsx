@@ -9,17 +9,22 @@ import { Button } from "@/components/ui/Button";
 import { HeadButton } from "@/components/ui/HeadButton";
 import { PageHead } from "@/components/ui/PageHead";
 import { Sheet } from "@/components/ui/Sheet";
+import { usePhones } from "@/lib/people/card-queries";
+import { shortName } from "@/lib/people/names";
 import { useTaskReactions } from "@/lib/points/game";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { isReactable, showsReactionBar } from "@/lib/points/reactions";
+import { usePushHealth } from "@/lib/push/health-query";
 import type { BoardTask } from "@/lib/pulse/board";
 import type { Rule } from "@/lib/recurrence/queries";
+import { noPushIds, type AttentionVerdict } from "@/lib/tasks/attention";
 import type { DeskReason } from "@/lib/tasks/reasons";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import {
   closedSections,
   directorScreen,
   directorTabOf,
+  DIRECTOR_TAB_LABEL,
   matchesQuery,
   peopleLoad,
   reasonFor,
@@ -106,9 +111,14 @@ export function DirectorTasksView({
     return map;
   }, [all, rows, now]);
 
+  // whose pushes do not reach them (D-114): an order to them needs the director at once (D-194)
+  const health = usePushHealth();
+  const noPush = useMemo(() => noPushIds(health.data), [health.data]);
+  const phones = usePhones();
+
   const people = useMemo(() => peopleLoad(all, reasons), [all, reasons]);
   const scoped = useMemo(() => (personId ? all.filter((task) => task.assignee_id === personId) : all), [all, personId]);
-  const screen = useMemo(() => directorScreen(scoped, reasons, now), [scoped, reasons, now]);
+  const screen = useMemo(() => directorScreen(scoped, reasons, now, { noPush }), [scoped, reasons, now, noPush]);
   const found = useMemo(() => scoped.filter((task) => matchesQuery(task, query)), [scoped, query]);
 
   const piles = useMemo(() => {
@@ -125,7 +135,7 @@ export function DirectorTasksView({
     if (current === "yours") {
       return yoursSections(piles.yours.map((task) => ({ task, reason: reasons.get(task.id) as DeskReason })));
     }
-    if (current === "working") return workingSections(piles.working, now, { reviewTitle: "На приёмке" });
+    if (current === "working") return workingSections(piles.working, now, { reviewTitle: "На проверке", unacceptedFirst: true });
     return closedSections(piles.closed, now);
   }, [current, piles, reasons, now]);
 
@@ -162,6 +172,17 @@ export function DirectorTasksView({
     accordion.focus(id);
   };
 
+  // the move for what needs the director: a call when a push will not reach, else the task's card
+  // (its first key is «Напомнить» — said there once, not twice on the screen)
+  // (once that card is open under the screen, the button has said its piece)
+  const focus = screen.attention && !screen.attention.ok && screen.focus && accordion.openId !== screen.focus ? byId(screen.focus) : null;
+  const focusPhone = focus && screen.attention?.action === "call" ? phones.data?.[focus.assignee_id] : undefined;
+  const statusAction = focus
+    ? focusPhone
+      ? { label: `Позвонить · ${shortName(focus.assignee?.full_name)}`, href: `tel:${focusPhone.replace(/[^+\d]/g, "")}` }
+      : { label: "Открыть задачу", onClick: () => showNearest(focus.id) }
+    : null;
+
   const person = personId ? people.find((p) => p.id === personId) : undefined;
   const closedLoaded = all.filter((task) => task.status === "done" || task.status === "revoked" || task.status === "declined").length;
   // the server's count: the list holds the latest pages only, the purge takes all of them
@@ -174,6 +195,7 @@ export function DirectorTasksView({
       query={query}
       nothingAtAll={all.length === 0}
       working={piles.working.length}
+      attention={screen.attention}
       onWorking={() => setTab("working")}
     />
   );
@@ -198,7 +220,7 @@ export function DirectorTasksView({
       />
 
       <div className="mt-3">
-        <StatusScreen screen={screen} now={now} title={person ? person.name : undefined} onNearest={showNearest} />
+        <StatusScreen screen={screen} now={now} title={person ? person.name : undefined} onNearest={showNearest} action={statusAction} />
       </div>
 
       <PeopleStrip people={people} value={personId} onChange={setPersonId} />
@@ -212,10 +234,10 @@ export function DirectorTasksView({
         value={current}
         onChange={(next) => setTab(next)}
         items={[
-          { key: "yours", label: "Ждут вас", count: piles.yours.length, alert: screen.tone === "danger" ? "danger" : "warn" },
-          { key: "working", label: "В работе", count: piles.working.length },
+          { key: "yours", label: DIRECTOR_TAB_LABEL.yours, count: piles.yours.length, alert: screen.tone === "danger" ? "danger" : "warn" },
+          { key: "working", label: DIRECTOR_TAB_LABEL.working, count: piles.working.length },
           // a person or a search narrows what is loaded; the plain tab counts what the server has
-          { key: "closed", label: "Закрытые", count: personId || query.trim() ? piles.closed.length : closedCount },
+          { key: "closed", label: DIRECTOR_TAB_LABEL.closed, count: personId || query.trim() ? piles.closed.length : closedCount },
         ]}
       >
         {searchOpen ? (
@@ -261,6 +283,8 @@ export function DirectorTasksView({
               reacted={Boolean(reactions.data?.[task.id])}
               canReact={isReactable(task, meId) && showsReactionBar(task.status, Boolean(reactions.data?.[task.id]))}
               pointsEnabled={pointsEnabled}
+              noPush={noPush}
+              phone={phones.data?.[task.assignee_id] ?? null}
               onToggle={() => accordion.toggle(task.id)}
               onAction={press}
               onAnswer={answer}
@@ -312,12 +336,15 @@ function EmptyState({
   query,
   nothingAtAll,
   working,
+  attention,
   onWorking,
 }: {
   tab: DirectorTab;
   query: string;
   nothingAtAll: boolean;
   working: number;
+  /** the one verdict: no green «всё хорошо» while something needs the director (D-194) */
+  attention?: AttentionVerdict;
   onWorking: () => void;
 }) {
   if (nothingAtAll) {
@@ -325,7 +352,7 @@ function EmptyState({
       <div className="flex flex-col items-center rounded-[20px] border border-border/70 px-6 py-10 text-center">
         <Mascot state="calm" size={64} />
         <p className="mt-4 font-display text-[17px] font-semibold">Пока ничего не отправлено</p>
-        <p className="mt-1 text-[14px] leading-[19px] text-muted">Задача — голосом: зажмите маскота на Пульсе и скажите, что сделать</p>
+        <p className="mt-1 text-[14px] leading-[19px] text-muted">Задача — голосом: удержите маскота на Пульсе и скажите, что сделать</p>
       </div>
     );
   }
@@ -337,16 +364,20 @@ function EmptyState({
     );
   }
   if (tab === "yours") {
+    const calm = attention?.ok !== false;
     return (
       <div className="flex flex-col items-center rounded-[20px] border border-border/70 px-6 py-9 text-center">
-        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-ok/15 text-ok">
-          <Icon name="check" size={24} />
+        <span className={`flex h-12 w-12 items-center justify-center rounded-full ${calm ? "bg-ok/15 text-ok" : "bg-warn/15 text-warn"}`}>
+          <Icon name={calm ? "check" : "clock"} size={24} />
         </span>
-        <p className="mt-3 font-display text-[17px] font-semibold">Ваших решений ничего не ждёт</p>
-        <p className="mt-1 text-[14px] leading-[19px] text-muted">Приёмка, вопросы, отказы и просрочки появятся здесь</p>
+        {/* «решений не ждут» only while nothing needs the director (D-194) */}
+        <p className="mt-3 font-display text-[17px] font-semibold">{calm ? "Решений от вас не ждут" : "Требует внимания"}</p>
+        <p className="mt-1 text-[14px] leading-[19px] text-muted">
+          {calm ? "Сданная работа, вопросы, просьбы о сроке, отказы и просрочки появятся здесь" : attention?.words}
+        </p>
         {working > 0 ? (
           <Button variant="secondary" size="sm" className="mt-4" onClick={onWorking}>
-            Что в работе · {working}
+            {DIRECTOR_TAB_LABEL.working} · {working}
           </Button>
         ) : null}
       </div>

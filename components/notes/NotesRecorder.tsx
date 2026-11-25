@@ -350,7 +350,7 @@ export function NotesRecorder({ hero, idle, words = NOTE_WORDS, receipt, dictati
         </span>
       </div>
       <p className={`mt-2 text-center text-[12px] leading-4 text-muted ${mode === "mic" ? "" : "invisible"}`} aria-hidden={mode !== "mic"}>
-        удержите — говорите · тап — старт и стоп
+        удержите — говорите · нажмите — старт и стоп
       </p>
     </section>
   );

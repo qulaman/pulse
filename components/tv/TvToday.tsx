@@ -6,15 +6,18 @@ import { aqtobeClock } from "@/lib/tv/clock";
 import { meetingOf, type MeetingLine } from "@/lib/tv/overlay";
 import type { TvSummary } from "@/lib/tv/queries";
 import { greetingOf, type TvSpeech } from "@/lib/tv/voice";
+import { weekBars } from "@/lib/tv/week";
 
 import { DayPulse } from "./DayPulse";
 import { TvMascot } from "./TvMascot";
+import { WeekStrip } from "./WeekStrip";
 
 /**
  * «Сегодня» is the wall's home (D-185): it stands between all the scenes of the round, on screen half the time.
  *
  * Two columns of the wall's grid (`.tv-split`). The main one carries the day: one number, large — what is done today;
- * behind a thin rule, the two figures beside it in a column (everything in work, done this week; zeros are not shown);
+ * behind a thin rule, beside it in a column, the tasks in work and the week as seven bars (`WeekStrip`: accepted per
+ * day, today framed — the week said once, so neither a «за неделю» figure here nor the band repeats it);
  * from noon on, the day's rhythm by the hour (DayPulse); the next meeting at the bottom. The number always means the
  * same — done today: a day with nothing done yet has the greeting by the hour in its place, never «в работе» standing
  * in for it. The side column is the mascot's: it stands at the bottom band and says the news of the last minute and a
@@ -29,15 +32,12 @@ import { TvMascot } from "./TvMascot";
 
 type Figure = { value: number; label: string };
 
-/** The day's one number — done today — and the two beside it; zeros are never shown. */
+/** The day's one number — done today — and the figure beside it; zeros are never shown. The week is the strip. */
 function figuresOf(summary: TvSummary | null): { done: number | null; more: Figure[] } {
   const today = summary?.today ?? { sent: 0, done: 0, in_work: 0 };
-  const week = (summary?.week ?? []).reduce((sum, day) => sum + day.done, 0);
   const done = today.done > 0 ? today.done : null;
   const more: Figure[] = [];
   if (today.in_work > 0) more.push({ value: today.in_work, label: "всего в работе" });
-  // beside «готово сегодня» the week reads as its sibling; under a greeting it says what it counts
-  if (week > 0) more.push({ value: week, label: done ? "за неделю" : "готово за неделю" });
   return { done, more };
 }
 
@@ -48,6 +48,7 @@ const EASE = [0.2, 0, 0, 1] as const;
 
 export function TvToday({ speech, summary, now }: { speech: TvSpeech; summary: TvSummary | null; now: Date }) {
   const { done, more } = figuresOf(summary);
+  const bars = weekBars(summary?.week);
   const next = summary?.events[0] ?? null;
   const meeting = next ? meetingOf(next, now) : null;
   // a day without a number has the greeting for its headline: the face then only says the news
@@ -72,12 +73,16 @@ export function TvToday({ speech, summary, now }: { speech: TvSpeech; summary: T
                 </p>
                 <p className="tv-body mt-[1.6vh] text-muted">готово сегодня</p>
               </div>
-              {more.length > 0 ? (
+              {more.length > 0 || bars.length > 0 ? (
                 <>
                   {done < 100 ? (
                     <span aria-hidden className="w-[0.3vh] shrink-0 self-stretch" style={{ background: "color-mix(in srgb, var(--text-muted) 32%, var(--bg))" }} />
                   ) : null}
-                  <Figures figures={more} />
+                  <div className="flex min-w-0 flex-1 flex-col justify-end gap-[3vh]">
+                    {more.length > 0 ? <Figures figures={more} /> : null}
+                    {/* a three-digit day with a meeting below: the week gives way, the scene keeps its height */}
+                    {done < 100 || meeting === null ? <WeekStrip bars={bars} /> : null}
+                  </div>
                 </>
               ) : null}
             </div>
@@ -87,6 +92,7 @@ export function TvToday({ speech, summary, now }: { speech: TvSpeech; summary: T
                 {greeting}
               </p>
               {more.length > 0 ? <Figures figures={more} /> : null}
+              <WeekStrip bars={bars} />
             </div>
           )}
 

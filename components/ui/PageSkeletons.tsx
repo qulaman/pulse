@@ -181,7 +181,7 @@ export function PeopleSkeleton() {
  * The person editor (D-104) before the person is in: the head — the name and the line of role
  * and position the editor always has — and the form's sections, as long as the form will be.
  */
-export function EditPersonSkeleton({ back = { href: "/settings?tab=team", label: "Сотрудники" } }: { back?: { href: string; label: string } }) {
+export function EditPersonSkeleton({ back = { href: "/people", label: "Команда" } }: { back?: { href: string; label: string } }) {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-40">
       <PageHead
@@ -206,7 +206,7 @@ export function EditPersonSkeleton({ back = { href: "/settings?tab=team", label:
 export function NewPersonSkeleton() {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
-      <PageHead back={{ href: "/settings?tab=team", label: "Сотрудники" }} title="Новый сотрудник" />
+      <PageHead back={{ href: "/people", label: "Команда" }} title="Новый сотрудник" />
       <div className="mt-5">
         <NewPersonFormBone />
       </div>

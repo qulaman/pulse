@@ -33,18 +33,21 @@ export function StatusEyebrow({
   overdue = false,
   question = false,
   tone,
+  word: own,
 }: {
   status: TaskStatus;
   overdue?: boolean;
   question?: boolean;
   tone: Tone;
+  /** The reader's own word (`statusWord`): the card says what the list and the task's screen say. */
+  word?: string;
 }) {
   const word =
     overdue && status !== "done"
       ? "Просрочено"
       : question
         ? TEXT.question
-        : SHORT_STATUS[status].charAt(0).toUpperCase() + SHORT_STATUS[status].slice(1);
+        : own ?? SHORT_STATUS[status].charAt(0).toUpperCase() + SHORT_STATUS[status].slice(1);
   return (
     <span
       className="inline-flex items-center gap-1.5 font-display text-[12px] font-semibold uppercase tracking-[0.06em]"
@@ -58,7 +61,7 @@ export function StatusEyebrow({
 
 /**
  * The deadline, always with its clock — «без срока» included, so the right edge of every
- * list is one shape. Red past the deadline, amber inside a day, accent further out.
+ * list is one shape. Red past the deadline, amber inside a day, grey further out.
  *
  * «Срочно» без срока (docs/AI.md §10: the director said «срочно» and named no time) is
  * the answer to «когда» too, and a louder one: it takes the slot, in amber and with a

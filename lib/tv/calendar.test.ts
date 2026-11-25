@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  cellShownTitle,
   cellTitle,
+  FOLDED_WEEK,
   firstColumn,
   isBirthday,
   LATER_DAYS,
   laterDays,
   monthGrid,
+  monthEmptyAhead,
   monthGridFrom,
+  monthLayout,
   monthRows,
   PER_CELL,
   PER_LATER_DAY,
@@ -155,7 +159,7 @@ describe("monthGrid — месяц сеткой", () => {
     expect(grid.weeks.map((w) => w.past)).toEqual([true, true, true, false, false]);
   });
 
-  it("в клетке одно мероприятие, дальше «+N»; в соседнем месяце — пусто", () => {
+  it("в клетке одно мероприятие, дальше «+N»; у дня соседнего месяца — его встречи", () => {
     expect(PER_CELL).toBe(1);
     const grid = monthGrid(
       cal([
@@ -169,7 +173,8 @@ describe("monthGrid — месяц сеткой", () => {
     const monday = cells.find((c) => c.day === 28 && c.inMonth);
     expect(monday?.rows).toHaveLength(PER_CELL);
     expect(monday?.more).toBe(1);
-    expect(cells.find((c) => c.day === 2 && !c.inMonth)?.rows).toHaveLength(0);
+    // the next month's day in the last week is a whole cell with its meeting: the row reads on
+    expect(cells.find((c) => c.day === 2 && !c.inMonth)?.rows.map((r) => r.id)).toEqual(["tail"]);
     expect(cells.find((c) => c.day === 29 && c.inMonth)?.rows[0]).toMatchObject({ birthday: true, time: "17:00" });
   });
 
@@ -197,6 +202,63 @@ describe("monthGrid — месяц сеткой", () => {
   });
 });
 
+describe("месяц читается целиком при любом раскладе (D-194)", () => {
+  // November 2026 starts on a Sunday and ends on a Monday: six weeks, a lone «1» and a lone «30» before
+  const november = new Date("2026-11-24T04:37:00Z");
+
+  it("крайние недели — целые ряды: дни соседних месяцев стоят числами, первый день следующего — с месяцем", () => {
+    const grid = monthGrid(cal([]), november);
+    expect(grid.weeks).toHaveLength(6);
+    expect(grid.weeks[0].days.map((c) => c.day)).toEqual([26, 27, 28, 29, 30, 31, 1]);
+    expect(grid.weeks[5].days.map((c) => c.day)).toEqual([30, 1, 2, 3, 4, 5, 6]);
+    expect(grid.weeks[5].days[1]).toMatchObject({ inMonth: false, mark: "дек" });
+    expect(grid.weeks[5].days.filter((c) => c.mark)).toHaveLength(1);
+    expect(grid.weeks[0].days.every((c) => c.mark === null)).toBe(true);
+  });
+
+  it("пустой месяц говорит «встреч нет»; только прошедшие — «дальше встреч нет»; есть впереди — молчит", () => {
+    expect(monthGrid(cal([]), november).note).toBe("встреч нет");
+    expect(monthEmptyAhead(cal([]), november)).toBe(true);
+    const past = cal([event({ id: "p", starts_at: "2026-11-10T05:00:00Z" })]);
+    expect(monthGrid(past, november).note).toBe("дальше встреч нет");
+    const ahead = cal([event({ id: "p", starts_at: "2026-11-10T05:00:00Z" }), event({ id: "a", starts_at: "2026-12-02T05:00:00Z" })]);
+    expect(monthGrid(ahead, november).note).toBeNull();
+    expect(monthEmptyAhead(ahead, november)).toBe(false);
+  });
+
+  it("название в клетке — целиком или никак: не «Совет директо-» на краю клетки", () => {
+    const grid = monthGrid(
+      cal([
+        event({ id: "short", title: "Планёрка", starts_at: "2026-11-25T06:00:00Z" }),
+        event({ id: "long", title: "Обучение по охране труда для новых сотрудников", starts_at: "2026-11-26T05:00:00Z" }),
+      ]),
+      november,
+    );
+    const { lines } = monthLayout(grid);
+    const week = grid.weeks.findIndex((w) => w.days.some((c) => c.today));
+    const cell = (day: number) => grid.weeks[week].days.find((c) => c.day === day && c.inMonth)!;
+    expect(lines[week]).toBeGreaterThanOrEqual(3);
+    expect(cellShownTitle(cell(25), lines[week])).toBe("Планёрка");
+    // more lines than the cell holds: the time on the date line says the day is busy, the title stays off
+    expect(cellShownTitle(cell(26), lines[week])).toBe("");
+    expect(cellShownTitle(cell(26), 20)).toBe("Обучение по охране труда для новых сотрудников");
+    // a folded week holds one line — its date
+    expect(lines.slice(0, 4)).toEqual([1, 1, 1, 1]);
+  });
+
+  it("при любом первом дне недели месяц — от 4 до 6 целых рядов по 7 дней, сегодня ровно один", () => {
+    for (let month = 0; month < 12; month++) {
+      const now = new Date(Date.UTC(2027, month, 15, 6));
+      const grid = monthGrid(cal([]), now);
+      expect(grid.weeks.length).toBeGreaterThanOrEqual(4);
+      expect(grid.weeks.length).toBeLessThanOrEqual(6);
+      expect(grid.weeks.every((w) => w.days.length === 7)).toBe(true);
+      expect(grid.weeks.flatMap((w) => w.days).filter((c) => c.today)).toHaveLength(1);
+      expect(grid.weeks.flatMap((w) => w.days).filter((c) => c.inMonth && c.day === 1)).toHaveLength(1);
+    }
+  });
+});
+
 describe("«Дальше» на сетке дня (D-185)", () => {
   it("первая колонка — по времени, а при длинном имени дня — по нему: дела дня начинаются с линии названий", () => {
     expect(firstColumn([])).toBe(TIME_COLUMN);
@@ -211,7 +273,7 @@ describe("«Дальше» на сетке дня (D-185)", () => {
 /** Where the soft hyphens are, drawn as «-». */
 const breaks = (text: string) => softHyphens(text).replace(/­/g, "-");
 /** The grid's tracks: «auto» or a whole «minmax(…)». */
-const tracks = (rows: string) => rows.match(/minmax\([^)]*\)|auto/g) ?? [];
+const tracks = (rows: string) => rows.match(/minmax\([^)]*\)|auto|[\d.]+vh/g) ?? [];
 
 describe("месяц на стене (D-185)", () => {
   it("мягкие переносы по слогам, по две буквы с каждой стороны", () => {
@@ -244,7 +306,10 @@ describe("месяц на стене (D-185)", () => {
     const rows = tracks(monthRows(grid));
     // the weekdays' line, three folded weeks, two weeks ahead
     expect(rows).toHaveLength(6);
-    expect(rows.slice(0, 4)).toEqual(["auto", "auto", "auto", "auto"]);
+    expect(rows[0]).toBe("auto");
+    // a folded week is a strip one line of dates high with air around it — never digits pressed together
+    expect(monthRows(grid).split(" ").slice(1, 4)).toEqual([`${FOLDED_WEEK}vh`, `${FOLDED_WEEK}vh`, `${FOLDED_WEEK}vh`]);
+    expect(FOLDED_WEEK).toBeGreaterThanOrEqual(4.4 * 1.2 + 0.7);
     expect(rows[4]).toMatch(/^minmax\([\d.]+vh, \dfr\)$/);
     // a six-week month on its first day: nothing is past, the weeks share the height by proportion only
     const crowded = monthGrid(

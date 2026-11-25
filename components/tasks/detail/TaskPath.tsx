@@ -8,9 +8,14 @@ import { timeLeft, type Step } from "@/lib/tasks/overview";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { TONE_VAR } from "@/lib/tasks/tone";
 
+/**
+ * Passed stages are green — done is the one thing green says; the stage the task stands at is
+ * plain text-white — it is not done yet, and never the brand colour, which a client may have green
+ * (D-194); amber and red say the stage needs someone.
+ */
 const COLOR: Record<Step["state"], string> = {
-  done: "var(--accent)",
-  current: "var(--accent)",
+  done: "var(--state-done)",
+  current: "var(--text)",
   todo: "var(--border)",
   warn: "var(--warn)",
   bad: "var(--danger)",

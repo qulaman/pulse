@@ -6,7 +6,7 @@ import type { TvState } from "./queries";
  * Правило всей пачки: строки может не быть вовсе (пульт ещё ни разу не командовал),
  * значение в ней может быть незнакомым (клиент старше базы после деплоя), а фокус —
  * уже истёкшим. Ни один из трёх случаев не имеет права погасить стену: во всех
- * ответ — эфир и сцена «лицо» (D-76).
+ * ответ — эфир; без строки — круг заставок, незнакомая сцена — «лицо» (D-76).
  */
 
 export type TvMode = "ether" | "employee" | "task";
@@ -111,9 +111,12 @@ export function carouselNext(now: Date, points: boolean, week = false, guest = f
   return { scene: list[(step + 1) % list.length], at: new Date((step + 1) * CAROUSEL_MS) };
 }
 
-/** Стена листает заставки сама (D-123). */
+/**
+ * The wall goes round by itself (D-123) — and does by default: a wall nobody has set from the remote yet is a
+ * channel, not a still picture (D-185); the column's default is the same. Only a scene picked by hand stops it.
+ */
 export function carouselOn(state: TvState | null): boolean {
-  return state?.carousel === true;
+  return state === null || state.carousel === true;
 }
 
 /**

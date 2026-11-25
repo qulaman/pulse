@@ -19,8 +19,9 @@ const FILL: Partial<Record<TaskStatus, number>> = {
 const PIE_R = 3.4;
 const PIE_C = 2 * Math.PI * PIE_R;
 
-export function StatusGlyph({ status, overdue = false, size = 22 }: { status: TaskStatus; overdue?: boolean; size?: number }) {
-  const color = TONE_VAR[toneOf(status, overdue)];
+/** `attention` — a new task that needs its reader now: amber instead of grey (lib/tasks/tone.ts `toneOf`). */
+export function StatusGlyph({ status, overdue = false, attention = false, size = 22 }: { status: TaskStatus; overdue?: boolean; attention?: boolean; size?: number }) {
+  const color = TONE_VAR[toneOf(status, overdue, { attention })];
 
   if (status === "done" || status === "declined") {
     return (

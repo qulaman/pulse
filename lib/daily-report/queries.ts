@@ -224,6 +224,15 @@ async function readFeedContext(): Promise<FeedContext> {
 }
 
 /**
+ * `settings.daily_report.ask_from` — the product's evening: Лента asks for the report from it, the
+ * form prefills «Ушёл» from it (`leftSuggestion`). The same read as Лента's, one cache entry.
+ */
+export function useAskFrom(): string {
+  const context = useQuery({ queryKey: dailyReportKeys.feed(), staleTime: 60_000, queryFn: readFeedContext });
+  return context.data?.askFrom ?? ASK_FROM_DEFAULT;
+}
+
+/**
  * Where today's report stands for Лента (D-167, `reportDue`): the row in «Дела», the face's call
  * and the greeting's line read this one answer. `now` — the screen's clock. Until the settings
  * come, the evening starts at 17:00; a director or the kiosk get no day (`not_team_member`) and

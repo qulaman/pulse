@@ -5,6 +5,7 @@ import type { KeyboardEvent } from "react";
 
 import { GroupLink, NumberInput, SettingRow, SettingsGroup, TextInput } from "@/components/desk/settings/form";
 import { Face } from "@/components/desk/ui/Face";
+import { ActionSign } from "@/components/desk/today/home/HomeSecretary";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { Switch } from "@/components/desk/ui/Switch";
 import { Select } from "@/components/desk/ui/Toolbar";
@@ -161,15 +162,17 @@ function ActionsTable({ actions, onChange }: { actions: Action[]; onChange: (act
           <Kbd>Alt ↓</Kbd> переставить · {actions.length} из {ACTIONS_MAX}
         </span>
       </div>
-      {/* the buttons as the director will see them, in this order — empty rows are not buttons yet */}
+      {/* the buttons as the director sees them on this computer, in this order — the sign is the one
+          «Сегодня» and «Заявки» draw (the scene's line icon; the company's own emoji only for a request
+          of no known scene, D-194); empty rows are not buttons yet */}
       {actions.some((row) => row.label.trim()) ? (
-        <div className="flex flex-wrap items-center gap-2" aria-label="Так увидит директор">
-          <span className="text-[12px] leading-4 text-muted">Так увидит директор:</span>
+        <div className="flex flex-wrap items-center gap-2" aria-label="Так увидит директор на компьютере" data-testid="secretary-actions-preview">
+          <span className="text-[12px] leading-4 text-muted">Так увидит директор на компьютере:</span>
           {actions
             .filter((row) => row.label.trim())
             .map((row, index) => (
               <span key={index} className="set-errand-chip">
-                {row.icon ? <span aria-hidden>{row.icon}</span> : null}
+                <ActionSign action={{ ...row, label: row.label.trim() }} />
                 {row.label.trim()}
               </span>
             ))}

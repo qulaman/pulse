@@ -12,7 +12,9 @@ import { ShopHero } from "@/components/shop/ShopHero";
 import { TeamPoints } from "@/components/shop/TeamPoints";
 import { PageHead } from "@/components/ui/PageHead";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
+import { usePeople } from "@/lib/people/queries";
 import { deliveredInPeriod, isOpenOrder, takenCounts } from "@/lib/shop/format";
+import { splitHands } from "@/lib/shop/hands";
 import { useAllShopItems, useOrders, useShopSummary, type ShopItem } from "@/lib/shop/queries";
 import type { Me } from "@/lib/tasks/queries";
 
@@ -50,13 +52,17 @@ export function AdminShop({ me }: { me: Me | undefined }) {
   const items = useAllShopItems(true);
   const orders = useOrders();
   const summary = useShopSummary(true);
+  const people = usePeople();
   const [editing, setEditing] = useState<ShopItem | "new" | null>(null);
 
   const list = items.data ?? [];
   const allOrders = orders.data ?? [];
   const waiting = allOrders.filter((order) => isOpenOrder(order.status) && order.user_id !== me?.userId);
   const taken = takenCounts(allOrders);
-  const heroLoading = orders.isLoading || summary.isLoading;
+  const heroLoading = orders.isLoading || summary.isLoading || people.isLoading;
+  // «Очки на руках» — the team's now, as the desk's «Очки и магазин» counts them (lib/shop/hands.ts):
+  // the points of people who left stay in the ledger, not «у команды»
+  const hands = splitHands(summary.data?.balances ?? [], people.data ?? []);
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
@@ -65,7 +71,7 @@ export function AdminShop({ me }: { me: Me | undefined }) {
       <Reveal index={0}>
         <ShopHero
           delivered={deliveredInPeriod(allOrders)}
-          onHands={summary.data?.onHands ?? 0}
+          onHands={hands.team}
           waiting={waiting.length}
           loading={heroLoading}
         />

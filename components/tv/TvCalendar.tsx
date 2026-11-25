@@ -3,11 +3,11 @@
 import { useMemo, type CSSProperties } from "react";
 
 import {
-  cellTitle,
+  cellShownTitle,
   firstColumn,
   laterDays,
   monthGrid,
-  monthRows,
+  monthLayout,
   softHyphens,
   todayPlan,
   type CalendarState,
@@ -30,7 +30,8 @@ import s from "./tv.module.css";
  *    Below, «Дальше» — only days that have something; the day's name stands in the time column, its
  *    meetings start on the line of the titles above;
  *  - «Месяц»: this month's weeks from Monday, today framed in the live colour, one event in a cell and «+N»;
- *    past weeks fold down to the dates.
+ *    past weeks fold down to one line of their dates; the edge weeks are whole rows — the neighbouring months'
+ *    days stand dimmed in them, the next month's with their meetings; nothing ahead — the head says «встреч нет».
  * Every word is at least `tv-small` (D-185). What does not fit is left out whole (the line goes entirely, it is
  * not clipped), the font does not shrink. Birthdays in gold. A guest gets no titles or places — the DB does not
  * send them (D-33).
@@ -205,39 +206,39 @@ function MonthView({ calendar, minute }: { calendar: TvCalendarData | null; minu
   const grid = useMemo(() => monthGrid(calendar, new Date(minute)), [calendar, minute]);
   // past weeks fold to their numbers; the weeks ahead share the rest by the lines their cells want, so a week
   // of long titles gets its lines and a quiet one gives them up
-  const rows = useMemo(() => monthRows(grid), [grid]);
+  const layout = useMemo(() => monthLayout(grid), [grid]);
 
   return (
     <div className="tv-box" data-testid="tv-calendar" data-view="month">
-      <TvSceneHead title={grid.month} sub={String(grid.year)} />
-      <div className="grid min-h-0 flex-1 grid-cols-7 gap-[0.4vh]" style={{ gridTemplateRows: rows }}>
+      <TvSceneHead title={grid.month} sub={grid.note ? `${grid.year} · ${grid.note}` : String(grid.year)} />
+      <div className="grid min-h-0 flex-1 grid-cols-7 gap-[0.4vh]" style={{ gridTemplateRows: layout.rows }}>
         {grid.weekdays.map((day, i) => (
           <span key={day} className="tv-small px-[1.2vh] text-muted" style={{ opacity: i >= 5 ? 0.7 : 1 }}>
             {day}
           </span>
         ))}
-        {grid.weeks.map((week) => week.days.map((cell) => <MonthDay key={cell.key} cell={cell} week={week} />))}
+        {grid.weeks.map((week, i) => week.days.map((cell) => <MonthDay key={cell.key} cell={cell} week={week} lines={layout.lines[i]} />))}
       </div>
     </div>
   );
 }
 
 /**
- * A day of the month: its number and the first event's time on the top line, the title in the whole lines the
- * cell has left, «+N» on the last line for the rest. Today is framed in the live colour — a frame, not a fill: the
- * loudest thing on the month is the date, not a green block.
+ * A day of the month: its number and the first event's time on the top line, the title — whole, when it fits the
+ * lines the cell has left — «+N» on the last line for the rest. Today is framed in the live colour — a frame, not a
+ * fill: the loudest thing on the month is the date, not a green block.
  */
-function MonthDay({ cell, week }: { cell: MonthCell; week: MonthWeek }) {
-  // another month's day in an edge week: an empty cell, not a dim number
-  if (!cell.inMonth) return <div aria-hidden />;
+function MonthDay({ cell, week, lines }: { cell: MonthCell; week: MonthWeek; lines: number }) {
   // a folded week shows no meetings
   const first = week.past ? null : (cell.rows[0] ?? null);
   const hidden = first ? cell.rows.length + cell.more - 1 : 0;
-  const title = first ? softHyphens(cellTitle(first)) : "";
-  const background = cell.weekend ? "color-mix(in srgb, var(--surface) 30%, var(--bg))" : "color-mix(in srgb, var(--surface) 62%, var(--bg))";
+  const title = first ? softHyphens(cellShownTitle(cell, lines)) : "";
+  // another month's day is quieter than the month's own: a fainter cell, its number in muted
+  const background = !cell.inMonth || cell.weekend ? "color-mix(in srgb, var(--surface) 30%, var(--bg))" : "color-mix(in srgb, var(--surface) 62%, var(--bg))";
   return (
     <div
-      className={`flex min-h-0 min-w-0 flex-col overflow-hidden px-[1.2vh] ${week.past ? "" : "py-[0.4vh]"}`}
+      // a folded week is one line of dates standing in the middle of its strip
+      className={`flex min-h-0 min-w-0 flex-col overflow-hidden px-[1.2vh] ${week.past ? "justify-center" : "py-[0.4vh]"}`}
       style={{
         background,
         // the frame sits inside the cell: nothing moves when the day turns
@@ -245,16 +246,17 @@ function MonthDay({ cell, week }: { cell: MonthCell; week: MonthWeek }) {
         opacity: cell.past ? PAST_OPACITY : 1,
       }}
       data-today={cell.today || undefined}
+      data-other={cell.inMonth ? undefined : true}
     >
-      <div className="flex shrink-0 items-baseline gap-[1.2vh]">
+      <div className="flex shrink-0 items-baseline gap-[1.2vh] whitespace-nowrap">
         <span
-          // a folded week is a row of dates: set solid, a line no taller than the type
-          className="tv-small tv-num font-bold"
-          style={{ color: cell.today ? "var(--tv-live)" : INK, opacity: cell.weekend && !cell.today ? 0.75 : 1, lineHeight: week.past ? 1 : undefined }}
+          className={`tv-small tv-num font-bold ${cell.inMonth ? "" : "text-muted"}`}
+          style={{ color: cell.today ? "var(--tv-live)" : cell.inMonth ? INK : undefined, opacity: cell.weekend && !cell.today && cell.inMonth ? 0.75 : 1 }}
         >
           {cell.day}
+          {cell.mark ? <span className="font-semibold"> {cell.mark}</span> : null}
         </span>
-        {first ? <span className="tv-small tv-num text-muted">{first.time}</span> : null}
+        {first && !cell.mark ? <span className="tv-small tv-num text-muted">{first.time}</span> : null}
       </div>
       {title ? (
         // the title takes the whole lines the cell has left — a short cell shows a line, a tall one two or three

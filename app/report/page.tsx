@@ -8,6 +8,7 @@ import { ReportSkeleton } from "@/components/daily-report/Skeletons";
 import { LoadFailed } from "@/components/daily-report/TeamDayPanel";
 import { PageHead } from "@/components/ui/PageHead";
 import {
+  useAskFrom,
   useMyDailyReport,
   useMyDailyReportHistory,
   useRefreshAfterReplay,
@@ -26,6 +27,7 @@ export default function ReportPage() {
   const submit = useSubmitDailyReport();
   useRefreshAfterReplay();
   const now = useNow();
+  const askFrom = useAskFrom();
   const [pop, setPop] = useState<Pop | null>(null);
 
   if (day.isPending) return <ReportSkeleton />;
@@ -50,6 +52,7 @@ export default function ReportPage() {
       day={day.data}
       history={history.isError ? [] : history.data}
       now={now}
+      askFrom={askFrom}
       waiting={waiting}
       pop={pop}
       onSubmit={(input) =>

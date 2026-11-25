@@ -125,7 +125,7 @@ export function TvScreen({
         // the director woke the wall from the remote: the night waits till the mark (D-105)
         night={isNight(now) && !awakeUntil(row, now)}
         offline={offline}
-        items={tickerItems(lines, data)}
+        items={tickerItems(lines, data, now)}
         speech={speech}
         summary={data ?? null}
         focus={focused}

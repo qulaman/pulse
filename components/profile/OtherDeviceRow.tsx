@@ -20,10 +20,11 @@ export function OtherDeviceRow({ userId, fullName }: { userId: string; fullName:
 
   return (
     <>
+      {/* short enough for a 375 px phone: the title was cut at «устройст…» (3.1) */}
       <Row
         icon={<DevicesIcon />}
-        title="Войти на другом устройстве"
-        value="код"
+        title="Другое устройство"
+        value="вход по коду"
         onClick={() => {
           setKey((k) => k + 1);
           setOpen(true);

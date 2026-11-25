@@ -87,7 +87,7 @@ export function answerInput({
   };
 }
 
-const NOT_UNDERSTOOD = "Пока отвечаю только про задачи и людей: кто чем занят, что там по делу, кто просрочил, что на приёмке. Спроси иначе или скажи задачу.";
+const NOT_UNDERSTOOD = "Пока отвечаю только про задачи и людей: кто чем занят, что там по делу, кто просрочил, что на проверке. Спросите иначе или скажите задачу.";
 
 /** The person the question is about: a first name or an alias, in any case («Марату», «Дины»). */
 export function findPerson(question: string, people: AnswerPerson[]): AnswerPerson | null {
@@ -152,10 +152,10 @@ export function answer(input: AnswerInput): Answer {
 
   // 2. review stack
   if (/приемк|проверк|сдал|сдали|готово|принять/.test(q)) {
-    if (input.review.length === 0) return { understood: true, lines: ["На приёмке ничего нет."] };
+    if (input.review.length === 0) return { understood: true, lines: ["На проверке ничего нет."] };
     return {
       understood: true,
-      lines: [`На приёмке ${input.review.length}:`, ...input.review.map((t) => taskLine(t, now, { person: true }))],
+      lines: [`На проверке ${input.review.length}:`, ...input.review.map((t) => taskLine(t, now, { person: true }))],
     };
   }
 
@@ -214,7 +214,7 @@ export function answer(input: AnswerInput): Answer {
     parts.push(`В работе ${input.open.length} ${pluralRu(input.open.length, TASKS_FORM)}.`);
     if (input.overdue.length) parts.push(`Просрочено ${input.overdue.length}.`);
     if (input.questions.length) parts.push(`Ждут ответа ${input.questions.length}.`);
-    if (input.review.length) parts.push(`На приёмке ${input.review.length}.`);
+    if (input.review.length) parts.push(`На проверке ${input.review.length}.`);
     if (parts.length === 1) parts.push("Ничего не требует внимания.");
     return { understood: true, lines: [parts.join(" ")] };
   }

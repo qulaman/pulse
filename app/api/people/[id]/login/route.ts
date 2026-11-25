@@ -45,7 +45,7 @@ export const GET = withAuth(
     const { data, error } = await createServiceSupabase().auth.admin.getUserById(target.id);
     if (error || !data.user) {
       console.error("getUserById failed:", error?.message);
-      return apiError(502, "auth_failed", "Не удалось прочитать вход, попробуй ещё раз");
+      return apiError(502, "auth_failed", "Не удалось прочитать вход, попробуйте ещё раз");
     }
     return apiOk({ email: data.user.email ?? null, last_sign_in_at: data.user.last_sign_in_at ?? null });
   },
@@ -68,7 +68,7 @@ export const PATCH = withAuth<z.infer<typeof PatchSchema>>(
         return apiError(409, "email_exists", "Такая почта уже у другого сотрудника");
       }
       console.error("updateUserById(email) failed:", message);
-      return apiError(502, "auth_failed", "Не удалось сменить почту, попробуй ещё раз");
+      return apiError(502, "auth_failed", "Не удалось сменить почту, попробуйте ещё раз");
     }
     return apiOk({ email: updated.data.user?.email ?? email });
   },

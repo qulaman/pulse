@@ -190,10 +190,35 @@ describe("buildTabel", () => {
     expect(day("2026-11-04").missed).toBe(0);
   });
 
-  it("totals over the people given", () => {
-    expect(tabel.totals).toEqual({ people: 4, submitted: 4, missed: 3, excused: 1, rate: 4 / 7, gaps: 2 });
+  it("totals over the team among the people given — the one who left keeps a row, not a weight", () => {
+    expect(tabel.totals).toEqual({ people: 3, submitted: 3, missed: 3, excused: 1, rate: 3 / 6, gaps: 2 });
+    expect(tabel.gone).toBe(1);
     expect(tabelTotals([of("b")])).toEqual({ people: 1, submitted: 0, missed: 0, excused: 0, rate: null, gaps: 0 });
+    expect(tabelTotals([of("d")])).toEqual({ people: 0, submitted: 0, missed: 0, excused: 0, rate: null, gaps: 0 });
     expect(missedByDay([of("c")], 30)[10]).toBe(1);
+  });
+
+  it("people who left: their misses stay in their row, at the bottom, out of the month's headline and «Не сдали»", () => {
+    const left = { ...PERSON, is_active: false };
+    const sheet = buildTabel({
+      from: "2026-11-02",
+      to: "2026-11-06",
+      today: TODAY,
+      rows: [row("w", "Тимур"), row("g", "Абай"), row("x", "Динара")],
+      marks: new Map([
+        ["g", new Map([["2026-11-02", missed], ["2026-11-04", missed], ["2026-11-05", missed]])],
+        ["x", new Map([["2026-11-02", missed]])],
+        ["w", new Map([["2026-11-02", handed("2026-11-02")]])],
+      ]),
+      rules: RULES,
+      people: new Map<string, ReportPerson>([["w", PERSON], ["g", left], ["x", left]]),
+    });
+    // the team first, the ones who left after it, each part by name
+    expect(sheet.people.map((person) => [person.row.full_name, person.gone])).toEqual([["Тимур", false], ["Абай", true], ["Динара", true]]);
+    expect(sheet.people[1].row).toMatchObject({ missed: 3, submitted: 0 });
+    expect(sheet.totals).toEqual({ people: 1, submitted: 1, missed: 0, excused: 0, rate: 1, gaps: 0 });
+    expect(sheet.gone).toBe(2);
+    expect(sheet.days.map((day) => day.missed)).toEqual([0, 0, 0, 0, 0]);
   });
 
   it("someone the roster does not know is out of the team, not a row of misses", () => {

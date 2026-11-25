@@ -7,7 +7,7 @@ import { When } from "@/components/desk/ui/When";
 import { Icon } from "@/components/tasks/desk/icons";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
 import { humanAqtobe } from "@/lib/ai/time";
-import { columnFits, deliveryLine, fitColumn, handInVerdict, latestLine, stageOf, underTitle, verdictRank, type Move } from "@/lib/desk/tasks";
+import { columnFits, deliveryLine, fitColumn, handInVerdict, latestLine, stageOf, underTitle, verdictRank, whoTight, type Move } from "@/lib/desk/tasks";
 import { shortName } from "@/lib/people/names";
 import { hasUnread, type BoardTask } from "@/lib/pulse/board";
 import { REASON_ORDER, type DeskReason } from "@/lib/tasks/desk";
@@ -85,8 +85,10 @@ export function taskColumns({
   // grouped by the person, the group's head names them: the column would only repeat it
   const byPerson = group === "person";
   const closedRow = (task: TaskWithPeople) => task.status === "done" || task.status === "revoked" || archivedIds.has(task.id);
-  const showDelivery = !panelOpen && columnFits("delivery", bucket) && shown.some((task) => task.status === "sent" || task.status === "scheduled");
-  const showLast = !panelOpen && columnFits("last", bucket) && shown.some((task) => latestLine(task, rows.get(task.id), now) !== null);
+  // the list's own width decides, the panel open or not: a wide window keeps the receipts and the
+  // thread's last word in their rows rather than a gap after «Что» (D-194)
+  const showDelivery = columnFits("delivery", bucket) && shown.some((task) => task.status === "sent" || task.status === "scheduled");
+  const showLast = columnFits("last", bucket) && shown.some((task) => latestLine(task, rows.get(task.id), now) !== null);
   // grouped by the reason or the stage, the group's head already says it
   const showStage = group !== "reason" && columnFits("stage", bucket);
   const showWho = !byPerson && columnFits("who", bucket);
@@ -107,7 +109,10 @@ export function taskColumns({
   // the person's face stands before the name (D-171, D-174): the column keeps room for it
   const face = 30;
   const widths = {
-    who: fitColumn(shown.map((task) => shortName(task.assignee?.full_name)), { min: 96 + face, max: (snug ? 120 : 160) + face, extra: 10 + face }),
+    // the person stays on every list (D-194): a narrow one keeps the face and as much of the name as fits
+    who: whoTight(bucket)
+      ? fitColumn(shown.map((task) => shortName(task.assignee?.full_name)), { min: 72 + face, max: 96 + face, extra: 10 + face })
+      : fitColumn(shown.map((task) => shortName(task.assignee?.full_name)), { min: 96 + face, max: (snug ? 120 : 160) + face, extra: 10 + face }),
     due: fitColumn([...shown, ...archived].map(dueText), { min: 116, max: archived.length > 0 ? 196 : snug ? 132 : 172, perChar: archived.length > 0 ? 8 : undefined }),
     closed: fitColumn(shown.map(closedText), { min: 116, max: snug ? 136 : 172 }),
     verdict: fitColumn(shown.map((task) => handInVerdict(task)?.text ?? ""), { min: 84, max: snug ? 148 : 180, perChar: 8 }),
@@ -185,6 +190,7 @@ export function taskColumns({
       render: (task) => {
         const row = rows.get(task.id);
         const under = underTitle(task, row, meId, now);
+        const moves = movesOf(task);
         const unread = row ? hasUnread(row, meId) : false;
         return (
           // one line: the title, then the thread's newest word in grey — a row stays 34 px
@@ -208,6 +214,19 @@ export function taskColumns({
             {unread ? (
               <span aria-label="новое сообщение" title="Новое сообщение" className="tasks-unread shrink-0 text-[12px] leading-4 text-accent">
                 новое
+              </span>
+            ) : null}
+            {moves.length > 0 ? (
+              // the row's two moves under the hand, at the end of «Что» — never over another column:
+              // the deadline, the stage and the receipt stay readable while the hand is on the row
+              // (D-194). Hovered or chosen (with the panel open the panel holds the chosen
+              // row's moves); a «Что» too narrow for them leaves them to «⋯», the keys and the panel.
+              <span
+                className={`tasks-cell-moves pointer-events-none ml-auto hidden shrink-0 items-center [.desk-row:hover_&]:pointer-events-auto [.desk-row:hover_&]:flex ${
+                  panelOpen ? "" : "[.desk-row[aria-selected=true]_&]:pointer-events-auto [.desk-row[aria-selected=true]_&]:flex"
+                }`}
+              >
+                <MoveRow className="flex-row-reverse" moves={moves} onPress={(move, target) => onMove(move, task, target)} />
               </span>
             ) : null}
           </span>
@@ -323,25 +342,11 @@ export function taskColumns({
       title: "",
       width: "44px",
       align: "right",
-      render: (task) => {
-        const moves = movesOf(task);
-        return (
-          <span className="flex justify-end">
-            {moves.length > 0 ? (
-              // the row's two moves under the hand: over the row's right end while it is hovered or
-              // chosen (with the panel open the panel holds the chosen row's moves)
-              <span
-                className={`desk-row-moves pointer-events-none absolute inset-y-0 right-8 hidden items-center pl-3 [.desk-row:hover_&]:pointer-events-auto [.desk-row:hover_&]:flex ${
-                  panelOpen ? "" : "[.desk-row[aria-selected=true]_&]:pointer-events-auto [.desk-row[aria-selected=true]_&]:flex"
-                }`}
-              >
-                <MoveRow className="flex-row-reverse" moves={moves} onPress={(move, target) => onMove(move, task, target)} />
-              </span>
-            ) : null}
-            <MoreButton taskId={task.id} items={() => menuOf(task)} />
-          </span>
-        );
-      },
+      render: (task) => (
+        <span className="flex justify-end">
+          <MoreButton taskId={task.id} items={() => menuOf(task)} />
+        </span>
+      ),
     },
   ];
 

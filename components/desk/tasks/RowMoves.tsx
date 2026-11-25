@@ -1,9 +1,13 @@
 "use client";
 
-import { useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 
 import { Menu, type MenuItem } from "@/components/desk/ui/Menu";
+import { toast } from "@/components/ui/Toast";
 import { KEY_CAP, type Move } from "@/lib/desk/tasks";
+import { usePhones } from "@/lib/people/card-queries";
+import { usePushHealth } from "@/lib/push/health-query";
+import { noPushIds } from "@/lib/tasks/attention";
 
 /**
  * A small button of the desk's lists (D-154), its letter inside — «Принять A». `main` — the
@@ -44,15 +48,11 @@ export function MiniButton({
         event.stopPropagation();
         onPress(event.currentTarget);
       }}
-      // `desk-mini` / `desk-cap`: «Графит» gives the plain word a body and the letter a key cap (D-171)
+      // `desk-mini`: «Графит» gives the plain word a body (D-171). The letter is in the title only: keys
+      // live in the «?» sheet and a button's tooltip, never printed on the button (owner, 2026-11-25)
       className={`desk-mini inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[2px] border leading-4 transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50 ${height} ${look}`}
     >
       {label}
-      {keyCap ? (
-        <span aria-hidden className="desk-cap nums text-[11px] leading-4 opacity-60">
-          {keyCap}
-        </span>
-      ) : null}
     </button>
   );
 }
@@ -164,5 +164,56 @@ export function MoreButton({ items, taskId, testId = "desk-row-more", label = "�
       </button>
       {anchor ? <Menu open onClose={() => setAnchor(null)} anchor={anchor} items={items()} align="end" width={280} label={label} /> : null}
     </>
+  );
+}
+
+/**
+ * Whose pushes do not reach and their phones (lib/tasks/reasons.ts `firstMoveOf`): a task of such a
+ * person puts «Позвонить» first instead of «Напомнить» (owner, 2026-11-25). The phones are the
+ * director's read of `profile_phones`; unknown — `blind`, «Напомнить» with an honest hint.
+ */
+export function useCallFirst(): { noPush: ReadonlySet<string>; phoneOf: (id: string) => string | null } {
+  const health = usePushHealth();
+  const phones = usePhones();
+  const noPush = useMemo(() => noPushIds(health.data), [health.data]);
+  return { noPush, phoneOf: (id: string) => phones.data?.[id] ?? null };
+}
+
+/** The number into the clipboard, said in a toast; a closed clipboard still shows the number. */
+export async function copyPhone(tel: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(tel);
+    toast(`Номер скопирован: ${tel}`);
+    return true;
+  } catch {
+    // the clipboard closed (a page without focus, an old browser): the number is in the words
+    toast(`Номер: ${tel}`);
+    return false;
+  }
+}
+
+/**
+ * «Позвонить» on the computer: no `tel:` here (D-175, as the alarm's guard number) — the number
+ * stands in the button and a click copies it for the phone in the hand.
+ */
+export function CallButton({ tel, size = "sm", testId }: { tel: string; size?: "sm" | "md"; testId?: string }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 1600);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  const copy = async () => {
+    if (await copyPhone(tel)) setCopied(true);
+  };
+  return (
+    <MiniButton
+      label={copied ? "Скопировано" : `Позвонить · ${tel}`}
+      size={size}
+      main
+      title={`Уведомления до исполнителя не доходят — позвоните. Клик скопирует номер ${tel}`}
+      onPress={() => void copy()}
+      testId={testId}
+    />
   );
 }

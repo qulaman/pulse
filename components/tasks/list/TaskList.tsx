@@ -377,6 +377,7 @@ export function CardHead({
   question = false,
   unread = false,
   closed = false,
+  attention = false,
 }: {
   task: {
     title: string;
@@ -399,6 +400,8 @@ export function CardHead({
   unread?: boolean;
   /** History for this reader: the title dims and «when» is the closing time. */
   closed?: boolean;
+  /** A new task that needs its reader now — the glyph turns amber (`toneOf`). */
+  attention?: boolean;
 }) {
   const overdue = isOverdue(task, now);
   const urgentNow = !task.deadline && task.priority === "high" && !closed;
@@ -424,7 +427,7 @@ export function CardHead({
   return (
     <>
       <span className="mt-[1px]">
-        <StatusGlyph status={task.status} overdue={overdue} />
+        <StatusGlyph status={task.status} overdue={overdue} attention={attention} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-start gap-3">
@@ -452,6 +455,17 @@ export function CardHead({
           <span className="shrink-0" style={statusColor ? { color: statusColor } : undefined}>
             {status}
           </span>
+          {/* urgent with a time: the time takes the corner, the flag stays here — urgency never
+              drops out of the list while the Лента card and the task's screen show it (D-194) */}
+          {task.priority === "high" && task.deadline && !closed ? (
+            <>
+              <Sep />
+              <span className="inline-flex shrink-0 items-center gap-1 text-warn" data-testid="task-urgent-mark">
+                <Icon name="flame" size={13} />
+                {TEXT.urgent}
+              </span>
+            </>
+          ) : null}
           {question ? (
             <>
               <Sep />

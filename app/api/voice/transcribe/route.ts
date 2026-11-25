@@ -60,7 +60,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     ]);
     if (file.error || !file.data) {
       console.error("voice download failed:", file.error?.message);
-      return apiError(502, "stt_failed", "Не расслышал, попробуй ещё раз", {
+      return apiError(502, "stt_failed", "Не расслышал, попробуйте ещё раз", {
         audio_path: body.audio_path,
       });
     }

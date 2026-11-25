@@ -5,10 +5,11 @@ import { useState } from "react";
 import { PointsLedger } from "@/components/shop/PointsLedger";
 import { Sheet } from "@/components/ui/Sheet";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
-import { usePeople } from "@/lib/people/queries";
+import { isTeamMember, usePeople } from "@/lib/people/queries";
 import { nearestGoal } from "@/lib/shop/format";
 import { useShopSummary, type ShopItem } from "@/lib/shop/queries";
 import { initialsOf } from "@/lib/people/names";
+import { formatNum } from "@/lib/desk/format";
 
 function Chevron() {
   return (
@@ -29,7 +30,8 @@ export function TeamPoints({ items }: { items: ShopItem[] }) {
   const people = usePeople();
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  const names = new Map((people.data ?? []).map((person) => [person.id, person.full_name]));
+  // the team now (lib/people/team.ts): who left keeps their points in the ledger, not on this list
+  const names = new Map((people.data ?? []).filter(isTeamMember).map((person) => [person.id, person.full_name]));
   const top = (summary.data?.balances ?? []).filter((row) => row.points > 0 && names.has(row.userId)).slice(0, 3);
 
   return (
@@ -75,8 +77,8 @@ export function TeamPoints({ items }: { items: ShopItem[] }) {
                           {goal ? `ещё ${goal.missing} до «${goal.title}»` : "хватает на любую награду"}
                         </span>
                       </span>
-                      <span className="nums shrink-0 text-[17px] font-bold leading-5" style={{ color: "var(--gold)" }}>
-                        {row.points}
+                      <span className="nums shrink-0 whitespace-nowrap text-[17px] font-bold leading-5" style={{ color: "var(--gold)" }}>
+                        {formatNum(row.points)}
                       </span>
                     </li>
                   );

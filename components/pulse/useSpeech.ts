@@ -10,6 +10,8 @@ import { describeChanges, openingLine, type BoardTask, type Lanes, type Phrase }
 import { describeEther, type EtherPost } from "@/lib/pulse/ether";
 import { wasUndone } from "@/lib/tasks/grace";
 
+import { useNoPush } from "./useNoPush";
+
 /** How long the mascot's mouth moves after a new line. */
 const SPEAKING_MS = 1_200;
 
@@ -35,7 +37,10 @@ export type Voice = {
   describeErrands?: (prev: readonly Errand[], next: readonly Errand[], now: Date) => Phrase[];
 };
 
-/** The director's voice: the verdict on opening, the board's changes as facts. */
+/**
+ * The director's voice: the verdict on opening, the board's changes as facts. The verdict knows whose
+ * pushes do not reach them (`useNoPush`): an order its assignee cannot hear about is not «тихо».
+ */
 export function useSpeech(
   rows: BoardTask[] | undefined,
   lanes: Lanes,
@@ -46,16 +51,17 @@ export function useSpeech(
   calendar?: CalendarEvent[],
   errands?: Errand[],
 ) {
+  const noPush = useNoPush();
   // «Марат пишет по …» is a message the reader has not seen — the reader is the director
   const voice = useMemo<Voice>(
     () => ({
-      opening: openingLine,
+      opening: (at, when, name) => openingLine(at, when, name, noPush),
       describe: (prev, next, at) => describeChanges(prev, next, at, meId, wasUndone),
       describeEther: (prev, next) => describeEther(prev, next, meId),
       describeCalendar: (prev, next, at) => describeCalendar(prev, next, at, meId),
       describeErrands: (prev, next) => describeErrandsForDirector(prev, next),
     }),
-    [meId],
+    [meId, noPush],
   );
   return useSpeechWith(rows, lanes, now, directorName, voice, ether, calendar, errands);
 }
@@ -73,8 +79,9 @@ export function useSpeechWith(
   const [line, setLine] = useState<SpokenLine | null>(null);
   const [speaking, setSpeaking] = useState(false);
   const previous = useRef<BoardTask[] | undefined>(undefined);
-  // the opening greets by name; if the name lands after the board did, the greeting is redone quietly
-  const opening = useRef<{ name: string } | null>(null);
+  // the opening greets by name; if the name — or what the verdict knows (the voice: whose pushes do
+  // not reach) — lands after the board did, the greeting is redone quietly
+  const opening = useRef<{ name: string; voice: Voice } | null>(null);
   // the clock and the lanes as of the latest render, for the effects and the replay tap
   // (declared before the effects below, so they see the fresh values)
   const nowRef = useRef(now);
@@ -94,7 +101,7 @@ export function useSpeechWith(
     const before = previous.current;
     previous.current = rows;
     if (!before) {
-      opening.current = { name: directorName };
+      opening.current = { name: directorName, voice };
       say(voice.opening(lanesRef.current, nowRef.current, directorName), true);
       return;
     }
@@ -148,8 +155,8 @@ export function useSpeechWith(
   }, [errands, say, voice]);
 
   useEffect(() => {
-    if (!opening.current || opening.current.name === directorName) return;
-    opening.current = { name: directorName };
+    if (!opening.current || (opening.current.name === directorName && opening.current.voice === voice)) return;
+    opening.current = { name: directorName, voice };
     setLine((current) => (current ? { ...voice.opening(lanesRef.current, nowRef.current, directorName), id: current.id, opening: true } : current));
   }, [directorName, voice]);
 
@@ -160,7 +167,7 @@ export function useSpeechWith(
   }, [speaking, line?.id]);
 
   const replay = useCallback(() => {
-    opening.current = { name: directorName };
+    opening.current = { name: directorName, voice };
     say(voice.opening(lanesRef.current, nowRef.current, directorName), true);
   }, [say, directorName, voice]);
 

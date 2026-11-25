@@ -115,11 +115,6 @@ function NavItem({
           <DirtyDot />
         </span>
       ) : null}
-      {keyHint && !dirty ? (
-        <span aria-hidden className="nums relative text-[11px] font-semibold text-muted/0 transition-colors duration-[120ms] group-hover:text-muted/70">
-          {keyHint}
-        </span>
-      ) : null}
     </Link>
   );
 }

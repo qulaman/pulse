@@ -174,7 +174,7 @@ function Sandbox() {
         </div>
       </FlightTargetProvider>
 
-      <p className="mt-4 px-1 text-[13px] text-muted">Объявление (везде, не только в Ленте):</p>
+      <p className="mt-4 px-1 text-[13px] text-muted">Объявление (везде, не только на Пульсе):</p>
       <AnnouncementCard
         item={ann}
         userId="me"

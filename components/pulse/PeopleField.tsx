@@ -60,6 +60,7 @@ export function PeopleField({
   hy,
   wide,
   reach,
+  skirt,
   dream,
   chase,
   picked = null,
@@ -75,6 +76,8 @@ export function PeopleField({
   /** how far out the rows may stand, further than the dream may fly */
   wide?: number;
   reach?: number;
+  /** where the floor of idlers starts under the face (`teamField`) */
+  skirt?: number;
   /** the dream in the air right now, and the line it flies — the room reacts to it (D-77) */
   dream?: { id: DreamId; key: number } | null;
   chase?: Chase | null;
@@ -139,9 +142,9 @@ export function PeopleField({
   // ---- where everybody stands --------------------------------------------------------------
   const digest = crew.map((c) => `${c.member.id}:${c.member.fullName}:${c.look.busy ? 1 : 0}`).join("|");
   const layout = useMemo(
-    () => teamField({ people: crew.map((c) => ({ id: c.member.id, fullName: c.member.fullName, busy: c.look.busy })), hx, hy, wide, reach }),
+    () => teamField({ people: crew.map((c) => ({ id: c.member.id, fullName: c.member.fullName, busy: c.look.busy })), hx, hy, wide, reach, skirt }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `digest` is the digest of who stands where
-    [digest, hx, hy, wide, reach],
+    [digest, hx, hy, wide, reach, skirt],
   );
 
   // Who has just changed halves. Nobody jumps across the face: they fly, and until they land

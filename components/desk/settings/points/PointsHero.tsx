@@ -11,10 +11,13 @@ import { aqtobeDay, toAqtobeIso } from "@/lib/ai/time";
 import { formatNum } from "@/lib/desk/format";
 import { usePeople } from "@/lib/people/queries";
 import { useRating } from "@/lib/points/queries";
+import type { Hands } from "@/lib/shop/hands";
 import { useCompanyLedger, type LedgerRow } from "@/lib/shop/queries";
 import { pluralRu } from "@/lib/tasks/status-text";
 
-type Summary = { onHands: number; earned30: number; spent: number };
+type Summary = { earned30: number; spent: number };
+
+const POINTS = (value: number) => pluralRu(Math.abs(value), ["очко", "очка", "очков"]);
 
 const DAYS = 30;
 const MONTHS = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"] as const;
@@ -150,12 +153,15 @@ function Count({ value, className }: { value: number; className?: string }) {
  */
 export function PointsHero({
   summary,
+  hands,
   waiting,
   disputes,
   onShop,
   onDisputes,
 }: {
   summary: Summary | undefined;
+  /** The points on hands by whose they are (lib/shop/hands.ts): the figure is the team's, the rest is said apart. */
+  hands: Hands | undefined;
   waiting: number;
   disputes: number;
   onShop: () => void;
@@ -168,14 +174,23 @@ export function PointsHero({
       <div className="pts-hero-main">
         <div className="pts-hero-total">
           <p className="pts-hero-label">На руках у команды</p>
-          {summary ? (
-            <p className="pts-hero-figure desk-figure nums" title={`${formatNum(summary.onHands)} ${pluralRu(Math.abs(summary.onHands), ["очко", "очка", "очков"])}`}>
-              <Count value={summary.onHands} />
+          {hands ? (
+            <p className="pts-hero-figure desk-figure nums" title={`${formatNum(hands.team)} ${POINTS(hands.team)}`} data-testid="points-hero-hands">
+              <Count value={hands.team} />
             </p>
           ) : (
             <Bone h={44} w={220} className="my-1" />
           )}
-          <p className="text-[13px] leading-[18px] text-muted">{summary ? pluralRu(Math.abs(summary.onHands), ["очко", "очка", "очков"]) : "очков"} — сумма всех начислений и трат</p>
+          {/* the figure is the sum of the table's rows; points of who left stay theirs and are said apart */}
+          <p className="text-[13px] leading-[18px] text-muted">{hands ? POINTS(hands.team) : "очков"} у тех, кто в команде сейчас</p>
+          {hands && hands.gone !== 0 ? (
+            <p className="nums text-[13px] leading-[18px] text-muted" data-testid="points-hero-gone">
+              ещё {formatNum(hands.gone)} — у ушедших
+            </p>
+          ) : null}
+          {hands && hands.other !== 0 ? (
+            <p className="nums text-[13px] leading-[18px] text-muted">ещё {formatNum(hands.other)} — у директора и экрана</p>
+          ) : null}
         </div>
         <div className="pts-hero-days">
           <p className="pts-hero-label">Роздано по дням</p>

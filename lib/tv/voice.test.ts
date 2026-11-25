@@ -95,9 +95,9 @@ describe("phraseOf — одна короткая фраза о событии (D
   }
 
   it("поручение, работа и проверка — без названия: оно продиктовано одному человеку (D-45)", () => {
-    expect(said("task_sent")).toBe("Марат: новое поручение");
+    expect(said("task_sent")).toBe("Марат: новая задача");
     expect(said("task_accepted")).toBe("Марат: в работе");
-    expect(said("task_review")).toBe("Марат: работа на проверке");
+    expect(said("task_review")).toBe("Марат: на проверке");
     for (const kind of ["task_sent", "task_accepted", "task_review"] as const) {
       expect(said(kind, "Сверка с поставщиком")).not.toMatch(/Сверка|Подписать/);
       expect(said(kind, "Акт")).toBe(said(kind, null));
@@ -110,8 +110,8 @@ describe("phraseOf — одна короткая фраза о событии (D
     const fits = "А".repeat(room);
     expect(said("task_done", fits, null, "Марат Оспанов")).toBe(`Марат Оспанов: ${fits}`);
     expect(said("task_done", fits, null, "Марат Оспанов")).toHaveLength(PHRASE_MAX);
-    expect(said("task_done", `${fits}Б`, null, "Марат Оспанов")).toBe("Марат Оспанов: работа принята");
-    expect(said("task_done", null)).toBe("Марат: работа принята");
+    expect(said("task_done", `${fits}Б`, null, "Марат Оспанов")).toBe("Марат Оспанов: готово");
+    expect(said("task_done", null)).toBe("Марат: готово");
   });
 
   it("очки — плюс, число и слово по числу; без числа — похвала", () => {
@@ -168,7 +168,7 @@ describe("phraseOf — одна короткая фраза о событии (D
       expect(phrase).not.toMatch(/Оспанов|Сверка|\d/);
     }
     expect(said("points", "за помощь", 50, "Марат Оспанов", true)).toBe("Марат: похвала");
-    expect(said("task_done", "Сверка", null, "Марат Оспанов", true)).toBe("Марат: работа принята");
+    expect(said("task_done", "Сверка", null, "Марат Оспанов", true)).toBe("Марат: готово");
   });
 
   it("негатива нет ни в одной фразе (D-45)", () => {

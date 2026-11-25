@@ -205,7 +205,7 @@ export function NotifyRules({ meId }: { meId: string }) {
               ))}
             </Select>
           </ProfileRow>
-          <ProfileRow label="Итог дня" hint="Один пуш в конце дня: принято, на приёмке, в работе, просрочено">
+          <ProfileRow label="Итог дня" hint="Один пуш в конце дня: принято, на проверке, в работе, просрочено">
             <Select value={prefs.day_summary_at ?? ""} onChange={(event) => update((p) => ({ ...p, day_summary_at: event.target.value || null }))} aria-label="Итог дня" className="pr-8">
               <option value="">выключен</option>
               {[...new Set([...DAY_SUMMARY_TIMES, ...(prefs.day_summary_at ? [prefs.day_summary_at] : [])])].sort().map((time) => (

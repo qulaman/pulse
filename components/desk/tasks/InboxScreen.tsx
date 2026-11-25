@@ -23,7 +23,6 @@ import { shortName, useNamesKey } from "@/lib/people/names";
 import { useTaskReactions } from "@/lib/points/game";
 import { isReactable, showsReactionBar } from "@/lib/points/reactions";
 import type { BoardTask } from "@/lib/pulse/board";
-import { answersFor } from "@/lib/tasks/answers";
 import { queueOf, type DeskAction, type DeskItem, type DeskReason } from "@/lib/tasks/desk";
 import { nearestDeadline } from "@/lib/tasks/grouping";
 import { useTaskActions, type TaskActions } from "@/lib/tasks/mutations";
@@ -83,7 +82,7 @@ export function InboxSkeleton() {
     <DeskPage>
       {/* the walk's room is kept, with a line of words: the head stands on the baseline of its words */}
       <PageTitle
-        title="Разобрать"
+        title="Ждут вас"
         actions={
           <span aria-hidden className="invisible inline-flex h-9 items-center text-[14px] leading-5">
             1 из 1
@@ -114,7 +113,7 @@ export function InboxSkeleton() {
 }
 
 /**
- * «Разобрать» (tasks/022 A п.6, D-154): everything waiting for the director as a stack, one task at
+ * «Ждут вас», formerly «Разобрать» (tasks/022 A п.6, D-154): everything waiting for the director as a stack, one task at
  * a time — why it waits as the first line in its ink, the task at the height of what it says, the
  * reason's buttons with their keys inside, the thread under it with the answer field, the rest of
  * the queue beside it. Made for the keyboard (wave 3): ←/→ or J/K walk, Enter presses the main move, the
@@ -131,7 +130,7 @@ export function InboxScreen() {
   const hydrated = useHydrated();
   if (!hydrated || me.isPending || !me.data || load.kind === "loading") return <InboxSkeleton />;
   // never «Всё разобрано» over a queue that did not come
-  if (load.kind === "failed") return <FailedScreen title="Разобрать" what="очередь решений" offline={load.offline} busy={board.isFetching} onRetry={retry} />;
+  if (load.kind === "failed") return <FailedScreen title="Ждут вас" what="очередь решений" offline={load.offline} busy={board.isFetching} onRetry={retry} />;
   return <InboxView me={me.data} board={board.data ?? []} load={load} onRetry={retry} />;
 }
 
@@ -184,7 +183,7 @@ function InboxView({ me, board, load, onRetry }: { me: Me; board: readonly Board
     setCurrent(id);
   };
 
-  useShortcuts("Разобрать", [
+  useShortcuts("Ждут вас", [
     { keys: ["←", "→"], label: "Предыдущая, следующая (или K / J)" },
     { keys: ["Enter"], label: "Главное действие карточки" },
     { keys: ["A"], label: "Принять" },
@@ -207,7 +206,7 @@ function InboxView({ me, board, load, onRetry }: { me: Me; board: readonly Board
     const next = soon ? board.find((task) => task.deadline === soon && task.status !== "declined") : undefined;
     return (
       <DeskPage width="narrow">
-        <PageTitle title="Разобрать" actions={staleMark} />
+        <PageTitle title="Ждут вас" actions={staleMark} />
         {/* the good kind of empty: its tick draws itself */}
         <div className="tasks-done">
           <EmptyState
@@ -247,7 +246,7 @@ function InboxView({ me, board, load, onRetry }: { me: Me; board: readonly Board
   return (
     <DeskPage>
       <PageTitle
-        title="Разобрать"
+        title="Ждут вас"
         actions={
           <>
             {staleMark}
@@ -390,17 +389,11 @@ function StackKeys({
   const reactions = useTaskReactions();
   const reacted = Boolean(reactions.data?.[task.id]);
   const canReact = isReactable(task, me.userId) && showsReactionBar(task.status, reacted);
-  const main = enterMove(moves);
   const [menuAt, setMenuAt] = useState<HTMLElement | null>(null);
   return (
     <div data-testid="desk-task-keys">
       <div className="flex flex-wrap items-center gap-3">
         <MoveRow moves={moves} onPress={onPress} size="md" fillMain />
-        {main ? (
-          <span className="flex items-center gap-1 text-[12px] leading-4 text-muted">
-            <Kbd>Enter</Kbd> {main.label.charAt(0).toLowerCase() + main.label.slice(1)}
-          </span>
-        ) : null}
         <button
           type="button"
           aria-haspopup="menu"
@@ -412,9 +405,6 @@ function StackKeys({
           className={MORE_WORD}
         >
           Ещё
-          <span aria-hidden className="nums text-[11px] leading-4 opacity-60">
-            .
-          </span>
         </button>
         <Menu open={Boolean(menuAt)} onClose={() => setMenuAt(null)} anchor={menuAt} items={desk.acts.menu(task)} align="end" width={280} label="Все действия" />
       </div>
@@ -579,21 +569,6 @@ function InboxCard({
           </div>
         )}
       </section>
-
-      {/* the letters stand on the buttons above: the hint keeps to the walk */}
-      <p className="-mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-muted" data-testid="desk-inbox-hint">
-        <span>
-          <Kbd>←</Kbd> <Kbd>→</Kbd> соседняя
-        </span>
-        {desk.signals.question ? (
-          <span>
-            <Kbd>1</Kbd>…<Kbd>{Math.min(9, answersFor(desk.signals.question, task.deadline, now).length)}</Kbd> быстрый ответ
-          </span>
-        ) : null}
-        <span>
-          <Kbd>?</Kbd> все клавиши
-        </span>
-      </p>
 
       {desk.acts.node}
     </>

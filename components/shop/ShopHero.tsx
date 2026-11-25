@@ -3,6 +3,7 @@
 import { Mascot } from "@/components/brand/Mascot";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { pluralRu } from "@/lib/tasks/status-text";
+import { formatNum } from "@/lib/desk/format";
 
 type Props = {
   /** How many rewards were handed out in the last 30 days — the screen's main number. */
@@ -18,8 +19,8 @@ function Fact({ label, value, color }: { label: string; value: number; color?: s
   return (
     <span className="min-w-0 flex-1">
       <span className="block text-[12px] leading-4 text-muted">{label}</span>
-      <span className="nums block text-[19px] font-bold leading-6" style={color ? { color } : undefined}>
-        {value}
+      <span className="nums block truncate whitespace-nowrap text-[19px] font-bold leading-6" style={color ? { color } : undefined}>
+        {formatNum(value)}
       </span>
     </span>
   );
@@ -67,7 +68,7 @@ export function ShopHero({ delivered, onHands, waiting, loading }: Props) {
                 </span>
               </p>
               {delivered === 0 ? (
-                <p className="mt-1 text-[14px] leading-5 text-muted">Первую вручишь прямо отсюда</p>
+                <p className="mt-1 text-[14px] leading-5 text-muted">Первую можно вручить прямо отсюда</p>
               ) : null}
             </div>
             <span className="-mr-1 -mt-1 shrink-0">

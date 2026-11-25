@@ -139,7 +139,7 @@ export function SecretaryPanel({
   if (actions.length === 0) {
     return (
       <p className="py-4 text-center text-[16px] leading-[22px] text-muted">
-        Каталог пуст. Добавь кнопки в настройках.
+        Каталог пуст. Добавьте кнопки в настройках.
       </p>
     );
   }
@@ -180,7 +180,7 @@ export function SecretaryPanel({
       {/* the rule of the buttons, until the hold is learned; a hint is always said here */}
       {hint || !learned ? (
         <p className={`px-1 text-[13px] leading-4 text-muted ${compact ? "text-center" : ""}`} style={hint ? { color: "var(--warn)" } : undefined} data-testid="panel-hint">
-          {hint ?? "Держать 2 секунды — отправить · тап — примечание"}
+          {hint ?? "Удержите 2 секунды — отправить · нажмите — примечание"}
         </p>
       ) : null}
       {nobodyHere ? (

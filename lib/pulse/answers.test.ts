@@ -64,7 +64,7 @@ describe("answer", () => {
 
   it("review stack", () => {
     const a = answer({ ...BASE, question: "Что на приёмке?" });
-    expect(a.lines[0]).toBe("На приёмке 1:");
+    expect(a.lines[0]).toBe("На проверке 1:");
     expect(a.lines[1]).toBe("Динара, «Договор с Казцинком» — без срока");
   });
 
@@ -111,7 +111,7 @@ describe("answer", () => {
 
   it("the general picture", () => {
     const a = answer({ ...BASE, question: "Как дела в целом?" });
-    expect(a.lines).toEqual(["В работе 3 задачи. Просрочено 1. На приёмке 1."]);
+    expect(a.lines).toEqual(["В работе 3 задачи. Просрочено 1. На проверке 1."]);
   });
 
   it("refusals with reasons", () => {

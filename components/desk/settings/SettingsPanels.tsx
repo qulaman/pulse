@@ -245,7 +245,7 @@ export function SettingsPanels({ tab }: { tab: SettingsTab }) {
   if (!visited.has(tab)) setVisited(new Set(visited).add(tab));
 
   useShortcuts("Настройки · вкладки", [
-    { keys: ["1", "2", "3", "4"], label: "Компания, Программа, Сотрудники, ИИ-модель" },
+    { keys: ["1", "2", "3", "4"], label: "Компания, Программа, Очки и отчёты, ИИ-модель" },
     { keys: ["Ctrl S"], label: "Сохранить вкладку" },
     { keys: ["↑ ↓"], label: "Число или время в поле: шаг (Shift — крупнее)" },
     { keys: ["← →"], label: "Выбор из нескольких: соседний вариант" },

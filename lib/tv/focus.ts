@@ -34,8 +34,8 @@ export const STAGE_WORD: Record<StageKey, string> = {
   done: STAGE.done,
 };
 
-/** A guest gets no title at all (D-33); for the team, an order without a title is just «Поручение». */
-const UNTITLED = "Поручение";
+/** A guest gets no title at all (D-33); for the team, an order without a title is just «Задача». */
+const UNTITLED = "Задача";
 
 export function stageOf(status: string): StageKey | null {
   return STAGE_OF[status] ?? null;
@@ -48,7 +48,7 @@ export function stageOf(status: string): StageKey | null {
 export type PersonStat = {
   key: "done" | "open" | "points";
   value: number;
-  /** «сделано за неделю», «дела в работе», «очков за неделю». */
+  /** «сделано за неделю», «задачи в работе», «очков за неделю». */
   label: string;
 };
 
@@ -95,14 +95,16 @@ export function personView(focus: TvFocusEmployee): PersonView {
     const stage = stageOf(task.status);
     return stage && stage !== "done" ? [itemOf(task, stage)] : [];
   });
-  const counted = focus.counts ? focus.counts.new + focus.counts.work + focus.counts.review : 0;
-  const openCount = Math.max(counted, open.length);
+  // «в работе» is the stage of a taken task (lib/tv/words.ts): an order not yet accepted is «Поручено», one handed in
+  // is «На проверке» — each is named by its own word in the list, never counted as work
+  const working = open.filter((item) => item.stage === "work").length;
+  const openCount = Math.max(focus.counts ? focus.counts.work : 0, working);
   const points = weekPoints(focus);
   const done = doneStat(focus);
 
   const stats: PersonStat[] = [];
   if (done) stats.push(done);
-  if (openCount > 0) stats.push({ key: "open", value: openCount, label: pluralRu(openCount, ["дело в работе", "дела в работе", "дел в работе"]) });
+  if (openCount > 0) stats.push({ key: "open", value: openCount, label: pluralRu(openCount, ["задача в работе", "задачи в работе", "задач в работе"]) });
   if (points !== null) stats.push({ key: "points", value: points, label: pluralRu(points, ["очко за неделю", "очка за неделю", "очков за неделю"]) });
 
   const finished = focus.guest ? [] : (focus.done_recent ?? []).filter((task) => task.status === "done").map((task) => itemOf(task, "done"));

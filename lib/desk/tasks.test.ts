@@ -6,6 +6,7 @@ import type { DeliveryRow } from "@/lib/tasks/receipts";
 
 import {
   ACT_LABEL,
+  attentionLine,
   archiveStatusOf,
   bulkPlan,
   columnFits,
@@ -43,6 +44,7 @@ import {
   stackMoves,
   stageOf,
   staleNote,
+  statusFilterLabel,
   stepHm,
   tableSections,
   togglePick,
@@ -50,6 +52,7 @@ import {
   wallIso,
   verdictRank,
   widthBucket,
+  whoTight,
   withSkipped,
   worstLoad,
   type QueryView,
@@ -104,7 +107,7 @@ describe("filters", () => {
 describe("a row's words", () => {
   it("the stage is the director's move by its name, else the stage", () => {
     const task = { status: "pending_review" as const, deadline: null };
-    expect(stageOf(task, "review", NOW)).toEqual({ text: "на приёмке", tone: "warn" });
+    expect(stageOf(task, "review", NOW)).toEqual({ text: "на проверке", tone: "warn" });
     expect(stageOf({ status: "sent", deadline: null }, null, NOW).text).toBe("не принята");
     // a question keeps the stage — «Последнее» says the question
     expect(stageOf({ status: "accepted", deadline: null }, "question", NOW).text).toBe("в работе");
@@ -329,9 +332,9 @@ describe("why a task waits, in words", () => {
   it("the headline of «Разобрать» carries a number", () => {
     const head = { ...waiting, closed_at: null, updated_at: at("2026-11-03T06:10:00Z") };
     expect(reasonHeadline("overdue", { ...head, deadline: at("2026-10-27T07:00:00Z") }, NOW)).toBe("Просрочена на 7 дней");
-    expect(reasonHeadline("review", { ...head, completed_at: at("2026-11-03T06:20:00Z") }, NOW)).toBe("Сдана 40 мин назад — ждёт приёмки");
-    expect(reasonHeadline("review", { ...head, completed_at: at("2026-11-03T06:20:00Z"), deadline: at("2026-11-03T03:20:00Z") }, NOW)).toBe("Сдана 40 мин назад · позже на 3 ч — ждёт приёмки");
-    expect(reasonHeadline("review", { ...head, completed_at: at("2026-11-03T06:20:00Z"), deadline: at("2026-11-03T13:00:00Z") }, NOW)).toBe("Сдана 40 мин назад · в срок — ждёт приёмки");
+    expect(reasonHeadline("review", { ...head, completed_at: at("2026-11-03T06:20:00Z") }, NOW)).toBe("Сдана 40 мин назад — ждёт проверки");
+    expect(reasonHeadline("review", { ...head, completed_at: at("2026-11-03T06:20:00Z"), deadline: at("2026-11-03T03:20:00Z") }, NOW)).toBe("Сдана 40 мин назад · позже на 3 ч — ждёт проверки");
+    expect(reasonHeadline("review", { ...head, completed_at: at("2026-11-03T06:20:00Z"), deadline: at("2026-11-03T13:00:00Z") }, NOW)).toBe("Сдана 40 мин назад · в срок — ждёт проверки");
     expect(reasonHeadline("declined", { ...head, closed_at: at("2026-11-03T06:10:00Z") }, NOW)).toBe("Отказ 50 мин назад — решение за вами");
     expect(reasonHeadline("question", { ...head, question_at: at("2026-11-03T06:46:00Z") }, NOW)).toBe("Вопрос ждёт ответа 14 мин");
     const request = { id: "q", proposed: at("2026-11-04T05:00:00Z"), words: null, at: at("2026-11-03T06:35:00Z"), senderId: "e1" };
@@ -372,7 +375,7 @@ describe("«Команда сейчас»", () => {
     const review = row("r", { status: "pending_review", title: "Смета" });
     expect(personNow(person, { ...load, overdue: 0 }, "green", [review], new Map([["r", "review" as const]]), NOW)).toEqual({
       ring: "warn",
-      line: "на приёмке · «Смета»",
+      line: "на проверке · «Смета»",
       rank: 1,
     });
     const soon = row("s", { title: "Смета", deadline: at("2026-11-03T10:00:00Z") });
@@ -382,8 +385,21 @@ describe("«Команда сейчас»", () => {
       line: "2 в работе · срок пт 18:00",
       rank: 3,
     });
-    expect(personNow(person, undefined, "gray", [], new Map(), NOW)).toEqual({ ring: null, line: "свободен", rank: 4 });
+    expect(personNow(person, undefined, "gray", [], new Map(), NOW)).toEqual({ ring: null, line: "дел нет", rank: 4 });
     expect(personNow({ availability: "vacation" }, load, "gray", [], new Map(), NOW).line).toBe("в отпуске");
+  });
+
+  it("an order given and not taken is neither «дел нет» nor «в работе» (D-194)", () => {
+    // given yesterday: lying untaken past half an hour — amber, never green
+    const test = row("t", { status: "sent", title: "Тест", created_at: at("2026-11-02T04:29:00Z") });
+    expect(personNow(person, { active: 1, overdue: 0, nearest: null, waiting: 1 }, "gray", [test], new Map(), NOW)).toEqual({ ring: "warn", line: "1 не принята · «Тест»", rank: 3 });
+    // given ten minutes ago: no ring yet
+    const fresh = row("f", { status: "sent", title: "Смета", created_at: at("2026-11-03T06:50:00Z") });
+    expect(personNow(person, { active: 1, overdue: 0, nearest: null, waiting: 1 }, "gray", [fresh], new Map(), NOW)).toEqual({ ring: null, line: "1 не принята · «Смета»", rank: 3 });
+    // the company's load knows of more than the director's own rows
+    expect(personNow(person, { active: 2, overdue: 0, nearest: null, waiting: 2 }, "gray", [], new Map(), NOW).line).toBe("2 не приняты");
+    // taken and untaken side by side: only the taken are «в работе»
+    expect(personNow(person, { active: 3, overdue: 0, nearest: null, waiting: 1 }, "green", [fresh], new Map(), NOW).line).toBe("2 в работе · 1 не принята");
   });
 });
 
@@ -628,11 +644,27 @@ describe("the table on a narrow list", () => {
     expect(columnFits("delivery", widthBucket(720))).toBe(false);
   });
 
-  it("a wide list keeps everything; a sliver of one keeps the title alone", () => {
+  it("a wide list keeps everything; a sliver of one keeps the title and the person", () => {
     expect(COLUMN_FLOORS.every((floor) => widthBucket(1200) >= floor)).toBe(true);
     expect(widthBucket(300)).toBe(0);
-    expect(columnFits("who", 0)).toBe(false);
+    expect(columnFits("who", 0)).toBe(true);
     expect(columnFits("due", 0)).toBe(false);
+  });
+
+  it("the person never leaves the table (D-194): 1100 and 960 with the panel keep them, tighter", () => {
+    // 1100 − the navigation − the panel at its narrowest leaves the list about 400 px
+    for (const width of [1200, 720, 560, 480, 420, 360, 300, 200]) expect(columnFits("who", widthBucket(width))).toBe(true);
+    expect(whoTight(widthBucket(420))).toBe(true);
+    expect(whoTight(widthBucket(480))).toBe(false);
+    // the tight width is a bucket of its own: crossing it redraws the column
+    expect(widthBucket(439)).not.toBe(widthBucket(440));
+  });
+
+  it("the desk's stage words are the dictionary's: «Не принята → В работе → На проверке → Готово»", () => {
+    expect(statusFilterLabel("sent")).toBe("Не принята");
+    expect(statusFilterLabel("accepted")).toBe("В работе");
+    expect(statusFilterLabel("pending_review")).toBe("На проверке");
+    expect(statusFilterLabel("done")).toBe("Готово");
   });
 
   it("the width between two floors is one bucket: dragging the panel there redraws nothing", () => {
@@ -659,5 +691,28 @@ describe("«Ждут вашего решения» beyond tasks", () => {
     expect(extrasWord(1, 0)).toBe("1 спор ждёт вас");
     expect(extrasWord(1, 2)).toBe("1 спор · 2 заказа ждут вас");
     expect(extrasWord(0, 5)).toBe("5 заказов ждут вас");
+  });
+});
+
+describe("attentionLine — what «Требует внимания» says of a row (D-194)", () => {
+  // NOW is 12:00 in Aqtobe
+  it("an order lying untaken says since when", () => {
+    expect(attentionLine("unaccepted", { created_at: at("2026-11-02T04:29:00Z"), deadline: null }, NOW)).toBe("не принята с вчера 09:29");
+    expect(attentionLine("unaccepted", { created_at: at("2026-11-03T05:30:00Z"), deadline: null }, NOW)).toBe("не принята с 10:30");
+    // a held order counts from when it went
+    expect(attentionLine("unaccepted", { created_at: at("2026-11-02T04:29:00Z"), scheduled_send_at: at("2026-11-03T05:00:00Z"), deadline: null }, NOW)).toBe("не принята с 10:00");
+  });
+
+  it("a push that will not reach asks for a call, not for «Напомнить»", () => {
+    expect(attentionLine("no_push", { created_at: at("2026-11-03T05:30:00Z"), deadline: null }, NOW)).toBe("уведомления не доходят — позвоните");
+  });
+
+  it("a deadline within the hour says its time", () => {
+    expect(attentionLine("soon", { created_at: at("2026-11-03T03:00:00Z"), deadline: at("2026-11-03T07:40:00Z") }, NOW)).toBe("срок в 12:40");
+  });
+
+  it("decisions and late ones keep their own lines", () => {
+    expect(attentionLine("decision", { created_at: at("2026-11-03T03:00:00Z"), deadline: null }, NOW)).toBeNull();
+    expect(attentionLine("overdue", { created_at: at("2026-11-03T03:00:00Z"), deadline: null }, NOW)).toBeNull();
   });
 });

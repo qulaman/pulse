@@ -80,7 +80,7 @@ function Line({ person, editable, me, push }: { person: Person; editable: boolea
 }
 
 /**
- * The roster as «Настройки» → «Сотрудники» manages it (D-104): who holds which role at a
+ * The roster as the secretary's «Команда» manages it (D-104): who holds which role at a
  * glance, search by name, position or spoken alias, a chip per role; a tap opens the
  * person's editor directly — role, card, password. The load board stays on «Команда».
  */

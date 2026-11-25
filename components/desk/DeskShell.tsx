@@ -397,17 +397,41 @@ function DeskReminders({ meId }: { meId: string }) {
   return null;
 }
 
-/** A desktop window narrower than the desk is meant for: it still works, and says where it is easier (В-11 в). */
+/** The narrow window's note put away for this tab: it said its piece once. */
+const NARROW_HINT_KEY = "desk-narrow-hint-off";
+
+/**
+ * A desktop window narrower than the desk is meant for: it still works, and says where it is easier
+ * (В-11 в). A strip of its own under the top bar — it pushes the screen down, never lies over the
+ * order line or a row (D-194) — and «×» puts it away until the tab closes.
+ */
 function NarrowHint({ role }: { role: DeskRole }) {
+  const [off, setOff] = useState(() => {
+    try {
+      return sessionStorage.getItem(NARROW_HINT_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  if (off) return null;
+  const close = () => {
+    setOff(true);
+    try {
+      sessionStorage.setItem(NARROW_HINT_KEY, "1");
+    } catch {
+      // storage closed (a private window): the note stays away for this page only
+    }
+  };
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-2 z-40 flex justify-center px-4">
-      <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-[13px] leading-4" style={{ boxShadow: "var(--shadow-raised)" }}>
-        <span className="text-muted">Этот экран удобнее на телефоне</span>
-        <span className="text-muted">·</span>
-        <button type="button" className="font-semibold text-accent" onClick={() => goPhoneView(homeForRole(role))}>
-          Открыть телефонную версию
-        </button>
-      </div>
+    <div className="mx-2 mb-2 flex min-h-9 shrink-0 flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-[10px] border border-border bg-surface py-1.5 pl-4 pr-1.5 text-[13px] leading-4" data-testid="desk-narrow-hint">
+      <span className="text-muted">Этот экран удобнее на телефоне</span>
+      <span aria-hidden className="text-muted">·</span>
+      <button type="button" className="font-semibold text-accent" onClick={() => goPhoneView(homeForRole(role))}>
+        Открыть телефонную версию
+      </button>
+      <button type="button" aria-label="Скрыть подсказку" onClick={close} className="ml-1 flex h-6 w-6 items-center justify-center rounded-[6px] text-[16px] leading-none text-muted hover:bg-surface-2 hover:text-text">
+        ×
+      </button>
     </div>
   );
 }
@@ -523,6 +547,7 @@ export function DeskShell({ me, role, brand, navFolded = false, children }: { me
             <SideNav role={role} brand={brand} folded={folded} onToggle={toggleNav} />
             <div className="flex min-h-0 min-w-0 flex-col">
               <TopBar fullName={me.fullName} role={role} folded={folded} onToggleNav={toggleNav} />
+              {narrow ? <NarrowHint role={role} /> : null}
               {/* the work area: the screen, and for a secretary the alarm over it or its strip above it (D-175) */}
               <div className="relative flex min-h-0 flex-1 flex-col" data-desk-work="">
                 <DeskAlarmGate meId={me.userId} role={role} main={main} />
@@ -548,7 +573,6 @@ export function DeskShell({ me, role, brand, navFolded = false, children }: { me
               ) : null}
             </DeskLinks>
           </div>
-          {narrow ? <NarrowHint role={role} /> : null}
           {chord ? <ChordHint role={role} left={navWidth + 12} /> : null}
           <DeskSignals role={role} meId={me.userId} />
           {/* a meeting of this person rings a quarter of an hour before it (D-180) */}

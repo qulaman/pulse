@@ -141,11 +141,12 @@ export function ProfileCard({ userId, fullName, role, pending = false }: Props) 
               <Stat value={stat?.people ?? null} label="в команде" />
               {/* «4 задачи», not «4 задач» (D-143) */}
               <Stat value={stat?.sent30 ?? null} label={`${pluralRu(stat?.sent30 ?? 0, ["задача", "задачи", "задач"])} за 30 дн.`} />
-              <Stat value={stat?.open ?? null} label="в работе у команды" />
+              {/* `open` counts given-and-not-accepted too (lib/profile/stats.ts): «открыто», not «в работе» (§4.4) */}
+              <Stat value={stat?.open ?? null} label="открыто у команды" />
             </>
           ) : (
             <>
-              <Stat value={stat?.open ?? null} label="в работе" />
+              <Stat value={stat?.open ?? null} label="открыто" />
               <Stat
                 value={stat?.done30 ?? null}
                 label="закрыто за 30 дн."

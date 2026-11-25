@@ -17,7 +17,7 @@ import type { ReactionCode } from "@/lib/points/reactions";
 import type { TaskDetailModel } from "@/lib/tasks/detail-model";
 import { closedAtOf, stepsOf } from "@/lib/tasks/overview";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
-import type { DeskAction } from "@/lib/tasks/reasons";
+import type { DeskAction, FirstMove } from "@/lib/tasks/reasons";
 import { reworkBannerText, TEXT, wordText } from "@/lib/tasks/status-text";
 import { TONE_VAR } from "@/lib/tasks/tone";
 
@@ -36,6 +36,7 @@ export function TaskStatusCard({
   model,
   now,
   keys,
+  reach = null,
   reaction,
   reactionPoints,
   canReact,
@@ -50,6 +51,8 @@ export function TaskStatusCard({
   now: Date;
   /** The director's keys of this task (`screenKeysFor`); none for anybody else. */
   keys: DeskAction[];
+  /** The holder's pushes do not reach them (`firstMoveOf`): a call first, or the honest reminder. */
+  reach?: FirstMove;
   /** D-133: the director's reaction — a gold badge for the assignee. */
   reaction: ReactionCode | null;
   reactionPoints: number | null;
@@ -177,7 +180,7 @@ export function TaskStatusCard({
 
       {/* the buttons of this role — the same as on the card */}
       {isDirector ? (
-        <DirectorKeys keys={keys} reason={model.reason} request={request} suggestion={suggestion} now={now} onPress={onDirectorKey} labels={SCREEN_LABEL} />
+        <DirectorKeys keys={keys} reason={model.reason} request={request} suggestion={suggestion} now={now} onPress={onDirectorKey} labels={SCREEN_LABEL} reach={reach} />
       ) : null}
       {canReact ? <ReactionBar taskId={task.id} pointsEnabled={pointsEnabled} className="mt-3" /> : null}
       {/* only the assignee answers: a manager opening a subordinate's task reads it, no more */}

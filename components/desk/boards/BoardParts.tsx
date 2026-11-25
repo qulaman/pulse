@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { Kbd } from "@/components/desk/ui/Kbd";
 import { DeskPage } from "@/components/desk/ui/PageTitle";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { cleanTitle } from "@/lib/mindboard/list";
@@ -21,29 +20,6 @@ export function BoardBones() {
         </div>
       </SkeletonGroup>
     </DeskPage>
-  );
-}
-
-/** The keys of the outline, one quiet line under it. */
-export function BoardKeys() {
-  return (
-    <p className="board-keys mt-2 flex items-center gap-x-3 overflow-hidden whitespace-nowrap text-[12px] leading-4 text-muted">
-      <span className="inline-flex items-center gap-1">
-        <Kbd>Enter</Kbd> строка
-      </span>
-      <span className="inline-flex items-center gap-1">
-        <Kbd>Tab</Kbd> подпункт
-      </span>
-      <span className="inline-flex items-center gap-1">
-        <Kbd>V</Kbd> голосом
-      </span>
-      <span className="inline-flex items-center gap-1">
-        <Kbd>Ctrl Enter</Kbd> отметить
-      </span>
-      <span className="inline-flex items-center gap-1">
-        <Kbd>?</Kbd> все клавиши
-      </span>
-    </p>
   );
 }
 

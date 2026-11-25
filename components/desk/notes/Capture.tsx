@@ -5,7 +5,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { DictationMic } from "@/components/desk/voice/DictationMic";
 import type { Dictation } from "@/lib/notes/dictation";
 
-import { KeyWord } from "./NoteList";
 
 /** The id Alt+N looks for (the shell's quick thought, D-177): on «Заметки» it focuses this field. */
 export const CAPTURE_ID = "desk-notes-capture";
@@ -124,16 +123,7 @@ export function Capture({
         className="nb-capture-field no-bar"
       />
       <div className="nb-capture-foot">
-        {listening ? (
-          <KeyWord k="Esc">отмена</KeyWord>
-        ) : (
-          <>
-            <KeyWord k="Enter">сохранить</KeyWord>
-            <KeyWord k="Shift Enter">строка</KeyWord>
-          </>
-        )}
         <span className="ml-auto flex items-center gap-2">
-          {listening ? null : <KeyWord k="V">сказать</KeyWord>}
           <DictationMic dictation={dictation} label={MIC_LABEL} testId="desk-notes-mic" />
         </span>
       </div>

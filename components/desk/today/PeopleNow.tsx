@@ -1,19 +1,17 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, type MouseEvent, type ReactNode } from "react";
 
+import { PersonMovesBar, usePersonMoves } from "@/components/desk/team/PersonMoves";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import type { MenuItem } from "@/components/desk/ui/Menu";
 import { MenuButton } from "@/components/desk/ui/Menu";
 import { PersonCell } from "@/components/desk/ui/PersonCell";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import type { Tone } from "@/components/desk/ui/tone";
-import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { When } from "@/components/desk/ui/When";
 import { CrewCircle, IdleCircle } from "@/components/pulse/CrewCircle";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
-import { Button } from "@/components/ui/Button";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { humanAqtobe } from "@/lib/ai/time";
 import { DESK_STATUS_LABEL } from "@/lib/desk/tasks";
@@ -157,7 +155,7 @@ export function PeopleNow({
           ) : null}
           {free.length > 0 ? (
             <div className="flex flex-col gap-1 pt-1" data-testid="today-free">
-              <p className="text-[12px] font-medium leading-4 text-muted">Свободны · {free.length}</p>
+              <p className="text-[12px] font-medium leading-4 text-muted">Без задач · {free.length}</p>
               {tiles(free)}
             </div>
           ) : null}
@@ -233,8 +231,9 @@ function ChosenRing() {
  * The chosen person's card under the tiles (D-164, under the tiles since D-168) — the phone's
  * `CrewCard`: who, where they are, what they are at, their open tasks from the director with the
  * stage and the deadline; a task opens in the panel, its «⋯» and right button hold every move (срок,
- * напомнить, передать, отозвать). «Дать задачу» puts the person into the order line (T); «Все дела»
- * and «Карточка» lead on; × and Esc put the card away.
+ * напомнить, передать, отозвать). The person's moves are every desk card's (`PersonMovesBar`):
+ * «Дать задачу» puts the person into the order line (T), «Изменить», «Карточка», «⋯»; × and Esc put
+ * the card away.
  */
 export function PersonHome({
   person,
@@ -258,6 +257,7 @@ export function PersonHome({
   onMenu: (task: TaskWithPeople, event: MouseEvent) => void;
   onClose: () => void;
 }) {
+  const moves = usePersonMoves("today");
   const away = person.availability !== "active";
   const extra = row ? [row.report, row.push ? `${row.push} — задачи увидит, только открыв Pulse` : null].filter(Boolean).join(" · ") : "";
   return (
@@ -277,32 +277,8 @@ export function PersonHome({
             </p>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {onGive ? (
-            <Tooltip label="Строка поручения уже знает, кому" keys={["T"]} side="bottom">
-              <Button size="sm" onClick={onGive} data-testid="today-person-give">
-                Дать задачу
-              </Button>
-            </Tooltip>
-          ) : null}
-          <Link href={`/desk/tasks?who=${encodeURIComponent(person.id)}`} className="btn-secondary inline-flex h-9 items-center px-3 text-[13px] leading-4" data-testid="today-person-all">
-            Все дела
-          </Link>
-          <Link href={`/desk/team/${encodeURIComponent(person.id)}`} className="inline-flex h-9 items-center px-2 text-[13px] leading-4 text-muted hover:text-text">
-            Карточка →
-          </Link>
-          <Tooltip label="Убрать карточку" keys={["Esc"]} side="bottom">
-            <button
-              type="button"
-              aria-label="Убрать карточку"
-              onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-[2px] text-[18px] leading-none text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
-              data-testid="today-person-close"
-            >
-              ×
-            </button>
-          </Tooltip>
-        </div>
+        {/* the same moves in the same order as every desk card (D-194); T gives from the screen's own keys */}
+        <PersonMovesBar person={person} moves={moves} handlers={onGive ? { give: onGive } : undefined} testId="today-person" onClose={onClose} />
       </div>
       <section className="flex flex-col gap-1">
         <SectionLabel count={tasks.length}>Задачи от вас</SectionLabel>
@@ -358,6 +334,7 @@ export function PersonHome({
           </ul>
         )}
       </section>
+      {moves.node}
     </div>
   );
 }

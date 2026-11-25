@@ -14,6 +14,7 @@ import { BUTTON, pluralRu } from "@/lib/tasks/status-text";
 import { toast } from "@/components/ui/Toast";
 import { springs } from "@/lib/design/tokens";
 import { TaskTile } from "./TaskTile";
+import { useNoPush } from "./useNoPush";
 
 /**
  * «Вниз — позже» outlives the deck (D-142): closing the ball, opening the other one or going to
@@ -131,6 +132,8 @@ export type CardDeckProps = {
  * one closing card that opens «Задачи».
  */
 export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply, replyLine = false, focus, onCurrentChange, showWork = true, held = [], onMore }: CardDeckProps) {
+  // whose pushes do not reach: their untaken orders are amber at once (D-195)
+  const noPush = useNoPush();
   const [postponed, setPostponedState] = useState<string[]>(() => putOff);
   const setPostponed = (update: (list: string[]) => string[]) =>
     setPostponedState((list) => {
@@ -340,6 +343,7 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
                   onReply={onReply}
                   showReply={replyLine && isCurrent}
                   onMore={isCurrent ? () => onMore(item.task) : undefined}
+                  unreachable={noPush.has(item.task.assignee_id)}
                 />
               ) : (
                 <WorkCard tasks={item.tasks} held={item.held} now={now} />
@@ -351,7 +355,7 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
       </div>
 
       <div className="mt-2 flex items-center justify-between px-1 text-[13px] leading-4 text-muted">
-        <span>{current?.kind === "task" ? (primaryOf(current, actions) ? `вверх — ${primaryOf(current, actions)!.label.toLowerCase()} · вниз — позже` : "вниз — позже · тап — карточка") : ""}</span>
+        <span>{current?.kind === "task" ? (primaryOf(current, actions) ? `вверх — ${primaryOf(current, actions)!.label.toLowerCase()} · вниз — позже` : "вниз — позже · нажмите — карточка") : ""}</span>
         <span className="flex items-center gap-3">
           {plainWords.length >= 2 ? (
             <button type="button" onClick={readAll} className="font-display text-[13px] font-semibold text-accent" data-testid="read-all">
@@ -367,7 +371,7 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
       {/* the full card: every button of the director, in a sheet over the deck */}
       <Sheet open={open !== null} onClose={() => setOpen(null)} title={open ? quoteTitleOf(open.title) : undefined}>
         {open ? (
-          <TaskCard task={open} variant="director" actions={actions} companyId={companyId} href={`/tasks/${open.id}`} question={open.question} declineReason={open.decline_reason} />
+          <TaskCard task={open} variant="director" actions={actions} companyId={companyId} href={`/tasks/${open.id}`} question={open.question} declineReason={open.decline_reason} unreachable={noPush.has(open.assignee_id)} />
         ) : null}
       </Sheet>
 

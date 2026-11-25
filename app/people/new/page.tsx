@@ -31,12 +31,12 @@ export default function NewPersonPage() {
   const finish = () => {
     // back to the list the person was added from; a direct link lands on the roster
     if (window.history.length > 1) router.back();
-    else router.replace("/settings?tab=team");
+    else router.replace("/people");
   };
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
-      <PageHead back={{ href: "/settings?tab=team", label: "Сотрудники" }} title="Новый сотрудник" />
+      <PageHead back={{ href: "/people", label: "Команда" }} title="Новый сотрудник" />
       <div className="mt-5">
         {/* mounted only in the browser, once the roster is in: the ready password is random
             and must not be rendered twice (server and client), and the aliases need the roster */}

@@ -215,13 +215,13 @@ export default function NotesPage() {
           ))}
         </FinishedBoards>
       ) : null}
-      {shownBoards.length + shownFinished.length === 0 ? (
+      {/* no boards yet: «Новая доска» above is the empty state itself — a second card under it
+          said the same «и выведите на стену» again; a search that found nothing says so */}
+      {query.trim() && shownBoards.length + shownFinished.length === 0 ? (
         <div className="mt-1 flex flex-col items-center rounded-[20px] border border-border/70 px-6 py-8 text-center" data-testid="boards-empty">
           <Mascot state="calm" size={56} />
-          <p className="mt-3 font-display text-[17px] font-semibold">{query ? "Ничего не нашёл" : "Досок пока нет"}</p>
-          <p className="mt-1 max-w-[280px] text-[14px] leading-[19px] text-muted">
-            {query ? "Попробуйте другое слово" : "Соберите пункты к планёрке — и выведите на стену"}
-          </p>
+          <p className="mt-3 font-display text-[17px] font-semibold">Ничего не нашёл</p>
+          <p className="mt-1 max-w-[280px] text-[14px] leading-[19px] text-muted">Попробуйте другое слово</p>
         </div>
       ) : null}
     </div>
@@ -332,7 +332,10 @@ export default function NotesPage() {
     );
   };
 
-  const empty = (
+  // no thoughts at all: the status card over the tabs already says «Пока пусто» and how to start —
+  // the list under it does not say it a second time
+  const saidByHero = filter === "active" && !query.trim() && hero.value === null;
+  const empty = saidByHero ? null : (
     <div className="mt-3 flex flex-col items-center rounded-[20px] border border-border/70 px-6 py-9 text-center" data-testid="notes-empty">
       <Mascot state="calm" size={64} />
       <p className="mt-4 font-display text-[17px] font-semibold">
@@ -345,7 +348,7 @@ export default function NotesPage() {
             ? `Удалённая заметка ждёт здесь ${TRASH_DAYS} дня, потом исчезнет сама`
             : filter === "converted"
               ? "«Поручить» или «Объявить» на заметке — и она окажется здесь"
-              : "Зажмите микрофон и скажите мысль — запишу слово в слово. Или напишите её"}
+              : "Скажите мысль или напишите — запишу слово в слово"}
       </p>
     </div>
   );

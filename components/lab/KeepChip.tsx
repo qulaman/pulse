@@ -56,7 +56,7 @@ export function KeepChip({ crids, crid, recording }: { crids: readonly string[];
     },
     onError: (_error, _next, context) => {
       if (context?.previous !== undefined) queryClient.setQueryData(key, context.previous);
-      toast("Не получилось отметить. Попробуй ещё раз");
+      toast("Не получилось отметить. Попробуйте ещё раз");
     },
   });
 

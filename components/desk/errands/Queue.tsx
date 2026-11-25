@@ -26,15 +26,6 @@ import { useBackOnTake } from "./StoikaHead";
 /** How long a request done by her keeps asking «Что передать директору?» at the top of the queue. */
 const RESULT_FOR_MS = 15 * 60_000;
 
-/** The key of a button, inside it: a quiet letter of the mono voice, no plate (D-158). */
-export function KeyCap({ children }: { children: string }) {
-  return (
-    <span aria-hidden className="nums ml-1.5 text-[11px] leading-none opacity-70">
-      {children}
-    </span>
-  );
-}
-
 /** A digit key, by the physical key: 1–9 from the row or the numpad; null — another key. */
 function digitOf(event: KeyboardEvent): number | null {
   const match = /^(?:Digit|Numpad)([1-9])$/.exec(event.code);

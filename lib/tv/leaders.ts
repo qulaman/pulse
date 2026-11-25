@@ -38,15 +38,25 @@ export type LeadersView =
       leaderGrowth: string | null;
       /** Places 2–5. */
       rest: LeaderRow[];
-      /** «За неделю команда закрыла 48 дел и заработала 1240 очков» — or null when there is nothing to praise. */
+      /** «За неделю команда закрыла 48 задач и заработала 1240 очков» — or null when there is nothing to praise. */
       team: string | null;
+      /**
+       * The same news as large figures, for a leader standing alone: the side column of places 2–5 would be empty,
+       * so the team's week stands there instead of one small line under the scene (D-194). Positive only.
+       */
+      teamFigures: TeamFigure[];
+      /** «Команда за неделю» — the head of those figures. */
+      teamHead: string;
     };
+
+export type TeamFigure = { key: "done" | "earned"; value: string; label: string; gold: boolean };
 
 export const RATING_TITLE = { week: "Рейтинг недели", month: "Рейтинг месяца" } as const;
 // `tv_rating` counts `interval '1 month'`: a calendar month back, not thirty days
 // the comparison never breaks inside itself (non-breaking spaces): «на 60 больше, чем неделю назад»
 const PREVIOUS = { week: "чем неделю назад", month: "чем месяц назад" } as const;
 const TEAM = { week: "За неделю команда", month: "За месяц команда" } as const;
+const TEAM_HEAD = { week: "Команда за неделю", month: "Команда за месяц" } as const;
 
 const DAY_MS = 86_400_000;
 const dayMonth = new Intl.DateTimeFormat("ru-RU", { timeZone: "Asia/Aqtobe", day: "numeric", month: "long" });
@@ -102,10 +112,22 @@ function rowOf(row: TvLeader): LeaderRow {
 
 /** One sentence of the team's good news: what was done and what was earned, never «в срок» (D-185). */
 function teamLine(data: TvRatingScene): string | null {
-  const done = data.team.done > 0 ? `закрыла ${formatPoints(data.team.done)} ${pluralRu(data.team.done, ["дело", "дела", "дел"])}` : null;
+  const done = data.team.done > 0 ? `закрыла ${formatPoints(data.team.done)} ${pluralRu(data.team.done, ["задачу", "задачи", "задач"])}` : null;
   const earned = data.team.earned > 0 ? `заработала ${formatPoints(data.team.earned)} ${pluralRu(data.team.earned, ["очко", "очка", "очков"])}` : null;
   const parts = [done, earned].filter(Boolean);
   return parts.length > 0 ? `${TEAM[data.period]} ${parts.join(" и ")}` : null;
+}
+
+/** The team's week as figures: tasks closed, points earned — what is there is said, a zero is not. */
+function teamFiguresOf(data: TvRatingScene): TeamFigure[] {
+  const figures: TeamFigure[] = [];
+  if (data.team.done > 0) {
+    figures.push({ key: "done", value: formatPoints(data.team.done), label: pluralRu(data.team.done, ["задача закрыта", "задачи закрыты", "задач закрыто"]), gold: false });
+  }
+  if (data.team.earned > 0) {
+    figures.push({ key: "earned", value: formatPoints(data.team.earned), label: pluralRu(data.team.earned, ["очко заработано", "очка заработано", "очков заработано"]), gold: true });
+  }
+  return figures;
 }
 
 export function leadersView(data: TvRatingScene | null, now: Date = new Date()): LeadersView {
@@ -128,5 +150,7 @@ export function leadersView(data: TvRatingScene | null, now: Date = new Date()):
     leaderGrowth: leader?.growth ? `на ${leader.growth.slice(1)} больше, ${PREVIOUS[data.period]}`.replace(/ /g, "\u00a0") : null,
     rest,
     team: teamLine(data),
+    teamFigures: teamFiguresOf(data),
+    teamHead: TEAM_HEAD[data.period],
   };
 }

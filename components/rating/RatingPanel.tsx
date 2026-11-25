@@ -9,6 +9,7 @@ import { useOpenDisputes } from "@/lib/points/game";
 import { useRating } from "@/lib/points/queries";
 import { useTvControl } from "@/lib/tv/mutations";
 import { initialsOf } from "@/lib/people/names";
+import { formatNum } from "@/lib/desk/format";
 
 /** The medal rings — the same as on the «Рейтинг» podium (Podium.tsx). */
 const RING = ["var(--gold)", "#B8C2CC", "#C98A5B"];
@@ -39,7 +40,7 @@ export function RatingPanel() {
       ) : null}
       {rating.isLoading ? null : rows.length === 0 ? (
         <p className="py-4 text-center text-[16px] leading-[22px] text-muted">
-          За неделю очков пока нет. Скажи «Марату 50 очков за объект».
+          За неделю очков пока нет. Скажите «Марату 50 очков за объект».
         </p>
       ) : (
         <ol className="flex flex-col gap-1.5">
@@ -63,8 +64,8 @@ export function RatingPanel() {
                     ↑{row.delta_vs_prev}
                   </span>
                 ) : null}
-                <span className="nums shrink-0 text-[18px] font-semibold leading-6" style={{ color: "var(--gold)" }}>
-                  {row.points}
+                <span className="nums shrink-0 whitespace-nowrap text-[18px] font-semibold leading-6" style={{ color: "var(--gold)" }}>
+                  {formatNum(row.points)}
                 </span>
               </li>
             );

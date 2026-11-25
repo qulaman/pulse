@@ -6,7 +6,6 @@ import { useEffect, useMemo, useState, ViewTransition, type MouseEvent } from "r
 import { moveWith, useDeskParams } from "@/components/desk/DeskAddress";
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { PersonFace } from "@/components/desk/errands/look";
-import { KeyCap } from "@/components/desk/errands/Queue";
 import { FailedScreen, LoadNote } from "@/components/desk/tasks/LoadState";
 import { writeParams } from "@/components/desk/tasks/flow";
 import { MiniButton, MoreButton } from "@/components/desk/tasks/RowMoves";
@@ -353,11 +352,11 @@ export function EtherDesk() {
     ...(director ? [{ keys: ["Del"], label: "Удалить объявление" }] : []),
     { keys: ["Esc"], label: "Закрыть панель" },
   ];
-  useShortcuts("Объявления", keys);
+  useShortcuts("Эфир", keys);
 
   const load = loadStateOf(feed);
-  if (!hydrated || !me.data || load.kind === "loading") return <DeskScreenBone title="Объявления" />;
-  if (load.kind === "failed") return <FailedScreen title="Объявления" what="объявления" offline={load.offline} busy={feed.isFetching} onRetry={() => void feed.refetch()} />;
+  if (!hydrated || !me.data || load.kind === "loading") return <DeskScreenBone title="Эфир" />;
+  if (load.kind === "failed") return <FailedScreen title="Эфир" what="объявления" offline={load.offline} busy={feed.isFetching} onRetry={() => void feed.refetch()} />;
 
   const sentCount = parts.sent.length;
   const line = rows.length === 0 ? null : [parts.held.length > 0 ? `${parts.held.length} ${pluralRu(parts.held.length, ["ждёт", "ждут", "ждут"])} отправки` : null, sentCount > 0 ? `${sentCount} ${pluralRu(sentCount, ["отправлено", "отправлено", "отправлено"])}` : null].filter(Boolean).join(" · ");
@@ -365,7 +364,7 @@ export function EtherDesk() {
   return (
     <DeskPage>
       <PageTitle
-        title="Объявления"
+        title="Эфир"
         state={line ? { text: line } : null}
         actions={
           <>
@@ -374,7 +373,6 @@ export function EtherDesk() {
               <Button size="sm" onClick={newAnnouncement} data-testid="ether-new" title="Строкой поручения: «Всем: …» · N">
                 <Megaphone size={15} strokeWidth={2.25} aria-hidden className="mr-1.5" />
                 Новое объявление
-                <KeyCap>N</KeyCap>
               </Button>
             ) : null}
           </>

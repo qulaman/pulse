@@ -6,6 +6,7 @@ import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { humanAqtobe } from "@/lib/ai/time";
 import { useCompanyLedger } from "@/lib/shop/queries";
 import { pluralRu } from "@/lib/tasks/status-text";
+import { formatNum } from "@/lib/desk/format";
 
 /** Where a line came from — in human words, without the database's source names. */
 const SOURCE_LABEL: Record<string, string> = {
@@ -48,10 +49,10 @@ export function PointsLedger({ open }: { open: boolean }) {
         {rows.slice(0, shown).map((row) => (
           <li key={row.id} className="flex items-baseline gap-3 py-2.5" data-testid="ledger-row">
             <span
-              className="nums w-[54px] shrink-0 text-[15px] font-bold leading-5"
+              className="nums min-w-[54px] shrink-0 whitespace-nowrap text-[15px] font-bold leading-5"
               style={{ color: row.amount > 0 ? "var(--gold)" : "var(--text-muted)" }}
             >
-              {row.amount > 0 ? `+${row.amount}` : row.amount}
+              {formatNum(row.amount, { signed: true })}
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[15px] leading-5">{row.user?.full_name ?? "—"}</span>

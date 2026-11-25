@@ -5,10 +5,10 @@ import { isOverdue, type TaskStatus } from "./status-text";
 /**
  * How «Задачи» orders what the director handed out. A planner's list is not a feed:
  * the first question is «что горит», not «что последнее». So the page groups by the
- * deadline — «просрочено» → «срочно» → «на приёмке» → «сегодня» → «завтра» → «на неделе» →
+ * deadline — «просрочено» → «срочно» → «на проверке» → «сегодня» → «завтра» → «на неделе» →
  * «позже» → «без срока» — and closed work sinks to its own group at the bottom. Two piles answer «чей
  * ход» instead of «когда»: «Срочно» is what the director called urgent without naming a
- * time (it means «сейчас», so it never hides in «Без срока»), and «На приёмке» is work
+ * time (it means «сейчас», so it never hides in «Без срока»), and «На проверке» is work
  * already handed in — nobody can move it, so it stands by the director's hand in their
  * list and at the foot of the employee's. Pure functions: the page only renders them.
  */
@@ -31,7 +31,7 @@ export type Bucket = "overdue" | "urgent" | "review" | "today" | "tomorrow" | "w
 export const BUCKET_TITLE: Record<Bucket, string> = {
   overdue: "Просрочено",
   urgent: "Срочно",
-  review: "На приёмке",
+  review: "На проверке",
   today: "Сегодня",
   tomorrow: "Завтра",
   week: "На этой неделе",
@@ -44,7 +44,7 @@ export const BUCKET_TITLE: Record<Bucket, string> = {
 export const TIME_BUCKETS: Bucket[] = ["today", "tomorrow", "week", "later", "none"];
 
 /**
- * «На приёмке» means «твой ход» to the director and «не твой ход» to the employee, so
+ * «На проверке» means «твой ход» to the director and «не твой ход» to the employee, so
  * the same pile stands at the top of one list and at the foot of the other.
  */
 function orderOf(reviewFirst: boolean): Bucket[] {
@@ -84,7 +84,7 @@ export function compareTasks(a: Groupable, b: Groupable): number {
 }
 
 export type GroupOptions = {
-  /** The director's list: «На приёмке» is their own queue and stands near the top. */
+  /** The director's list: «На проверке» is their own queue and stands near the top. */
   reviewFirst?: boolean;
 };
 

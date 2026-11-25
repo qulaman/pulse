@@ -200,7 +200,8 @@ export function ReportsDesk() {
 
   // the data's own day and period, not the controls': while the next one loads the old one is on screen
   const dayRows = (day.data?.rows ?? []).filter(match);
-  const tabelPeople = (tabel.data?.people ?? []).filter((person) => match(person.row) && (tabelShow === "all" || person.row.missed > 0));
+  // «С пропусками» — the team's gaps only, as on the screen (TabelView, D-194)
+  const tabelPeople = (tabel.data?.people ?? []).filter((person) => match(person.row) && (tabelShow === "all" || (!person.gone && person.row.missed > 0)));
   const paper =
     tab === "day"
       ? day.data && { kind: "day" as const, file: dayFileName(day.data.date), title: daySheetTitle(day.data.date), sheet: daySheet(day.data, dayRows), shown: dayRows.length, all: day.data.rows.length }

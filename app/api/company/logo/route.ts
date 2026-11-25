@@ -37,7 +37,7 @@ export const POST = withAuth(["director", "secretary"], async ({ req, profile })
   });
   if (upload.error) {
     console.error("logo upload failed:", upload.error.message);
-    return apiError(502, "upload_failed", "Не удалось загрузить логотип, попробуй ещё раз");
+    return apiError(502, "upload_failed", "Не удалось загрузить логотип, попробуйте ещё раз");
   }
   const { data: pub } = service.storage.from("brand").getPublicUrl(path);
 

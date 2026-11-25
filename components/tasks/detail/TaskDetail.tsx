@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 
 import { screenKeysFor } from "@/components/tasks/list/DirectorTaskCard";
 import { useDirectorControls } from "@/components/tasks/list/useDirectorControls";
@@ -15,7 +15,10 @@ import { useRecurrenceRules } from "@/lib/recurrence/queries";
 import { taskDetailModel } from "@/lib/tasks/detail-model";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { Me, TaskMessage, TaskWithPeople } from "@/lib/tasks/queries";
-import type { DeskAction } from "@/lib/tasks/reasons";
+import { usePhones } from "@/lib/people/card-queries";
+import { usePushHealth } from "@/lib/push/health-query";
+import { noPushIds } from "@/lib/tasks/attention";
+import { firstMoveOf, type DeskAction } from "@/lib/tasks/reasons";
 
 import { TaskAbout } from "./TaskAbout";
 import { TaskStatusCard } from "./TaskStatusCard";
@@ -49,7 +52,11 @@ export function TaskDetail({
   wall?: ReactNode;
 }) {
   const seenAtOpen = useSeenAtOpen(task.id, me.role !== "director" && task.assignee_id === me.userId ? me.userId : undefined);
-  const model = taskDetailModel(task, messages, me, now, seenAtOpen);
+  // whose pushes do not reach them — the director's question only (the RPC answers nobody else)
+  const health = usePushHealth(me.role === "director");
+  const noPush = useMemo(() => noPushIds(health.data), [health.data]);
+  const phones = usePhones();
+  const model = taskDetailModel(task, messages, me, now, seenAtOpen, { noPush });
   const { isDirector, question, request, suggestion } = model;
 
   const director = useDirectorControls({
@@ -71,6 +78,8 @@ export function TaskDetail({
   const keys: DeskAction[] = isDirector
     ? screenKeysFor(task, { question: Boolean(question), request: Boolean(request), suggestion: Boolean(suggestion) }, now)
     : [];
+  // a push will not reach the holder: «Позвонить» first, or an honest «Напомнить» (the owner, 2026-11-25)
+  const reach = isDirector ? firstMoveOf(task, keys, { noPush, phone: phones.data?.[task.assignee_id] ?? null }) : null;
   // the capsule of the head (D-187): the director moves the deadline (answering a request for time,
   // when there is one), the assignee asks for more
   const move = model.deadlineMove;
@@ -96,7 +105,7 @@ export function TaskDetail({
           isDirector ? (
             <>
               {wall}
-              <HeadButton label="Все действия" icon="more" testId="task-more" onClick={() => director.more(task)} />
+              <HeadButton label="Все действия" icon="more" testId="task-more" onClick={() => director.more(task, keys)} />
             </>
           ) : null
         }
@@ -107,6 +116,7 @@ export function TaskDetail({
         model={model}
         now={now}
         keys={keys}
+        reach={reach}
         reaction={reaction}
         reactionPoints={reaction && pointsEnabled ? prices[reaction] : null}
         canReact={canReact}

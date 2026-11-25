@@ -16,7 +16,7 @@ import { compareTasks } from "@/lib/tasks/grouping";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import { closedSections, employeeScreen, employeeTabOf, workingSections, type EmployeeTab, type Section } from "@/lib/tasks/overview";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
-import { isOverdue, TEXT } from "@/lib/tasks/status-text";
+import { isOverdue } from "@/lib/tasks/status-text";
 
 import type { EmployeeAction } from "./EmployeeKeys";
 import { EmployeeTaskCard } from "./EmployeeTaskCard";
@@ -104,7 +104,7 @@ export function EmployeeTasksView({
   };
 
   const sections: Section<TaskWithPeople>[] = useMemo(() => {
-    if (current === "new") return piles.new.length ? [{ key: "new", title: "", tone: "accent", tasks: [...piles.new].sort(compareTasks) }] : [];
+    if (current === "new") return piles.new.length ? [{ key: "new", title: "", tone: "warn", tasks: [...piles.new].sort(compareTasks) }] : [];
     if (current === "working") return workingSections(piles.working, now);
     return closedSections(piles.closed, now);
   }, [current, piles, now]);
@@ -172,7 +172,7 @@ export function EmployeeTasksView({
         // the numbers stay what they count; a late order inside is a red dot on the corner (D-173) —
         // a red «5» beside «3 ждут вас» read as five late
         items={[
-          { key: "new", label: "Новые", count: piles.new.length, alert: "accent", mark: lateIn.new ? "danger" : undefined, markLabel: LATE_MARK },
+          { key: "new", label: "Новые", count: piles.new.length, alert: "warn", mark: lateIn.new ? "danger" : undefined, markLabel: LATE_MARK },
           { key: "working", label: "В работе", count: piles.working.length, mark: lateIn.working ? "danger" : undefined, markLabel: LATE_MARK },
           { key: "closed", label: "Закрытые", count: piles.closed.length },
         ]}
@@ -232,11 +232,12 @@ function EmptyState({
   working: number;
   onWorking: () => void;
 }) {
+  // never had a task: the status screen above says the one empty phrase (DESIGN §5) — the mascot
+  // under it keeps the screen company without saying it a second time (FIX §4.5)
   if (nothingAtAll) {
     return (
-      <div className="flex flex-col items-center rounded-[20px] border border-border/70 px-6 py-10 text-center">
+      <div className="flex flex-col items-center px-6 py-10 text-center">
         <Mascot state="calm" size={64} />
-        <p className="mt-4 text-[16px] leading-[22px]">{TEXT.emptyFeed}</p>
       </div>
     );
   }
@@ -246,8 +247,8 @@ function EmptyState({
         <span className="flex h-12 w-12 items-center justify-center rounded-full bg-ok/15 text-ok">
           <Icon name="check" size={24} />
         </span>
-        <p className="mt-3 font-display text-[17px] font-semibold">Новых поручений нет</p>
-        <p className="mt-1 text-[14px] leading-[19px] text-muted">Появится задача — покажу здесь и пришлю уведомление</p>
+        <p className="mt-3 font-display text-[17px] font-semibold">Новых задач нет</p>
+        <p className="mt-1 text-[14px] leading-[19px] text-muted">Придёт задача — я позову</p>
         {working > 0 ? (
           <Button variant="secondary" size="sm" className="mt-4" onClick={onWorking}>
             Что в работе · {working}
@@ -256,7 +257,7 @@ function EmptyState({
       </div>
     );
   }
-  // the status screen above says «Открытых дел нет» already: the empty tab says what lives in it
+  // the status screen above says «Дел нет» already: the empty tab says what lives in it
   return (
     <p className="rounded-[20px] border border-border/70 px-6 py-8 text-center text-[15px] text-muted">
       {tab === "working" ? "Здесь будет то, что вы приняли в работу" : "Закрытых пока нет"}

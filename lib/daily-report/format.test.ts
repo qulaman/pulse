@@ -16,8 +16,10 @@ import {
   isoWeekday,
   lengthText,
   periodOf,
+  markGone,
   personDayLine,
   pointsHint,
+  reportTimesLine,
   pointsText,
   rangeText,
   taskMeta,
@@ -108,14 +110,14 @@ describe("days", () => {
 describe("the employee's day", () => {
   it("says the state of the day", () => {
     expect(dayState(day({ enabled: false }))).toEqual({ tone: "none", text: "Отчёты выключены" });
-    expect(dayState(day())).toEqual({ tone: "accent", text: "Не сдан" });
+    expect(dayState(day())).toEqual({ tone: "wait", text: "Не сдан" });
     expect(dayState(day({ workday: false }))).toEqual({ tone: "none", text: "Выходной — можно сдать, без очков" });
     expect(dayState(day({ report: report() }))).toEqual({ tone: "ok", text: "Сдан в 18:04 · +1" });
     expect(dayState(day({ report: report({ points: 0 }) })).text).toBe("Сдан в 18:04");
   });
 
   it("says it in two words for «Дела»", () => {
-    expect(entryState(day()).text).toBe("не сдан");
+    expect(entryState(day())).toEqual({ tone: "wait", text: "не сдан" });
     expect(entryState(day({ report: report() })).text).toBe("сдан в 18:04");
     expect(entryState(day({ workday: false })).text).toBe("выходной");
   });
@@ -145,7 +147,7 @@ describe("the employee's day", () => {
     expect(historyLine(report({ tasks }))).toBe("сдан · 8 ч 40 мин · 3 задачи · +1");
     expect(historyLine(report({ status: "missed", points: -10, arrived_at: null, left_at: null }))).toBe("не сдан · −10");
     // a minus given back — by «Оспорить» or by the D-155 refund — nets the day to 0
-    expect(historyLine(report({ status: "missed", points: 0, arrived_at: null, left_at: null }))).toBe("не сдан");
+    expect(historyLine(report({ status: "missed", points: 0, arrived_at: null, left_at: null }))).toBe("не сдан · без штрафа");
     // D-183: the director excused the day — the minus is back, the reason is said
     expect(historyLine(report({ status: "missed", points: 0, arrived_at: null, left_at: null, excused_at: "2026-10-29T10:00:00+05:00", excused_reason: "болел" }))).toBe(
       "не сдан · уважительная причина",
@@ -155,7 +157,7 @@ describe("the employee's day", () => {
   it("says a task's state and its deadline", () => {
     const task = { id: "t", title: "КП", status: "done" as const, completed_at: null, closed_at: null, on_time: true };
     expect(taskMeta(task)).toBe("принята · в срок");
-    expect(taskMeta({ ...task, status: "pending_review", on_time: false })).toBe("на приёмке · после срока");
+    expect(taskMeta({ ...task, status: "pending_review", on_time: false })).toBe("на проверке · после срока");
     expect(taskMeta({ ...task, on_time: null })).toBe("принята");
   });
 
@@ -202,7 +204,10 @@ describe("the director's day", () => {
 
   it("writes the person's line", () => {
     // D-183: times without a gender
-    expect(personDayLine(row())).toBe("9:05–18:10 · 9,1 ч");
+    // D-194: the moment it was handed in, not the typed times and their hours
+    expect(personDayLine(row())).toBe("сдан в 18:04");
+    expect(reportTimesLine(row().report)).toBe("В отчёте: 9:05–18:10");
+    expect(reportTimesLine(null)).toBe("");
     expect(personDayLine(row({ state: "pending", report: null, hours: null }))).toBe("отчёта пока нет");
     expect(personDayLine(row({ state: "off", report: null, hours: null }))).toBe("отчёт не нужен");
     expect(personDayLine(row({ state: "away", availability: "sick", report: null }))).toBe("на больничном");
@@ -217,7 +222,22 @@ describe("the director's day", () => {
   it("sums the team's day", () => {
     const totals = { team: 12, submitted: 7, missed: 2, pending: 0, away: 1, excused: 0, handed_over: 15, closed: 9 };
     expect(teamTotalsLine({ date: "2026-10-27", today: false, workday: true, rows: [], totals })).toBe(
-      "не сдали 2 · в отпуске или на больничном 1 · сдано задач 15 · принято 9",
+      "сдано задач 15 · принято 9",
     );
+    // a quiet day: no «сдано задач 0 · принято 0»
+    expect(teamTotalsLine({ date: "2026-10-27", today: false, workday: true, rows: [], totals: { ...totals, missed: 0, away: 0, handed_over: 0, closed: 0 } })).toBe("");
+  });
+});
+
+describe("markGone", () => {
+  it("the database's flag wins, the roster fills in for an older database; the team first, order kept", () => {
+    const rows = [{ user_id: "a" }, { user_id: "b", gone: true }, { user_id: "c" }, { user_id: "d", gone: false }];
+    expect(markGone(rows, new Set(["c", "d"])).map((row) => [row.user_id, row.gone])).toEqual([
+      ["a", false],
+      ["d", false],
+      ["b", true],
+      ["c", true],
+    ]);
+    expect(markGone([], new Set())).toEqual([]);
   });
 });

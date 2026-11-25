@@ -4,7 +4,7 @@ import type { CSSProperties } from "react";
 
 import { humanAqtobe } from "@/lib/ai/time";
 import type { StatusScreen as Screen, Segment } from "@/lib/tasks/overview";
-import { deadlineToneOf, TONE_VAR } from "@/lib/tasks/tone";
+import { deadlineToneOf, dotStyle, segmentStyle, TONE_VAR } from "@/lib/tasks/tone";
 
 import { Icon } from "../icons";
 
@@ -18,18 +18,25 @@ import { Icon } from "../icons";
  * The employee's screen comes in two more shapes (D-173, `screen.variant`): «compact» — one line
  * while orders wait for their move, so the cards and «Принял» are in sight; «lean» — no «открыто»
  * and no legend beside the tabs, which say those numbers already. The director's has no variant.
+ *
+ * Each fact once (D-194): «открыто» only when it is not the big number already, the legend only
+ * when the bar splits the work into two states or more — one state is the label's to say. While the
+ * director's verdict is not ok, `action` stands under the words: the move for the loudest task.
  */
 export function StatusScreen({
   screen,
   now,
   title,
   onNearest,
+  action,
 }: {
   screen: Screen;
   now: Date;
   /** Replaces the eyebrow — a person picked on the strip names the screen. */
   title?: string;
   onNearest?: (id: string) => void;
+  /** The move for what needs the director (`screen.focus`): «Позвонить», «Открыть задачу». */
+  action?: { label: string; href?: string; onClick?: () => void } | null;
 }) {
   if (screen.variant === "compact") return <CompactStatus screen={screen} now={now} onNearest={onNearest} />;
   const lean = screen.variant === "lean";
@@ -40,11 +47,13 @@ export function StatusScreen({
     { key: "today", label: "закрыто сегодня", count: screen.closedToday, tone: "ok" },
     { key: "week", label: "за 7 дней", count: screen.closedWeek, tone: "muted" },
   ];
-  // lean says only what is there (D-173): nothing open and nothing closed is no bar and no zeros
-  const legend: Segment[] = total > 0 ? (lean ? [] : screen.segments) : lean ? closedLegend.filter((segment) => segment.count > 0) : closedLegend;
-  const bar = !(lean && total === 0 && legend.length === 0);
-  // lean with nothing open: the legend has said today's count, the foot would say it again
-  const foot = !(lean && total === 0);
+  // both screens say only what is there (D-173, FIX §4.5): nothing open and nothing closed is no
+  // bar and no zeros
+  const legend: Segment[] =
+    total > 0 ? (lean || screen.segments.length < 2 ? [] : screen.segments) : closedLegend.filter((segment) => segment.count > 0);
+  const bar = !(total === 0 && legend.length === 0);
+  // nothing open: no deadline to name, and the legend has said today's count — the foot would say it again
+  const foot = total > 0;
   const nearest = screen.nearest;
   const nearestTone = nearest
     ? nearest.late
@@ -67,7 +76,7 @@ export function StatusScreen({
           <span aria-hidden className="h-[7px] w-[7px] shrink-0 rounded-full" style={{ background: tone, boxShadow: `0 0 10px ${tone}` }} />
           <span className="truncate">{title ?? screen.eyebrow}</span>
         </span>
-        {lean ? null : (
+        {lean || screen.open === 0 || screen.value === screen.open ? null : (
           <span className="shrink-0 text-[12px] leading-4 text-muted">
             <span className="nums text-text">{screen.open}</span> открыто
           </span>
@@ -94,6 +103,8 @@ export function StatusScreen({
         </div>
       </div>
 
+      {action ? <StatusAction action={action} tone={tone} /> : null}
+
       {/* the bar: one segment per state that exists, loudest first; an empty track when nothing is open */}
       {bar ? (
         <div
@@ -104,13 +115,12 @@ export function StatusScreen({
             <span
               key={segment.key}
               className="bar-grow h-full"
+              data-tone={segment.tone}
               style={{
                 flexGrow: segment.count,
                 flexBasis: 0,
                 minWidth: 6,
-                background: TONE_VAR[segment.tone],
-                opacity: segment.tone === "muted" ? 0.55 : 1,
-                borderRadius: index === 0 || index === screen.segments.length - 1 ? 999 : 2,
+                ...segmentStyle(segment.tone, { first: index === 0, last: index === screen.segments.length - 1 }),
                 animationDelay: `${index * 60}ms`,
               }}
             />
@@ -122,11 +132,7 @@ export function StatusScreen({
         <ul className="mt-2 flex min-h-[18px] flex-wrap gap-x-3.5 gap-y-1">
           {legend.map((segment) => (
             <li key={segment.key} className="flex items-center gap-1.5 whitespace-nowrap text-[13px] leading-[18px]">
-              <span
-                aria-hidden
-                className="h-[7px] w-[7px] shrink-0 rounded-full"
-                style={{ background: TONE_VAR[segment.tone], opacity: segment.tone === "muted" ? 0.55 : 1 }}
-              />
+              <span aria-hidden className="h-[7px] w-[7px] shrink-0 rounded-full" style={dotStyle(segment.tone)} />
               <span className="nums font-semibold text-text">{segment.count}</span>
               <span className="text-muted">{segment.label}</span>
             </li>
@@ -177,6 +183,23 @@ export function StatusScreen({
         </div>
       ) : null}
     </section>
+  );
+}
+
+/** The move under the verdict's words: a link (a phone call) or a button that opens the task. */
+function StatusAction({ action, tone }: { action: { label: string; href?: string; onClick?: () => void }; tone: string }) {
+  const className =
+    "mt-2.5 inline-flex min-h-[40px] items-center gap-2 rounded-[12px] border px-3.5 text-[14px] font-semibold leading-5 transition-transform duration-[120ms] active:scale-[.97]";
+  const style = { color: tone, borderColor: `color-mix(in srgb, ${tone} 40%, transparent)`, background: `color-mix(in srgb, ${tone} 10%, transparent)` };
+  return action.href ? (
+    <a href={action.href} className={className} style={style} data-testid="status-action">
+      {action.label}
+    </a>
+  ) : (
+    <button type="button" onClick={action.onClick} className={className} style={style} data-testid="status-action">
+      {action.label}
+      <Icon name="open" size={14} />
+    </button>
   );
 }
 

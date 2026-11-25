@@ -35,7 +35,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     const updated = await service.auth.admin.updateUserById(target.id, { password: body.password });
     if (updated.error) {
       console.error("updateUserById failed:", updated.error.message);
-      return apiError(502, "auth_failed", "Не удалось сменить пароль, попробуй ещё раз");
+      return apiError(502, "auth_failed", "Не удалось сменить пароль, попробуйте ещё раз");
     }
 
     return apiOk({ id: target.id });

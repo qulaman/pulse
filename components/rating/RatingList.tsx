@@ -12,19 +12,21 @@ import { PointsSheet } from "@/components/rating/PointsSheet";
 import { Button } from "@/components/ui/Button";
 import { RatingListBone } from "@/components/ui/PageSkeletons";
 import { RollingNumber } from "@/components/ui/RollingNumber";
+import { formatNum } from "@/lib/desk/format";
 import { shortName, initialsOf } from "@/lib/people/names";
 import { usePeople } from "@/lib/people/queries";
-import { useAwardPoints, useRating, type RatingPeriod, type RatingRow } from "@/lib/points/queries";
+import { useAwardPoints, useBalance, useRating, type RatingPeriod, type RatingRow } from "@/lib/points/queries";
+import { myRatingWords, ratingLineView, ratingSummary } from "@/lib/points/rating-view";
 
 const RING = ["var(--gold)", "#B8C2CC", "#C98A5B"];
 
-function Delta({ value }: { value: number }) {
-  if (value === 0) return null;
+function Delta({ value }: { value: number | null }) {
+  if (!value) return null;
   const up = value > 0;
   return (
-    <span className="nums text-[13px] leading-4" style={{ color: up ? "var(--ok)" : "var(--danger)" }}>
+    <span className="nums shrink-0 whitespace-nowrap text-[13px] leading-4" style={{ color: up ? "var(--ok)" : "var(--danger)" }}>
       {up ? "↑" : "↓"}
-      {Math.abs(value)}
+      {formatNum(Math.abs(value))}
     </span>
   );
 }
@@ -45,12 +47,16 @@ export function RatingRowLine({
   onOpen: (row: RatingRow) => void;
 }) {
   const ring = row.points > 0 && row.rank <= 3 ? RING[row.rank - 1] : null;
+  // somebody else's zero or minus is just the name (D-45): no number, no fall
+  const view = ratingLineView(row);
+  // my own row is framed in the accent only for a place earned; my zero or minus stays in a neutral frame
+  const framed = row.is_me && row.points > 0;
   return (
     <li
       className="flex items-center gap-3 rounded-[16px] border px-3 py-3"
       style={{
-        borderColor: row.is_me ? "color-mix(in srgb, var(--accent) 55%, transparent)" : "var(--border)",
-        background: row.is_me ? "color-mix(in srgb, var(--accent) 8%, var(--surface))" : "var(--surface)",
+        borderColor: framed ? "color-mix(in srgb, var(--accent) 55%, transparent)" : row.is_me ? "var(--border-strong, var(--border))" : "var(--border)",
+        background: framed ? "color-mix(in srgb, var(--accent) 8%, var(--surface))" : "var(--surface)",
       }}
     >
       <button type="button" onClick={() => onOpen(row)} className="flex min-w-0 flex-1 items-center gap-3 text-left" aria-label={`${row.display_name}: подробности`}>
@@ -71,9 +77,9 @@ export function RatingRowLine({
             {row.display_name}
             {row.is_me ? <span className="ml-1 text-[13px] text-muted">· вы</span> : null}
           </span>
-          <span className="flex items-center gap-2 text-[13px] leading-4 text-muted">
-            <Delta value={row.delta_vs_prev} />
-            {row.on_time_pct !== null ? <span className="nums">{row.on_time_pct}% в срок</span> : <span>без закрытых</span>}
+          <span className="flex min-w-0 items-center gap-2 whitespace-nowrap text-[13px] leading-4 text-muted">
+            <Delta value={view.delta} />
+            {row.on_time_pct !== null ? <span className="nums truncate">{row.on_time_pct}% в срок</span> : <span className="truncate">без закрытых</span>}
             {streak >= 2 ? (
               <span className="nums font-semibold" style={{ color: "var(--gold)" }} data-testid="streak">
                 🔥 {streak} подряд
@@ -81,9 +87,12 @@ export function RatingRowLine({
             ) : null}
           </span>
         </span>
-        <span className="nums text-[19px] font-semibold leading-6" style={{ color: row.points > 0 ? "var(--gold)" : "var(--text-muted)" }}>
-          <RollingNumber value={row.points} />
-        </span>
+        {view.points !== null ? (
+          // a long number stays whole on its line; the name gives way (4.5)
+          <span className="nums shrink-0 whitespace-nowrap text-[19px] font-semibold leading-6" style={{ color: view.points > 0 ? "var(--gold)" : "var(--text-muted)" }}>
+            <RollingNumber value={view.points} />
+          </span>
+        ) : null}
       </button>
       {canAward ? (
         <Button variant="secondary" className="!min-h-[36px] !px-3 !text-[13px]" onClick={() => onAward(row)} aria-label={`Поощрить: ${row.display_name}`}>
@@ -119,12 +128,13 @@ export function RatingList({
   const streakOf = (userId: string) => (pointsEnabled ? (people.data?.find((person) => person.id === userId)?.streak_count ?? 0) : 0);
 
   const rows = rating.data ?? [];
-  const scored = rows.filter((r) => r.points > 0);
-  const total = rows.reduce((sum, r) => sum + r.points, 0);
-  const onTime = rows.filter((r) => r.on_time_pct !== null);
-  const onTimeAvg = onTime.length ? Math.round(onTime.reduce((s, r) => s + (r.on_time_pct ?? 0), 0) / onTime.length) : null;
+  // what the team earned — the minuses are nobody's public business (D-45, 2.4)
+  const summary = ratingSummary(rows);
   const me = rows.find((r) => r.is_me);
   const ahead = me ? rows.find((r) => r.rank === me.rank - 1) : undefined;
+  // a minus for the period is said beside the whole ledger: one story with «Профиль» (2.4)
+  const balance = useBalance(me && me.points < 0 && !isDirector ? me.user_id : undefined);
+  const mine = me ? myRatingWords(me, ahead, period, balance.data) : null;
 
   const startAward = (row: RatingRow) => {
     setOpen(null);
@@ -157,27 +167,28 @@ export function RatingList({
         <RatingListBone withAward={canAward} />
       ) : (
         <>
-          {scored.length === 0 ? (
+          {summary.scored === 0 ? (
             <div className="mt-4 flex items-center gap-3 card px-4 py-3 text-left">
               <Mascot state="calm" size={44} />
               <div>
                 <p className="text-[16px] leading-[22px]">Пока никто не набрал очков</p>
                 <p className="mt-0.5 text-[13px] leading-4 text-muted">
-                  {canAward ? "Нажми «+» у сотрудника или скажи «Марату плюс десять за скорость»" : "Первые очки придут за закрытые в срок задачи"}
+                  {canAward ? "Нажмите «+» у сотрудника или скажите «Марату плюс десять за скорость»" : "Первые очки придут за закрытые в срок задачи"}
                 </p>
               </div>
             </div>
           ) : (
             <>
               <Podium rows={rows} onPick={setOpen} />
-              <div className="mt-3 grid grid-cols-3 gap-2">
+              {/* no «в срок» tile: fn_rating gives a percent without how many tasks it stands on, so the
+                  bar of lib/people/enough.ts cannot be checked — «100 %» over one task is no verdict (8.3) */}
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 {[
-                  { value: total, label: "очков за период" },
-                  { value: scored.length, label: "с очками" },
-                  { value: onTimeAvg === null ? "—" : `${onTimeAvg}%`, label: "в срок" },
+                  { value: formatNum(summary.earned), label: "очков за период" },
+                  { value: summary.scored, label: "с очками" },
                 ].map((stat) => (
-                  <div key={stat.label} className="rounded-[12px] bg-surface-2 px-2 py-2 text-center">
-                    <p className="nums text-[19px] font-bold leading-6">{stat.value}</p>
+                  <div key={stat.label} className="min-w-0 rounded-[12px] bg-surface-2 px-2 py-2 text-center">
+                    <p className="nums truncate whitespace-nowrap text-[19px] font-bold leading-6">{stat.value}</p>
                     <p className="text-[11px] leading-4 text-muted">{stat.label}</p>
                   </div>
                 ))}
@@ -185,28 +196,30 @@ export function RatingList({
             </>
           )}
 
-          {me && !isDirector ? (
-            <div className="mt-3 flex items-center gap-3 rounded-[16px] border border-accent/40 bg-surface px-4 py-3">
+          {me && mine && !isDirector ? (
+            // the accent frame only around a place; a minus or nothing is said in a neutral frame
+            <div className={`mt-3 flex items-center gap-3 rounded-[16px] border bg-surface px-4 py-3 ${mine.kind === "place" ? "border-accent/40" : "border-border"}`}>
+              {/* at a penalty the face is neutral (D-45) */}
               <Mascot state={me.points > 0 ? "happy" : "calm"} size={36} />
-              <p className="text-[14px] leading-[18px]">
-                {me.points > 0 ? (
+              <p className="nums min-w-0 text-[14px] leading-[18px]">
+                {mine.kind === "place" ? (
                   <>
-                    Вы на <span className="nums font-semibold">{me.rank}</span> месте
-                    {ahead && ahead.points > me.points ? (
+                    Вы на <span className="font-semibold">{mine.rank}</span> месте
+                    {mine.gap !== null && ahead ? (
                       <>
                         {" "}
                         · {shortName(ahead.display_name)} впереди на{" "}
-                        <span className="nums font-semibold" style={{ color: "var(--gold)" }}>
-                          {ahead.points - me.points}
+                        <span className="font-semibold" style={{ color: "var(--gold)" }}>
+                          {formatNum(mine.gap)}
                         </span>
                       </>
-                    ) : me.rank === 1 ? (
+                    ) : mine.leader ? (
                       " · вы лидер"
                     ) : null}
                   </>
                 ) : (
                   // about the one who looks, not the list under it: the rest of the team may well have points
-                  "У вас очков за этот период пока нет. Закрытая в срок задача — первые очки"
+                  mine.text
                 )}
               </p>
             </div>

@@ -195,6 +195,8 @@ describe("notesHero", () => {
 
   it("says what to do when there is nothing yet", () => {
     expect(notesHero(splitNotes([]), NOW).value).toBeNull();
+    // what to say, not how to hold the microphone — that is the hint under it, said once
+    expect(notesHero(splitNotes([]), NOW)).toMatchObject({ label: "Пока пусто", detail: "Скажите мысль или напишите —", second: "запишу слово в слово" });
   });
 });
 

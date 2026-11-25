@@ -234,7 +234,7 @@ describe("describeChange", () => {
 
   it("agrees the verb with «задача», never with the person", () => {
     expect(describeChange(sent, { ...sent, status: "accepted" }, NOW, ME)?.text).toBe("Марат: задача «КП по Казхрому» принята в работу");
-    expect(describeChange(sent, { ...sent, status: "pending_review" }, NOW, ME)?.text).toBe("Марат: задача «КП по Казхрому» сдана, ждёт приёмки");
+    expect(describeChange(sent, { ...sent, status: "pending_review" }, NOW, ME)?.text).toBe("Марат: задача «КП по Казхрому» сдана, на проверке");
     expect(describeChange(sent, { ...sent, status: "rework" }, NOW, ME)?.text).toBe("Марат: задача «КП по Казхрому» на доработке");
   });
 
@@ -296,7 +296,7 @@ describe("describeChange", () => {
     const after = [{ ...before[0]!, status: "accepted" as const }, { ...before[1]!, status: "pending_review" as const }];
     expect(describeChanges(before, after, NOW, ME).map((p) => p.text)).toEqual([
       "Марат: задача «КП по Казхрому» принята в работу",
-      "Ерлан: задача «Смета» сдана, ждёт приёмки",
+      "Ерлан: задача «Смета» сдана, на проверке",
     ]);
   });
 });
@@ -312,12 +312,12 @@ describe("openingLine", () => {
       NOW,
       ME,
     );
-    expect(openingLine(lanes, NOW, "Асхат")).toEqual({ text: "Доброе утро, Асхат. 1 просрочка, 2 на приёмке.", tone: "danger" });
+    expect(openingLine(lanes, NOW, "Асхат")).toEqual({ text: "Доброе утро, Асхат. 1 просрочка, 2 на проверке.", tone: "danger" });
   });
 
   it("a refusal makes the line red, as its ball on the board", () => {
     const lanes = lanesOf([row("d", "Смета", "Ерлан", "declined"), row("r", "КП", "Марат", "pending_review")], NOW, ME);
-    expect(openingLine(lanes, NOW, "Асхат")).toEqual({ text: "Доброе утро, Асхат. 1 отказ, 1 на приёмке.", tone: "danger" });
+    expect(openingLine(lanes, NOW, "Асхат")).toEqual({ text: "Доброе утро, Асхат. 1 отказ, 1 на проверке.", tone: "danger" });
   });
 
   it("greets and says it is quiet otherwise, with the nearest deadline", () => {
@@ -326,6 +326,25 @@ describe("openingLine", () => {
       text: "Доброе утро, Асхат. Пока тихо. 1 задача в работе, ближайший срок сегодня 18:00 (Марат, «Отчёт»).",
       tone: "ok",
     });
+  });
+
+  it("D-194: an order untaken since yesterday is not «пока тихо» — the one verdict says it", () => {
+    const lanes = lanesOf([row("s", "Тест", "Марат", "sent", { created_at: "2026-09-10T12:40:00Z" })], NOW, ME);
+    expect(openingLine(lanes, NOW, "Асхат")).toEqual({ text: "Доброе утро, Асхат. Тест · не принята с вчера 17:40.", tone: "warn" });
+  });
+
+  it("D-194: an order to someone whose pushes do not reach is said at once", () => {
+    const lanes = lanesOf([row("s", "Тест", "Марат", "sent", { created_at: "2026-09-11T04:25:00Z" })], NOW, ME);
+    expect(openingLine(lanes, NOW, "Асхат", new Set(["u-Марат"]))).toEqual({ text: "Доброе утро, Асхат. Марат · уведомления не доходят.", tone: "warn" });
+  });
+
+  it("D-194: the quiet line never calls an untaken order «в работе»", () => {
+    const lanes = lanesOf(
+      [row("a", "Отчёт", "Марат", "accepted"), row("s", "Смета", "Ерлан", "sent", { created_at: "2026-09-11T04:20:00Z" })],
+      NOW,
+      ME,
+    );
+    expect(openingLine(lanes, NOW, "Асхат").text).toBe("Доброе утро, Асхат. Пока тихо. 1 задача в работе, 1 ещё не принята, все без срока.");
   });
 
   it("labels the collapsed work row", () => {
@@ -429,7 +448,7 @@ describe("Пульс manages tasks (D-139)", () => {
       NOW,
       ME,
     );
-    expect(openingLine(lanes, NOW, "Асхат").text).toBe("Доброе утро, Асхат. 1 вопрос, 1 сообщение, 1 на приёмке.");
+    expect(openingLine(lanes, NOW, "Асхат").text).toBe("Доброе утро, Асхат. 1 вопрос, 1 сообщение, 1 на проверке.");
   });
 
   it("the director's board takes a task held for the morning; anybody else's never does", () => {

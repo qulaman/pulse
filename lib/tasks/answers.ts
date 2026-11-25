@@ -87,3 +87,19 @@ export function answersFor(question: string, deadline: string | null, now: Date 
 export function wantsWords(question: string): boolean {
   return questionKind(question) === "open";
 }
+
+/** The employee's ready-made questions of «Уточнить» — one tap each, the field is for the rest. */
+export const QUICK_QUESTIONS = ["Когда срок?", "Какой формат?", "Где взять данные?", "Это срочно?"] as const;
+
+/**
+ * The ready-made questions this task still leaves open (D-194): «Когда срок?» goes once the card
+ * says the deadline, «Это срочно?» once it says «срочно» — a question that goes with one tap must
+ * not ask the director what the screen has answered already.
+ */
+export function quickQuestionsFor(task: { deadline: string | null; priority?: string | null }): string[] {
+  return QUICK_QUESTIONS.filter((question) => {
+    if (question === "Когда срок?") return !task.deadline;
+    if (question === "Это срочно?") return task.priority !== "high";
+    return true;
+  });
+}

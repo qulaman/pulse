@@ -14,6 +14,8 @@ import type { QuickAnswer } from "@/lib/tasks/answers";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { BUTTON, deadlineLabel, reworkBannerText, STATUS_LABEL, TEXT } from "@/lib/tasks/status-text";
+import { isStaleUnaccepted } from "@/lib/tasks/attention";
+import { statusWord } from "@/lib/tasks/overview";
 import { toneOf } from "@/lib/tasks/tone";
 import { AudioOriginal } from "./AudioOriginal";
 import { DeliveryStatus } from "./DeliveryStatus";
@@ -41,23 +43,29 @@ export type TaskCardProps = {
   question?: string | null;
   /** Omitted inside the thread itself: the card must not link to its own page. */
   href?: string;
+  /** The director's card: the assignee's pushes do not reach them, so an untaken task is amber at once (D-195). */
+  unreachable?: boolean;
 };
 
 /* -------------------------------------------------------------------------- */
 
 /**
- * The full card of a task where a list is not the point — Пульс, Лента, a person's card.
+ * The full card of a task where a list is not the point — Пульс (the director's and the employee's), a person's card.
  * Its buttons are the hooks of «Задачи» (D-83, D-128), so a button means the same thing on
  * every screen: the employee's «Не могу» asks for time or names a colleague here too, the
  * director answers a request for time and hands a task to the suggested person in one tap.
  */
-export function TaskCard({ task, variant, actions, companyId, declineReason, question, href }: TaskCardProps) {
+export function TaskCard({ task, variant, actions, companyId, declineReason, question, href, unreachable = false }: TaskCardProps) {
   const router = useRouter();
 
   // the clock is read once per mount: the pill needs no live tick on a card
   const [now] = useState(() => new Date());
   const deadline = deadlineLabel(task, now);
-  const tone = toneOf(task.status, deadline.overdue);
+  // a new task is the holder's move (amber) and, to the director, amber once nobody has taken it for half an hour —
+  // or at once when the assignee's pushes do not reach them
+  const tone = toneOf(task.status, deadline.overdue, {
+    attention: variant === "employee" || isStaleUnaccepted(task, now) || (unreachable && task.status === "sent"),
+  });
   const dimmed = task.status === "revoked" || task.status === "done";
   const request = task.time_request && isWorking(task.status) ? task.time_request : null;
   const suggestion = task.status === "declined" ? (task.suggestion ?? null) : null;
@@ -100,7 +108,7 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
 
       {/* row 1: status and due */}
       <div className="relative flex items-center justify-between gap-2">
-        <StatusEyebrow status={task.status} overdue={deadline.overdue} tone={tone} />
+        <StatusEyebrow status={task.status} overdue={deadline.overdue} tone={tone} word={statusWord(task, variant, now)} />
         <DeadlinePill task={task} now={now} />
       </div>
 
@@ -116,10 +124,12 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
         )}
       </div>
 
-      {/* row 3: who and how urgent */}
-      {(variant === "director" && task.assignee) || (task.priority === "high" && !isUrgentNow(task)) ? (
+      {/* row 3: who and how urgent — the other side of the order: the holder to the director, who
+          gave it to the employee (the list and the task's screen say the same, D-194) */}
+      {(variant === "director" ? task.assignee : task.author) || (task.priority === "high" && !isUrgentNow(task)) ? (
         <div className="relative mt-3 flex flex-wrap items-center gap-2">
           {variant === "director" && task.assignee ? <PersonChip fullName={task.assignee.full_name} /> : null}
+          {variant === "employee" && task.author ? <PersonChip fullName={task.author.full_name} /> : null}
           {task.priority === "high" && !isUrgentNow(task) ? urgent : null}
         </div>
       ) : null}

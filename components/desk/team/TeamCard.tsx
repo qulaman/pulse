@@ -1,14 +1,10 @@
 "use client";
 
-import { BellOff, CalendarOff, Phone, X } from "lucide-react";
-import Link from "next/link";
+import { BellOff, CalendarOff, Phone } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Morph } from "@/components/desk/ui/Morph";
-import { MenuButton, type MenuItem } from "@/components/desk/ui/Menu";
 import { SegmentTabs } from "@/components/desk/ui/Toolbar";
-import { Tooltip } from "@/components/desk/ui/Tooltip";
-import { Button } from "@/components/ui/Button";
 import { assignableRoles, canChangeAccess, canEditPerson, type Who } from "@/lib/people/access";
 import { useSavePhone, useSavePhoto } from "@/lib/people/card-queries";
 import type { Load } from "@/lib/people/loads";
@@ -22,25 +18,18 @@ import { CopyButton } from "./fields";
 import { CardFacts, PushBlock } from "./PersonDesk";
 import { OpenTasks } from "./PersonPeek";
 import { PersonEditor } from "./PersonEditor";
-import { loadWords, tidy } from "./shared";
-import { TileFace, tileState } from "./TeamGrid";
+import { loadWords } from "./shared";
+import { stateTone, TileFace, tileState } from "./TeamGrid";
 
 /** The card's three faces: the numbers, the data (read or edited), the open work. */
 export type CardTab = "stats" | "data" | "tasks";
 
-export type CardMoves = {
-  give?: () => void;
-  /** the full card's page */
-  open: () => void;
-  more: MenuItem[];
-};
-
 /**
  * A person opened under their row of the grid (D-172): who — the circle, the name, the position,
- * the phone — with the moves at hand («Дать задачу», «Изменить», the full card, «⋯», ×), then three
- * tabs: «Показатели» — the director's dashboard of this person (`stats`), «Данные» — the card's facts,
- * a double click or «Изменить» turns them into the editor right here, and «Задачи» — what is open on
- * them. The secretary sees the data only (D-104).
+ * the phone — with the person's moves (`PersonMovesBar`, one set on every desk card, D-194), then
+ * the tabs in the order of the person's page: «Показатели» — the director's dashboard of this person
+ * (`stats`), «Задачи» — what is open on them, «Данные» — the card's facts, a double click or
+ * «Изменить» turns them into the editor right here. The secretary sees the data only (D-104).
  */
 export function TeamCard({
   person,
@@ -52,6 +41,7 @@ export function TeamCard({
   phone,
   phonesReady,
   load,
+  stale = false,
   tasks,
   push,
   now,
@@ -60,7 +50,6 @@ export function TeamCard({
   editing,
   onEditing,
   moves,
-  onClose,
   stats,
 }: {
   person: Person;
@@ -74,6 +63,8 @@ export function TeamCard({
   /** the phones came: the editor starts from the real number, not an empty field */
   phonesReady: boolean;
   load?: Load;
+  /** a task of theirs not taken past the grace (the grid's `TileFacts.stale`) */
+  stale?: boolean;
   tasks: TaskWithPeople[];
   push?: Health;
   now: Date;
@@ -81,8 +72,8 @@ export function TeamCard({
   onTab: (tab: CardTab) => void;
   editing: boolean;
   onEditing: (on: boolean) => void;
-  moves: CardMoves;
-  onClose: () => void;
+  /** the person's moves — the screen's `PersonMovesBar` (× included) */
+  moves: ReactNode;
   /** the dashboard, rendered by the screen (components/desk/team/PersonStats.tsx) */
   stats: ReactNode;
 }) {
@@ -94,13 +85,14 @@ export function TeamCard({
   const works = person.is_active && person.role !== "tv";
   const showStats = director && crew && Boolean(stats);
   const showTasks = director && works;
+  // the page's order: the numbers, the work, the facts (D-194)
   const tabs = [
     ...(showStats ? [{ value: "stats" as const, label: "Показатели" }] : []),
-    { value: "data" as const, label: editing ? "Данные · правка" : "Данные" },
     ...(showTasks ? [{ value: "tasks" as const, label: "Задачи", count: tasks.length }] : []),
+    { value: "data" as const, label: editing ? "Данные · правка" : "Данные" },
   ];
   const current: CardTab = tabs.some((item) => item.value === tab) ? tab : tabs[0].value;
-  const state = tileState(person, load, crew);
+  const state = tileState(person, load, crew, stale);
   const position = person.position && person.position.toLowerCase() !== ROLE_LABEL[person.role].toLowerCase() ? person.position : null;
   const away = person.is_active && person.role !== "tv" && person.availability !== "active";
   const deaf = push && (push.state === "off" || push.state === "broken");
@@ -132,7 +124,7 @@ export function TeamCard({
               </span>
             ) : null}
             {director && crew && person.is_active ? (
-              <span className="team-chip" data-tone={(load?.overdue ?? 0) > 0 ? "danger" : (load?.active ?? 0) > 0 ? "ok" : "muted"}>
+              <span className="team-chip" data-tone={stateTone(state)}>
                 {loadWords(load)}
               </span>
             ) : null}
@@ -153,46 +145,7 @@ export function TeamCard({
             ) : null}
           </p>
         </div>
-        <div className="team-card-moves">
-          {moves.give ? (
-            <Tooltip label="Строка поручения уже знает, кому" keys={["T"]} side="bottom">
-              <Button size="sm" onClick={moves.give} data-testid="team-card-give">
-                Дать задачу
-              </Button>
-            </Tooltip>
-          ) : null}
-          {mayEdit && !editing ? (
-            <Tooltip label="Изменить карточку здесь" keys={["E"]} side="bottom">
-              <Button size="sm" variant="secondary" onClick={edit} data-testid="team-card-edit">
-                Изменить
-              </Button>
-            </Tooltip>
-          ) : null}
-          <Tooltip label="Полная карточка" keys={["Enter"]} side="bottom">
-            {/* in full, ahead (D-184): a page that lands with its code and its circle in one go lets
-                the circle fly; one that loads after the click shows empty for a moment and breaks the pair */}
-            <Link href={`/desk/team/${person.id}`} prefetch className="btn-secondary inline-flex h-9 items-center px-3 text-[13px] font-medium leading-4" data-testid="team-card-open" onClick={(event) => {
-              event.preventDefault();
-              moves.open();
-            }}>
-              Открыть
-            </Link>
-          </Tooltip>
-          {moves.more.length > 0 ? (
-            <MenuButton
-              items={tidy(moves.more)}
-              label="Ещё"
-              className="flex h-9 w-9 items-center justify-center rounded-[8px] text-[18px] leading-none text-muted hover:bg-surface-2 hover:text-text"
-            >
-              ⋯
-            </MenuButton>
-          ) : null}
-          <Tooltip label="Закрыть" keys={["Esc"]} side="bottom">
-            <button type="button" aria-label="Закрыть карточку" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-[8px] text-muted hover:bg-surface-2 hover:text-text" data-testid="team-card-close">
-              <X size={18} strokeWidth={2} aria-hidden />
-            </button>
-          </Tooltip>
-        </div>
+        <div className="team-card-moves">{moves}</div>
       </header>
 
       {tabs.length > 1 ? (

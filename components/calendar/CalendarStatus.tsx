@@ -2,7 +2,7 @@
 
 import type { CSSProperties } from "react";
 
-import type { CalendarScreen, DayStrip } from "@/lib/calendar/overview";
+import { calendarCard, type CalendarScreen, type DayStrip } from "@/lib/calendar/overview";
 import { TONE_VAR } from "@/lib/tasks/tone";
 import { Icon } from "@/components/tasks/icons";
 
@@ -10,11 +10,31 @@ import { Icon } from "@/components/tasks/icons";
  * The head of /calendar (D-100) in the language of «Задачи» (D-83): the moment in one number
  * and a sentence, today as a strip of the working day with the hand of now on it, and the
  * nearest meeting as the foot — a tap opens its card below. Every row keeps its height
- * whatever the day holds, so the month under it never moves when the data lands.
+ * whatever the day holds, so the month under it never moves when the data lands; a calendar with
+ * nothing in it at all — once the days ahead are read (`ready`) — is one line, «Встреч нет», and
+ * every fact is said once (`calendarCard`).
  */
-export function CalendarStatus({ screen, onNearest }: { screen: CalendarScreen; onNearest: (id: string) => void }) {
+export function CalendarStatus({ screen, ready, onNearest }: { screen: CalendarScreen; ready: boolean; onNearest: (id: string) => void }) {
   const tone = TONE_VAR[screen.tone];
   const nearest = screen.nearest;
+  const card = calendarCard(screen, ready);
+
+  if (card.compact) {
+    return (
+      <section data-testid="calendar-status" data-empty="" className="status-screen relative overflow-hidden rounded-[22px] px-4 py-3" style={{ "--tone": "var(--accent)" } as CSSProperties}>
+        <div className="flex min-h-[46px] items-center gap-3.5">
+          <span
+            aria-hidden
+            className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-full"
+            style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)", color: "var(--accent)" }}
+          >
+            <Icon name="check" size={22} />
+          </span>
+          <p className="min-w-0 flex-1 truncate font-display text-[17px] font-semibold leading-[22px] tracking-[-0.015em]">{card.label}</p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section
@@ -28,11 +48,13 @@ export function CalendarStatus({ screen, onNearest }: { screen: CalendarScreen; 
           style={{ color: tone }}
         >
           <span aria-hidden className="h-[7px] w-[7px] shrink-0 rounded-full" style={{ background: tone, boxShadow: `0 0 10px ${tone}` }} />
-          <span className="truncate">{screen.eyebrow}</span>
+          <span className="truncate">{card.eyebrow}</span>
         </span>
-        <span className="shrink-0 text-[12px] leading-4 text-muted">
-          <span className="nums text-text">{screen.week}</span> на неделе
-        </span>
+        {card.week !== null ? (
+          <span className="shrink-0 text-[12px] leading-4 text-muted">
+            <span className="nums text-text">{card.week}</span> на неделе
+          </span>
+        ) : null}
       </div>
 
       {/* the big line names a meeting — «приглашение ждёт ответа» above all: a tap opens it, with
@@ -65,15 +87,16 @@ export function CalendarStatus({ screen, onNearest }: { screen: CalendarScreen; 
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <p className="truncate font-display text-[17px] font-semibold leading-[22px] tracking-[-0.015em]">{screen.label}</p>
-          <p className="mt-0.5 line-clamp-2 min-h-[36px] text-[13px] leading-[18px] text-muted">{screen.detail || " "}</p>
+          <p className="truncate font-display text-[17px] font-semibold leading-[22px] tracking-[-0.015em]">{card.label}</p>
+          {/* a free day has no line here (the foot names what is next): «Встреч нет» stands by the mark */}
+          {card.detail ? <p className="mt-0.5 line-clamp-2 min-h-[36px] text-[13px] leading-[18px] text-muted">{card.detail}</p> : null}
         </div>
       </div>
 
       <Strip strip={screen.strip} />
 
       <ul className="mt-2 flex min-h-[18px] flex-wrap gap-x-3.5 gap-y-1">
-        {screen.legend.map((item) => (
+        {card.legend.map((item) => (
           <li key={item.key} className="flex items-center gap-1.5 whitespace-nowrap text-[13px] leading-[18px]">
             <span
               aria-hidden

@@ -26,7 +26,7 @@ export default function EditPersonPage({ searchParams }: { searchParams: Promise
   const update = useUpdatePerson();
 
   const p = person.data;
-  const back = from === "card" && p ? { href: `/people/${id}`, label: p.full_name } : { href: "/settings?tab=team", label: "Сотрудники" };
+  const back = from === "card" && p ? { href: `/people/${id}`, label: p.full_name } : { href: "/people", label: "Команда" };
   const loading = person.isLoading || me.isLoading || people.isLoading;
   const editor = me.data ? { id: me.data.userId, role: me.data.role } : null;
 

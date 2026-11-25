@@ -9,10 +9,7 @@ import {
   Flame,
   Gauge,
   ListTodo,
-  LogIn,
-  LogOut,
   RotateCcw,
-  Timer,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useId, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
@@ -21,10 +18,11 @@ import { useDeskScope } from "@/components/desk/DeskScope";
 import { RollingNumber } from "@/components/ui/RollingNumber";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { humanAqtobe } from "@/lib/ai/time";
-import { dayName, hoursText, rangeText, shortHm, timeOf } from "@/lib/daily-report/format";
+import { dayName, rangeText, shortHm, timeOf } from "@/lib/daily-report/format";
 import { WEEKDAYS_SHORT_RU } from "@/lib/datetime/calendar";
 import { formatNum } from "@/lib/desk/format";
 import type { Load } from "@/lib/people/loads";
+import { ENOUGH, enough, onTimeWords, speedWords, weeksWith } from "@/lib/people/enough";
 import { PERIOD_DAYS } from "@/lib/people/period";
 import type { Person } from "@/lib/people/queries";
 import {
@@ -231,7 +229,10 @@ function DoneTile({ source, index, className }: { source: Source<TaskStats>; ind
         {(stats) => {
           const lined = stats.series.some((week) => week.count > 0);
           if (stats.doneAll === 0 && stats.current.handed === 0 && !lined) return <Quiet>Выполненных задач пока нет</Quiet>;
-          const compared = stats.previous.handed > 0 || stats.previous.returned > 0;
+          // a line and a change only over enough weeks and a base worth comparing with (D-194)
+          const drawn = enough("weeks", weeksWith(stats.series));
+          const compared = enough("base", stats.previous.handed);
+          const total = stats.series.reduce((sum, week) => sum + week.count, 0);
           return (
             <>
               <Figure unit="за всё время">
@@ -243,7 +244,19 @@ function DoneTile({ source, index, className }: { source: Source<TaskStats>; ind
                 </span>
                 <Delta change={compared ? changeOf(stats.current.handed, stats.previous.handed) : null} good="up" title={BEFORE} />
               </p>
-              {lined ? <Spark series={stats.series} /> : <p className="mt-auto text-[12px] leading-4 text-muted">За {STATS_WEEKS} недель сданных задач нет</p>}
+              {drawn ? (
+                <Spark series={stats.series} />
+              ) : (
+                <p className="mt-auto text-[12px] leading-4 text-muted" data-testid="person-stat-weeks-words">
+                  {lined ? (
+                    <>
+                      За {STATS_WEEKS} недель сдано <span className="nums">{formatNum(total)}</span> — по неделям рисовать рано
+                    </>
+                  ) : (
+                    `За ${STATS_WEEKS} недель сданных задач нет`
+                  )}
+                </p>
+              )}
             </>
           );
         }}
@@ -337,12 +350,18 @@ function OnTimeTile({ source, index, className }: { source: Source<TaskStats>; i
         {(stats) => {
           const timed = stats.current.onTime + stats.current.late;
           const share = percent(stats.current.onTime, timed);
-          const before = percent(stats.previous.onTime, stats.previous.onTime + stats.previous.late);
-          if (share === null) {
+          const timedBefore = stats.previous.onTime + stats.previous.late;
+          // the share against the share before only when both stand on enough tasks (D-194)
+          const before = enough("onTime", timedBefore) ? percent(stats.previous.onTime, timedBefore) : null;
+          if (share === null) return <Quiet>За {PERIOD_DAYS} дней задач со сроком не сдано</Quiet>;
+          if (!enough("onTime", timed)) {
+            // «100 %» and a full ring over one task read as a verdict on the person: the counts, in words
             return (
-              <div className="flex flex-1 items-start justify-between gap-3">
-                <Quiet>За {PERIOD_DAYS} дней задач со сроком не сдано</Quiet>
-                <Ring onTime={0} late={0} />
+              <div className="flex flex-1 flex-col gap-1" data-testid="person-stat-ontime-words">
+                <p className="text-[15px] font-medium leading-6">{onTimeWords(stats.current.onTime, stats.current.late)}</p>
+                <p className="mt-auto text-[12px] leading-4 text-muted">
+                  Долю в срок покажу от {ENOUGH.onTime} задач со сроком за {PERIOD_DAYS} дней
+                </p>
               </div>
             );
           }
@@ -418,7 +437,7 @@ function NowTile({ source, now, index, className }: { source: Source<Load>; now:
           const parts: Part[] = [
             { key: "working", label: "в работе", value: working, tone: "muted" },
             { key: "overdue", label: "просрочено", value: load.overdue, tone: "danger" },
-            { key: "review", label: "на приёмке", value: load.review, tone: "warn" },
+            { key: "review", label: "на проверке", value: load.review, tone: "warn" },
           ];
           return (
             <>
@@ -479,11 +498,20 @@ function SpeedTile({ source, index, className }: { source: Source<TaskStats>; in
       <Body source={source} what="задачи" bones={<TileBones picture={74} />}>
         {(stats) => {
           const typical = median(stats.spans);
-          const compared = stats.previous.handed > 0 || stats.previous.returned > 0;
+          const compared = enough("base", stats.previous.handed);
+          // «обычно 18 мин» and a strip of dots only over enough hand-ins; fewer — their times in words (D-194)
+          const few = typical !== null && !enough("speed", stats.spans.length);
           return (
             <>
               {typical === null ? (
                 <Quiet>За {PERIOD_DAYS} дней сданных задач нет</Quiet>
+              ) : few ? (
+                <div className="flex flex-col gap-1" data-testid="person-stat-speed-words">
+                  <p className="text-[15px] font-medium leading-6">{speedWords(stats.spans)}</p>
+                  <p className="text-[12px] leading-4 text-muted">
+                    от выдачи до сдачи · обычное время покажу от {ENOUGH.speed} сданных
+                  </p>
+                </div>
               ) : (
                 <>
                   <Figure>
@@ -576,7 +604,7 @@ function PointsTile({ source, personId, index, className }: { source: Source<Poi
               ) : (
                 <p className="text-[13px] leading-5 text-muted">За месяц новых очков нет</p>
               )}
-              {week && week.points > 0 && stats.weekRows.length > 1 ? <RankStrip rows={stats.weekRows} personId={personId} /> : null}
+              {week && week.points > 0 && enough("rank", stats.weekRows.length) ? <RankStrip rows={stats.weekRows} personId={personId} /> : null}
             </>
           );
         }}
@@ -632,7 +660,7 @@ function RankStrip({ rows, personId }: { rows: PointsStats["weekRows"]; personId
   );
 }
 
-/* ---- Отчёты: handed in, the run, the hours, five weeks of days ----------------------------------------- */
+/* ---- Отчёты: handed in, the run, when they hand in, five weeks of days ----------------------------------------- */
 
 const DAY_WORD: Record<ReportDayState, string> = {
   submitted: "сдан",
@@ -670,11 +698,12 @@ function ReportsTile({ source, now, index, className }: { source: Source<ReportS
                       />
                     </>
                   )}
-                  <ul className="mt-auto grid grid-cols-2 gap-x-4 gap-y-1 text-[13px] leading-5">
+                  {/* «Пришёл» and «Ушёл» of a report are the form's own defaults (the company's start,
+                      the moment it was opened): never averaged into «приход», «уход» or hours — only
+                      the moment the report was handed in, and called that (D-194) */}
+                  <ul className="mt-auto flex flex-col gap-y-1 text-[13px] leading-5">
                     {stats.streak > 0 ? <Fact icon={Flame} label="подряд" value={formatNum(stats.streak)} /> : null}
-                    {period?.avg_hours ? <Fact icon={Timer} label="в день" value={hoursText(period.avg_hours)} /> : null}
-                    {period?.avg_arrived ? <Fact icon={LogIn} label="приход" value={shortHm(period.avg_arrived)} /> : null}
-                    {period?.avg_left ? <Fact icon={LogOut} label="уход" value={shortHm(period.avg_left)} /> : null}
+                    {usualOf(period) ? <Fact icon={Clock} label="обычно сдаёт отчёт около" value={usualOf(period) as string} first /> : null}
                   </ul>
                 </div>
                 <Days calendar={stats.calendar} now={now} />
@@ -687,20 +716,32 @@ function ReportsTile({ source, now, index, className }: { source: Source<ReportS
   );
 }
 
-function Fact({ icon: Glyph, label, value }: { icon: LucideIcon; label: string; value: string }) {
+/** A fact under the tile's figure; `first` — the label before the value («обычно сдаёт отчёт около 15:08»). */
+function Fact({ icon: Glyph, label, value, first = false }: { icon: LucideIcon; label: string; value: string; first?: boolean }) {
   return (
     <li className="flex min-w-0 items-center gap-1.5 whitespace-nowrap">
       <Glyph aria-hidden size={13} strokeWidth={2} className="ps-icon shrink-0" />
+      {first ? <span className="truncate text-muted">{label}</span> : null}
       <span className="nums font-medium text-text">{value}</span>
-      <span className="text-muted">{label}</span>
+      {first ? null : <span className="text-muted">{label}</span>}
     </li>
   );
 }
 
-/** What a day of the calendar says when the pointer is on it. */
+/**
+ * When the person usually hands the report in over the period, «15:08» — the period's
+ * `usual_submitted` (migration 20261124130000, D-194). Until it is applied the row has no
+ * such field and there is no line: `avg_left` is the form's default, not a fact.
+ */
+function usualOf(period: ReportStats["period"]): string | null {
+  const usual = (period as { usual_submitted?: string | null } | null)?.usual_submitted;
+  return usual ? shortHm(usual) : null;
+}
+
+/** What a day of the calendar says when the pointer is on it: the moment it was handed in, not the form's «Пришёл–Ушёл». */
 function dayLine(cell: ReportCell, now: Date): string {
   const name = dayName(cell.day, now);
-  if (cell.state === "submitted" && cell.row?.arrived_at && cell.row.left_at) return `${name} — сдан, ${timeOf(cell.row.arrived_at)}–${timeOf(cell.row.left_at)}`;
+  if (cell.state === "submitted" && cell.row?.submitted_at) return `${name} — сдан в ${timeOf(cell.row.submitted_at)}`;
   return `${name} — ${DAY_WORD[cell.state]}`;
 }
 

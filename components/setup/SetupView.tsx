@@ -143,7 +143,7 @@ type Props = {
   model: SetupModel;
   /** «Позже» / «Назад» */
   onLeave: () => void;
-  /** «В Ленту» / «На Пульс» once everything is through */
+  /** «На Пульс» once everything is through */
   onHome: () => void;
   /** the self-issued sign-in code for the home-screen app; absent — the button is not shown */
   onCode?: () => void;
@@ -612,7 +612,7 @@ function DoneCard({ team, onHome }: { team: boolean; onHome: () => void }) {
       {team ? (
         <div className="flex w-full flex-col gap-2 text-left">
           <p className="rounded-[12px] bg-surface-2 px-3 py-2.5 text-[15px] leading-[21px]">
-            <span className="font-semibold">Лента</span> — лично вам: поручения, слова директора, приглашения.
+            <span className="font-semibold">Пульс</span> — лично вам: поручения, слова директора, приглашения.
           </p>
           <p className="rounded-[12px] bg-surface-2 px-3 py-2.5 text-[15px] leading-[21px]">
             <span className="font-semibold" style={{ color: "var(--gold)" }}>
@@ -625,7 +625,7 @@ function DoneCard({ team, onHome }: { team: boolean; onHome: () => void }) {
         <Lead>Ответы, сданные задачи и просьбы команды придут уведомлением.</Lead>
       )}
       <Button block size="lg" onClick={onHome} data-testid="setup-home">
-        {team ? "В Ленту" : "На Пульс"}
+        {"На Пульс"}
       </Button>
     </motion.section>
   );

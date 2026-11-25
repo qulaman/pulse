@@ -20,8 +20,19 @@ export const PERIOD_LABEL: Record<RatingPeriod, string> = { week: "Неделя"
 
 const PERIOD_COLUMN: Record<RatingPeriod, string> = { week: "За неделю", month: "За месяц", all: "За всё время" };
 
-/** The change against the period before — none for «всё время», which has no period before it. */
-const DELTA_COLUMN: Record<RatingPeriod, string | null> = { week: "Динамика", month: "Динамика", all: null };
+/**
+ * The period before, as its own figure beside this one (D-194): «+15 за неделю» next to «+307
+ * неделей раньше» says the trend without a sum to do — a bare «динамика −292» did not say of what
+ * and over which days. None for «всё время», which has no period before it.
+ */
+const PREV_COLUMN: Record<RatingPeriod, { title: string; hint: string } | null> = {
+  week: { title: "Неделей раньше", hint: "Очки за семь дней перед этой неделей" },
+  month: { title: "Месяцем раньше", hint: "Очки за месяц перед этим" },
+  all: null,
+};
+
+/** The points of the period before: the rating gives this period's and the change against it. */
+const prevOf = (row: RatingRow) => row.points - row.delta_vs_prev;
 
 type Line = { row: RatingRow; person: Person | undefined; sub: string | null; balance: number | null };
 
@@ -80,13 +91,14 @@ function OnTime({ pct }: { pct: number | null }) {
   );
 }
 
-/** The change against the period before: an arrow up in gold, down quiet — never an alarm. */
-function Delta({ value }: { value: number }) {
-  if (value === 0) return <Num value={0} />;
+/** The period before: its points quiet, an arrow when this period went past it (gold) or fell short — never an alarm. */
+function Before({ row }: { row: RatingRow }) {
+  const prev = prevOf(row);
+  const delta = row.delta_vs_prev;
   return (
     <span className="inline-flex items-center justify-end gap-1">
-      {value > 0 ? <TrendingUp size={13} strokeWidth={2.25} aria-hidden style={{ color: "var(--gold)" }} /> : <TrendingDown size={13} strokeWidth={2.25} aria-hidden className="text-muted" />}
-      <Points value={value} />
+      {delta > 0 ? <TrendingUp size={13} strokeWidth={2.25} aria-hidden style={{ color: "var(--gold)" }} /> : delta < 0 ? <TrendingDown size={13} strokeWidth={2.25} aria-hidden className="text-muted" /> : null}
+      <Num value={prev} signed tone={prev === 0 ? null : "muted"} />
     </span>
   );
 }
@@ -148,8 +160,8 @@ export function BalancesTable({
         balance: balances.data ? (balances.data[row.user_id] ?? 0) : null,
       };
     });
-    // the richest first, as the shop's «кто копит»
-    return rows.sort((a, b) => nums(b.balance) - nums(a.balance) || byName(a, b));
+    // the period's place first — «Место» reads 1, 2, 3 down the rows (D-194); the column heads sort otherwise
+    return rows.sort((a, b) => a.row.rank - b.row.rank || byName(a, b));
   }, [rating.data, balances.data, people.data]);
 
   const max = Math.max(0, ...lines.map((line) => line.balance ?? 0));
@@ -186,15 +198,15 @@ export function BalancesTable({
         </span>
       ),
     },
-    ...(DELTA_COLUMN[period]
+    ...(PREV_COLUMN[period]
       ? [
           {
-            key: "delta",
-            title: DELTA_COLUMN[period],
-            width: "104px",
+            key: "prev",
+            title: <span title={PREV_COLUMN[period].hint}>{PREV_COLUMN[period].title}</span>,
+            width: "144px",
             align: "right",
-            sort: (a, b) => a.row.delta_vs_prev - b.row.delta_vs_prev,
-            render: (line) => <Delta value={line.row.delta_vs_prev} />,
+            sort: (a, b) => prevOf(a.row) - prevOf(b.row),
+            render: (line) => <Before row={line.row} />,
           } satisfies Column<Line>,
         ]
       : []),

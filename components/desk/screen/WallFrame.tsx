@@ -49,19 +49,25 @@ export function WallFrame({ receipt, label }: { receipt: WallReceipt | null; lab
           style={{ width: WALL_W, height: WALL_H, transform: `scale(${scale})`, visibility: scale > 0 ? "visible" : "hidden" }}
         />
       </div>
-      <figcaption className="screen-chin flex h-9 items-center gap-2.5" data-testid="desk-wall-receipt" data-tone={receipt?.tone ?? "muted"}>
+      {/* one line while all is well; a silent wall gets its advice whole on a second line — the
+          words and the screen's name are never cut (D-194) */}
+      <figcaption className="screen-chin flex flex-wrap items-center gap-x-2.5 gap-y-1" data-testid="desk-wall-receipt" data-tone={receipt?.tone ?? "muted"}>
         {/* the diode: the receipt's colour, steady — a wall that went silent is red, never blinking */}
         <span aria-hidden className="screen-diode" />
-        <span className="truncate text-[13px] font-medium leading-[18px]" style={{ color: INK[receipt?.tone ?? "muted"] }}>
+        <span className="screen-receipt min-w-0 truncate text-[13px] font-medium leading-[18px]" style={{ color: INK[receipt?.tone ?? "muted"] }}>
           {receipt?.text ?? "Связываюсь со стеной…"}
         </span>
+        {label ? (
+          <span className="ml-auto max-w-[50%] truncate pl-3 text-[12px] leading-4 text-muted" title={label}>
+            {label}
+          </span>
+        ) : null}
         {receipt?.tone === "warn" ? (
           // what to do, not only what broke (D-160): the wall is a browser on a TV
-          <span className="truncate text-[12px] leading-4 text-muted" data-testid="desk-wall-help">
+          <span className="screen-help basis-full pl-[17px] text-[12px] leading-4 text-muted" data-testid="desk-wall-help">
             Проверьте, что телевизор включён, а на нём открыт Pulse — страница «Стена»
           </span>
         ) : null}
-        {label ? <span className="ml-auto truncate pl-3 text-[12px] leading-4 text-muted">{label}</span> : null}
       </figcaption>
     </figure>
   );

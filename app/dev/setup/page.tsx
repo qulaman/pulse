@@ -116,7 +116,7 @@ function Sandbox() {
 
   return (
     <>
-      <SetupView model={model} onLeave={() => setLeft("Позже")} onHome={() => setLeft("В Ленту")} onCode={() => setLeft("код")} />
+      <SetupView model={model} onLeave={() => setLeft("Позже")} onHome={() => setLeft("На Пульс")} onCode={() => setLeft("код")} />
       {left ? (
         <p className="fixed inset-x-0 bottom-4 text-center text-[13px] text-muted" data-testid="sandbox-left">
           нажато: {left}

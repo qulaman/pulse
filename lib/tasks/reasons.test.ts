@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { BoardTask } from "@/lib/pulse/board";
 
 import {
+  firstMoveOf,
+  keysBesideCall,
   keysFor,
   queueOf,
   reasonOf,
@@ -163,5 +165,35 @@ describe("receiptText", () => {
     });
     expect(receiptText({ ...row, status: "failed", last_error: "410" }, "sent", NOW)).toEqual({ text: "уведомление не ушло", tone: "warn" });
     expect(receiptText(row, "sent", NOW)).toEqual({ text: "отправляю уведомление…", tone: "muted" });
+  });
+});
+
+describe("firstMoveOf (the owner, 2026-11-25): a push that will not arrive is not the first move", () => {
+  const noPush = new Set(["u-1"]);
+  const sent = { status: "sent" as TaskStatus, assignee_id: "u-1" };
+
+  it("a call takes the reminder's place when the holder's number is known", () => {
+    expect(firstMoveOf(sent, ["nudge", "extend", "reassign"], { noPush, phone: "+7 (701) 123-45-67" })).toEqual({ kind: "call", tel: "+77011234567" });
+    expect(keysBesideCall(["nudge", "extend", "reassign"])).toEqual(["extend", "reassign"]);
+    // a fresh order with no «Напомнить» yet: the call still leads — nobody else can tell them
+    expect(firstMoveOf(sent, ["extend", "reassign"], { noPush, phone: "87011234567" })).toEqual({ kind: "call", tel: "87011234567" });
+    expect(keysBesideCall(["extend", "reassign", "revoke"])).toEqual(["extend", "reassign"]);
+  });
+
+  it("no number: the reminder stays, said honestly", () => {
+    expect(firstMoveOf(sent, ["nudge", "extend", "reassign"], { noPush, phone: null })).toEqual({ kind: "blind" });
+    expect(firstMoveOf(sent, ["extend", "reassign"], { noPush, phone: "" })).toBeNull();
+  });
+
+  it("taken work is called about only where a reminder was offered", () => {
+    const late = { status: "accepted" as TaskStatus, assignee_id: "u-1" };
+    expect(firstMoveOf(late, ["extend", "nudge", "reassign"], { noPush, phone: "87011234567" })).toEqual({ kind: "call", tel: "87011234567" });
+    expect(firstMoveOf(late, ["extend", "reassign"], { noPush, phone: "87011234567" })).toBeNull();
+  });
+
+  it("pushes that reach, or a closed task: the keys stay as they are", () => {
+    expect(firstMoveOf(sent, ["nudge", "extend"], { noPush: new Set(), phone: "87011234567" })).toBeNull();
+    expect(firstMoveOf(sent, ["nudge", "extend"], { phone: "87011234567" })).toBeNull();
+    expect(firstMoveOf({ status: "pending_review", assignee_id: "u-1" }, ["approve", "rework"], { noPush, phone: "87011234567" })).toBeNull();
   });
 });

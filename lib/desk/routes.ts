@@ -34,14 +34,15 @@ export type DeskNavItem = { href: string; label: string; badge?: DeskBadge; key?
  * «Профиль» stands apart at the bottom of the bar — it is not in these lists.
  */
 export const DESK_NAV: Record<DeskRole, DeskNavItem[]> = {
-  // «Разобрать» carries no count of its own: it is the same number as «Задачи» (D-154)
+  // One thing, one word (D-194): a section is named what its screen and the «Сегодня» block
+  // call it. «Ждут вас» carries no count of its own: it is the same number as «Задачи» (D-154)
   director: [
     { href: "/desk/today", label: "Сегодня", badge: "today", key: "S" },
     { href: "/desk/tasks", label: "Задачи", badge: "tasks", key: "T" },
-    { href: "/desk/inbox", label: "Разобрать", key: "I" },
+    { href: "/desk/inbox", label: "Ждут вас", key: "I" },
     { href: "/desk/team", label: "Команда", key: "K" },
     { href: "/desk/errands", label: "Заявки", badge: "errands", key: "Z" },
-    { href: "/desk/ether", label: "Объявления", key: "A" },
+    { href: "/desk/ether", label: "Эфир", key: "A" },
     { href: "/desk/reports", label: "Отчёты", key: "O" },
     { href: "/desk/calendar", label: "Календарь", badge: "calendar", key: "C" },
     { href: "/desk/notes", label: "Заметки", key: "N" },
@@ -52,7 +53,7 @@ export const DESK_NAV: Record<DeskRole, DeskNavItem[]> = {
   secretary: [
     { href: "/desk/errands", label: "Заявки", badge: "errands", key: "Z" },
     { href: "/desk/team", label: "Команда", key: "K" },
-    { href: "/desk/ether", label: "Объявления", key: "A" },
+    { href: "/desk/ether", label: "Эфир", key: "A" },
     { href: "/desk/calendar", label: "Календарь", badge: "calendar", key: "C" },
     { href: "/desk/settings", label: "Настройки", key: "H" },
   ],

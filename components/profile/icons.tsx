@@ -34,13 +34,6 @@ export const VibrateIcon = () => (
   </svg>
 );
 
-export const SendIcon = () => (
-  <svg {...stroke}>
-    <path d="M16.5 4 3.5 9.2l4.6 1.7L16.5 4z" />
-    <path d="M16.5 4l-2.2 12-6.2-5.1L16.5 4z" />
-  </svg>
-);
-
 export const GearIcon = () => (
   <svg {...stroke}>
     <circle cx="10" cy="10" r="2.4" />

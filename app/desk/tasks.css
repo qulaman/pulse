@@ -174,10 +174,10 @@
       animation: tasks-glow 1300ms linear both;
     }
 
-    /* the row's moves under the hand: they come in from the right over a fade of the row */
-    .desk-row-moves {
-      padding-left: 28px;
-      background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--ink) 4.5%, var(--raise)) 26px);
+    /* the row's moves under the hand: they come in from the right at the end of «Что», in the
+       title's own room — the columns after it stay readable (D-194) */
+    .tasks-cell-moves {
+      padding-left: 12px;
       animation: tasks-moves-in 170ms var(--ease-snap) both;
 
       .desk-mini {
@@ -186,9 +186,6 @@
         border-radius: 7px;
         font-size: 12.5px;
       }
-    }
-    .desk-row[aria-selected="true"] .desk-row-moves {
-      background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--pen) 9%, var(--raise)) 26px);
     }
     [data-testid="desk-row-more"] {
       border-radius: 7px;
@@ -377,6 +374,7 @@
   }
   .tasks-steps {
     column-gap: 0;
+    container: tasks-steps / inline-size;
   }
   .tasks-step {
     position: relative;
@@ -386,6 +384,17 @@
       margin-top: 0;
       font-size: 12.5px;
       line-height: 16px;
+    }
+  }
+  /* a panel at its narrowest: «На проверке» stays whole rather than «На прове…» */
+  @container tasks-steps (max-width: 380px) {
+    .tasks-step {
+      padding-right: 4px;
+
+      .tasks-step-label {
+        font-size: 11px;
+        letter-spacing: -0.01em;
+      }
     }
   }
   .tasks-step-bar {
@@ -818,9 +827,11 @@
       color: var(--ink-3);
     }
   }
+  /* the answer field's strip: a short fade over the thread, then the sheet itself — the thread never
+     shows through around the field (D-194) */
   .tasks-dock {
-    padding-top: 18px;
-    background: linear-gradient(180deg, transparent, var(--thread-bg, var(--sheet)) 16px);
+    padding-top: 14px;
+    background: linear-gradient(180deg, transparent, var(--thread-bg, var(--sheet)) 6px);
   }
   /* the director's buttons have bodies here: the first one stands inside the sheet, not in its margin */
   .tasks-keys [data-testid="desk-task-keys"] > div > span:first-child {
@@ -1396,6 +1407,12 @@ html[data-surface="desk"][data-journal] {
   }
   @container tasks-what (max-width: 330px) {
     .tasks-under {
+      display: none;
+    }
+  }
+  /* a «Что» too narrow for the title and the row's moves keeps the title: the moves are in «⋯» */
+  @container tasks-what (max-width: 380px) {
+    .tasks-cell-moves {
       display: none;
     }
   }

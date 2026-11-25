@@ -3,13 +3,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { MenuButton, type MenuItem } from "@/components/desk/ui/Menu";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
-import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { TONE_VAR, type Tone } from "@/components/desk/ui/tone";
 import { When } from "@/components/desk/ui/When";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
-import { Button } from "@/components/ui/Button";
 import { humanAqtobe } from "@/lib/ai/time";
 import { todayYmd } from "@/lib/datetime/calendar";
 import { timeOf } from "@/lib/daily-report/format";
@@ -26,18 +23,6 @@ import { isOverdue } from "@/lib/tasks/status-text";
 import type { HeroFact } from "./Hero";
 import { PeriodPeek } from "./PeriodBlock";
 import { AVAILABILITY_TONE, Face, StateWord, roleLine } from "./shared";
-
-/** What a person's peek can do — the same moves as the row's menu and its letters. */
-export type PeekMoves = {
-  /** «Дать задачу» — only where the director may give one (T). */
-  give?: () => void;
-  /** «Изменить» — only where the viewer may edit the card (E). */
-  edit?: () => void;
-  /** The card's page (Enter). */
-  open: () => void;
-  /** The rest of the row's menu, for «⋯». */
-  more: MenuItem[];
-};
 
 function FactRow({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -108,8 +93,8 @@ function reportWord(row: TeamDayRow): { text: string; tone?: Tone } | null {
 /**
  * A person at a glance in the right-hand panel (D-154 wave 3, D-158): a click on a row of
  * «Команда» peeks here, the table stays in sight — who they are, how loaded, what they are on,
- * today's report, whether their phone hears; the moves of the row. The card's page is one Enter
- * away. The secretary sees the roster only (D-104): no tasks, no points, no report.
+ * today's report, whether their phone hears; the person's moves, as on every desk card. The card's
+ * page is one Enter away. The secretary sees the roster only (D-104): no tasks, no points, no report.
  */
 export function PersonPeek({
   person,
@@ -133,7 +118,8 @@ export function PersonPeek({
   balance: number | null;
   push: Health | undefined;
   now: Date;
-  moves: PeekMoves;
+  /** The person's moves — the screen's `PersonMovesBar`: the same set and order as every desk card (D-194). */
+  moves: ReactNode;
 }) {
   const works = person.is_active && person.role !== "tv";
   const phone = usePhones().data?.[person.id];
@@ -143,7 +129,7 @@ export function PersonPeek({
     facts.push(
       { key: "work", value: load ? load.active - load.review : 0, label: "в работе", href: `${tasksOf}&tab=working` },
       { key: "overdue", value: load?.overdue ?? 0, label: "просрочено", tone: "danger", href: `${tasksOf}&tab=yours` },
-      { key: "review", value: load?.review ?? 0, label: "на приёмке", tone: "warn", href: `${tasksOf}&tab=yours` },
+      { key: "review", value: load?.review ?? 0, label: "на проверке", tone: "warn", href: `${tasksOf}&tab=yours` },
     );
     if (balance !== null) facts.push({ key: "points", value: balance, label: "очков", tone: balance > 0 ? "gold" : "muted" });
   }
@@ -166,55 +152,26 @@ export function PersonPeek({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2" data-testid="person-peek-moves">
-        {moves.give ? (
-          <Tooltip label="Строка поручения уже знает, кому" keys={["T"]}>
-            <Button size="sm" variant="secondary" className="desk-move" onClick={moves.give} data-testid="person-peek-give">
-              Дать задачу
-            </Button>
-          </Tooltip>
-        ) : null}
-        <Tooltip label="Открыть карточку целиком" keys={["Enter"]}>
-          <Button size="sm" variant="secondary" onClick={moves.open} data-testid="person-peek-open">
-            Карточка
-          </Button>
-        </Tooltip>
-        {moves.edit ? (
-          <Tooltip label="Изменить карточку" keys={["E"]}>
-            <Button size="sm" variant="ghost" onClick={moves.edit} data-testid="person-peek-edit">
-              Изменить
-            </Button>
-          </Tooltip>
-        ) : null}
-        {moves.more.length > 0 ? (
-          <MenuButton
-            items={moves.more}
-            label="Ещё"
-            className="ml-auto flex h-9 w-9 items-center justify-center rounded-[2px] text-[18px] leading-none text-muted hover:bg-surface-2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-          >
-            ⋯
-          </MenuButton>
-        ) : null}
-      </div>
+      {moves}
 
       {facts.length > 0 ? (
-        <dl className="grid grid-cols-4 divide-x divide-border" data-testid="person-peek-facts">
+        <dl className="flex divide-x divide-border" data-testid="person-peek-facts">
           {facts.map((fact) => {
             const quiet = fact.value === 0;
             const body = (
               <>
-                <dd className={`nums desk-figure text-[22px] leading-[26px] ${quiet ? "text-muted/50" : ""}`} style={!quiet && fact.tone ? { color: TONE_VAR[fact.tone] } : undefined}>
+                <dd className={`nums desk-figure whitespace-nowrap text-[22px] leading-[26px] ${quiet ? "text-muted/50" : ""}`} style={!quiet && fact.tone ? { color: TONE_VAR[fact.tone] } : undefined}>
                   {formatNum(fact.value)}
                 </dd>
                 <dt className="truncate text-[12px] leading-4 text-muted">{fact.label}</dt>
               </>
             );
             return fact.href ? (
-              <Link key={fact.key} href={fact.href} className="flex min-w-0 flex-col px-2.5 py-0.5 first:pl-0 hover:bg-surface-2/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40" title="Открыть в «Задачах»">
+              <Link key={fact.key} href={fact.href} className="flex min-w-0 flex-1 basis-0 flex-col px-2.5 py-0.5 first:pl-0 hover:bg-surface-2/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40" title="Открыть в «Задачах»">
                 {body}
               </Link>
             ) : (
-              <div key={fact.key} className="flex min-w-0 flex-col px-2.5 py-0.5 first:pl-0">
+              <div key={fact.key} className={`flex flex-col px-2.5 py-0.5 first:pl-0 ${fact.key === "points" ? "shrink-0" : "min-w-0 flex-1 basis-0"}`}>
                 {body}
               </div>
             );

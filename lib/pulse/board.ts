@@ -18,6 +18,7 @@ import {
   type Suggestion,
   type TimeRequest,
 } from "@/lib/tasks/lifecycle";
+import { attentionOf } from "@/lib/tasks/attention";
 import type { TaskMessageRow, TaskRow, TaskWithPeople } from "@/lib/tasks/queries";
 import { isOverdue, pluralRu, verdict, type TaskStatus } from "@/lib/tasks/status-text";
 
@@ -425,7 +426,7 @@ export function describeChange(prev: BoardTask | undefined, next: BoardTask | un
       case "in_progress":
         return { text: `${who}: задача ${title} принята в работу`, tone: "muted", kind: "accepted" };
       case "pending_review":
-        return { text: `${who}: задача ${title} сдана, ждёт приёмки`, tone: "ok", kind: "handed" };
+        return { text: `${who}: задача ${title} сдана, на проверке`, tone: "ok", kind: "handed" };
       case "declined": {
         const reason = after.decline_reason ? `: ${lowerFirst(after.decline_reason.trim())}` : "";
         const suggested = after.suggestion ? ` · предлагает: ${shortName(after.suggestion.name)}` : "";
@@ -505,6 +506,7 @@ export function toBriefTask(task: BoardTask): BriefTask {
     deadline: task.deadline,
     assignee: task.assignee?.full_name ? shortName(task.assignee.full_name) : null,
     assigneeId: task.assignee_id,
+    taken: task.status !== "sent",
   };
 }
 
@@ -513,10 +515,14 @@ export function toBriefTask(task: BoardTask): BriefTask {
  * where things stand — the verdict when something needs the director, the quiet line
  * with what is in work otherwise.
  */
-export function openingLine(lanes: Lanes, now: Date, directorName: string): Phrase {
+export function openingLine(lanes: Lanes, now: Date, directorName: string, noPush?: ReadonlySet<string>): Phrase {
   const counts = countsOf(lanes);
   const hello = greeting(now, directorName);
   if (counts.attention === 0) {
+    // the calm lane may still hold what needs the director — an order untaken for half an hour,
+    // pushes that do not reach, a deadline within the hour: the one verdict says it, not «тихо»
+    const verdict = attentionOf(lanes.work, { now, noPush, reasons: new Map() });
+    if (!verdict.ok && verdict.words) return { text: `${hello} ${verdict.words}.`, tone: "warn" };
     const open = [...lanes.work].map(toBriefTask);
     return { text: `${hello} ${quietLine(open, now)}`, tone: "ok" };
   }
@@ -534,7 +540,7 @@ export const LANE_WORD: Record<Lane, string> = {
   overdue: "просрочена",
   declined: "отказ",
   question: "сообщение",
-  review: "на приёмке",
+  review: "на проверке",
   work: "в работе",
 };
 

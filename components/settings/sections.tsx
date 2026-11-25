@@ -15,6 +15,7 @@ import { Disclosure } from "@/components/ui/Disclosure";
 import { PARSER_KIND_LABEL, PARSER_KINDS, REQUIRED_KIND, type ParserKind } from "@/lib/ai/kinds/names";
 import { kzFixedHolidays } from "@/lib/daily-report/holidays";
 import { parseYmd, todayYmd, WEEKDAYS_SHORT_RU, type Ymd } from "@/lib/datetime/calendar";
+import { quietHoursText } from "@/lib/delivery-window";
 import { usePeople } from "@/lib/people/queries";
 import { REACTION_CODES, REACTION_GLYPH, REACTION_LABEL } from "@/lib/points/reactions";
 import type { CompanySettings } from "@/lib/settings";
@@ -384,22 +385,22 @@ export function SecretarySection() {
           ? `${secretaries.map((p) => p.full_name.split(" ")[0]).join(", ")} · ${draft.secretary.actions.length} ${pluralRu(draft.secretary.actions.length, ["кнопка", "кнопки", "кнопок"])}`
           : "роль никому не назначена"
       }
-      hint="Кнопки, которыми ты зовёшь секретаря. Заявка — не задача: без срока, без приёмки, живёт минуты."
+      hint="Кнопки, которыми директор зовёт секретаря. Заявка — не задача: без срока, без приёмки, живёт минуты."
     >
       <div className="flex flex-col gap-4">
         <p className="text-[13px] leading-4 text-muted">
           {secretaries.length ? (
             <>
               Сейчас это {secretaries.map((p) => p.full_name.split(" ")[0]).join(", ")}. Роль меняется в{" "}
-              <Link href="/settings?tab=team" className="underline">
+              <Link href="/people" className="underline">
                 карточке человека
               </Link>
               .
             </>
           ) : (
             <>
-              Назначь роль «Секретарь» в{" "}
-              <Link href="/settings?tab=team" className="underline">
+              Назначьте роль «Секретарь» в{" "}
+              <Link href="/people" className="underline">
                 карточке человека
               </Link>{" "}
               — тогда на Пульсе появится секретарь за столом.
@@ -691,7 +692,7 @@ export function WindowSection() {
       icon={<MoonIcon />}
       title="Тихие часы"
       dirty={dirty.window}
-      summary={`доставка ${draft.delivery_window.from} — ${draft.delivery_window.to}`}
+      summary={quietHoursText(draft.delivery_window)}
       hint="Вне окна задачи ждут утра, если не нажать «отправить сейчас»."
     >
       <div className="grid grid-cols-2 gap-3">
@@ -875,10 +876,10 @@ export function DailyReportSection() {
               <Field label="Напомнить в">
                 <TimeField label="Напомнить про отчёт в" value={report.remind_at} step={15} onChange={(remind_at) => set({ remind_at })} />
               </Field>
-              <Field label="Лента просит с">
-                <TimeField label="Лента просит отчёт с" value={report.ask_from} step={15} onChange={(ask_from) => set({ ask_from })} />
+              <Field label="Пульс просит с">
+                <TimeField label="Пульс просит отчёт с" value={report.ask_from} step={15} onChange={(ask_from) => set({ ask_from })} />
               </Field>
-              <p className="self-end pb-1 text-[13px] leading-4 text-muted">С этого часа Лента сотрудника просит сдать отчёт; пуш — в «Напомнить в»</p>
+              <p className="self-end pb-1 text-[13px] leading-4 text-muted">С этого часа Пульс сотрудника просит сдать отчёт; пуш — в «Напомнить в»</p>
             </div>
             <p className="text-[13px] leading-[18px] text-muted">
               {draft.points_enabled
@@ -924,7 +925,7 @@ export function MorningBriefSection() {
       title="Утренняя сводка"
       dirty={dirty.morning_brief}
       summary={on ? `в ${draft.delivery_window.from}, в рабочие дни` : "выключена"}
-      hint="Каждому — его дела на сегодня и встречи одним пушем; нажал — открылась Лента."
+      hint="Каждому — его дела на сегодня и встречи одним пушем; нажал — открылся Пульс."
     >
       <Toggle
         label="Утренняя сводка сотрудникам"

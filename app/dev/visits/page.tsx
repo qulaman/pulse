@@ -48,7 +48,7 @@ export default function VisitsSandbox() {
   return (
     <main className="mx-auto flex w-full max-w-lg flex-col gap-6 px-4 py-6">
       <section className="flex flex-col gap-3" data-testid="secretary">
-        <p className="text-[13px] uppercase tracking-[0.1em] text-muted">Секретарь · Лента</p>
+        <p className="text-[13px] uppercase tracking-[0.1em] text-muted">Секретарь · Пульс</p>
         <div className="flex justify-center gap-2">
           <VisitorButton visits={visits} />
           <MessageButton visits={visits} />

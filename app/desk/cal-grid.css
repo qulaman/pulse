@@ -60,9 +60,11 @@ html[data-surface="desk"][data-journal] {
       border-bottom-style: dashed;
     }
   }
+  /* a title wraps between words only: in a narrow column (a weekend) «Встреча с …» never reads as
+     «Встреч / а с…» (D-194); a word wider than the block is cut at its edge, the tooltip says it whole */
   .cal-event-title {
-    overflow-wrap: anywhere;
-    hyphens: auto;
+    overflow-wrap: normal;
+    word-break: normal;
   }
   .cal-event-time,
   .cal-who {

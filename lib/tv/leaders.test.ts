@@ -117,12 +117,12 @@ describe("leadersView — заставка «Рейтинг» (D-123, D-185)", (
     expect(Object.keys(at())).not.toContain("awards");
   });
 
-  it("итог команды — одним предложением хорошего: закрыла дела и заработала очки", () => {
-    expect(at().team).toBe("За неделю команда закрыла 48 дел и заработала 1240 очков");
-    expect(at({ period: "month" }).team).toBe("За месяц команда закрыла 48 дел и заработала 1240 очков");
+  it("итог команды — одним предложением хорошего: закрыла задачи и заработала очки", () => {
+    expect(at().team).toBe("За неделю команда закрыла 48 задач и заработала 1240 очков");
+    expect(at({ period: "month" }).team).toBe("За месяц команда закрыла 48 задач и заработала 1240 очков");
     expect(at({ team: { done: 0, on_time: 0, earned: 21, people: 3 } }).team).toBe("За неделю команда заработала 21 очко");
-    expect(at({ team: { done: 1, on_time: 1, earned: 0, people: 3 } }).team).toBe("За неделю команда закрыла 1 дело");
-    expect(at({ team: { done: 3, on_time: 0, earned: 12400, people: 3 } }).team).toBe(`За неделю команда закрыла 3 дела и заработала 12${NNBSP}400 очков`);
+    expect(at({ team: { done: 1, on_time: 1, earned: 0, people: 3 } }).team).toBe("За неделю команда закрыла 1 задачу");
+    expect(at({ team: { done: 3, on_time: 0, earned: 12400, people: 3 } }).team).toBe(`За неделю команда закрыла 3 задачи и заработала 12${NNBSP}400 очков`);
     expect(at({ team: { done: 0, on_time: 0, earned: 0, people: 3 } }).team).toBeNull();
   });
 

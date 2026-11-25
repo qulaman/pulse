@@ -4,7 +4,8 @@ import { LayoutGroup, motion } from "motion/react";
 import { useState } from "react";
 
 import { CARD_SPRING, CardShell } from "@/components/tasks/list/TaskList";
-import { dayName, historyLine, pointsText, timeOf, durationText } from "@/lib/daily-report/format";
+import { dayName, historyLine, pointsText, rangeText, timeOf, durationText } from "@/lib/daily-report/format";
+import { finedMiss, foldHistory, gapLine, type HistoryItem } from "@/lib/daily-report/history";
 import type { DailyReport } from "@/lib/daily-report/types";
 
 import { DayTasks } from "./DayTasks";
@@ -12,7 +13,8 @@ import { DayTasks } from "./DayTasks";
 /**
  * «Прошлые отчёты» (D-152): one card a day, newest first — the day, «сдан · 8 ч 40 мин ·
  * 3 задачи · +1» or «не сдан · −10»; a tap opens it in place (the card language of «Мои дела»,
- * one open at a time): the times, the person's words, the tasks of that day.
+ * one open at a time): the times, the person's words, the tasks of that day. Three misses and more
+ * in a row are one card (`foldHistory`); a miss is red only when it cost points.
  */
 export function ReportHistory({ items, now }: { items: readonly DailyReport[]; now: Date }) {
   const [openId, setOpenId] = useState<string | null>(null);
@@ -28,18 +30,19 @@ export function ReportHistory({ items, now }: { items: readonly DailyReport[]; n
   return (
     <LayoutGroup>
       <div className="flex flex-col gap-2" data-testid="report-history">
-        {items.map((report) => {
-          const open = openId === report.report_date;
+        {foldHistory(items).map((item) => {
+          const key = item.kind === "day" ? item.report.report_date : `gap-${item.newest}`;
+          const open = openId === key;
           return (
-            <motion.div key={report.report_date} layout="position" transition={CARD_SPRING}>
+            <motion.div key={key} layout="position" transition={CARD_SPRING}>
               <CardShell
-                id={`report-${report.report_date}`}
+                id={`report-${key}`}
                 open={open}
-                closed={report.status === "missed"}
-                onToggle={() => setOpenId(open ? null : report.report_date)}
-                head={<HistoryHead report={report} now={now} />}
+                closed={item.kind === "gap" || item.report.status === "missed"}
+                onToggle={() => setOpenId(open ? null : key)}
+                head={item.kind === "day" ? <HistoryHead report={item.report} now={now} /> : <GapHead gap={item} />}
               >
-                <HistoryBody report={report} />
+                {item.kind === "day" ? <HistoryBody report={item.report} /> : <GapBody gap={item} now={now} />}
               </CardShell>
             </motion.div>
           );
@@ -49,16 +52,18 @@ export function ReportHistory({ items, now }: { items: readonly DailyReport[]; n
   );
 }
 
+/** The day's dot: green — handed in, red — a miss that cost points, grey — a miss that cost nothing. */
+function dotOf(report: DailyReport): string {
+  if (report.status !== "missed") return "var(--ok)";
+  return finedMiss(report) ? "var(--danger)" : "var(--text-muted)";
+}
+
 function HistoryHead({ report, now }: { report: DailyReport; now: Date }) {
   const missed = report.status === "missed";
   const points = pointsText(report.points);
   return (
     <>
-      <span
-        aria-hidden
-        className="mt-[7px] h-2 w-2 shrink-0 rounded-full"
-        style={{ background: missed ? "var(--danger)" : "var(--ok)", opacity: missed ? 0.8 : 1 }}
-      />
+      <span aria-hidden className="mt-[7px] h-2 w-2 shrink-0 rounded-full" style={{ background: dotOf(report), opacity: missed ? 0.8 : 1 }} />
       <span className="min-w-0 flex-1">
         <span className="block truncate font-display text-[16px] font-semibold leading-[22px] tracking-[-0.01em]">
           {dayName(report.report_date, now)}
@@ -74,6 +79,41 @@ function HistoryHead({ report, now }: { report: DailyReport; now: Date }) {
         </span>
       ) : null}
     </>
+  );
+}
+
+type Gap = Extract<HistoryItem, { kind: "gap" }>;
+
+function GapHead({ gap }: { gap: Gap }) {
+  return (
+    <>
+      <span
+        aria-hidden
+        className="mt-[7px] h-2 w-2 shrink-0 rounded-full"
+        style={{ background: gap.points < 0 ? "var(--danger)" : "var(--text-muted)", opacity: 0.8 }}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="nums block truncate font-display text-[16px] font-semibold leading-[22px] tracking-[-0.01em]">
+          {rangeText(gap.oldest, gap.newest)}
+        </span>
+        <span className="block truncate text-[13px] leading-[18px] text-muted">{gapLine(gap)}</span>
+      </span>
+    </>
+  );
+}
+
+/** The days of a folded run, one line each. */
+function GapBody({ gap, now }: { gap: Gap; now: Date }) {
+  return (
+    <ul className="flex flex-col gap-1.5">
+      {gap.reports.map((report) => (
+        <li key={report.report_date} className="nums flex items-baseline justify-between gap-3 text-[14px] leading-[20px]">
+          <span className="min-w-0 truncate">{dayName(report.report_date, now)}</span>
+          <span className="shrink-0 text-muted">{report.points < 0 ? pointsText(report.points) : "без штрафа"}</span>
+        </li>
+      ))}
+      {gap.points < 0 ? <li className="pt-1 text-[13px] leading-[18px] text-muted">Минус можно оспорить в истории очков — «Профиль», карточка очков.</li> : null}
+    </ul>
   );
 }
 

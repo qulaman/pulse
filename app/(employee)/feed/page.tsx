@@ -74,6 +74,7 @@ import {
   reasonOf,
   reportPhrase,
   tasksBallCount,
+  waitingTasksLine,
 } from "@/lib/pulse/employee";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { sortByUrgency, useMe, useMyTasks, usePulseBoard } from "@/lib/tasks/queries";
@@ -136,12 +137,12 @@ const FACE_GO: Partial<Record<OrbitId, string>> = {
 const FACE_GO_BALLS = "Дела, сообщения, эфир ›";
 /** The resting face's own name for the screen reader: where its tap leads. */
 const FACE_LABEL: Partial<Record<OrbitId, string>> = {
-  tasks: "Маскот: тап — открыть дела",
-  messages: "Маскот: тап — сообщение директора",
-  ether: "Маскот: тап — новое объявление",
-  calendar: "Маскот: тап — ответить на приглашение",
+  tasks: "Маскот: нажмите — открыть дела",
+  messages: "Маскот: нажмите — сообщение директора",
+  ether: "Маскот: нажмите — новое объявление",
+  calendar: "Маскот: нажмите — ответить на приглашение",
 };
-const FACE_LABEL_BALLS = "Маскот: тап — дела, сообщения, эфир, календарь";
+const FACE_LABEL_BALLS = "Маскот: нажмите — дела, сообщения, эфир, календарь";
 
 /** Where a card taken in hand flies on Лента: the employee's face (D-167). */
 const faceTarget = () => document.querySelector<HTMLElement>('[data-testid="mascot-lever"]');
@@ -265,6 +266,10 @@ export default function FeedPage() {
   });
   // «Дела» opened while the board was still being read: its report row takes its place once it is read
   if (mode === "panel" && panel === "tasks" && reportTop === null && settled) go({ mode, panel, reportTop: reportTopNow });
+  // The secretary's Лента at rest is her request desk (D-87, D-97): «Дела» is not raised over the
+  // requests, so the orders waiting for her move are said under the face — a tap opens «Дела» (D-173)
+  const secretaryWaiting = useMemo(() => (isSecretary ? waitingTasksLine(open, now) : null), [isSecretary, open, now]);
+  const openTasks = useCallback(() => show("panel", "tasks"), [show]);
   const [wakeKey, setWakeKey] = useState(0);
   // the thread opens over Лента, the face and the balls stay as they were (D-64 §5)
   const [thread, setThread] = useState<{ id: string; title: string } | null>(null);
@@ -333,7 +338,8 @@ export default function FeedPage() {
     // waits for the person — the director's word, an announcement, an invitation — and in the
     // evening the report not yet in; the nearest meeting closes it. At rest and over an open card the
     // band is small: the greeting and the one line that matters most; three lines at most with the balls.
-    const opening = employeeOpening(lanes, now, name, { reportPending: report.asking });
+    // over the open «Дела» card the card itself says «Дел нет…» / «На проверке у директора»: said once
+    const opening = employeeOpening(lanes, now, name, { reportPending: report.asking, tasksOpen: mode === "panel" && panel === "tasks" });
     const waiting = isSecretary
       ? null
       : employeeWaiting(
@@ -360,7 +366,7 @@ export default function FeedPage() {
     const soonest = next && !(saidInvite && next.id === invites[0]?.id) ? nextEventLine(attending, now) : null;
     if (soonest && said.length < 3) said.push({ id: "calendar", text: soonest });
     return said;
-  }, [mode, hydrated, loading, raising, lanes, now, name, attending, isSecretary, unread, unacked.length, invites, report]);
+  }, [mode, panel, hydrated, loading, raising, lanes, now, name, attending, isSecretary, unread, unacked.length, invites, report]);
 
   // The feelings live here, on the side that carries the work (D-70): an unopened order
   // calls (D-69), a deadline within the hour is panic, an unread word from the director
@@ -683,7 +689,7 @@ export default function FeedPage() {
       )
     ) : panel === "calendar" ? (
       events.length === 0 ? (
-        <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Пока ничего не запланировано.</p>
+        <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Встреч нет.</p>
       ) : (
         <CalendarList events={events} now={now} meId={meId} onOpen={setOpenEvent} variant="compact" />
       )
@@ -759,7 +765,7 @@ export default function FeedPage() {
                 wakeKey={wakeKey}
                 talking={mode !== "idle" && speech.speaking}
                 bare={mode !== "idle"}
-                label={acceptByFace && desk.errand ? `Принять: ${desk.errand.label}` : "Секретарь: тап — дела, сообщения, эфир, календарь, заявки"}
+                label={acceptByFace && desk.errand ? `Принять: ${desk.errand.label}` : "Секретарь: нажмите — дела, сообщения, эфир, календарь, заявки"}
                 act={secretaryAct}
                 urgency={secretary.urgency}
                 queue={desk.queue}
@@ -839,7 +845,7 @@ export default function FeedPage() {
                 exit={FADE_AWAY}
                 data-testid="desk-under"
               >
-                <DeskUnder home={secretary} now={now} acceptByFace={acceptByFace} act={secretaryAct} />
+                <DeskUnder home={secretary} now={now} acceptByFace={acceptByFace} act={secretaryAct} waiting={secretaryWaiting} onTasks={openTasks} />
               </motion.div>
             ) : null}
           </LocalPresence>
@@ -872,7 +878,7 @@ export default function FeedPage() {
           className={`pointer-events-none fixed inset-x-0 z-20 px-4 text-center text-[12px] leading-4 text-muted${afterCard ? ` ${AFTER_CARD}` : ""}`}
           style={{ bottom: "calc(var(--tabbar-space) + 2px)" }}
         >
-          тап — дела, сообщения, эфир, календарь, заявки
+          нажмите — дела, сообщения, эфир, календарь, заявки
         </p>
       ) : null}
 

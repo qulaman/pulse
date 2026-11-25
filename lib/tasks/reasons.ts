@@ -128,6 +128,37 @@ export function keysFor(
   return ["open", "remove"];
 }
 
+/**
+ * The first move on a task whose holder cannot be reached by push (the owner, 2026-11-25, D-128):
+ * «Напомнить» IS a push, so it would not arrive. With the holder's phone known the call takes the
+ * reminder's place and stands first (`kind: "call"`, digits ready for `tel:`); without a number the
+ * reminder stays but says honestly that it will not reach them (`kind: "blind"`). Null — pushes
+ * reach the holder, or there is nothing to remind of: the keys stay as they are. `noPush` —
+ * `noPushIds(usePushHealth().data)`.
+ */
+export type FirstMove = { kind: "call"; tel: string } | { kind: "blind" } | null;
+
+export function firstMoveOf(
+  task: { status: TaskStatus; assignee_id: string },
+  keys: readonly DeskAction[],
+  { noPush, phone }: { noPush?: ReadonlySet<string>; phone?: string | null },
+): FirstMove {
+  if (!noPush?.has(task.assignee_id) || !WORKING.includes(task.status)) return null;
+  // an order not taken yet is what a call is for even before «Напомнить» earns its place
+  if (!keys.includes("nudge") && task.status !== "sent") return null;
+  const tel = (phone ?? "").replace(/[^+\d]/g, "");
+  if (tel.replace(/\D/g, "").length >= 5) return { kind: "call", tel };
+  return keys.includes("nudge") ? { kind: "blind" } : null;
+}
+
+/** The keys beside a call: the reminder goes (it is the push that does not arrive), the call takes one of the three places. */
+export function keysBesideCall(keys: readonly DeskAction[]): DeskAction[] {
+  return keys.filter((key) => key !== "nudge").slice(0, 2);
+}
+
+/** Under «Напомнить» when the push will not arrive (`kind: "blind"`). */
+export const BLIND_NUDGE_HINT = "Пуш не дойдёт: у исполнителя не включены уведомления — напоминание будет видно только в приложении";
+
 type Delivery = Database["public"]["Tables"]["notification_deliveries"]["Row"];
 
 export type ReceiptTone = "ok" | "warn" | "muted";

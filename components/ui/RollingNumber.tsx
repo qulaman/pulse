@@ -43,9 +43,12 @@ export function RollingNumber({
   // effect): the new value and the way it is shown reach the screen in one commit
   const [last, setLast] = useState({ value, rolls: false });
   if (last.value !== value) setLast({ value, rolls: value > last.value || rollDown });
+  // Intl prints a hyphen for a minus; the screens write «−» (the minus sign), as formatNum does
+  const negative = value < 0;
   return (
     <NumberFlow
-      value={value}
+      value={negative ? -value : value}
+      prefix={negative ? "−" : undefined}
       locales="ru-RU"
       format={FORMAT}
       animated={last.rolls}

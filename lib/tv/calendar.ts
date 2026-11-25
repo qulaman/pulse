@@ -333,8 +333,13 @@ export function laterDays(calendar: TvCalendar | null | undefined, now: Date, da
 export type MonthCell = {
   key: string;
   day: number;
-  /** Another month's day in the edge weeks: the cell is empty. */
+  /**
+   * Another month's day in the edge weeks: its number stands dimmed and its meetings show, so an edge week is
+   * a whole row — not a lone «1» above the grid or a lone «30» under it.
+   */
   inMonth: boolean;
+  /** The short month by the next month's first day («дек.»): the row reads on past the month's end. */
+  mark: string | null;
   today: boolean;
   past: boolean;
   weekend: boolean;
@@ -355,6 +360,11 @@ export type MonthGrid = {
   year: number;
   weekdays: string[];
   weeks: MonthWeek[];
+  /**
+   * Nothing ahead on the grid: «встреч нет» — or «дальше встреч нет» when past ones still stand dimmed on it
+   * (an empty month says so in words, not as a blank grid). Null when something is ahead.
+   */
+  note: string | null;
 };
 
 export const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"] as const;
@@ -389,18 +399,23 @@ const CELL_TEXT = 19.4;
 /**
  * How many lines of `tv-small` the busiest cell of a week wants: the date and the time, the first event's title,
  * «+N» for the rest (at least two: a week with nothing still keeps a line under its dates). The weeks ahead share
- * the month's height in these proportions.
+ * the month's height in these proportions; the next month's days in the last week count as well — they show.
  */
 export function weekLines(week: MonthWeek): number {
   let most = 2;
   for (const cell of week.days) {
     const first = cell.rows[0];
-    if (!cell.inMonth || !first) continue;
+    if (!first) continue;
     const title = cellTitle(first);
-    const lines = title ? Math.min(3, Math.ceil(lineWidth(title, 4.4, "leaf") / CELL_TEXT)) : 0;
+    const lines = title ? Math.min(3, titleLines(title)) : 0;
     most = Math.max(most, 1 + lines + (cell.rows.length + cell.more > 1 ? 1 : 0));
   }
   return most;
+}
+
+/** Lines of `tv-small` a month cell's title takes, broken at its syllables (`softHyphens`). */
+export function titleLines(title: string): number {
+  return Math.ceil(lineWidth(title, 4.4, "leaf") / CELL_TEXT);
 }
 
 /**
@@ -414,18 +429,75 @@ const SMALL_LH = 5.28;
 const MONTH_GAP = 0.4;
 /** The cell's padding (0.4 vh top and bottom) and a hair for rounding: a title's lines are counted whole. */
 const CELL_PAD = 1;
+/**
+ * A past week folds to one line of its dates — a whole line of `tv-small` and air above and below it, so the folded
+ * rows read as a quiet strip of dates, never as digits pressed against each other.
+ */
+export const FOLDED_WEEK = 6;
 
-export function monthRows(grid: Pick<MonthGrid, "weeks">): string {
+export type MonthLayout = {
+  /** `grid-template-rows` of the month: the weekdays' line, then a track per week. */
+  rows: string;
+  /** Whole lines of `tv-small` a cell of each week holds, its date line included (a folded week — one). */
+  lines: number[];
+};
+
+/**
+ * The month's rows and how many lines each week's cells get. The heights follow the browser's sharing of `fr`
+ * tracks with minimums: a week that wants less than its share keeps its minimum, the rest share what is left.
+ */
+export function monthLayout(grid: Pick<MonthGrid, "weeks">): MonthLayout {
   const past = grid.weeks.filter((week) => week.past).length;
-  const room = MONTH_HEIGHT - SMALL_LH - past * 4.4 - grid.weeks.length * MONTH_GAP;
+  const room = MONTH_HEIGHT - SMALL_LH - past * FOLDED_WEEK - grid.weeks.length * MONTH_GAP;
   const want = grid.weeks.map((week) => (week.past ? 0 : weekLines(week)));
   const need = want.map((lines) => Math.round((lines * SMALL_LH + CELL_PAD) * 10) / 10);
   const fits = need.reduce((sum, value) => sum + value, 0) <= room;
-  const tracks = grid.weeks.map((week, i) => (week.past ? "auto" : `minmax(${fits ? `${need[i]}vh` : "0"}, ${want[i]}fr)`));
-  return ["auto", ...tracks].join(" ");
+  const tracks = grid.weeks.map((week, i) => (week.past ? `${FOLDED_WEEK}vh` : `minmax(${fits ? `${need[i]}vh` : "0"}, ${want[i]}fr)`));
+
+  // the heights: flexible tracks share the room by `fr`; one whose share is under its minimum is frozen at it
+  const heights = grid.weeks.map((week): number => (week.past ? FOLDED_WEEK : 0));
+  let open = grid.weeks.map((week, i) => i).filter((i) => !grid.weeks[i].past);
+  let left = room;
+  for (let changed = true; changed && open.length > 0; ) {
+    changed = false;
+    const unit = left / open.reduce((sum, i) => sum + want[i], 0);
+    for (const i of open) {
+      const min = fits ? need[i] : 0;
+      if (want[i] * unit < min) {
+        heights[i] = min;
+        left -= min;
+        open = open.filter((j) => j !== i);
+        changed = true;
+        break;
+      }
+    }
+    if (!changed) for (const i of open) heights[i] = want[i] * unit;
+  }
+  const lines = heights.map((height, i) => (grid.weeks[i].past ? 1 : Math.max(1, Math.floor((height - CELL_PAD + 0.2) / SMALL_LH))));
+  return { rows: ["auto", ...tracks].join(" "), lines };
 }
 
-/** This month's weeks from Monday; days of the neighbouring months are empty cells with no events. */
+export function monthRows(grid: Pick<MonthGrid, "weeks">): string {
+  return monthLayout(grid).rows;
+}
+
+/**
+ * The title a month cell shows: whole, or not at all — a title cut at the cell's bottom («Совет директо-») reads as
+ * a fault from across the room; the time on the date line and «+N» still say the day is busy (D-185: what does not
+ * fit goes whole). `lines` — the cell's whole lines, the date line included.
+ */
+export function cellShownTitle(cell: MonthCell, lines: number): string {
+  const first = cell.rows[0];
+  if (!first) return "";
+  const title = cellTitle(first);
+  if (!title) return "";
+  const room = lines - 1 - (cell.rows.length + cell.more > 1 ? 1 : 0);
+  return titleLines(title) <= room ? title : "";
+}
+
+const shortMonthFmt = new Intl.DateTimeFormat("ru-RU", { timeZone: "Asia/Aqtobe", month: "short" });
+
+/** This month's weeks from Monday; the neighbouring months' days in the edge weeks are dimmed, with their meetings. */
 export function monthGrid(calendar: TvCalendar | null | undefined, now: Date): MonthGrid {
   const events = sorted(calendar);
   const states = statesOf(events, now);
@@ -442,7 +514,7 @@ export function monthGrid(calendar: TvCalendar | null | undefined, now: Date): M
       const index = start + w * 7 + d;
       const parts = partsOf(index);
       const inMonth = parts.month === month;
-      const day = inMonth ? events.filter((e) => dayIndex(new Date(e.starts_at)) === index) : [];
+      const day = events.filter((e) => dayIndex(new Date(e.starts_at)) === index);
       // today's cell leads with what is still ahead: the morning's meeting gives way, into «+N»
       const all = index === today ? [...day.filter((e) => states.get(e.id) !== "past"), ...day.filter((e) => states.get(e.id) === "past")] : day;
       const rows = all.slice(0, PER_CELL).map((event) => rowOf(event, states.get(event.id) ?? "later"));
@@ -450,6 +522,7 @@ export function monthGrid(calendar: TvCalendar | null | undefined, now: Date): M
         key: String(index),
         day: parts.day,
         inMonth,
+        mark: !inMonth && parts.day === 1 ? shortMonthFmt.format(noonOf(index)).replace(/\.$/, "") : null,
         today: index === today,
         past: index < today,
         weekend: d >= 5,
@@ -460,5 +533,17 @@ export function monthGrid(calendar: TvCalendar | null | undefined, now: Date): M
     weeks.push({ key: String(start + w * 7), past: days.every((cell) => !cell.inMonth || cell.past), days });
   }
 
-  return { month: capital(monthFmt.format(noonOf(today))), year, weekdays: [...WEEKDAYS], weeks };
+  const last = start + weeksCount * 7;
+  const onGrid = events.filter((e) => {
+    const index = dayIndex(new Date(e.starts_at));
+    return index >= start && index < last;
+  });
+  const ahead = onGrid.some((e) => states.get(e.id) !== "past");
+  const note = ahead ? null : onGrid.length > 0 ? "дальше встреч нет" : "встреч нет";
+  return { month: capital(monthFmt.format(noonOf(today))), year, weekdays: [...WEEKDAYS], weeks, note };
+}
+
+/** The month on the wall has nothing ahead — in the round its turn gives way to «Сегодня», as an empty week does. */
+export function monthEmptyAhead(calendar: TvCalendar | null | undefined, now: Date): boolean {
+  return monthGrid(calendar, now).note !== null;
 }

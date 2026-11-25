@@ -17,7 +17,7 @@ import { visitKeys, type Visit, type VisitAnswer, type VisitKind } from "./queri
  * `offlineFirst`.
  */
 
-const OFFLINE = "Нет связи — директор не узнал. Попробуй ещё раз";
+const OFFLINE = "Нет связи — директор не узнал. Попробуйте ещё раз";
 const TIMEOUT_MS = 12_000;
 
 async function withTimeout<T>(call: Promise<T>, message: string): Promise<T> {
@@ -93,7 +93,7 @@ export function useCloseVisit() {
     },
     onError: (_error, _id, context) => {
       if (context?.snapshot) queryClient.setQueryData(visitKeys.list(), context.snapshot);
-      toast("Нет связи. Попробуй ещё раз");
+      toast("Нет связи. Попробуйте ещё раз");
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: visitKeys.root });

@@ -18,10 +18,11 @@ export type PaletteTask = { id: string; title: string; status: string; assignee:
 const SECTION_WORDS: Record<string, string> = {
   "/desk/today": "главная пульс день дом",
   "/desk/tasks": "поручения приёмка",
-  "/desk/inbox": "решения входящие ждут",
+  // the sections' former names still find them: «разобрать» → «Ждут вас», «объявления» → «Эфир»
+  "/desk/inbox": "решения входящие разобрать",
   "/desk/team": "люди сотрудники",
-  "/desk/errands": "секретарь приёмная кофе посетитель",
-  "/desk/ether": "эфир объявление новости сообщение",
+  "/desk/errands": "секретарь приёмная кофе посетитель просьбы",
+  "/desk/ether": "объявление объявления новости сообщение",
   "/desk/reports": "отчет день",
   "/desk/calendar": "встречи мероприятия",
   "/desk/notes": "мысли напоминания блокнот",
@@ -111,4 +112,16 @@ export function matchCommands<T extends PalettePerson>(query: string, people: re
     return found.map((person, index) => ({ kind: "remove", person, lead: short && index === 0 && found.length === 1 }));
   }
   return [];
+}
+
+/**
+ * The order line's example by the room the field has (D-194): the whole example while it
+ * fits, then a shorter one — never an example cut in the middle («…по объекту до пятницы» — En»).
+ * 15 px text averages about 7.6 px a letter.
+ */
+export function commandHint(width: number, pinned: boolean): string {
+  const hints = pinned
+    ? ["Что сделать и к какому сроку — Enter", "Что сделать — Enter"]
+    : ["Кому и что сделать: «Ерлану смета по объекту до пятницы» — Enter", "Кому и что сделать — Enter", "Поручение — Enter"];
+  return hints.find((hint) => hint.length * 7.6 <= width) ?? hints[hints.length - 1];
 }

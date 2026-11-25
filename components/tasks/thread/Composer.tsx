@@ -204,7 +204,7 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
     try {
       audio = await active.stop();
     } catch {
-      toast("Не записалось. Попробуй ещё раз");
+      toast("Не записалось. Попробуйте ещё раз");
       return;
     }
     if (audio.durationMs < MIN_RECORDING_MS) {
@@ -376,8 +376,8 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
       placeholder={
         recording
           ? cancelArmed
-            ? "Отпусти — отменю"
-            : `Говори… ${left} с`
+            ? "Отпустите — отменю"
+            : `Говорите… ${left} с`
           : TEXT.composerPlaceholder
       }
       value={draft}

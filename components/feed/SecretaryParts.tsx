@@ -8,6 +8,7 @@ import { ReceptionCards } from "@/components/visits/ReceptionCards";
 import { MessageButton, VisitorButton } from "@/components/visits/VisitorButton";
 import { askedDetails, AWAY_SPANS, awayUntil, deskLine, RESULTS, sceneOf, untilLine } from "@/lib/errands/scene";
 import { shortName } from "@/lib/people/names";
+import type { Phrase } from "@/lib/pulse/board";
 
 import type { useSecretaryHome } from "./useSecretaryHome";
 
@@ -46,10 +47,25 @@ export function SecretaryTop({ home, meId, now, showTally }: { home: SecretaryHo
 
 /**
  * Right under the secretary's face: what it is doing in a few words (D-87, D-97), «на месте», what
- * a tap on the face does while a request rings, and a little lower «Посетитель» (D-96) and
+ * a tap on the face does while a request rings, the orders waiting for her move (`waiting`,
+ * `waitingTasksLine`) — a tap opens «Дела» — and a little lower «Посетитель» (D-96) and
  * «Сообщение» (D-116) — the secretary's own words on the director's wall.
  */
-export function DeskUnder({ home, now, acceptByFace, act }: { home: SecretaryHome; now: Date; acceptByFace: boolean; act: ReturnType<typeof useSecretaryActs> }) {
+export function DeskUnder({
+  home,
+  now,
+  acceptByFace,
+  act,
+  waiting = null,
+  onTasks,
+}: {
+  home: SecretaryHome;
+  now: Date;
+  acceptByFace: boolean;
+  act: ReturnType<typeof useSecretaryActs>;
+  waiting?: Phrase | null;
+  onTasks?: () => void;
+}) {
   const { desk, urgency, showsGuest, streak, away, meAtDesk, visitRows } = home;
   const thanks = act === "thanks";
   return (
@@ -94,15 +110,40 @@ export function DeskUnder({ home, now, acceptByFace, act }: { home: SecretaryHom
         </button>
         {acceptByFace ? (
           <p className="text-[12px] leading-4 text-muted" data-testid="desk-hint">
-            {[askedDetails(desk, now), "тап по лицу — принять"].filter(Boolean).join(" · ")}
+            {[askedDetails(desk, now), "нажмите на лицо — принять"].filter(Boolean).join(" · ")}
           </p>
         ) : null}
       </div>
+      {waiting && onTasks ? <WaitingTasks line={waiting} onOpen={onTasks} /> : null}
       <div className="mt-4 flex flex-wrap justify-center gap-2">
         <VisitorButton visits={visitRows} />
         <MessageButton visits={visitRows} />
       </div>
     </>
+  );
+}
+
+/**
+ * The orders waiting for the secretary's move, said at rest (D-173): her Лента keeps the request
+ * desk in front — «Дела» is not raised over it (D-87, D-97) — so they are one button under the face,
+ * in the colour of attention (red with an overdue one), never good news.
+ */
+function WaitingTasks({ line, onOpen }: { line: Phrase; onOpen: () => void }) {
+  const tone = line.tone === "danger" ? "var(--danger)" : "var(--warn)";
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="card-in mt-3 inline-flex min-h-[44px] max-w-full items-center gap-1.5 rounded-full border px-4 font-display text-[15px] font-semibold leading-5 transition-transform duration-[120ms] ease-out active:scale-[0.97]"
+      style={{ borderColor: `color-mix(in srgb, ${tone} 50%, var(--border))`, color: tone, background: "color-mix(in srgb, var(--surface) 88%, transparent)" }}
+      data-testid="desk-tasks"
+      data-tone={line.tone}
+    >
+      <span className="nums min-w-0 truncate">{line.text}</span>
+      <span aria-hidden className="shrink-0">
+        ›
+      </span>
+    </button>
   );
 }
 

@@ -35,7 +35,7 @@ import { PersonCell } from "@/components/desk/ui/PersonCell";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { When } from "@/components/desk/ui/When";
 import { Icon } from "@/components/tasks/desk/icons";
-import { DraftMark, MiniButton, MoreButton, MoveButton, MoveRow } from "@/components/desk/tasks/RowMoves";
+import { CallButton, DraftMark, MiniButton, MoreButton, MoveButton, MoveRow } from "@/components/desk/tasks/RowMoves";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
 import { aqtobeDay, humanAqtobe } from "@/lib/ai/time";
 import { isOver, nextEvent, peopleCount, timeRange, ymdOfEvent } from "@/lib/calendar/agenda";
@@ -43,8 +43,10 @@ import { isRunning } from "@/lib/calendar/overview";
 import type { CalendarEvent } from "@/lib/calendar/queries";
 import type { TeamDay, TeamDayRow } from "@/lib/daily-report/types";
 import { todayYmd } from "@/lib/datetime/calendar";
-import { decisionLine, decisionParts, type Move } from "@/lib/desk/tasks";
+import { attentionLine, decisionLine, decisionParts, type Move } from "@/lib/desk/tasks";
 import { shortName } from "@/lib/people/names";
+import type { BoardTask } from "@/lib/pulse/board";
+import type { AttentionReason } from "@/lib/tasks/attention";
 import type { DeskItem } from "@/lib/tasks/desk";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { pluralRu, isOverdue } from "@/lib/tasks/status-text";
@@ -187,6 +189,7 @@ export function Decisions({
   failed,
   extrasNote,
   extrasUnknown,
+  watching = false,
 }: {
   items: readonly DeskItem[];
   limit: number;
@@ -209,6 +212,8 @@ export function Decisions({
   /** disputes or orders did not load, or are an old copy */
   extrasNote: ReactNode;
   extrasUnknown: boolean;
+  /** «Требует внимания» stands below (lib/tasks/attention.ts): an empty queue says nothing then */
+  watching?: boolean;
 }) {
   const shown = items.slice(0, limit);
   const moreTasks = items.length - shown.length;
@@ -216,6 +221,8 @@ export function Decisions({
   const moreExtras = extras.length - extrasShown.length;
   const nothing = items.length + extras.length === 0;
   if (failed && nothing) return null;
+  // nothing to decide, yet something needs the director: no «ничего не ждёт» over it (D-194)
+  if (watching && nothing && !extrasUnknown) return null;
   return (
     <section className="@container flex flex-col gap-1" data-testid="today-decisions">
       {/* the same words as the «Ждут вас» tab of «Задачи»; «Разобрать» goes through them one by one (D-160) */}
@@ -233,7 +240,8 @@ export function Decisions({
         Ждут вас
       </SectionLabel>
       {!nothing || extrasUnknown ? null : (
-        <EmptyState tone="ok" title="Ваших решений ничего не ждёт" hint="Сданная работа, вопросы, просьбы о сроке и отказы встанут сюда — с кнопками под рукой" />
+        // the moment above has said that nothing waits: the block only says what will come here (D-194)
+        <EmptyState title="Сданная работа, вопросы, просьбы о сроке и отказы встанут сюда" />
       )}
       {nothing ? null : (
         <WorkList testId="today-decisions-list">
@@ -347,6 +355,85 @@ function ExtraRow({ extra, compact }: { extra: ExtraDecision; compact: boolean }
         <span />
       </div>
     </WorkRow>
+  );
+}
+
+/** A task that needs the director without waiting for his decision (lib/tasks/attention.ts). */
+export type WatchItem = { task: BoardTask; reason: AttentionReason };
+
+/**
+ * «Требует внимания» (D-194): what the verdict holds besides the decisions and the late ones —
+ * an order lying untaken for half an hour, a holder whose pushes do not reach, a deadline within the
+ * hour. Each row says why in words and offers its one move: «Напомнить» (or when the last reminder
+ * went), «Срок»; a push that will not reach has no «Напомнить» — the line asks for a call.
+ */
+export function Attention({
+  items,
+  openId,
+  moveOf,
+  telOf,
+  onMove,
+  onOpen,
+  menuOf,
+  onMenu,
+  now,
+}: {
+  items: readonly WatchItem[];
+  openId: string | null;
+  moveOf: (item: WatchItem) => Move | null;
+  /** the holder's number when the push will not reach: «Позвонить» takes the move's place */
+  telOf?: (item: WatchItem) => string | null;
+  onMove: (move: Move, task: BoardTask, target: HTMLElement) => void;
+  onOpen: (id: string) => void;
+  menuOf: (task: BoardTask) => MenuItem[];
+  onMenu: (task: BoardTask, event: MouseEvent) => void;
+  now: Date;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <section className="@container flex flex-col gap-1" data-testid="today-attention">
+      <SectionLabel count={items.length} action={<BlockLink href="/desk/tasks?tab=working">В задачах →</BlockLink>}>
+        Требует внимания
+      </SectionLabel>
+      <WorkList>
+        {items.map((item) => {
+          const move = moveOf(item);
+          const tel = telOf?.(item) ?? null;
+          const line = attentionLine(item.reason, item.task, now) ?? "";
+          return (
+            <WorkRow
+              key={item.task.id}
+              rowKey={item.task.id}
+              testId="today-attention-row"
+              chosen={openId === item.task.id}
+              cursor={false}
+              onOpen={() => onOpen(item.task.id)}
+              onMenu={(event) => onMenu(item.task, event)}
+            >
+              <div className={`grid items-center gap-x-3 ${ROW_LATE}`}>
+                <span className="min-w-0 @max-[640px]:hidden">
+                  <PersonCell name={item.task.assignee?.full_name} />
+                </span>
+                <StatusGlyph status={item.task.status} overdue={isOverdue(item.task, now)} size={16} />
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate font-medium" title={item.task.title}>
+                    {item.task.title}
+                  </span>
+                  <span className="hidden truncate text-[13px] leading-[18px] text-muted @max-[640px]:block">
+                    {shortName(item.task.assignee?.full_name)} · {line}
+                  </span>
+                </span>
+                <span className="max-w-[300px] truncate text-[13px] text-warn @max-[640px]:hidden" title={line} data-testid="today-attention-line">
+                  {line}
+                </span>
+                {tel ? <CallButton tel={tel} /> : move ? <MoveButton move={move} onPress={(pressed, target) => onMove(pressed, item.task, target)} showKey={false} /> : <span />}
+                <MoreButton items={() => menuOf(item.task)} taskId={item.task.id} />
+              </div>
+            </WorkRow>
+          );
+        })}
+      </WorkList>
+    </section>
   );
 }
 

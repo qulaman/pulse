@@ -115,9 +115,9 @@ const SaveSchema = z.strictObject({
 });
 
 const RUN_PROBLEM: Record<"forged" | "stale" | "incomplete", string> = {
-  forged: "Прогон не сходится. Проверь на корпусе ещё раз",
-  stale: "С прогона поменялась модель, промпт или корпус. Проверь ещё раз",
-  incomplete: "Прогон неполный. Проверь на корпусе ещё раз",
+  forged: "Прогон не сходится. Проверьте на корпусе ещё раз",
+  stale: "С прогона поменялась модель, промпт или корпус. Проверьте ещё раз",
+  incomplete: "Прогон неполный. Проверьте на корпусе ещё раз",
 };
 
 export const PUT = withAuth<z.infer<typeof SaveSchema>>(
@@ -130,7 +130,7 @@ export const PUT = withAuth<z.infer<typeof SaveSchema>>(
 
     const head = rules.versions[0]?.version ?? 0;
     if (body.base_version !== head) {
-      return apiError(409, "conflict", "Правила только что поменялись. Открой вкладку заново и проверь ещё раз");
+      return apiError(409, "conflict", "Правила только что поменялись. Откройте вкладку заново и проверьте ещё раз");
     }
 
     const text = normalizeRules(body.text);

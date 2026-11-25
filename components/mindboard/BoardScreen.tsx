@@ -408,7 +408,7 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
     summary.total === 0 ? (
       <div className="flex h-full flex-col justify-center">
         <p className="font-display text-[17px] font-semibold leading-[22px] tracking-[-0.015em]">Пока пусто</p>
-        <p className="mt-0.5 text-[13px] leading-[18px] text-muted">Зажмите микрофон и скажите первый пункт — или вставьте список, разобью на пункты</p>
+        <p className="mt-0.5 text-[13px] leading-[18px] text-muted">Скажите первый пункт или вставьте список — разобью на пункты</p>
       </div>
     ) : (
       <div className="flex h-full items-center gap-3.5">
@@ -500,14 +500,15 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
           </span>
           <span className="min-w-0">
             <span className="block font-display text-[16px] font-semibold leading-[21px]">Здесь встанет первый пункт</span>
-            <span className="mt-1 block text-[14px] leading-[19px] text-muted">Скажите его в микрофон или напишите. Подробности — подпунктами: откройте пункт и добавьте.</span>
+            {/* how to say it is the status card's above: here only what comes after */}
+            <span className="mt-1 block text-[14px] leading-[19px] text-muted">Подробности — подпунктами: откройте пункт и добавьте.</span>
           </span>
         </div>
       ) : (
         <>
           {handing ? (
             <p className="mt-4 px-1 text-[13px] leading-[18px] text-muted" data-testid="hand-out-hint">
-              Тап по пункту — кому его поручить. Потом «Поручить» внизу — уйдут все сразу
+              Нажмите на пункт — кому его поручить. Потом «Поручить» внизу — уйдут все сразу
             </p>
           ) : null}
           <Reorder.Group as="div" axis="y" values={order.order} onReorder={order.onReorder} className={`${handing ? "mt-2" : "mt-4"} flex flex-col gap-2`} data-testid="board-points">

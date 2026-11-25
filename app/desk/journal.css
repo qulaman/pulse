@@ -247,12 +247,13 @@ html[data-surface="desk"][data-journal] {
     }
   }
 
-  .desk-fields .field:not(textarea) {
+  .desk-fields .field:not(textarea):not(.desk-search) {
     padding-left: 0;
   }
-  /* an example in an empty field is pale and slanted: it never reads as something already typed (D-160) */
+  /* an example in an empty field is pale and slanted: it never reads as something already typed (D-160).
+     A search field holds no example: its «Найти …» is upright, as in every other section (D-194) */
   .desk-fields .field::placeholder,
-  .desk-fields .field input::placeholder,
+  .desk-fields .field:not(.desk-search) input::placeholder,
   [data-testid="bulk-text"]::placeholder {
     color: var(--ink-2);
     opacity: 0.55;
@@ -764,6 +765,9 @@ html[data-surface="desk"][data-journal] {
     position: relative;
     padding: 14px 16px 8px;
     animation: desk-crew-card-in 220ms var(--ease-out) both;
+    /* brought into view as it opens (PeopleNow): measured mid-rise, 6 px above where it lands — the
+       margin keeps its foot clear of the window's edge, never cut under it (D-194) */
+    scroll-margin-block: 24px;
   }
   .desk-crew-card-body {
     animation: desk-crew-words 160ms var(--ease-out) both;

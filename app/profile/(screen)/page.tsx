@@ -16,7 +16,6 @@ import { PageHead } from "@/components/ui/PageHead";
 import { Row, RowGroup } from "@/components/ui/Row";
 import { SignOutRow } from "@/components/profile/SignOutRow";
 import { VersionRow } from "@/components/profile/VersionRow";
-import { SendIcon } from "@/components/profile/icons";
 import { getSessionProfile } from "@/lib/auth";
 import { canManageTeam, isTeamRole } from "@/lib/routes";
 import { createServerSupabase } from "@/lib/supabase/server";
@@ -62,7 +61,6 @@ export default async function ProfilePage() {
           <SignOutOthersRow userId={profile.userId} />
           <NotificationsRow director={director} />
           <HapticsRow />
-          <Row icon={<SendIcon />} title="Telegram" tone="muted" value="скоро" />
         </RowGroup>
 
         {/* the company's settings moved to the computer with «Настройки» off the bar (D-153) */}
@@ -80,11 +78,8 @@ export default async function ProfilePage() {
 
         <footer className="mt-8 flex flex-col items-center gap-1.5 opacity-45">
           <PulseMark />
-          {/* the build this page came from — the same one the phone runs (D-115) */}
-          <p className="nums text-[12px] leading-4 text-muted">
-            версия {versionLabel(BUILD)}
-            {BUILD.at && BUILD.sha ? ` · ${BUILD.sha}` : ""}
-          </p>
+          {/* the build this page came from — the same one the phone runs (D-115); its hash is for developers, not here */}
+          <p className="nums text-[12px] leading-4 text-muted">версия {versionLabel(BUILD)}</p>
         </footer>
       </AfterPoints>
     </main>

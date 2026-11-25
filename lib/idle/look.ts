@@ -127,7 +127,7 @@ export function wordOf(task: CrewTask): string {
     case "rework":
       return `${late}на доработке`;
     case "pending_review":
-      return "сдана, ждёт приёмки";
+      return "сдана, ждёт проверки";
     case "declined":
       return task.reason ? `не может: ${task.reason}` : "не может";
     case "done":

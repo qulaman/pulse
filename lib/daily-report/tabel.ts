@@ -11,7 +11,7 @@
  * person joined, not after today); a miss the director excused is counted apart.
  */
 import { isWorkday, reportDayState, type ReportDayState, type ReportPerson, type ReportRules } from "@/lib/people/stats";
-import { isTeamMember } from "@/lib/people/queries";
+import { isTeamMember } from "@/lib/people/team";
 import { addDays, MONTHS_RU, parseYmd, ymdHmToAqtobeIso, type Ymd } from "@/lib/datetime/calendar";
 
 import { kzHolidayName } from "./holidays";
@@ -77,7 +77,13 @@ export type TabelPerson = {
   person: ReportPerson;
 };
 
+/**
+ * The sums of the табель — over the team now only (lib/people/team.ts): the people who left keep
+ * their rows and their own numbers, but never weigh in the headline, the totals or «Не сдали» of a
+ * day — a director who let three people go does not get a failed month for it.
+ */
 export type TabelTotals = {
+  /** People of the team now among the ones given. */
   people: number;
   submitted: number;
   missed: number;
@@ -93,9 +99,12 @@ export type Tabel = {
   to: Ymd;
   today: Ymd;
   days: TabelDay[];
-  /** By name. */
+  /** The team by name, then the ones who left by name. */
   people: TabelPerson[];
+  /** Over the team now — see `TabelTotals`. */
   totals: TabelTotals;
+  /** Rows of people who left the team (history), at the bottom of `people`. */
+  gone: number;
   /** The rules the cells were read with (the tooltip's «why nothing was due»). */
   rules: ReportRules;
 };
@@ -182,25 +191,28 @@ export function countCells(cells: readonly TabelCell[]) {
   return { submitted, missed, excused, workdays, submit_rate: submitted + missed > 0 ? submitted / (submitted + missed) : null };
 }
 
-/** The totals over the people given — the shown ones on paper, everybody in the line over the sheet. */
+/** The totals over the team among the people given — the shown ones on paper, everybody in the line over the sheet. */
 export function tabelTotals(people: readonly TabelPerson[]): TabelTotals {
+  let count = 0;
   let submitted = 0;
   let missed = 0;
   let excused = 0;
   let gaps = 0;
-  for (const { row } of people) {
+  for (const { row, gone } of people) {
+    if (gone) continue;
+    count += 1;
     submitted += row.submitted;
     missed += row.missed;
     excused += row.excused ?? 0;
     if (row.missed > 0) gaps += 1;
   }
-  return { people: people.length, submitted, missed, excused, rate: submitted + missed > 0 ? submitted / (submitted + missed) : null, gaps };
+  return { people: count, submitted, missed, excused, rate: submitted + missed > 0 ? submitted / (submitted + missed) : null, gaps };
 }
 
-/** People who did not hand in on each day, over the people given (the bottom row «Не сдали»). */
+/** People of the team who did not hand in on each day, over the people given (the bottom row «Не сдали»). */
 export function missedByDay(people: readonly TabelPerson[], count: number): number[] {
   const missed = new Array<number>(count).fill(0);
-  for (const person of people) person.cells.forEach((cell, index) => cell.due && cell.state === "missed" && (missed[index] += 1));
+  for (const person of people) if (!person.gone) person.cells.forEach((cell, index) => cell.due && cell.state === "missed" && (missed[index] += 1));
   return missed;
 }
 
@@ -220,7 +232,7 @@ export type TabelInput = {
 /** Someone the roster does not know (never under RLS, but a табель must not break): out of the team, their rows speak for themselves. */
 const STRANGER: ReportPerson = { is_active: false, role: "employee", availability: "active", created_at: "1970-01-01T00:00:00Z" };
 
-/** The табель: the RPC's people × the period's days, by name; each row's counts from its own cells. */
+/** The табель: the RPC's people × the period's days, the team by name, then the ones who left; each row's counts from its own cells. */
 export function buildTabel({ from, to, today, rows, marks, rules, people }: TabelInput): Tabel {
   const list = daysOf(from, to);
   const persons = [...rows]
@@ -230,7 +242,9 @@ export function buildTabel({ from, to, today, rows, marks, rules, people }: Tabe
       const mine = marks.get(row.user_id);
       const cells = list.map((day) => tabelCell(day, today, mine?.get(day), rules, person));
       return { row: { ...row, ...countCells(cells) }, cells, gone: !isTeamMember(person), person };
-    });
+    })
+    // stable: the names keep their order inside each part
+    .sort((a, b) => Number(a.gone) - Number(b.gone));
   const missed = missedByDay(persons, list.length);
   const days = list.map(
     (day, index): TabelDay => ({
@@ -243,7 +257,7 @@ export function buildTabel({ from, to, today, rows, marks, rules, people }: Tabe
       missed: missed[index],
     }),
   );
-  return { from, to, today, days, people: persons, totals: tabelTotals(persons), rules };
+  return { from, to, today, days, people: persons, totals: tabelTotals(persons), gone: persons.filter((person) => person.gone).length, rules };
 }
 
 /* ---- words and marks ------------------------------------------------------------------------- */

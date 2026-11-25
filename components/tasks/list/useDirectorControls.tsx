@@ -22,18 +22,28 @@ import type { TaskWithPeople } from "@/lib/tasks/queries";
 
 import { ACTION_ICON, ACTION_LABEL, allActionsFor } from "./DirectorTaskCard";
 
-type SheetState = { name: DirectorSheetName | "answer" | "more"; taskId: string; passTo?: PassTo } | null;
+/** `shown` — the keys already on the card or screen: «Ещё» does not offer them a second time. */
+type SheetState = { name: DirectorSheetName | "answer" | "more"; taskId: string; passTo?: PassTo; shown?: readonly DeskAction[] } | null;
 
-/** «Все действия» says a little more than a key on a card has room for. */
+/**
+ * «Все действия» says a little more than a key on a card has room for — in the words of the keys
+ * (one action, one word: «Передать», «Срок», FIX §4.4).
+ */
 const MORE_LABEL: Partial<Record<DeskAction, string>> = {
-  reassign: "Переназначить",
-  extend: "Изменить срок",
   grant: "Согласовать срок",
-  retime: "Назначить другой срок",
+  retime: "Другой срок",
   keep: "Оставить прежний срок",
   handoff: "Передать предложенному",
-  nudge: "Напомнить",
   reissue: "Выдать снова",
+};
+
+/**
+ * The two ends that look alike, told apart in words under their names: a recall stays in the
+ * history and the person sees it; a delete leaves nothing.
+ */
+const MORE_HINT: Partial<Record<DeskAction, string>> = {
+  revoke: "исполнитель увидит, что задача отозвана; она останется в истории",
+  remove: "стереть без следа, вместе с перепиской",
 };
 
 /**
@@ -72,7 +82,7 @@ export function useDirectorControls({
   actions: TaskActions;
   press: (action: DeskAction, task: TaskWithPeople) => void;
   answer: (task: TaskWithPeople, text: string | null, deadlineIso?: string) => void;
-  more: (task: TaskWithPeople) => void;
+  more: (task: TaskWithPeople, shown?: readonly DeskAction[]) => void;
   sheets: ReactNode;
 } {
   const router = useRouter();
@@ -222,7 +232,10 @@ export function useDirectorControls({
   const flags = sheetTask
     ? { request: Boolean(requestOf(sheetTask.id)), suggestion: Boolean(sheetTask.status === "declined" && suggestionOf(sheetTask.id)) }
     : {};
-  const choices: DeskAction[] = sheetTask ? [...allActionsFor(sheetTask, flags), ...(onThread ? (["open"] as const) : [])] : [];
+  const shown = sheet?.name === "more" ? (sheet.shown ?? []) : [];
+  const choices: DeskAction[] = sheetTask
+    ? [...allActionsFor(sheetTask, flags).filter((action) => !shown.includes(action)), ...(onThread ? (["open"] as const) : [])]
+    : [];
   const sheetRule = sheetTask?.recurrence_rule_id ? (rules.data?.find((rule) => rule.id === sheetTask.recurrence_rule_id) ?? null) : null;
 
   const sheets = sheetTask ? (
@@ -265,7 +278,9 @@ export function useDirectorControls({
         <p className="-mt-1 line-clamp-2 text-[14px] leading-[19px] text-muted">{sheetTask.title}</p>
         <div className="mt-3 flex flex-col gap-1">
           {choices.map((action) => {
-            const danger = action === "remove" || action === "cancel" || action === "revoke";
+            // only what cannot be taken back is red: a recall can be handed out again (D-139)
+            const danger = action === "remove" || action === "cancel";
+            const hint = MORE_HINT[action];
             const icon = action === "open" ? "reply" : (ACTION_ICON[action] ?? "open");
             return (
               <button
@@ -289,7 +304,10 @@ export function useDirectorControls({
                 >
                   <Icon name={icon} size={18} />
                 </span>
-                <span className="flex-1">{action === "open" ? "Открыть переписку" : (MORE_LABEL[action] ?? ACTION_LABEL[action])}</span>
+                <span className="min-w-0 flex-1 py-1.5">
+                  <span className="block">{action === "open" ? "Открыть переписку" : (MORE_LABEL[action] ?? ACTION_LABEL[action])}</span>
+                  {hint ? <span className="block text-[13px] font-normal leading-[17px] text-muted">{hint}</span> : null}
+                </span>
                 <span className="text-muted">
                   <Icon name="open" size={14} />
                 </span>
@@ -328,5 +346,5 @@ export function useDirectorControls({
     </Fragment>
   ) : null;
 
-  return { actions, press, answer, more: (task) => setSheet({ name: "more", taskId: task.id }), sheets };
+  return { actions, press, answer, more: (task, shown) => setSheet({ name: "more", taskId: task.id, shown }), sheets };
 }

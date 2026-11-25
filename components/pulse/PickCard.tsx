@@ -168,7 +168,7 @@ export function PickCard({ picked, held = false, onClose }: { picked: Picked; he
           </div>
         )}
         {!recording && stage !== "recording" ? (
-          <p className="mt-2.5 text-center text-[12px] leading-4 text-muted">или зажмите маскота и говорите</p>
+          <p className="mt-2.5 text-center text-[12px] leading-4 text-muted">или удержите маскота и говорите</p>
         ) : null}
       </div>
       {/* the tail: the card is the face's own speech, and it points at the face */}

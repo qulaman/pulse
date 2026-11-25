@@ -94,7 +94,7 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     console.error("sweep failed:", err instanceof Error ? err.message : err);
-    return apiError(500, "internal", "Что-то пошло не так, попробуй ещё раз");
+    return apiError(500, "internal", "Что-то пошло не так, попробуйте ещё раз");
   }
 }
 

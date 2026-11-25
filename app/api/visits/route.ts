@@ -33,7 +33,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       ...(body.kind === "message" ? { p_kind: "message" } : {}),
     });
     if (error) {
-      return rpcFailure(error, { forbidden: NO_ACCESS, empty_message: [400, "Напиши, что показать директору"] }, "announce_visit");
+      return rpcFailure(error, { forbidden: NO_ACCESS, empty_message: [400, "Напишите, что показать директору"] }, "announce_visit");
     }
     after(() => kickDeliveries());
     return apiOk({ visit: data });

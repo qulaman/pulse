@@ -1,4 +1,3 @@
-import { pluralRu } from "@/lib/tasks/status-text";
 
 import { tvTime, tvWeekday } from "./clock";
 import type { TvLine } from "./feed";
@@ -13,8 +12,12 @@ import { PHRASE_MAX, phraseOf } from "./voice";
  *
  * An item is two words in different voices: `lead` (a time, «+50», «Топ недели») in its tone's colour and
  * semibold, `text` in calm white. There is nothing negative in the line at all (D-45): no overdue, no
- * declines, no «на приёмке» — that is the language of the director's «Входящее», not of the wall. For a guest
- * no surnames and no points get into the line, because the data has none already (D-33).
+ * declines, no «на приёмке» — that is the language of the director's «Входящее», not of the wall — and no
+ * zero or minus in the week's top. For a guest no surnames and no points get into the line, because the data
+ * has none already (D-33).
+ *
+ * An event's time is a time of today: yesterday's event says so («Вчера 17:40»), older ones are history
+ * and stay off the line — «09:55» at 09:37 reads as a wrong clock.
  */
 
 export type TickerTone = "accent" | "ok" | "gold" | "muted" | "warn";
@@ -24,7 +27,12 @@ export type TickerItem = { id: string; lead: string | null; text: string; tone: 
 /** Сколько событий едет в строке: дальше уже не новости, а история. */
 const EVENTS = 8;
 
-export function tickerItems(lines: readonly TvLine[], summary: TvSummary | undefined): TickerItem[] {
+export function tickerItems(
+  lines: readonly TvLine[],
+  summary: TvSummary | undefined,
+  // the kiosk passes its clock; without it — the moment the summary was counted
+  now: Date = summary ? new Date(summary.now) : new Date(),
+): TickerItem[] {
   const items: TickerItem[] = [];
 
   if (summary) {
@@ -32,38 +40,35 @@ export function tickerItems(lines: readonly TvLine[], summary: TvSummary | undef
 
     // что впереди у всей компании: три ближайшие встречи, гостю — без названий (D-33)
     for (const event of (summary.events ?? []).slice(0, EVENTS_AHEAD)) {
-      const meeting = meetingText(event, new Date(summary.now));
+      const meeting = meetingText(event, now);
       items.push({
         id: `meeting:${event.id}`,
         lead: meeting.lead,
         text: meeting.text,
-        tone: startsWithin(event, new Date(summary.now), SOON_MS) ? "warn" : "accent",
+        tone: startsWithin(event, now, SOON_MS) ? "warn" : "accent",
       });
     }
   }
 
-  for (const line of lines.slice(0, EVENTS)) {
+  for (const line of lines.filter((line) => { const back = dayIndex(now) - dayIndex(line.at); return back === 0 || back === 1; }).slice(0, EVENTS)) {
     items.push({
       id: `event:${line.id}`,
-      lead: tvTime(line.at),
+      lead: eventLead(line.at, now),
       text: phraseOf(line),
       tone: line.tone,
     });
   }
 
-  if (summary?.points_enabled && summary.rating.length > 0) {
+  // the top is good news only (D-45): nobody with a zero or a minus stands in it; a guest's rows come without
+  // points, and the base already left out anyone without them
+  const top = (summary?.rating ?? []).filter((row) => row.points === null || row.points > 0).slice(0, 3);
+  if (summary?.points_enabled && top.length > 0) {
     // first names only: three full names never fit the band's window whole
-    const top = summary.rating
-      .slice(0, 3)
-      .map((row) => (row.points === null ? firstName(row.name) : `${firstName(row.name)} ${formatPoints(row.points)}`))
-      .join(" · ");
-    items.push({ id: "rating", lead: "Топ недели", text: top, tone: "gold" });
+    const text = top.map((row) => (row.points === null ? firstName(row.name) : `${firstName(row.name)} ${formatPoints(row.points)}`)).join(" · ");
+    items.push({ id: "rating", lead: "Топ недели", text, tone: "gold" });
   }
 
-  const week = summary?.week?.reduce((sum, day) => sum + day.done, 0) ?? 0;
-  if (week > 0) {
-    items.push({ id: "week", lead: "За неделю", text: `готово ${week} ${pluralRu(week, ["дело", "дела", "дел"])}`, tone: "ok" });
-  }
+  // the week stands on «Сегодня» as seven bars, every other turn of the round: the band does not repeat it
 
   if (summary?.points_enabled && summary.merch.length > 0) {
     const last = summary.merch[0]!;
@@ -91,6 +96,12 @@ function startsWithin(event: TvEventRow, now: Date, withinMs: number): boolean {
 function dayIndex(iso: string | Date): number {
   const ms = (typeof iso === "string" ? new Date(iso) : iso).getTime();
   return Math.floor((ms + AQTOBE_OFFSET_MS) / DAY_MS);
+}
+
+/** An event of today by its time, of yesterday with the word: the band never shows a bare time of another day. */
+function eventLead(at: Date, now: Date): string {
+  // only the day before is «Вчера»; a line a step ahead of the kiosk's clock is today's
+  return dayIndex(now) - dayIndex(at) === 1 ? `Вчера ${tvTime(at)}` : tvTime(at);
 }
 
 /** «16:00 Планёрка, в переговорной» — the place only while the line stays short; no head count. */

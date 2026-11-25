@@ -126,7 +126,7 @@ export function ttlLeft(row: AgedRow, now: Date = new Date()): number {
  * news without its words — no task title, no name, no message. The alarm keeps its words.
  */
 const PRIVATE_TITLE: Record<string, string> = {
-  review: "Задача на приёмке",
+  review: "Задача на проверке",
   declined: "Отказ по задаче",
   questions: "Вопрос по задаче",
   messages: "Новое сообщение",

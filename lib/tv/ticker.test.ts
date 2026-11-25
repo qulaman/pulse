@@ -48,7 +48,8 @@ describe("tickerItems", () => {
     expect(items.map((item) => item.lead)).not.toContain("Сегодня");
     expect(printed(items)).not.toMatch(/просроч|отказ|приёмк|вопрос|доработ|в срок/i);
     expect(ids).toContain("rating");
-    expect(ids).toContain("week");
+    // the week stands on «Сегодня» as seven bars: the band does not repeat it
+    expect(ids).not.toContain("week");
   });
 
   it("событие едет со временем и коротко: имя, двоеточие, стадия", () => {
@@ -83,7 +84,7 @@ describe("tickerItems", () => {
   });
 
   it("без сводки строка всё равно едет — на одних событиях", () => {
-    const items = tickerItems([line("task_done")], undefined);
+    const items = tickerItems([line("task_done")], undefined, new Date("2026-09-17T10:00:00Z"));
     expect(items).toHaveLength(1);
     expect(items[0]!.text).toBe("Марат Оспанов: Акт");
   });
@@ -102,12 +103,17 @@ describe("tickerItems", () => {
     expect(guest.find((item) => item.id === "rating")?.text).toBe("Айгерим · Марат");
   });
 
-  it("неделя — «За неделю» и «готово N дел» по-русски", () => {
-    const week = (done: number) => tickerItems([], { ...SUMMARY, week: [{ day: "2026-09-17", done }] }).find((item) => item.id === "week");
-    expect(week(48)).toEqual({ id: "week", lead: "За неделю", text: "готово 48 дел", tone: "ok" });
-    expect([1, 3, 21].map((n) => week(n)?.text)).toEqual(["готово 1 дело", "готово 3 дела", "готово 21 дело"]);
-    // the summary's own days are summed: 2 + 3
-    expect(tickerItems([], SUMMARY).find((item) => item.id === "week")?.text).toBe("готово 5 дел");
+  it("в топе недели нет ни нуля, ни минуса (D-45); нет положительных — нет и топа", () => {
+    const rating = [
+      { name: "Айболат Нурланов", points: 15, rank: 1 },
+      { name: "Ербол Сотрудник", points: 0, rank: 2 },
+      { name: "Юля Смирнова", points: -1_000_000, rank: 3 },
+    ];
+    const row = tickerItems([], { ...SUMMARY, rating }).find((item) => item.id === "rating");
+    expect(row?.text).toBe("Айболат 15");
+    expect(printed(tickerItems([], { ...SUMMARY, rating }))).not.toMatch(/[−-]\s?\d|\b0\b|Ербол|Юля/);
+    const nobody = tickerItems([], { ...SUMMARY, rating: rating.slice(1) });
+    expect(nobody.map((item) => item.id)).not.toContain("rating");
   });
 
   it("награда — «имя · название», только если строка влезает целиком", () => {
@@ -123,6 +129,28 @@ describe("tickerItems", () => {
     const long = tickerItems([], { ...SUMMARY, merch: [{ ...SUMMARY.merch[0]!, title: "Я".repeat(room + 1) }] });
     expect(long.map((item) => item.id)).not.toContain("merch");
     expect(printed(long)).not.toMatch(/…|\.\.\./);
+  });
+});
+
+describe("tickerItems: время события — сегодняшнее", () => {
+  const at = (iso: string) =>
+    lineOf({ id: iso, kind: "task_accepted", created_at: iso, payload: { name: "Айболат", title: null, amount: null }, payload_guest: { name: "Айболат", title: null, amount: null } }, false);
+  // 09:37 on the 24th in Aqtobe
+  const now = new Date("2026-11-24T04:37:00Z");
+
+  it("сегодняшнее — время, вчерашнее — «Вчера» и время, старше — в строку не едет", () => {
+    const items = tickerItems(
+      [at("2026-11-24T04:20:00Z"), at("2026-11-23T04:55:00Z"), at("2026-11-22T12:00:00Z")],
+      { ...SUMMARY, now: now.toISOString() },
+      now,
+    ).filter((item) => item.id.startsWith("event:"));
+    expect(items.map((item) => item.lead)).toEqual(["09:20", "Вчера 09:55"]);
+  });
+
+  it("полночь считается по Актобе: 23:50 по Актобе вчера — «Вчера», 00:10 сегодня — время", () => {
+    const morning = new Date("2026-11-23T19:30:00Z"); // 00:30 on the 24th in Aqtobe
+    const items = tickerItems([at("2026-11-23T19:10:00Z"), at("2026-11-23T18:50:00Z")], undefined, morning);
+    expect(items.map((item) => item.lead)).toEqual(["00:10", "Вчера 23:50"]);
   });
 });
 

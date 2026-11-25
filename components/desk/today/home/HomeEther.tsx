@@ -22,7 +22,7 @@ import { Aside, BlockLink, BlockNote, HeadMove, RowsBone } from "./parts";
 /** A line of «Эфир»: when in the margin, the words, the reach or the points at the end; icons centre it. */
 const ETHER_ROW = "grid grid-cols-[84px_minmax(0,1fr)_auto] items-center gap-x-3 py-[7px] text-[13px] leading-5";
 
-/** How many rows the block shows; the rest is a click away in «Объявления». */
+/** How many rows the block shows; the rest is a click away in «Эфир». */
 const SHOWN = 4;
 
 /**
@@ -62,7 +62,7 @@ export function HomeEther({ onAnnounce }: { onAnnounce: () => void }) {
               </HeadMove>
             ) : null}
             <BlockLink href="/desk/ether" testId="home-ether-all">
-              Все объявления →
+              Весь эфир →
             </BlockLink>
           </span>
         }
@@ -136,7 +136,7 @@ function EtherRow({ line, team, now }: { line: EtherLine<Announcement, EtherEven
       </span>
       {line.until ? (
         // waits for the delivery window (D-38): when it goes, in the pen — the director may send it now in «Объявления»
-        <span title={`Ждёт окна доставки: уйдёт ${humanAqtobe(new Date(line.until), now)} — отправить сейчас можно в «Объявлениях»`}>
+        <span title={`Ждёт окна доставки: уйдёт ${humanAqtobe(new Date(line.until), now)} — отправить сейчас можно в «Эфире»`}>
           <Pill ink="pen" icon={Clock}>
             уйдёт {humanAqtobe(new Date(line.until), now).split(" ").at(-1)}
           </Pill>

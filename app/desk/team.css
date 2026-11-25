@@ -101,8 +101,16 @@ html[data-surface="desk"] {
     &[data-state="review"] {
       --ring: var(--warn);
     }
+    /* not taken for half an hour, or the pushes do not reach: amber; given and not taken yet: grey —
+       never green (D-194) */
+    &[data-state="stale"] {
+      --ring: var(--warn);
+    }
     &[data-state="work"] {
       --ring: var(--ok);
+    }
+    &[data-state="waiting"] {
+      --ring: color-mix(in srgb, var(--text-muted) 75%, transparent);
     }
     &[data-state="free"] {
       --ring: color-mix(in srgb, var(--text-muted) 35%, transparent);

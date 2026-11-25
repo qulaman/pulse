@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { Mascot } from "@/components/brand/Mascot";
 import { humanAqtobe } from "@/lib/ai/time";
+import { formatNum } from "@/lib/desk/format";
 import { usePerson } from "@/lib/people/queries";
 import { useBalance, usePointHistory, useRating } from "@/lib/points/queries";
 
@@ -66,14 +67,17 @@ export function PointsCard({ userId, enabled }: { userId: string; enabled: boole
             className="nums mt-0.5 text-[40px] font-bold leading-[44px]"
             style={{ color: "var(--gold)" }}
           >
-            {total.isLoading ? <BalanceBone /> : balance}
+            {total.isLoading ? <BalanceBone /> : formatNum(balance)}
           </p>
           <p className="mt-0.5 text-[13px] leading-4 text-muted">
             {total.isLoading
               ? " "
               : myRow && myRow.points > 0
                 ? `${myRow.rank}-е место за неделю`
-                : myRow
+                : myRow && myRow.points < 0
+                  ? // one story with «Рейтинг» and the list below: a minus this week is said, not «пока нет» (2.4)
+                    `за неделю ${formatNum(myRow.points)}`
+                  : myRow
                   ? "за неделю очков пока нет"
                 : balance > 0
                   ? "за закрытые в срок задачи и поощрения"
@@ -94,11 +98,12 @@ export function PointsCard({ userId, enabled }: { userId: string; enabled: boole
         <ul className="px-4">
           {rows.slice(0, 3).map((row) => (
             <li key={row.id} className="flex items-baseline gap-2.5 border-t border-border/70 py-2.5">
+              {/* at least the width of «+10», as wide as a long number needs — never over the reason (4.5) */}
               <span
-                className="nums w-[42px] shrink-0 text-[15px] font-bold leading-5"
+                className="nums min-w-[42px] shrink-0 whitespace-nowrap text-[15px] font-bold leading-5"
                 style={{ color: row.amount > 0 ? "var(--gold)" : "var(--danger)" }}
               >
-                {row.amount > 0 ? `+${row.amount}` : row.amount}
+                {formatNum(row.amount, { signed: true })}
               </span>
               <span className="min-w-0 flex-1 truncate text-[15px] leading-5">{row.reason}</span>
               <span className="nums shrink-0 text-[12px] leading-4 text-muted">{humanAqtobe(new Date(row.created_at))}</span>

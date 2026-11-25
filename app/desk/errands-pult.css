@@ -28,7 +28,7 @@ html[data-surface="desk"][data-journal] {
 
   /* ---- the frame: the work on the left, the keypad on the right ---------------------------- */
   .pult-frame {
-    container-type: inline-size;
+    container: pult-frame / inline-size;
   }
   .pult {
     display: grid;
@@ -878,6 +878,28 @@ html[data-surface="desk"][data-journal] {
   @container (max-width: 899px) {
     .pult-keys {
       grid-template-columns: repeat(auto-fill, minmax(156px, 1fr));
+    }
+  }
+  /* a wide screen (1920): the keypad on the right grows to three keys a row rather than a narrow
+     stack beside an empty board (D-194) — still on the right, still where the hand left it */
+  /* the thirty days on a calm day: only where the board would stand empty beside the keypad — the
+     frame's width, not the work column's (that one is a container of its own) */
+  .pult-calm {
+    display: none;
+  }
+  @container pult-frame (min-width: 1400px) {
+    .pult-calm {
+      display: block;
+      max-width: 720px;
+    }
+  }
+  @container (min-width: 1400px) {
+    .pult {
+      grid-template-columns: minmax(0, 1fr) 540px;
+    }
+
+    .pult-keys {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
   .pult-key {

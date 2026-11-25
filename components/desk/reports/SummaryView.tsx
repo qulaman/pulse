@@ -240,7 +240,7 @@ export function SummaryView({
       : narrowed && day.rows.some(handedIn)
         ? { title: "Среди сдавших никого по поиску" }
         : day.today && nowHm(now) < askFrom
-          ? { title: "Отчёты приходят к вечеру", hint: `Лента попросит каждого сдать отчёт с ${shortHm(askFrom)}` }
+          ? { title: "Отчёты приходят к вечеру", hint: `Пульс попросит каждого сдать отчёт с ${shortHm(askFrom)}` }
           : day.today
             ? { title: "Пока ни одного отчёта" }
             : offWord

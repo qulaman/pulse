@@ -7,7 +7,7 @@ import { tabScope } from "@/lib/lab/access";
 
 /**
  * «Подключение» (D-190): a screen of its own without the tab bar — a short run of steps the person
- * leaves with «Позже» or «В Ленту». Every signed-in person but the wall: the team gets it once by
+ * leaves with «Позже» or «На Пульс». Every signed-in person but the wall: the team gets it once by
  * itself on the first sign-in, the director from «Профиль».
  */
 export default async function SetupLayout({ children }: { children: React.ReactNode }) {

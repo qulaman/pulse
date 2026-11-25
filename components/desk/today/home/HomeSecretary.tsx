@@ -31,7 +31,7 @@ import { INK, Live, Mark, Titled } from "./look";
 import { Aside, BlockLink, BlockNote, DAY_ROW_END, Quiet, RowsBone } from "./parts";
 
 /** The sign of a request: the scene's icon in its ink (one map with «Заявки», D-174); a request of the company's own keeps its emoji. */
-function ActionSign({ action }: { action: SecretaryAction }) {
+export function ActionSign({ action }: { action: SecretaryAction }) {
   const scene = sceneOfAction(action);
   if (scene === "other" && action.icon) {
     return (
@@ -76,9 +76,9 @@ export function HomeSecretary({ me }: { me: Me }) {
 
   return (
     <Aside testId="home-secretary">
-      <SectionLabel action={<BlockLink href="/desk/errands" testId="home-secretary-errands">Заявки →</BlockLink>}>
+      <SectionLabel action={<BlockLink href="/desk/errands" testId="home-secretary-errands">Все заявки →</BlockLink>}>
         <Titled icon={ConciergeBell} ink="ok" live={there && waiting}>
-          Секретарь
+          Заявки
         </Titled>
       </SectionLabel>
       <BlockNote state={load} failed="Секретари не загрузились" now={now} onRetry={() => void secretaries.refetch()} />

@@ -63,6 +63,18 @@ describe("teamField", () => {
     }
   });
 
+  it("starts the floor further down when the screen keeps buttons under the face (Пульс: «Сказать · Написать»)", () => {
+    const skirt = SKIRT + 34;
+    const layout = teamField({ people: team(20), ...AREA, skirt });
+    for (const person of team(20).filter((p) => !p.busy)) {
+      const seat = layout.seats.get(person.id);
+      if (seat) expect(seat.y - layout.size / 2).toBeGreaterThanOrEqual(skirt);
+    }
+    // the sky above the face does not move
+    const plain = teamField({ people: team(20), ...AREA });
+    for (const person of team(20).filter((p) => p.busy)) expect(layout.seats.get(person.id)).toEqual(plain.seats.get(person.id));
+  });
+
   it("puts everyone in the same place, wherever he stands in the roster", () => {
     const straight = teamField({ people: team(20), ...AREA });
     const shuffled = teamField({ people: [...team(20)].reverse(), ...AREA });

@@ -33,8 +33,8 @@ describe("team look", () => {
     expect(lookOf([task({})]).accepted).toBe(false);
   });
 
-  it("speaks the colours of «Задачи»: green at work, yellow handed in, red late or refused", () => {
-    expect(toneFor(task({ status: "sent" }))).toBe("var(--accent)");
+  it("speaks the colours of «Задачи»: grey not taken yet, green at work, yellow handed in, red late or refused", () => {
+    expect(toneFor(task({ status: "sent" }))).toBe("var(--text-muted)");
     expect(toneFor(task({ status: "accepted" }))).toBe("var(--ok)");
     expect(toneFor(task({ status: "pending_review" }))).toBe("var(--warn)");
     expect(toneFor(task({ status: "rework" }))).toBe("var(--warn)");

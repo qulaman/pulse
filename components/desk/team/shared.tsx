@@ -92,14 +92,17 @@ export function AwayTag({ availability }: { availability: Availability }) {
   );
 }
 
-/** The load in words, for a title: «3 в работе · 1 просрочена · 1 на приёмке». */
+/** The load in words, for a title: «3 в работе · 1 просрочена · 1 на проверке». */
 export function loadWords(load: Load | undefined): string {
   if (!load || load.active === 0) return "открытых задач нет";
-  const working = load.active - load.review;
+  // a task given and not taken is «не принята», never «в работе» (the stage words, D-194)
+  const waiting = load.waiting ?? 0;
+  const working = load.active - load.review - waiting;
   return [
     working > 0 ? `${working} в работе` : null,
+    waiting > 0 ? `${waiting} не ${pluralRu(waiting, ["принята", "приняты", "приняты"])}` : null,
     load.overdue > 0 ? `${load.overdue} ${pluralRu(load.overdue, ["просрочена", "просрочены", "просрочено"])}` : null,
-    load.review > 0 ? `${load.review} на приёмке` : null,
+    load.review > 0 ? `${load.review} на проверке` : null,
   ]
     .filter(Boolean)
     .join(" · ");

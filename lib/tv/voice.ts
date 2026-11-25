@@ -62,13 +62,13 @@ export function phraseOf(line: TvLine): string {
   const title = line.detail;
   switch (line.kind) {
     case "task_sent":
-      return `${name}: новое поручение`;
+      return `${name}: новая задача`;
     case "task_accepted":
       return `${name}: в работе`;
     case "task_review":
-      return `${name}: работа на проверке`;
+      return `${name}: на проверке`;
     case "task_done":
-      return fits(title, PHRASE_MAX - name.length - 2) ? `${name}: ${title}` : `${name}: работа принята`;
+      return fits(title, PHRASE_MAX - name.length - 2) ? `${name}: ${title}` : `${name}: готово`;
     case "points":
       return line.amount ? `${name}: +${line.amount} ${pluralRu(line.amount, ["очко", "очка", "очков"])}` : `${name}: похвала`;
     case "announcement":

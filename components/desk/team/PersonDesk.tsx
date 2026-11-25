@@ -10,10 +10,8 @@ import { useDeskScope } from "@/components/desk/DeskScope";
 import { Morph } from "@/components/desk/ui/Morph";
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
-import { MenuButton, type MenuItem } from "@/components/desk/ui/Menu";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
-import { Tooltip } from "@/components/desk/ui/Tooltip";
 import type { Tone } from "@/components/desk/ui/tone";
 import { When } from "@/components/desk/ui/When";
 import { usePushTest } from "@/components/push/usePushTest";
@@ -58,10 +56,11 @@ import { CardSection, HeroFacts, SectionTabs, type HeroFact, type PageSectionLin
 import { useScreenKeys } from "./keys";
 import { LoginBlock } from "./LoginBlock";
 import { PersonEditor } from "./PersonEditor";
+import { PersonMovesBar, usePersonMoves, type MoveHandlers } from "./PersonMoves";
 import { PersonStats } from "./PersonStats";
 import { RemoveDialog, type RemoveMode } from "./RemoveDialog";
-import { addressOf, AVAILABILITY_TONE, GridBone, LoadFailed, loadWords, roleLine, StateWord, tidy } from "./shared";
-import { TileFace, tileState } from "./TeamGrid";
+import { addressOf, AVAILABILITY_TONE, GridBone, LoadFailed, loadWords, roleLine, StateWord } from "./shared";
+import { stateTone, TileFace, tileState } from "./TeamGrid";
 
 const OPEN: TaskStatus[] = ["scheduled", "sent", "accepted", "in_progress", "rework"];
 const CLOSED: TaskStatus[] = ["done", "declined", "revoked"];
@@ -93,7 +92,7 @@ function LoadChip({ person }: { person: Person }) {
   if (!loads.data) return null;
   const load = loads.data[person.id];
   return (
-    <span className="team-chip" data-tone={(load?.overdue ?? 0) > 0 ? "danger" : (load?.active ?? 0) > 0 ? "ok" : "muted"}>
+    <span className="team-chip" data-tone={stateTone(tileState(person, load, true))}>
       {loadWords(load)}
     </span>
   );
@@ -222,7 +221,7 @@ function DirectorFacts({ person, companyId, pointsOn, now }: { person: Person; c
   const facts: HeroFact[] = [
     { key: "work", value: load ? load.active - load.review : 0, label: "в работе", href: `${tasksOf}&tab=working`, title: "Открыть в «Задачах»" },
     { key: "overdue", value: load?.overdue ?? 0, label: "просрочено", tone: "danger", href: `${tasksOf}&tab=yours`, title: "Открыть в «Задачах»" },
-    { key: "review", value: load?.review ?? 0, label: "на приёмке", tone: "warn", href: `${tasksOf}&tab=yours`, title: "Открыть в «Задачах»" },
+    { key: "review", value: load?.review ?? 0, label: "на проверке", tone: "warn", href: `${tasksOf}&tab=yours`, title: "Открыть в «Задачах»" },
   ];
   // no points came: no figure, rather than a zero
   if (pointsOn && person.role !== "director" && !balances.isLoadingError) {
@@ -534,6 +533,7 @@ export function PersonDesk({ id }: { id: string }) {
   const phones = usePhones();
   const phone = phones.data?.[id] ?? null;
   const setWorking = useSetWorking();
+  const moves = usePersonMoves("page");
   const now = useMinute();
   const router = useRouter();
   const pathname = usePathname();
@@ -547,6 +547,12 @@ export function PersonDesk({ id }: { id: string }) {
 
   // the card turns into its editor and back in place, no trip to the server (D-184)
   const setEditing = (on: boolean) => writeDeskAddress(on ? `${pathname}?edit=1` : pathname, { type: "desk-switch" });
+  // the facts stand under the work for the director (D-194): «Изменить» brings their editor into view
+  useEffect(() => {
+    if (!editing) return;
+    const frame = requestAnimationFrame(() => document.getElementById("person-card")?.scrollIntoView({ block: "start", behavior: "smooth" }));
+    return () => cancelAnimationFrame(frame);
+  }, [editing]);
 
   // the roster carries the same row: one of the two answering is enough to know the person
   const p = person.data ?? people.data?.find((row) => row.id === id);
@@ -636,10 +642,6 @@ export function PersonDesk({ id }: { id: string }) {
   const access = canChangeAccess(editor, p);
   const roster = people.data ?? [];
   const manageLogin = canResetLogin(editor, p);
-  const more: MenuItem[] = [];
-  if (director && works) more.push({ key: "tasks", label: "Задачи человека", onSelect: () => router.push(`/desk/tasks?who=${p.id}`) });
-  if (director && works) more.push({ key: "reports", label: "Отчёт за сегодня", onSelect: () => router.push(`/desk/reports?day=${todayYmd()}&p=${p.id}`) });
-  if (manageLogin && p.is_active) more.push({ key: "login", label: "Выдать код входа…", onSelect: () => writeDeskAddress(`${pathname}?login=1`) });
   const kiosk = p.role === "tv";
   const revive = () =>
     setWorking.mutate(
@@ -649,61 +651,91 @@ export function PersonDesk({ id }: { id: string }) {
         onError: (error) => toast(error.message),
       },
     );
-  if (access && !p.is_active && director && (standing.data?.open.movable ?? 0) > 0) more.push({ key: "pass", label: "Передать задачи…", onSelect: () => setRemoving("pass") });
-  // not from the editor: a card about to go has no draft worth a question
-  if (access && !editing) {
-    more.push("separator", {
-      key: "remove",
-      label: p.is_active ? (kiosk ? "Выключить экран…" : "Удалить…") : "Удалить насовсем…",
-      hint: "Del",
-      danger: true,
-      onSelect: () => setRemoving(p.is_active ? "remove" : "erase"),
-    });
-  }
+  // the page's own ways of the moves every desk card has (D-194): it edits here, its dialogs are here
+  const handlers: MoveHandlers = {
+    give,
+    edit: () => setEditing(true),
+    revive,
+    login: () => writeDeskAddress(`${pathname}?login=1`),
+    pass: () => setRemoving("pass"),
+    remove: () => setRemoving(p.is_active ? "remove" : "erase"),
+  };
 
   const crew = isCrew(p);
   // the page's sections as tabs that lead: only where the page is long — the director's look at a person at work
+  // one order with the card under a tile of «Команда» (D-194): the numbers, the work, the facts
   const tabs: PageSectionLink[] =
     director && works && crew
       ? [
-          { id: "person-card", label: "Данные" },
           { id: "person-stats", label: "Показатели" },
           { id: "person-tasks", label: "Задачи" },
           { id: "person-messages", label: "Сообщения" },
+          { id: "person-card", label: "Данные" },
         ]
       : [];
-  const moves = (
-    <>
-      {givable ? (
-        <Tooltip label="Строка поручения уже знает, кому" keys={["T"]} side="bottom">
-          {/* the fill is the screen's one: while a form or a code is open, theirs */}
-          <Button size="sm" variant={editing || focusLogin ? "secondary" : "primary"} data-testid="desk-person-give" onClick={give}>
-            Дать задачу
-          </Button>
-        </Tooltip>
-      ) : null}
-      {access && !p.is_active ? (
-        <Button size="sm" variant="secondary" loading={setWorking.isPending} onClick={revive} data-testid="desk-person-revive">
-          {kiosk ? "Включить экран" : "Вернуть в команду"}
-        </Button>
-      ) : null}
-      {mayEdit && !editing ? (
-        <Tooltip label="Изменить карточку" keys={["E"]} side="bottom">
-          <Button size="sm" variant="secondary" onClick={() => setEditing(true)} data-testid="desk-person-edit">
-            Изменить
-          </Button>
-        </Tooltip>
-      ) : null}
-      {more.length > 0 ? (
-        <MenuButton
-          items={tidy(more)}
-          label="Ещё"
-          className="flex h-9 w-9 items-center justify-center rounded-[8px] text-[18px] leading-none text-muted hover:bg-surface-2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-        >
-          ⋯
-        </MenuButton>
-      ) : null}
-    </>
+  // the director's look at a person at work: the facts after the work, as the tabs say
+  const factsLast = director && crew;
+  const bar = (
+    <PersonMovesBar
+      person={p}
+      moves={moves}
+      handlers={handlers}
+      held={standing.data?.open.movable ?? 0}
+      testId="desk-person"
+      keys
+      // the fill is the screen's one: while a form or a code is open, theirs
+      quietGive={editing || focusLogin}
+      // not from the editor: a card about to go has no draft worth a question
+      hide={editing ? ["edit", "remove"] : []}
+    />
+  );
+
+  const facts = (
+    <ViewTransition update={SWITCH_SWAP} default="none">
+      <CardSection
+        id="person-card"
+        title="Карточка"
+        testId="desk-person-card"
+        end={editing ? <span className="person-editing-tag">правка</span> : null}
+      >
+        {!mayEdit ? (
+          <>
+            <CardFacts person={p} phone={phone} people={roster} />
+            <p className="person-note">Карточку директора меняет только директор</p>
+          </>
+        ) : editing && phones.isPending ? null : editing ? (
+          <PersonEditor
+            key={p.id}
+            mode="edit"
+            draftKey={p.id}
+            photoUrl={p.avatar_url}
+            initial={deskDraftOf(p, phone)}
+            roles={assignableRoles(editor.role, p.role)}
+            lockedRole={
+              access
+                ? undefined
+                : editor.id === p.id
+                  ? "Свою роль и доступ здесь не меняют — иначе можно закрыть себе вход в настройки"
+                  : "Роль директора меняет только директор"
+            }
+            managers={roster.filter((m) => m.id !== id && m.is_active && (m.role === "manager" || m.role === "director"))}
+            roster={roster.filter((m) => m.id !== id && m.is_active && m.role !== "tv")}
+            pending={update.isPending || savePhoto.isPending || savePhone.isPending}
+            onSubmit={async (draft, photo, { leaving }) => {
+              // the photo first: it is what fails, and then nothing else has been written
+              await savePhoto.mutateAsync({ id, companyId: me.data.companyId, photo });
+              await update.mutateAsync({ id, patch: deskPatchOf(draft, access) });
+              const typed = cleanPhone(draft.phone);
+              if (typed !== phone) await savePhone.mutateAsync({ id, companyId: me.data.companyId, phone: typed });
+              if (!leaving) setEditing(false);
+            }}
+            onCancel={() => setEditing(false)}
+          />
+        ) : (
+          <CardFacts person={p} phone={phone} people={roster} onEdit={() => setEditing(true)} />
+        )}
+      </CardSection>
+    </ViewTransition>
   );
 
   return (
@@ -717,7 +749,7 @@ export function PersonDesk({ id }: { id: string }) {
         <span aria-hidden>›</span>
         <span className="truncate text-text">{p.full_name}</span>
       </nav>
-      <PersonHero person={p} director={director} phone={phone} pushKnown={mayEdit} moves={moves}>
+      <PersonHero person={p} director={director} phone={phone} pushKnown={mayEdit} moves={bar}>
         {director ? <DirectorFacts person={p} companyId={me.data.companyId} pointsOn={pointsEnabled} now={now} /> : null}
       </PersonHero>
       {tabs.length > 0 ? <SectionTabs sections={tabs} label="Оглавление карточки" /> : null}
@@ -725,52 +757,7 @@ export function PersonDesk({ id }: { id: string }) {
       <div className="@container">
         <div className="person-columns grid items-start gap-x-8 gap-y-7 @min-[920px]:grid-cols-[minmax(0,1fr)_minmax(340px,420px)]" data-testid="desk-person">
           <div className="flex min-w-0 flex-col gap-7">
-            <ViewTransition update={SWITCH_SWAP} default="none">
-              <CardSection
-                id="person-card"
-                title="Карточка"
-                testId="desk-person-card"
-                end={editing ? <span className="person-editing-tag">правка</span> : null}
-              >
-                {!mayEdit ? (
-                  <>
-                    <CardFacts person={p} phone={phone} people={roster} />
-                    <p className="person-note">Карточку директора меняет только директор</p>
-                  </>
-                ) : editing && phones.isPending ? null : editing ? (
-                  <PersonEditor
-                    key={p.id}
-                    mode="edit"
-                    draftKey={p.id}
-                    photoUrl={p.avatar_url}
-                    initial={deskDraftOf(p, phone)}
-                    roles={assignableRoles(editor.role, p.role)}
-                    lockedRole={
-                      access
-                        ? undefined
-                        : editor.id === p.id
-                          ? "Свою роль и доступ здесь не меняют — иначе можно закрыть себе вход в настройки"
-                          : "Роль директора меняет только директор"
-                    }
-                    managers={roster.filter((m) => m.id !== id && m.is_active && (m.role === "manager" || m.role === "director"))}
-                    roster={roster.filter((m) => m.id !== id && m.is_active && m.role !== "tv")}
-                    pending={update.isPending || savePhoto.isPending || savePhone.isPending}
-                    onSubmit={async (draft, photo, { leaving }) => {
-                      // the photo first: it is what fails, and then nothing else has been written
-                      await savePhoto.mutateAsync({ id, companyId: me.data.companyId, photo });
-                      await update.mutateAsync({ id, patch: deskPatchOf(draft, access) });
-                      const typed = cleanPhone(draft.phone);
-                      if (typed !== phone) await savePhone.mutateAsync({ id, companyId: me.data.companyId, phone: typed });
-                      if (!leaving) setEditing(false);
-                    }}
-                    onCancel={() => setEditing(false)}
-                  />
-                ) : (
-                  <CardFacts person={p} phone={phone} people={roster} onEdit={() => setEditing(true)} />
-                )}
-              </CardSection>
-            </ViewTransition>
-
+            {factsLast ? null : facts}
             {/* a person who left still has their last 30 days */}
             {director && crew ? (
               <div id="person-stats" className="person-anchor">
@@ -778,6 +765,7 @@ export function PersonDesk({ id }: { id: string }) {
               </div>
             ) : null}
             {director ? <DirectorLists person={p} meId={me.data.userId} now={now} /> : null}
+            {factsLast ? facts : null}
           </div>
 
           <div className="person-side flex min-w-0 flex-col gap-7">
@@ -788,6 +776,7 @@ export function PersonDesk({ id }: { id: string }) {
           </div>
         </div>
       </div>
+      {moves.node}
       {removing ? (
         <RemoveDialog
           person={p}

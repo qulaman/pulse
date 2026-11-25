@@ -31,7 +31,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       slot = { audio_path: path, signed_url: "", token: "", stored: true };
     } else if (error || !data) {
       console.error("signed upload url failed:", error?.message);
-      return apiError(502, "upload_url_failed", "Не удалось начать загрузку, попробуй ещё раз");
+      return apiError(502, "upload_url_failed", "Не удалось начать загрузку, попробуйте ещё раз");
     } else {
       slot = { audio_path: path, signed_url: data.signedUrl, token: data.token };
     }

@@ -59,7 +59,7 @@ export function RulesCard({
       void queryClient.invalidateQueries({ queryKey: ["settings"] });
     },
     onError: (error) => {
-      toast(error instanceof Error ? error.message : "Не получилось сохранить. Попробуй ещё раз");
+      toast(error instanceof Error ? error.message : "Не получилось сохранить. Попробуйте ещё раз");
       // the rules moved under the page: show what is in force now
       if (error instanceof ApiFailure && (error.code === "conflict" || error.code === "unchanged")) {
         setConfirmClear(false);

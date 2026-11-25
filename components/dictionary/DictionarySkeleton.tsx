@@ -73,7 +73,7 @@ export function DictionarySkeleton() {
 export function DictionaryHead({ from }: { from?: "team" }) {
   return (
     <PageHead
-      back={from === "team" ? { href: "/settings?tab=team", label: "Сотрудники" } : { href: "/settings?tab=ai", label: "Настройки" }}
+      back={from === "team" ? { href: "/settings?tab=team", label: "Очки и отчёты" } : { href: "/settings?tab=ai", label: "Настройки" }}
       title="Словарь"
     />
   );

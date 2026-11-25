@@ -162,7 +162,7 @@ export function NotifySettings({ meId }: { meId: string }) {
 
       <Sheet open={sheet?.kind === "digest"} onClose={() => setSheet(null)} title="Сводка">
         <p className="text-[15px] leading-[21px] text-muted">
-          Всё, что стоит на «Сводкой», копится и приходит одним пушем: «Сводка · 3 на приёмку · 2 вопроса». Пустая сводка не приходит, а
+          Всё, что стоит на «Сводкой», копится и приходит одним пушем: «Сводка · 3 на проверку · 2 вопроса». Пустая сводка не приходит, а
           то, что вы уже видели в приложении, в неё не попадает.
         </p>
         <div className="mt-4 flex flex-col gap-2">
@@ -182,7 +182,7 @@ export function NotifySettings({ meId }: { meId: string }) {
 
       <Sheet open={sheet?.kind === "day"} onClose={() => setSheet(null)} title="Итог дня">
         <p className="text-[15px] leading-[21px] text-muted">
-          Один пуш в конце дня: сколько принято, на приёмке, в работе, не открыто и просрочено по вашим задачам.
+          Один пуш в конце дня: сколько принято, на проверке, в работе, не открыто и просрочено по вашим задачам.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Chip

@@ -166,8 +166,11 @@ export function TaskPanel({
         <DeskThread taskId={task.id} me={me} messages={desk.messages} loading={desk.messagesLoading} load={desk.threadLoad} onRetry={desk.retry} actions={desk.acts.actions} />
       </div>
 
-      {/* the answer field stays in sight while the thread scrolls under it */}
-      <div className="tasks-dock sticky bottom-0 z-[1] -mx-5 mt-auto bg-surface px-5 pb-1 pt-2">
+      {/* the answer field stays in sight while the thread scrolls under it. The panel's scroller keeps
+          a 24 px foot (DeskPanelColumn's pb-6) and a sticky box stops above that padding: the dock
+          reaches over it to the panel's edge, so no word of the thread shows below the field
+          (D-194) — the margin gives the room back, the scroll length stays the same */}
+      <div className="tasks-dock sticky -bottom-6 z-[1] -mx-5 -mb-6 mt-auto bg-surface px-5 pb-7 pt-2">
         {task.status === "revoked" ? (
           <p className="pb-2 text-[13px] leading-5 text-muted" data-testid="thread-closed">
             Задача отозвана — переписка закрыта

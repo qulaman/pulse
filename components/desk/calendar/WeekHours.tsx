@@ -503,8 +503,9 @@ function DayHead({
   const past = ymd < today;
   const weekday = WEEKDAYS_SHORT_RU[weekdayOf(ymd)];
   const meetings = count > 0 ? `${count} ${pluralRu(count, ["встреча", "встречи", "встреч"])}` : "встреч нет";
-  // the focused day says it in words; the others give their count, a day off only its date
-  const words = focused ? (isToday ? `сегодня · ${meetings}` : meetings) : null;
+  // the focused day says its count in words, the others give the number; an empty day says nothing
+  // here — the side beside the grid says «Встреч нет» once (D-194)
+  const words = focused ? (count > 0 ? (isToday ? `сегодня · ${meetings}` : meetings) : isToday ? "сегодня" : null) : null;
   return (
     <Tooltip label={focused ? `${humanYmd(ymd, now)} · ${meetings}` : `Крупно: ${humanYmd(ymd, now)} · ${meetings}`} className="flex min-w-0" side="bottom">
       <button

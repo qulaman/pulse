@@ -58,6 +58,8 @@ export function TvLeaders({ data, now }: { data: TvRatingScene | null; now: Date
 
   // a photo slot in every line once anybody of the four has a photo: the names keep one x
   const faces = view.rest.some((row) => row.avatar);
+  // a leader alone: the side column carries the team's week as large figures instead of empty places 2–5
+  const alone = view.rest.length === 0 && view.teamFigures.length > 0;
 
   return (
     <div className="tv-box" data-testid="tv-rating">
@@ -69,23 +71,37 @@ export function TvLeaders({ data, now }: { data: TvRatingScene | null; now: Date
           </Swap>
         </section>
 
-        {/* places two to five; keyed by place — an award that reorders them changes who holds a place, not the rows */}
-        <ol className="flex min-w-0 flex-col gap-[4vh]" aria-label="Места 2–5">
-          {view.rest.map((row) => (
-            <li
-              key={row.rank}
-              className="grid min-h-[12vh] items-baseline gap-x-[2.4vh]"
-              style={{ gridTemplateColumns: "4vh minmax(0, 1fr)" }}
-            >
-              <span className="tv-body tv-num text-muted">{row.rank}</span>
-              <Swap id={row.id}>
-                <Place row={row} faces={faces} />
-              </Swap>
-            </li>
-          ))}
-        </ol>
+        {alone ? (
+          <section className="flex min-w-0 flex-col justify-center gap-[4vh] pb-[6vh]" aria-label={view.teamHead} data-testid="tv-rating-team">
+            <p className="tv-small text-muted">{view.teamHead}</p>
+            {view.teamFigures.map((figure) => (
+              <p key={figure.key} className="flex min-w-0 flex-col">
+                <span className="tv-title tv-num whitespace-nowrap" style={{ color: figure.gold ? "var(--tv-points)" : "var(--tv-text)" }}>
+                  {figure.value}
+                </span>
+                <span className="tv-body text-muted">{figure.label}</span>
+              </p>
+            ))}
+          </section>
+        ) : (
+          // places two to five; keyed by place — an award that reorders them changes who holds a place, not the rows
+          <ol className="flex min-w-0 flex-col gap-[4vh]" aria-label="Места 2–5">
+            {view.rest.map((row) => (
+              <li
+                key={row.rank}
+                className="grid min-h-[12vh] items-baseline gap-x-[2.4vh]"
+                style={{ gridTemplateColumns: "4vh minmax(0, 1fr)" }}
+              >
+                <span className="tv-body tv-num text-muted">{row.rank}</span>
+                <Swap id={row.id}>
+                  <Place row={row} faces={faces} />
+                </Swap>
+              </li>
+            ))}
+          </ol>
+        )}
       </div>
-      {view.team ? <p className="tv-small text-muted">{view.team}</p> : null}
+      {view.team && !alone ? <p className="tv-small text-muted">{view.team}</p> : null}
     </div>
   );
 }

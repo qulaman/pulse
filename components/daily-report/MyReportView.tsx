@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { PageHead } from "@/components/ui/PageHead";
 import { dayState, dayTitle, durationText, formProblem, isoAt, pointsHint, SUMMARY_MAX, timeOf, isoToHm } from "@/lib/daily-report/format";
 import { readDraft, writeDraft, type Draft } from "@/lib/daily-report/draft";
+import { leftSuggestion } from "@/lib/daily-report/due";
 import type { DailyReport, MyDailyReportDay, SubmitDailyReportInput } from "@/lib/daily-report/types";
 import type { Hm } from "@/lib/datetime/calendar";
 import { fitHeight } from "@/lib/ui/fitHeight";
@@ -33,6 +34,7 @@ export function MyReportView({
   day,
   history,
   now,
+  askFrom,
   onSubmit,
   waiting = false,
   pop = null,
@@ -41,6 +43,8 @@ export function MyReportView({
   /** Past days, newest first; undefined while they load. */
   history: readonly DailyReport[] | undefined;
   now: Date;
+  /** `settings.daily_report.ask_from`: «Ушёл» is prefilled from it on (`leftSuggestion`). */
+  askFrom?: string;
   onSubmit: (input: SubmitDailyReportInput) => void;
   /** The submit waits for the network (it is on the phone, the outbox delivers it). */
   waiting?: boolean;
@@ -57,12 +61,12 @@ export function MyReportView({
       <PageHead
         eyebrow={dayTitle(day.date)}
         title="Отчёт за день"
-        tone={state.tone === "none" ? "muted" : state.tone}
+        tone={state.tone === "ok" ? "ok" : "muted"}
         state={waiting ? "Сдан · ждёт связи" : state.text}
       />
 
       {day.enabled ? (
-        <ReportForm key={day.date} day={day} handedInBefore={handedInBefore} onSubmit={onSubmit} waiting={waiting} pop={pop} />
+        <ReportForm key={day.date} day={day} now={now} askFrom={askFrom} handedInBefore={handedInBefore} onSubmit={onSubmit} waiting={waiting} pop={pop} />
       ) : (
         <div className="card-in mt-3 flex flex-col items-center rounded-[20px] border border-border/70 px-6 py-9 text-center" data-testid="reports-off">
           <Mascot state="calm" size={56} />
@@ -79,12 +83,16 @@ export function MyReportView({
 
 function ReportForm({
   day,
+  now,
+  askFrom,
   handedInBefore,
   onSubmit,
   waiting,
   pop,
 }: {
   day: MyDailyReportDay;
+  now: Date;
+  askFrom: string | undefined;
   /** A report handed in on an earlier day; undefined while the past days load. */
   handedInBefore: boolean | undefined;
   onSubmit: (input: SubmitDailyReportInput) => void;
@@ -99,7 +107,8 @@ function ReportForm({
     return {
       date: day.date,
       arrived: isoToHm(saved?.arrived_at ?? day.suggest.arrived_at),
-      left: isoToHm(saved?.left_at ?? day.suggest.left_at),
+      // «Ушёл» is not «now» in the morning: empty until the evening (7.6)
+      left: saved ? isoToHm(saved.left_at) : leftSuggestion(day, now, askFrom),
       summary: saved?.summary ?? "",
       restored: false,
     };
@@ -173,7 +182,7 @@ function ReportForm({
       </section>
 
       <h2 className="eyebrow mt-6 flex items-center gap-1.5 px-1">
-        Закрыл сегодня
+        Закрыто сегодня
         {day.tasks.length ? <span className="nums text-muted">{day.tasks.length}</span> : null}
       </h2>
       <div className="mt-2">

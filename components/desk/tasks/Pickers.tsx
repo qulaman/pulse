@@ -360,9 +360,13 @@ export function PersonPicker({
 
   const loadWords = (id: string) => {
     const load = loads.data?.[id];
-    if (!load || load.active === 0) return "свободен";
+    if (!load || load.active === 0) return "дел нет";
     const late = load.overdue > 0 ? ` · ${load.overdue} ${pluralRu(load.overdue, ["просрочка", "просрочки", "просрочек"])}` : "";
-    return `${load.active} в работе${late}`;
+    // an order given and not taken is not «в работе» (D-194)
+    const waiting = load.waiting ?? 0;
+    const taken = load.active - waiting;
+    const untaken = waiting > 0 ? `${waiting} не ${pluralRu(waiting, ["принята", "приняты", "приняты"])}` : "";
+    return [taken > 0 ? `${taken} в работе` : "", untaken].filter(Boolean).join(" · ") + late;
   };
 
   return (

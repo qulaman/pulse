@@ -6,7 +6,7 @@ import { parseDictionaryTab } from "@/lib/dictionary-tabs";
  * «Словарь» (D-111): the names people are called by and the words the recogniser has to
  * spell, with instructions and edits saved on the tap. The director and the secretary —
  * the settings layout lets nobody else in (D-104). `?tab=names|words` opens a tab,
- * `?from=team` sends «назад» to «Сотрудники» instead of «ИИ-модель».
+ * `?from=team` sends «назад» to «Очки и отчёты» instead of «ИИ-модель».
  */
 export default async function DictionaryPage({
   searchParams,

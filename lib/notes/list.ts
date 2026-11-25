@@ -280,7 +280,8 @@ export function notesHero(piles: NotePiles, now: Date, total = 0): NotesHero {
   // the server may hold more than the screen loaded (D-95): the number is the server's
   const count = Math.max(active.length, total);
   if (active.length === 0) {
-    return { value: null, label: "Пока пусто", detail: "Зажмите микрофон и скажите мысль —", second: "запишу слово в слово" };
+    // how to hold the microphone is the hint under it: here only what to say
+    return { value: null, label: "Пока пусто", detail: "Скажите мысль или напишите —", second: "запишу слово в слово" };
   }
   const pinned = active.filter((note) => note.pinned).length;
   const latest = active.reduce((a, b) => (time(b.created_at) > time(a.created_at) ? b : a));

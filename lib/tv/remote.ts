@@ -81,7 +81,7 @@ export function wallReceipt(state: TvState | null, now: Date): WallReceipt {
 
   if (!state.seen_at || now.getTime() - new Date(state.seen_at).getTime() > STALE_MS) {
     return state.seen_at
-      ? { tone: "warn", text: `Экран не отвечает с ${tvTime(new Date(state.seen_at))}` }
+      ? { tone: "warn", text: `Экран не отвечает с ${sinceWords(new Date(state.seen_at), now)}` }
       : { tone: "muted", text: "Экран ещё не подключался" };
   }
 
@@ -90,6 +90,19 @@ export function wallReceipt(state: TvState | null, now: Date): WallReceipt {
   }
 
   return { tone: "ok", text: "На стене" };
+}
+
+const AQTOBE_OFFSET_MS = 5 * 3_600_000;
+const DAY_MS = 86_400_000;
+const dayIndex = (date: Date) => Math.floor((date.getTime() + AQTOBE_OFFSET_MS) / DAY_MS);
+const dayMonthFmt = new Intl.DateTimeFormat("ru-RU", { timeZone: "Asia/Aqtobe", day: "numeric", month: "long" });
+
+/** «09:14» today, «18:40 вчера», «22 ноября» — a bare time of another day reads as today's. */
+function sinceWords(at: Date, now: Date): string {
+  const days = dayIndex(now) - dayIndex(at);
+  if (days <= 0) return tvTime(at);
+  if (days === 1) return `${tvTime(at)} вчера`;
+  return dayMonthFmt.format(at);
 }
 
 /** Название доски на дисплее: длинное режется, чтобы «пункт 3 из 7 · до 21:00» не ушло за край. */
@@ -102,7 +115,7 @@ function clip(title: string): string {
 
 /**
  * Что показывается прямо сейчас: «Эфир · часы», «Марат Ахметов · ещё 7 мин»,
- * «Дело «Замер окон» · ещё 7 мин» (D-123), «Доска «Планёрка» · пункт 3 из 7 · до 21:00»
+ * «Задача «Замер окон» · ещё 7 мин» (D-123), «Доска «Планёрка» · пункт 3 из 7 · до 21:00»
  * (D-102, D-121) — названия досок и пункты доски на стене пульт отдаёт сам — или
  * «Ночь · тусклые часы», пока стена спит (D-105): иначе пульт ночью обещал бы лицо. Круг
  * заставок — «· по кругу» после сцены (D-123).
@@ -132,7 +145,7 @@ export function wallNow(
   }
   if (mode === "task") {
     const title = extra.taskTitle?.trim();
-    return `${title ? `Дело «${title}»` : "Одно дело"} · ещё ${minutes} мин`;
+    return `${title ? `Задача «${title}»` : "Одна задача"} · ещё ${minutes} мин`;
   }
   if (wallAsleep(state, now)) return "Ночь · тусклые часы";
   const scene = sceneOf(state, now, extra.points ?? true, extra.guest ?? false);

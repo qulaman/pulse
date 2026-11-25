@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { Chip } from "@/components/ui/Chip";
+import { formatNum } from "@/lib/desk/format";
 import { AVAILABILITY_LABEL, ROLE_LABEL, type Person } from "@/lib/people/queries";
+import { absenceOf, isGoneMember, isTeamMember } from "@/lib/people/team";
 import { textHas } from "@/lib/people/search";
 import { LOAD_COLOR, LOAD_LABEL, loadColor, type Load } from "@/lib/people/loads";
 import { useTeamBalances } from "@/lib/points/queries";
@@ -22,13 +24,19 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: "free", label: "Свободны" },
 ];
 
-const ROLE_ORDER: Record<string, number> = { director: 0, manager: 1, employee: 2, shopkeeper: 2, secretary: 2, tv: 9 };
-const GROUP_LABEL: Record<string, string> = { lead: "Руководство", staff: "Сотрудники", tv: "Экраны" };
+const ROLE_ORDER: Record<string, number> = { manager: 1, employee: 2, shopkeeper: 2, secretary: 2, director: 8, tv: 9 };
 
-function groupOf(p: Person): "lead" | "staff" | "tv" {
-  if (p.role === "tv") return "tv";
-  if (p.role === "director" || p.role === "manager") return "lead";
-  return "staff";
+type Group = "lead" | "staff" | "director";
+
+/** The team in two groups; the directors after it, apart and out of the team's count (lib/people/team.ts). */
+function groupOf(p: Person): Group {
+  if (p.role === "director") return "director";
+  return p.role === "manager" ? "lead" : "staff";
+}
+
+function groupLabel(group: Group, count: number): string {
+  if (group === "director") return count === 1 ? "Директор" : "Директора";
+  return group === "lead" ? "Руководители" : "Сотрудники";
 }
 
 function matches(p: Person, q: string): boolean {
@@ -37,7 +45,7 @@ function matches(p: Person, q: string): boolean {
 
 /** One person: avatar with the load dot, name and position, load and points on the right. */
 function Row({ person, load, balance, pointsOn }: { person: Person; load: Load | undefined; balance: number | undefined; pointsOn: boolean }) {
-  const available = person.is_active && person.availability === "active";
+  const available = person.is_active && absenceOf(person) === null;
   const color = loadColor(load, available);
   const active = load?.active ?? 0;
   return (
@@ -69,22 +77,28 @@ function Row({ person, load, balance, pointsOn }: { person: Person; load: Load |
 
         <span className="flex shrink-0 flex-col items-end gap-1">
           {!person.is_active ? (
-            <Chip tone="muted" interactive={false}>не работает</Chip>
-          ) : person.role === "tv" ? (
-            <Chip tone="muted" interactive={false}>киоск</Chip>
+            <Chip tone="muted" interactive={false}>не в команде</Chip>
           ) : person.availability !== "active" ? (
             <Chip tone="warn" interactive={false}>{AVAILABILITY_LABEL[person.availability]}</Chip>
-          ) : active === 0 ? (
-            <span className="text-[13px] leading-4 text-muted">свободен</span>
+          ) : absenceOf(person) === "out" ? (
+            <Chip tone="warn" interactive={false}>не на месте</Chip>
+          ) : person.role === "director" ? null : active === 0 ? (
+            <span className="text-[13px] leading-4 text-muted">дел нет</span>
           ) : (
             <span className="nums text-[13px] leading-4" style={{ color: LOAD_COLOR[color] }}>
               {active} {pluralRu(active, ["задача", "задачи", "задач"])}
-              {load && load.overdue > 0 ? ` · ${load.overdue} просроч.` : load && load.review > 0 ? ` · ${load.review} на приёмке` : ""}
+              {load && load.overdue > 0
+                ? ` · ${load.overdue} просроч.`
+                : load && load.review > 0
+                  ? ` · ${load.review} на проверке`
+                  : load && (load.waiting ?? 0) > 0
+                    ? ` · ${load.waiting} не ${pluralRu(load.waiting ?? 0, ["принята", "приняты", "приняты"])}`
+                    : ""}
             </span>
           )}
-          {pointsOn && person.is_active && person.role !== "tv" && person.role !== "director" ? (
-            <span className="nums text-[13px] font-semibold leading-4" style={{ color: "var(--gold)" }}>
-              {balance ?? 0} очк.
+          {pointsOn && isTeamMember(person) ? (
+            <span className="nums whitespace-nowrap text-[13px] font-semibold leading-4" style={{ color: (balance ?? 0) > 0 ? "var(--gold)" : "var(--text-muted)" }}>
+              {formatNum(balance ?? 0)} очк.
             </span>
           ) : null}
         </span>
@@ -97,6 +111,8 @@ function Row({ person, load, balance, pointsOn }: { person: Person; load: Load |
  * The roster with the director's working questions answered on the spot: who is free,
  * who is drowning, who is away — search by name, position or the spoken alias,
  * filters, three sorts, groups by role, the departed folded away at the bottom.
+ * Counted is the team (lib/people/team.ts): the directors stand apart after it, the wall's kiosk
+ * is not a person and lives on «Экран» (D-135), the ones who left only in their fold.
  */
 export function TeamList({ people, loads, pointsOn }: { people: Person[]; loads: Record<string, Load> | undefined; pointsOn: boolean }) {
   const balances = useTeamBalances(pointsOn);
@@ -111,22 +127,25 @@ export function TeamList({ people, loads, pointsOn }: { people: Person[]; loads:
   // the clock is read once per mount — «дедлайн близко» does not need a live tick here
   const [now] = useState(() => Date.now());
 
+  const team = useMemo(() => people.filter(isTeamMember), [people]);
   const visible = useMemo(() => {
     return people
-      .filter((p) => p.is_active)
+      .filter((p) => p.is_active && p.role !== "tv")
+      // a director has no load and no absence to filter by: he is in the list only as it is
+      .filter((p) => filter === "all" || isTeamMember(p))
       .filter((p) => matches(p, q))
       .filter((p) => {
         const load = loadMap[p.id];
-        const away = p.availability !== "active";
+        const away = absenceOf(p, now) !== null;
         switch (filter) {
           case "present":
-            return !away && p.role !== "tv";
+            return !away;
           case "away":
             return away;
           case "busy":
             return !away && (loadColor(load, true, now) === "red" || (load?.active ?? 0) >= 4);
           case "free":
-            return !away && p.role !== "tv" && (load?.active ?? 0) === 0;
+            return !away && (load?.active ?? 0) === 0;
           default:
             return true;
         }
@@ -138,11 +157,12 @@ export function TeamList({ people, loads, pointsOn }: { people: Person[]; loads:
       });
   }, [people, q, filter, sort, loadMap, balanceMap, now]);
 
-  const inactive = people.filter((p) => !p.is_active && matches(p, q));
+  const inactive = people.filter((p) => isGoneMember(p) && matches(p, q));
+  const shownTeam = visible.filter(isTeamMember).length;
 
-  const groups: { key: string; items: Person[] }[] =
+  const groups: { key: Group | "all"; items: Person[] }[] =
     sort === "name"
-      ? ["lead", "staff", "tv"].map((key) => ({ key, items: visible.filter((p) => groupOf(p) === key) })).filter((g) => g.items.length > 0)
+      ? (["lead", "staff", "director"] as const).map((key) => ({ key, items: visible.filter((p) => groupOf(p) === key) })).filter((g) => g.items.length > 0)
       : [{ key: "all", items: visible }];
 
   return (
@@ -158,7 +178,7 @@ export function TeamList({ people, loads, pointsOn }: { people: Person[]; loads:
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Имя, должность или как зовут в речи"
+          placeholder="Имя, должность, прозвище"
           aria-label="Поиск по команде"
           className="min-h-[44px] w-full field pl-10 pr-10 text-[16px] leading-[22px] outline-none transition-colors duration-[120ms] placeholder:text-muted focus:border-accent"
         />
@@ -183,9 +203,8 @@ export function TeamList({ people, loads, pointsOn }: { people: Person[]; loads:
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-3 text-[13px] leading-4 text-muted">
-        <span className="nums">
-          {visible.length} {pluralRu(visible.length, ["человек", "человека", "человек"])}
-        </span>
+        {/* the team's count, the same «N в команде» as the profile and the reports; a filter says «из N» */}
+        <span className="nums">{filter === "all" && !q ? `${team.length} в команде` : `${shownTeam} из ${team.length}`}</span>
         <span className="flex items-center gap-1">
           <span>Сортировка:</span>
           {(
@@ -218,7 +237,7 @@ export function TeamList({ people, loads, pointsOn }: { people: Person[]; loads:
         <section key={group.key} className="mt-4">
           {group.key !== "all" ? (
             <h2 className="mb-2 flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-muted">
-              {GROUP_LABEL[group.key]}
+              {groupLabel(group.key, group.items.length)}
               <span className="nums rounded-full bg-surface-2 px-2 text-[12px] font-medium normal-case tracking-normal">{group.items.length}</span>
             </h2>
           ) : null}
@@ -238,7 +257,7 @@ export function TeamList({ people, loads, pointsOn }: { people: Person[]; loads:
             aria-expanded={showInactive}
             className="text-[13px] leading-4 text-muted"
           >
-            {showInactive ? "Скрыть уволенных" : `Уволенные · ${inactive.length}`}
+            {showInactive ? "Скрыть ушедших" : `Ушедшие · ${inactive.length}`}
           </button>
           {showInactive ? (
             <ul className="mt-2 space-y-2">

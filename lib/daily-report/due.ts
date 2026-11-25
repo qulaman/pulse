@@ -93,6 +93,19 @@ export function oneTapInput(
 }
 
 /**
+ * «Ушёл» on the form before anything is typed (7.6): now on the minute — but only from `ask_from`,
+ * the product's evening. Earlier the person has not left: a prefilled «now» read as «31 мин на
+ * работе» at half past nine, and a report handed in so carried a leaving time nobody chose. Before
+ * the evening — empty: the field says «Время», the length line stays quiet. A day that is not today
+ * keeps what the database suggested (only today's report can be written anyway).
+ */
+export function leftSuggestion(day: MyDailyReportDay, now: Date, askFrom: string = ASK_FROM_DEFAULT): Hm | null {
+  if (day.date !== todayYmd(now)) return isoToHm(day.suggest.left_at);
+  const clock = nowHm(now);
+  return clock >= askFromOf(askFrom) ? clock : null;
+}
+
+/**
  * Where today's report stands for Лента. `day` — `my_daily_report` (undefined while it loads or
  * when it failed: nothing is shown); `askFrom` — `settings.daily_report.ask_from`; `away` — the
  * person's own `availability` is not «на месте» (`my_daily_report` does not say it; the push

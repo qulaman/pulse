@@ -41,7 +41,7 @@ export const GET = withAuth("any", async ({ req, profile }) => {
   const signed = await createServiceSupabase().storage.from(bucket).createSignedUrl(message.file_path, TTL_SECONDS);
   if (signed.error || !signed.data) {
     console.error("file sign failed:", signed.error?.message);
-    return apiError(502, "sign_failed", "Не удалось открыть файл, попробуй ещё раз");
+    return apiError(502, "sign_failed", "Не удалось открыть файл, попробуйте ещё раз");
   }
   return apiOk({ url: signed.data.signedUrl, expires_in: TTL_SECONDS });
 });

@@ -16,6 +16,7 @@
 | `components/providers/QueryProvider.tsx` | `QueryClient`, регистрация воркера, снимок данных |
 | `queries.ts` и `mutations.ts` в папках `lib/` | запросы и мутации доменов |
 | `lib/outbox.ts`, `lib/tasks/grace.ts` | очередь неотправленного, окно «Отменить» |
+| `lib/tasks/attention.ts`, `lib/tasks/tone.ts`, `lib/people/team.ts`, `lib/people/enough.ts`, `lib/shop/hands.ts`, `lib/desk/person-moves.ts`, `lib/delivery-window.ts` | общие правила экранов (раздел 12) |
 | `lib/store/`, `lib/voice/` | конвейер ввода, запись, копия фразы на телефоне |
 | `public/sw.js`, `lib/offline/`, `lib/update/` | сервис-воркер, снимок данных, обновление |
 
@@ -42,7 +43,7 @@ Layout читает сессию (`getSessionProfile`), проверяет ро�
 
 | Маршруты | Оболочка | Кого пускает |
 |---|---|---|
-| `/pulse`, `/sent`, `/confirm`, `/notes`, `/screen`, `/admin` | `app/(director)/layout.tsx` → `DirectorShell` | директора |
+| `/pulse`, `/sent`, `/confirm`, `/notes`, `/screen`, `/admin` | `app/(director)/layout.tsx` → `DirectorShell` | директора; `/admin` — только при `settings.dev_tools` (`app/(director)/admin/layout.tsx`, иначе в «Настройки») |
 | `/feed`, `/tasks` | `app/(employee)/layout.tsx` | команду (`TEAM_ROLES`) |
 | `/settings`, `/people/*` | `AdminShell`: директору — `DirectorShell`, секретарю — её бар | директора и секретаря (D-104) |
 | `/reports` | `DirectorShell` | директора |
@@ -77,7 +78,7 @@ Layout читает сессию (`getSessionProfile`), проверяет ро�
 
 ### 3.4. Оболочки
 
-**Таб-бар** (`components/TabBar.tsx`, D-112). Число на «Делах» — дела, ждущие хода человека (`useFreshTaskCount`, фильтр `myMoveFilter` из `lib/tasks/my-move.ts`): то же правило у значка приложения (`/api/push/badge`) и у шарика «Дела» в Ленте (D-173). Набор вкладок решает сервер (`tabScope` в `lib/lab/access.ts`), первый кадр — уже со всеми. Вложенный экран подсвечивает вкладку раздела (`SECTIONS`), туда же ведёт «Назад» (`backTarget`). «Настройки» и «Лаб» на телефоне открываются из «Профиля» (D-153). Пристыкованное над баром стоит на `var(--tabbar-space)` с классом `.above-tabbar`; панель над баром сообщает высоту через `useDockSpace` (`--dock-space`), нижние тосты встают над ней.
+**Таб-бар** (`components/TabBar.tsx`, D-112). Число на «Делах» — дела, ждущие хода человека (`useFreshTaskCount`, фильтр `myMoveFilter` из `lib/tasks/my-move.ts`): то же правило у значка приложения (`/api/push/badge`) и у шарика «Дела» на Пульсе сотрудника (D-173). Вкладка `/feed` команды подписана «Пульс», как дом директора (D-195). Набор вкладок решает сервер (`tabScope` в `lib/lab/access.ts`), первый кадр — уже со всеми. Вложенный экран подсвечивает вкладку раздела (`SECTIONS`), туда же ведёт «Назад» (`backTarget`); разделы у ролей свои: у секретаря `/secretary` — её шарик «Заявки» на Пульсе, поэтому подсвечен её «Пульс» и «Назад» ведёт на `/feed`. «Настройки» и «Лаб» на телефоне открываются из «Профиля» (D-153). Пристыкованное над баром стоит на `var(--tabbar-space)` с классом `.above-tabbar`; панель над баром сообщает высоту через `useDockSpace` (`--dock-space`), нижние тосты встают над ней.
 
 **`RoleScope`** даёт роль бара (`useTabRole`), признак «Лаб» (`useLabTab`), кладёт профиль в кэш (раздел 4) и ведёт имена компании для `shortName` (`lib/people/names.ts`, D-146).
 
@@ -103,14 +104,14 @@ Layout читает сессию (`getSessionProfile`), проверяет ро�
 
 ### 3.5. Подключение телефона
 
-Онбординг телефона — экран `/setup` (D-190, что на нём — `docs/SCREENS.md` §3.6). Всё о телефоне собирает `useSetup` (`components/setup/useSetup.ts`), его читают четыре места: экран, строка Ленты и Пульса `SetupEntry`, строка профиля `SetupRow` и `SetupLaunch` в Ленте.
+Онбординг телефона — экран `/setup` (D-190, что на нём — `docs/SCREENS.md` §3.6). Всё о телефоне собирает `useSetup` (`components/setup/useSetup.ts`), его читают четыре места: экран, строка Пульса директора и сотрудника `SetupEntry`, строка профиля `SetupRow` и `SetupLaunch` на Пульсе сотрудника.
 
 - **Факты устройства** читаются после первой отрисовки: `pushPlatform` (платформа, открыт ли с экрана «Домой»), `pushState`, `useInstallOffer`, разрешение микрофона (`navigator.permissions`), модель из client hints Chrome; производитель, браузер и встроенный браузер мессенджера — чистые функции `lib/setup/device.ts` (их же `inAppBrowser` — у `signInPlace` входа). На возврате в приложение (`visibilitychange`) факты читаются заново — человек мог поменять настройки телефона.
 - **Что знает сервер** — своя строка `push_subscriptions` по endpoint этого браузера (RLS пускает к своим строкам): нет её — «не подключён», `enabled=false` — выключено, последняя ошибка позже последнего успеха — «последний не дошёл» (`channelOf`). Без сети браузер с подпиской считается подключённым.
 - **Ответы человека** — localStorage `pulse.setup.v1.<userId>` (`lib/setup/marks.ts`, внешний стор с `storage`-событием, чтение и запись в try/catch): «пришло», «пропустить», когда экран показан (`seen`), «скрыть строку до завтра» (`later`, день по Asia/Aqtobe). Факт сильнее ответа: пропущенные и потом включённые уведомления — «готово».
 - **Шаги и слова** — `lib/setup/steps.ts`: `setupSteps`, `setupProgress` («N из 4», пропущенный шаг закрывает экран, но не считается сделанным), `entryLine` (строка домашних экранов — только пока уведомления не включены и не проверены), `shouldAutoOpen`, советы `pushAdvice` / `micAdvice`.
-- **Автопоказ** — `SetupLaunch` в Ленте: команда, телефон, сервер ответил, не всё готово, `seen` ещё нет — ставит `seen` и `router.push("/setup?from=feed")`. Один раз на человека и телефон; «Позже» — тоже ответ.
-- Строка Ленты и Пульса берёт на себя и то, что делала карточка пушей: при монтировании регистрирует воркер и закрывает квитанции «увидел» (`markSeen`).
+- **Автопоказ** — `SetupLaunch` на Пульсе сотрудника: команда, телефон, сервер ответил, не всё готово, `seen` ещё нет — ставит `seen` и `router.push("/setup?from=feed")`. Один раз на человека и телефон; «Позже» — тоже ответ.
+- Строка Пульса директора и сотрудника берёт на себя и то, что делала карточка пушей: при монтировании регистрирует воркер и закрывает квитанции «увидел» (`markSeen`).
 - Директору и секретарю сводка «Без уведомлений» — `noPushPeople` (`lib/push/health.ts`) над `push_health`.
 
 ## 4. Сервер и клиент
@@ -190,7 +191,7 @@ Layout читает сессию (`getSessionProfile`), проверяет ро�
 
 ### 7.4. Тосты
 
-Кнопки сотрудника (`components/tasks/list/useEmployeeControls.tsx`): внутри `FlightTargetProvider` (Лента) `press` с узлом карточки играет полёт поверх уже записанного, тостов «Принято · в работе» и «Сдано на проверку» там нет; вне него — без движения и с тостами (D-167). Отчёт за день в Ленте — `useReportDue(now)` (`lib/daily-report/queries.ts`): `my_daily_report`, `companies.settings->daily_report->>ask_from` и своя `profiles.availability` под RLS (ключ `["daily-report","feed"]`); сдача, ждущая на телефоне (`useSubmitWaiting`), считается сданной, а `useRefreshMyDay` не перечитывает день, пока сдача в пути.
+Кнопки сотрудника (`components/tasks/list/useEmployeeControls.tsx`): внутри `FlightTargetProvider` (Пульс сотрудника) `press` с узлом карточки играет полёт поверх уже записанного, тостов «Принято · в работе» и «Сдано на проверку» там нет; вне него — без движения и с тостами (D-167). Отчёт за день на Пульсе сотрудника — `useReportDue(now)` (`lib/daily-report/queries.ts`): `my_daily_report`, `companies.settings->daily_report->>ask_from` и своя `profiles.availability` под RLS (ключ `["daily-report","feed"]`); сдача, ждущая на телефоне (`useSubmitWaiting`), считается сданной, а `useRefreshMyDay` не перечитывает день, пока сдача в пути.
 
 `toast(text, { action?, lifetimeMs?, windowMs? })` и `dismissToast(id)` (`components/ui/Toast.tsx`) зовутся откуда угодно, и вне React. Тост с кнопкой стоит внизу над баром и `--dock-space`, тап его не прячет (D-142); тонкая полоска внизу тает за `windowMs` — время, пока кнопку ещё можно нажать (по умолчанию вся жизнь тоста, D-166).
 
@@ -212,7 +213,7 @@ Layout читает сессию (`getSessionProfile`), проверяет ро�
 
 ### 8.2. Конвейер ввода директора
 
-`lib/store/ingest.ts` — одна машина на голос и текст, оба ведут в один парсер. Правила сущностей (что считается, что можно отправить) — `lib/confirm/entities.ts`, копия фразы на телефоне — `lib/store/ingest-kept.ts`. На Пульсе её играет лицо, на других экранах директора — оверлей `DirectorFab`, на десктопе — строка поручения и панель. Подписи и позы стадий — `lib/voice/stages.ts`: фраза не летит молча (D-43).
+`lib/store/ingest.ts` — одна машина на голос и текст, оба ведут в один парсер. Правила сущностей (что считается, что можно отправить) — `lib/confirm/entities.ts`, копия фразы на телефоне — `lib/store/ingest-kept.ts`. На Пульсе её запускают лицо и ряд «Сказать / Написать» (`components/pulse/SayWrite.tsx`: те же `startVoice` / `stopVoice` и запрос шторки текста) и играет лицо, на других экранах директора — оверлей `DirectorFab`, на десктопе — строка поручения и панель. Подписи и позы стадий — `lib/voice/stages.ts`: фраза не летит молча (D-43).
 
 | Стадия | Что |
 |---|---|
@@ -297,7 +298,7 @@ PWA живёт днями, и после деплоя код на экране �
 
 **Покой** (D-131). Слушатель `animationiteration`, который React вешает на корень, будит основной поток на каждой границе бесконечной CSS-петли; строка `QUIET_LOOPS` (`lib/design/quiet-loops.ts`) в `<head>` не даёт его зарегистрировать, поэтому `onAnimationIteration` не использовать. `MascotPower` останавливает лица вне экрана; помощники скольжения — `components/ui/motion.ts`.
 
-**Тап по лицу и шарикам** (D-178). Пульс и Лента держат сцену в одном `useReducer` (режим, шарик, `cameFrom`, у Ленты ещё место строки отчёта). Части, которых тап не касается, мемоизированы: `SaidBand`, `MascotLever` (внутри — лицо и закрытый `TextSheet`), `OrbitBalls` вплоть до шарика, `PanelCard` с телом из `useMemo`, `IdleScene`, `ThoughtBubble`, листы событий и переписки. Обработчики — `useStableCallback`, действия задач — `useStableActions` (`components/pulse/stable.ts`). `AnimatePresence` внутри общего `LayoutGroup` — только через `LocalPresence`, иначе конец выхода перерисовывает весь экран посреди скольжения лица.
+**Тап по лицу и шарикам** (D-178). Пульс директора и сотрудника держат сцену в одном `useReducer` (режим, шарик, `cameFrom`, у сотрудника ещё место строки отчёта). Части, которых тап не касается, мемоизированы: `SaidBand`, `MascotLever` (внутри — лицо и закрытый `TextSheet`), `OrbitBalls` вплоть до шарика, `PanelCard` с телом из `useMemo`, `IdleScene`, `ThoughtBubble`, листы событий и переписки. Обработчики — `useStableCallback`, действия задач — `useStableActions` (`components/pulse/stable.ts`). `AnimatePresence` внутри общего `LayoutGroup` — только через `LocalPresence`, иначе конец выхода перерисовывает весь экран посреди скольжения лица.
 
 **Клавиатура телефона** (`lib/ui/keyboard.ts`): ответ на неё пишется в DOM внутри события `visualViewport`, не через состояние React, и ничто не прокручивает страницу в ответ на прокрутку — иначе экран дрожит. Целевые телефоны — iPhone 16–18 и флагманы Android (D-136).
 
@@ -310,7 +311,7 @@ PWA живёт днями, и после деплоя код на экране �
   - Рост прокручивается, как табло; падение меняется сразу.
   - Баланс магазина крутится вниз, пока свой заказ в пути или удался.
   - Первый рендер совпадает с серверным.
-  - В Ленте `PointsFlight` (`components/pulse/PointsFlight.tsx`) по ключу `usePointsArrival` через 0,35 с отправляет копию пилюли «+N» в счётчик `data-points-target` (`HeaderPoints`). Полёт — `flyInto` с `lifted: false` и `arrivesAs`, 0,65 с. Нет счётчика на экране — нет полёта.
+  - На Пульсе сотрудника `PointsFlight` (`components/pulse/PointsFlight.tsx`) по ключу `usePointsArrival` через 0,35 с отправляет копию пилюли «+N» в счётчик `data-points-target` (`HeaderPoints`). Полёт — `flyInto` с `lifted: false` и `arrivesAs`, 0,65 с. Нет счётчика на экране — нет полёта.
 
 **Вибрация** (D-147, `lib/haptics.ts`). `TapHaptics` — один слушатель `click` на документе: тик 10 мс на всё нажимаемое (не на поля), после обработчиков. Свой узор (`haptic()`) глушит тик того же нажатия, `data-haptic="off"` снимает тик с жеста. На iOS Vibration API нет: тикает только палец на скрытом переключателе `HapticSwitch` внутри `Button`, `Chip`, `HeadButton`, `Row` и вкладок, а способ человек выбирает на своём iPhone в «Профиль → Вибрация» (`/profile/haptics`, `components/profile/HapticsChoice.tsx`, D-193): строка каждого способа несёт свой переключатель, так что нажатие, которым способ выбирают, его и проверяет; `/lab/haptics` остаётся скамьёй разработчиков. Нет API — тихо, без ошибки.
 
@@ -323,6 +324,18 @@ PWA живёт днями, и после деплоя код на экране �
 **Мутация.** В `mutations.ts` домена: ключ при тапе, оптимистичная правка в `onMutate`, откат в `onError`, тост словами сервера, списки — устаревшими. Отменяемый тап — через `holdForUndo`; то, что должно пережить закрытую вкладку, — через очередь, хранимую по человеку.
 
 **Стор** — только эфемерное, рядом с владельцем; общий — в `lib/store/`. Серверные модули начинаются с `import "server-only"`.
+
+**Общее правило** — одна чистая функция в `lib/`; экран, который говорит то же, спрашивает её, а не считает сам (D-194):
+
+- «Всё в порядке» директора — `attentionOf` / `taskAttention` (`lib/tasks/attention.ts`); кому не доходят пуши — `noPushIds(usePushHealth().data)`, на Пульсе — `useNoPush`. Его читают `directorScreen` (`lib/tasks/overview.ts`), тревога и первая фраза Пульса (`alarmOf`, `openingLine`), «Сегодня», «Задачи» и «Команда» компьютера.
+- Первая кнопка, когда исполнителю не доходят пуши, — `firstMoveOf` («Позвонить» или «Напомнить» с `BLIND_NUDGE_HINT`, `lib/tasks/reasons.ts`); на компьютере номер и `noPush` даёт `useCallFirst`, кнопку — `CallButton` (`components/desk/tasks/RowMoves.tsx`, D-195).
+- Цвет состояния — `toneOf`, `deadlineToneOf`, полоса — `segmentStyle` / `dotStyle` (`lib/tasks/tone.ts`, токены `--state-*`); цвет бренда, который можно принять за состояние, — `accentClash` / `accentRefusal` (`lib/brand-color.ts`), их же проверяет `app/api/company/route.ts`.
+- Команда и на месте — `isTeamMember`, `isHere`, `isGoneMember`, `countTeam` (`lib/people/team.ts`); SQL-двойник — `p.is_active and team_role(p.role)`.
+- Достаточно ли данных для показателя — `enough` и слова ниже порога (`lib/people/enough.ts`).
+- Очки на руках команды и ушедших — `splitHands` (`lib/shop/hands.ts`); что показывает строка рейтинга — `lib/points/rating-view.ts`.
+- Действия над человеком на компьютере — `personMoves` (`lib/desk/person-moves.ts`), кнопки — `PersonMovesBar` (`components/desk/team/PersonMoves.tsx`).
+- «Тихие часы» словами — `quietHoursText` (`lib/delivery-window.ts`).
+- Время из отчёта за день («Пришёл», «Ушёл») — то, что подставила форма, а не учёт рабочего времени: экраны не показывают приход, уход и часы; время человека — «сдан в …» и `usual_submitted` периода («обычно сдаёт отчёт около …»), набранное — только в раскрытом отчёте (`reportTimesLine`, `lib/daily-report/format.ts`).
 
 **Примитивы.** Телефон — `components/ui/` (`Button`, `Chip`, `Row`, `PageHead`, `Sheet`, `Toast`, `Skeleton`, поля даты `datetime`, «железо» пульта `device`); выбор людей — только `components/people/PeoplePicker.tsx` (D-108). Десктоп — `components/desk/ui/` (`DataGrid`, `DeskPanel`, `Dialog`, `Popover`, `Menu`, `Tooltip`, `Shortcuts`): на месте телефонных шторок у него свои поповеры и диалоги (D-156). Вид — `docs/DESIGN.md`.
 
@@ -340,7 +353,7 @@ Vitest гоняет `*.test.ts` из `lib/` и `tests/` в Node — компон
 ## 15. Известные ограничения
 
 - `loadBrand()` без id читает первую строку `companies`. Так его зовут корневой layout (акцент), layout команды (показ очков под именем) и `/tv` (название и логотип стены): в базе с несколькими компаниями там видны вид и выключатель первой.
-- `lib/outbox.ts` — одна очередь на браузер, а не на человека; вход и выход её не чистят, и повтор идёт под сессией, открытой в момент повтора. Так же по браузеру хранится черновик отчёта за день (`lib/daily-report/draft.ts`, `pulse.daily-report.draft.v1`): его читают форма `/report` и «Сдать» в Ленте (`oneTapInput`): одной кнопкой отчёт уходит только со словами из черновика (D-183).
+- `lib/outbox.ts` — одна очередь на браузер, а не на человека; вход и выход её не чистят, и повтор идёт под сессией, открытой в момент повтора. Так же по браузеру хранится черновик отчёта за день (`lib/daily-report/draft.ts`, `pulse.daily-report.draft.v1`): его читают форма `/report` и «Сдать» на Пульсе сотрудника (`oneTapInput`): одной кнопкой отчёт уходит только со словами из черновика (D-183).
 - Без открытого приложения ничего не досылается: тап в закрытой PWA уйдёт при следующем запуске.
 - После деплоя снимок прошлой сборки не поднимается: первый старт показывает заглушки.
 - Голосовые и фото без сети не открываются: ссылка берётся по тапу и не кэшируется.

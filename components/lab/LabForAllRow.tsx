@@ -46,7 +46,7 @@ export function LabForAllRow() {
     },
     onError: (_error, _on, context) => {
       if (context?.before) queryClient.setQueryData(settingsKey, context.before);
-      toast("Не получилось сохранить. Попробуй ещё раз");
+      toast("Не получилось сохранить. Попробуйте ещё раз");
     },
     onSuccess: (next) => {
       queryClient.setQueryData(settingsKey, next);

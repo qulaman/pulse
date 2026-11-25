@@ -24,11 +24,11 @@ const TASK_FORMS: [string, string, string] = ["открытая задача", "
  */
 export type RemoveMode = "remove" | "erase" | "pass";
 
-/** «3 можно передать · 1 на приёмке · 1 отложена». */
+/** «3 можно передать · 1 на проверке · 1 отложена». */
 function workLine(open: OpenWork): string {
   return [
     open.movable > 0 ? `${open.movable} можно передать` : null,
-    open.review > 0 ? `${open.review} на приёмке` : null,
+    open.review > 0 ? `${open.review} на проверке` : null,
     open.scheduled > 0 ? `${open.scheduled} ${open.scheduled === 1 ? "отложена" : "отложено"}` : null,
   ]
     .filter(Boolean)
@@ -318,10 +318,10 @@ export function RemoveDialog({
                 Задачи закроются как отозванные — у вас они останутся в «Закрытых».
               </p>
             )}
-            {open.review + open.scheduled > 0 ? <p className="text-[13px] leading-[18px] text-muted">Задачи на приёмке и отложенные остаются в «Задачах»: примите их или отзовите там.</p> : null}
+            {open.review + open.scheduled > 0 ? <p className="text-[13px] leading-[18px] text-muted">Задачи на проверке и отложенные остаются в «Задачах»: примите их или отзовите там.</p> : null}
           </>
         ) : (
-          <p className="text-[13px] leading-[18px] text-muted">Передавать нечего: задачи на приёмке и отложенные остаются в «Задачах» — примите их или отзовите там.</p>
+          <p className="text-[13px] leading-[18px] text-muted">Передавать нечего: задачи на проверке и отложенные остаются в «Задачах» — примите их или отзовите там.</p>
         )}
       </div>
     );

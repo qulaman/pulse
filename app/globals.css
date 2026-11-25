@@ -35,6 +35,17 @@
   --danger: var(--phone-danger);
   --overlay: rgba(4,8,12,.6);
 
+  /* State colours (lib/tasks/tone.ts): what a state means, said once for the phone, the desk and the
+     wall. Green — taken, in work, handed in; amber — needs someone now; red — late, refused; gold —
+     closed, points; grey — not answered yet (a bar draws it hollow), held, recalled. The brand
+     accent (--accent, a client's colour, sometimes green) is never one of them. */
+  --state-done: var(--ok);
+  --state-wait: var(--text-muted);
+  --state-attention: var(--warn);
+  --state-bad: var(--danger);
+  --state-reward: var(--gold);
+  --state-off: var(--text-muted);
+
   --t-instant: 120ms;
   --t-screen: 150ms;
   --t-effect: 400ms;

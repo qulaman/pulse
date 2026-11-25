@@ -131,7 +131,7 @@ export function tasksCount(n: number): string {
 
 /** What a task of the day says beside its title: «принята · в срок». */
 export function taskMeta(task: DailyReportTask): string {
-  const state = task.status === "done" ? "принята" : "на приёмке";
+  const state = task.status === "done" ? "принята" : "на проверке";
   if (task.on_time === null) return state;
   return `${state} · ${task.on_time ? "в срок" : "после срока"}`;
 }
@@ -143,13 +143,18 @@ export function taskMeta(task: DailyReportTask): string {
 export function historyLine(report: DailyReport): string {
   if (report.status === "missed") {
     if (report.excused_at) return "не сдан · уважительная причина";
-    return ["не сдан", pointsText(report.points)].filter(Boolean).join(" · ");
+    // a miss that cost nothing says so: the form promises «пропуск не штрафуется» (D-155 §1)
+    return ["не сдан", report.points < 0 ? pointsText(report.points) : "без штрафа"].join(" · ");
   }
   const length = durationText(report.arrived_at, report.left_at);
   return ["сдан", length, tasksCount(report.tasks.length), pointsText(report.points)].filter(Boolean).join(" · ");
 }
 
-export type DayTone = "ok" | "accent" | "none";
+/**
+ * `wait` — not in yet and the day is not over: neutral, never green and never the client's brand
+ * colour (a pilot with a green brand would read «Не сдан» as done — the state map in lib/tasks/tone.ts).
+ */
+export type DayTone = "ok" | "wait" | "none";
 
 /**
  * The state of the employee's day, for the head of «Отчёт за день»: off — said so; submitted —
@@ -165,16 +170,16 @@ export function dayState(day: MyDailyReportDay): { tone: DayTone; text: string }
   // a company holiday (D-155 §7) is a day off too, said by its name
   if (day.holiday) return { tone: "none", text: "Праздник — отчёт сегодня не нужен" };
   if (!day.workday) return { tone: "none", text: "Выходной — можно сдать, без очков" };
-  // today is not over: a calm «to do», not an alarm
-  return { tone: "accent", text: "Не сдан" };
+  // today is not over: a calm «to do», not an alarm — and not green
+  return { tone: "wait", text: "Не сдан" };
 }
 
 /** The same state in two words for the row in «Дела»: «сдан ✓» / «не сдан» / «выходной» / «праздник». */
-export function entryState(day: MyDailyReportDay): { tone: "ok" | "accent" | "muted"; text: string } {
+export function entryState(day: MyDailyReportDay): { tone: "ok" | "wait" | "muted"; text: string } {
   if (day.report?.status === "submitted") return { tone: "ok", text: `сдан в ${timeOf(day.report.submitted_at)}` };
   if (day.holiday) return { tone: "muted", text: "праздник" };
   if (!day.workday) return { tone: "muted", text: "выходной" };
-  return { tone: "accent", text: "не сдан" };
+  return { tone: "wait", text: "не сдан" };
 }
 
 /**
@@ -246,18 +251,12 @@ export function activityLine(activity: TeamDayActivity): string {
   return parts.length ? parts.join(" · ") : "в задачах тихо";
 }
 
-/** The second line of the team's day: «не сдали 2 · в отпуске или на больничном 1 · сдано задач 15 · принято 9». */
+/** The second line of the team's day: «сдано задач 15 · принято 9»; empty on a quiet day. */
 export function teamTotalsLine(day: TeamDay): string {
   const t = day.totals;
-  return [
-    t.missed ? `не сдали ${t.missed}` : "",
-    t.pending ? `ждём ${t.pending}` : "",
-    t.away ? `в отпуске или на больничном ${t.away}` : "",
-    `сдано задач ${t.handed_over}`,
-    `принято ${t.closed}`,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  // the people's counts (сдали, ждём, не сдали, отпуск) stand once, in the legend under the bar;
+  // here only what moved in the tasks — no empty «0 …» counters (FIX §4.5)
+  return [t.handed_over ? `сдано задач ${t.handed_over}` : "", t.closed ? `принято ${t.closed}` : ""].filter(Boolean).join(" · ");
 }
 
 /** The people of a day in the order the director reads them, with the heading of each group. */
@@ -272,10 +271,14 @@ export const STATE_TITLE: Record<TeamDayState, string> = {
   off: "Отчёт не нужен",
 };
 
-/** The tone of a person's state: a status colour only where it is a status (DESIGN §1.3). */
+/**
+ * The tone of a person's state: a status colour only where it is a status (DESIGN §1.3). «Ещё не
+ * сдали» on a day that is not over is not done and not alarming — neutral (the state map,
+ * lib/tasks/tone.ts: `wait`), drawn as a ring where a dot can be one (`STATE_DOT`).
+ */
 export const STATE_TONE: Record<TeamDayState, "ok" | "warn" | "danger" | "muted"> = {
   submitted: "ok",
-  pending: "warn",
+  pending: "muted",
   missed: "danger",
   away: "muted",
   off: "muted",
@@ -288,13 +291,25 @@ export function spanText(arrived: string | null | undefined, left: string | null
   return from && to ? `${from}–${to}` : from || to;
 }
 
-/** The line under a person's name on a day: «9:05–18:10 · 9 ч» or what stands instead. */
+/** The dot and the bar segment of a person's state — `wait` is a hollow ring (lib/tasks/tone.ts). */
+export const STATE_DOT: Record<TeamDayState, "ok" | "wait" | "danger" | "muted"> = {
+  submitted: "ok",
+  pending: "wait",
+  missed: "danger",
+  away: "muted",
+  off: "muted",
+};
+
+/**
+ * The line under a person's name on a day: «сдан в 18:12» or what stands instead. Not the typed
+ * «Пришёл–Ушёл» and their hours: those are what the form prefilled, not attendance (D-194) — they
+ * stay inside the opened report, said as the report's (`reportTimesLine`).
+ */
 export function personDayLine(row: TeamDay["rows"][number]): string {
   const report = row.report;
   if (report?.status === "submitted") {
-    const times = spanText(report.arrived_at, report.left_at);
-    const hours = hoursText(row.hours);
-    return hours ? `${times} · ${hours}` : times;
+    const at = timeOf(report.submitted_at);
+    return at ? `сдан в ${at}` : "сдан";
   }
   switch (row.state) {
     case "pending":
@@ -307,6 +322,20 @@ export function personDayLine(row: TeamDay["rows"][number]): string {
     default:
       return "отчёт не нужен";
   }
+}
+
+/**
+ * The rows of a day or a period with `gone` known — the database's flag (migration 20261124130000),
+ * or the roster's while the database is older — the team first, the ones who left after it (stable).
+ */
+export function markGone<R extends { user_id: string; gone?: boolean }>(rows: readonly R[], goneIds: ReadonlySet<string>): (R & { gone: boolean })[] {
+  return rows.map((row) => ({ ...row, gone: row.gone ?? goneIds.has(row.user_id) })).sort((a, b) => Number(a.gone) - Number(b.gone));
+}
+
+/** «В отчёте: 9:05–18:10» — the times as the person wrote them, inside one report only (D-194). */
+export function reportTimesLine(report: Pick<DailyReport, "arrived_at" | "left_at"> | null | undefined): string {
+  const times = report ? spanText(report.arrived_at, report.left_at) : "";
+  return times ? `В отчёте: ${times}` : "";
 }
 
 /** A share as a percent: «82%»; a dash when nothing was due. */

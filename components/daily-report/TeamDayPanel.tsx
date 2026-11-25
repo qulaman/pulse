@@ -1,14 +1,17 @@
 "use client";
 
 import { LayoutGroup, motion } from "motion/react";
-import { useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 
 import { PersonFace } from "@/components/people/PeoplePicker";
 import { CARD_SPRING, CardShell, SectionHead } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
 import {
   activityLine,
+  markGone,
   personDayLine,
+  reportTimesLine,
+  STATE_DOT,
   STATE_ORDER,
   STATE_TITLE,
   STATE_TONE,
@@ -18,7 +21,8 @@ import {
 import type { TeamDay, TeamDayRow, TeamDayState } from "@/lib/daily-report/types";
 import type { Ymd } from "@/lib/datetime/calendar";
 import { shortName } from "@/lib/people/names";
-import { TONE_VAR, type Tone } from "@/lib/tasks/tone";
+import { useGoneIds } from "@/lib/people/queries";
+import { dotStyle, segmentStyle, TONE_VAR, type BarTone, type Tone } from "@/lib/tasks/tone";
 
 import { DayStepper } from "./DayStepper";
 import { DayTasks } from "./DayTasks";
@@ -64,17 +68,22 @@ export function TeamDayPanel({
   );
 }
 
-const BAR: { state: TeamDayState; tone: Tone; label: string }[] = [
-  { state: "submitted", tone: "ok", label: "сдали" },
-  { state: "pending", tone: "accent", label: "ждём" },
-  { state: "missed", tone: "danger", label: "не сдали" },
-  { state: "away", tone: "muted", label: "отпуск, больничный" },
+// «ждём» is not done: a hollow segment, never green, never the brand colour (lib/tasks/tone.ts)
+const BAR: { state: TeamDayState; tone: BarTone; label: string }[] = [
+  { state: "submitted", tone: STATE_DOT.submitted, label: "сдали" },
+  { state: "pending", tone: STATE_DOT.pending, label: "ждём" },
+  { state: "missed", tone: STATE_DOT.missed, label: "не сдали" },
+  { state: "away", tone: STATE_DOT.away, label: "отпуск, больничный" },
 ];
 
 function DaySummary({ day }: { day: TeamDay }) {
   const t = day.totals;
+  const goneIds = useGoneIds();
+  // the team now (lib/people/team.ts): the day's rows hold whoever left with a report that day too
+  const team = useMemo(() => markGone(day.rows, goneIds).filter((row) => !row.gone).length, [day.rows, goneIds]);
   const counts: Record<TeamDayState, number> = { submitted: t.submitted, pending: t.pending, missed: t.missed, away: t.away, off: 0 };
-  const tone: Tone = !day.workday ? "muted" : t.missed > 0 ? "danger" : t.pending > 0 ? "accent" : t.submitted > 0 ? "ok" : "muted";
+  // green only when every report that was due is in; waiting is neutral
+  const tone: Tone = !day.workday ? "muted" : t.missed > 0 ? "danger" : t.pending > 0 ? "muted" : t.submitted > 0 ? "ok" : "muted";
   const color = TONE_VAR[tone];
   const segments = BAR.filter((segment) => counts[segment.state] > 0);
 
@@ -90,7 +99,7 @@ function DaySummary({ day }: { day: TeamDay }) {
           <span className="truncate">{!day.workday ? "Не рабочий день" : day.today ? "Сегодня" : "Рабочий день"}</span>
         </span>
         <span className="shrink-0 text-[12px] leading-4 text-muted">
-          <span className="nums text-text">{t.team}</span> в команде
+          <span className="nums text-text">{team}</span> в команде
         </span>
       </div>
 
@@ -99,8 +108,8 @@ function DaySummary({ day }: { day: TeamDay }) {
           {t.submitted}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="font-display text-[17px] font-semibold leading-[22px] tracking-[-0.015em]">из {t.team} сдали отчёт</p>
-          <p className="mt-0.5 line-clamp-2 text-[13px] leading-[18px] text-muted">{teamTotalsLine(day)}</p>
+          <p className="font-display text-[17px] font-semibold leading-[22px] tracking-[-0.015em]">из {team} сдали отчёт</p>
+          {teamTotalsLine(day) ? <p className="mt-0.5 line-clamp-2 text-[13px] leading-[18px] text-muted">{teamTotalsLine(day)}</p> : null}
         </div>
       </div>
 
@@ -117,9 +126,7 @@ function DaySummary({ day }: { day: TeamDay }) {
               flexGrow: counts[segment.state],
               flexBasis: 0,
               minWidth: 6,
-              background: TONE_VAR[segment.tone],
-              opacity: segment.tone === "muted" ? 0.55 : 1,
-              borderRadius: index === 0 || index === segments.length - 1 ? 999 : 2,
+              ...segmentStyle(segment.tone, { first: index === 0, last: index === segments.length - 1 }),
               animationDelay: `${index * 60}ms`,
             }}
           />
@@ -128,7 +135,7 @@ function DaySummary({ day }: { day: TeamDay }) {
       <ul className="mt-2 flex min-h-[18px] flex-wrap gap-x-3.5 gap-y-1">
         {segments.map((segment) => (
           <li key={segment.state} className="flex items-center gap-1.5 whitespace-nowrap text-[13px] leading-[18px]">
-            <span aria-hidden className="h-[7px] w-[7px] shrink-0 rounded-full" style={{ background: TONE_VAR[segment.tone], opacity: segment.tone === "muted" ? 0.55 : 1 }} />
+            <span aria-hidden className="h-[7px] w-[7px] shrink-0 rounded-full" style={dotStyle(segment.tone)} />
             <span className="nums font-semibold text-text">{counts[segment.state]}</span>
             <span className="text-muted">{segment.label}</span>
           </li>
@@ -140,7 +147,10 @@ function DaySummary({ day }: { day: TeamDay }) {
 
 function DayPeople({ day }: { day: TeamDay }) {
   const [openId, setOpenId] = useState<string | null>(null);
-  const groups = STATE_ORDER.map((state) => ({ state, rows: day.rows.filter((row) => row.state === state) })).filter((group) => group.rows.length > 0);
+  const goneIds = useGoneIds();
+  // whoever left keeps their row of that day, after the team of its state, said as gone
+  const rows = useMemo(() => markGone(day.rows, goneIds), [day.rows, goneIds]);
+  const groups = STATE_ORDER.map((state) => ({ state, rows: rows.filter((row) => row.state === state) })).filter((group) => group.rows.length > 0);
 
   if (groups.length === 0) {
     return <p className="mt-4 rounded-[20px] border border-border/70 px-6 py-7 text-center text-[15px] text-muted">В команде пока никого</p>;
@@ -178,17 +188,16 @@ function DayPeople({ day }: { day: TeamDay }) {
   );
 }
 
-function PersonHead({ row }: { row: TeamDayRow }) {
-  const tone = TONE_VAR[STATE_TONE[row.state]];
+function PersonHead({ row }: { row: TeamDayRow & { gone: boolean } }) {
   return (
     <>
-      <span className="relative shrink-0">
+      <span className="relative shrink-0" style={{ opacity: row.gone ? 0.55 : 1 }}>
         <PersonFace person={row} size={40} />
-        <span aria-hidden className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-surface" style={{ background: tone }} />
+        <span aria-hidden className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-surface" style={{ ...dotStyle(STATE_DOT[row.state]), ...(STATE_DOT[row.state] === "wait" ? { background: "var(--surface)" } : {}) }} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[16px] leading-[22px]">{shortName(row.full_name)}</span>
-        <span className="nums block truncate text-[13px] leading-[18px] text-muted">{personDayLine(row)}</span>
+        <span className="nums block truncate text-[13px] leading-[18px] text-muted">{[row.gone ? "больше не в команде" : "", personDayLine(row)].filter(Boolean).join(" · ")}</span>
       </span>
       {row.tasks.length ? <span className="nums mt-0.5 shrink-0 text-[13px] leading-4 text-muted">{tasksCount(row.tasks.length)}</span> : null}
     </>
@@ -206,6 +215,8 @@ function PersonBody({ row }: { row: TeamDayRow }) {
         ) : (
           <p className="mt-1 text-[14px] leading-5 text-muted">{row.state === "pending" ? "Отчёт ещё не сдан" : "Отчёта нет"}</p>
         )}
+        {/* the times as written in the report — said as the report's, not as attendance (D-194) */}
+        {reportTimesLine(report) ? <p className="nums mt-1 text-[13px] leading-[18px] text-muted">{reportTimesLine(report)}</p> : null}
       </div>
       <div>
         <p className="eyebrow">Задачи дня</p>

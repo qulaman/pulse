@@ -166,7 +166,7 @@ export function useTvControl() {
       // a declined or revoked order never goes up (D-45, D-123): say so, not «no network»
       toast(
         error instanceof Error && error.message.includes("bad_task")
-          ? "Это дело на стену не встанет"
+          ? "Эта задача на стену не встанет"
           : error instanceof Error && error.message.includes("bad_employee")
             ? "Этого сотрудника на стену не вывести"
             : OFFLINE,

@@ -92,7 +92,7 @@ function Key({ action, digit, note, held, pressed, onPress, keyRef }: { action: 
       type="button"
       className="pult-key desk-focus"
       onClick={(event) => onPress(event.currentTarget)}
-      title={dnd ? "Выбрать, на сколько" : `Уйдёт через 5 с — успеете отменить${note ? ` · как обычно: ${note}` : ""}`}
+      title={`${dnd ? "Выбрать, на сколько" : `Уйдёт через 5 с — успеете отменить${note ? ` · как обычно: ${note}` : ""}`}${digit ? ` · ${digit}` : ""}`}
       aria-haspopup={dnd ? "menu" : undefined}
       aria-keyshortcuts={digit ? String(digit) : undefined}
       data-code={action.code}

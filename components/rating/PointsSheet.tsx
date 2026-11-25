@@ -10,6 +10,8 @@ import { humanAqtobe } from "@/lib/ai/time";
 import { useDisputePoints, useMyDisputes, type MyDispute } from "@/lib/points/game";
 import { useBalance, usePointHistory, type PointRow, type RatingRow } from "@/lib/points/queries";
 import { initialsOf } from "@/lib/people/names";
+import { formatNum } from "@/lib/desk/format";
+import { ratingLineView } from "@/lib/points/rating-view";
 
 const SOURCE_LABEL: Record<string, string> = {
   manual: "от директора",
@@ -59,12 +61,15 @@ export function PointsSheet({
               <p className="nums text-[13px] leading-4 text-muted">
                 {row.rank} место · {row.on_time_pct !== null ? `${row.on_time_pct}% в срок` : "без закрытых задач"}
               </p>
-              <p className="nums text-[24px] font-bold leading-[30px]" style={{ color: "var(--gold)" }}>
-                {row.points} <span className="text-[13px] font-normal text-muted">за период</span>
-                {canRead && total.data !== undefined ? (
-                  <span className="ml-2 text-[13px] font-normal text-muted">· всего {balance}</span>
-                ) : null}
-              </p>
+              {/* somebody else's zero or minus is not shown to whoever may not read their ledger (D-45) */}
+              {canRead || ratingLineView(row).points !== null ? (
+                <p className="nums text-[24px] font-bold leading-[30px]" style={{ color: row.points > 0 ? "var(--gold)" : "var(--text-muted)" }}>
+                  <span className="whitespace-nowrap">{formatNum(row.points)}</span> <span className="text-[13px] font-normal text-muted">за период</span>
+                  {canRead && total.data !== undefined ? (
+                    <span className="ml-2 whitespace-nowrap text-[13px] font-normal text-muted">· всего {formatNum(balance)}</span>
+                  ) : null}
+                </p>
+              ) : null}
             </div>
             {canAward ? (
               <Button variant="secondary" className="!min-h-[40px] !px-3 !text-[14px]" onClick={() => onAward(row)}>
@@ -166,7 +171,7 @@ function HistoryLine({
       <div className="flex items-baseline justify-between gap-3">
         <span className="min-w-0 truncate">
           <span className="nums font-semibold" style={{ color: line.amount > 0 ? "var(--gold)" : "var(--danger)" }}>
-            {line.amount > 0 ? `+${line.amount}` : line.amount}
+            {formatNum(line.amount, { signed: true })}
           </span>{" "}
           {line.reason ?? SOURCE_LABEL[line.source] ?? ""}
         </span>

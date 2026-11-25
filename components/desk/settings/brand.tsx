@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { createContext, useContext, useState, type ReactNode } from "react";
 
 import { toast } from "@/components/ui/Toast";
-import { APP_BG, contrastRatio, MIN_ACCENT_CONTRAST, parseHex } from "@/lib/brand-color";
+import { accentClash, accentRefusal, APP_BG, clashWords, contrastRatio, MIN_ACCENT_CONTRAST, parseHex, savedClashWords } from "@/lib/brand-color";
 import { useCompanyCard, useSaveCompanyCard, type CompanyCard } from "@/lib/desk/settings-queries";
 
 export type BrandEdit = { name: string; tagline: string; accent: string };
@@ -16,15 +16,24 @@ export function normalAccent(text: string): string | null | undefined {
   return rgb ? `#${rgb.map((c) => c.toString(16).padStart(2, "0")).join("").toUpperCase()}` : undefined;
 }
 
-/** What the accent readout says, and whether the accent will be honoured (≥ 4.5:1 on the app's background). */
-export function accentVerdict(text: string): { text: string; tone: "muted" | "warn" | "ok" } {
+/**
+ * What the accent readout says, and whether the accent will be honoured (≥ 4.5:1 on the app's
+ * background). A brand colour never says a state (owner, 2026-11-25): a new one near green, amber or
+ * red is refused (`danger`, the save says why); the one `stored` before the rule is honoured, with
+ * a note (`clash`) until it is changed.
+ */
+export function accentVerdict(text: string, stored?: string | null): { text: string; tone: "muted" | "warn" | "ok" | "danger"; clash: boolean } {
   const hex = normalAccent(text);
-  if (hex === null) return { text: "Без цвета остаётся фирменный акцент Pulse", tone: "muted" };
-  if (hex === undefined) return { text: "Нужен hex вида #RRGGBB", tone: "warn" };
+  if (hex === null) return { text: "Без цвета остаётся фирменный акцент Pulse", tone: "muted", clash: false };
+  if (hex === undefined) return { text: "Нужен hex вида #RRGGBB", tone: "warn", clash: false };
+  const clash = accentClash(hex);
+  if (clash && accentRefusal(hex, stored)) return { text: clashWords(clash), tone: "danger", clash: true };
   const ratio = contrastRatio(hex, APP_BG) ?? 0;
-  return ratio >= MIN_ACCENT_CONTRAST
-    ? { text: `Контраст с фоном ${ratio.toFixed(1)}:1 — подходит`, tone: "ok" }
-    : { text: `Контраст ${ratio.toFixed(1)}:1 — слишком тёмный, нужен не меньше ${MIN_ACCENT_CONTRAST}:1; останется акцент по умолчанию`, tone: "warn" };
+  if (ratio < MIN_ACCENT_CONTRAST) {
+    return { text: `Контраст ${ratio.toFixed(1)}:1 — слишком тёмный, нужен не меньше ${MIN_ACCENT_CONTRAST}:1; останется акцент по умолчанию`, tone: "warn", clash: false };
+  }
+  if (clash) return { text: savedClashWords(clash), tone: "ok", clash: true };
+  return { text: `Контраст с фоном ${ratio.toFixed(1)}:1 — подходит`, tone: "ok", clash: false };
 }
 
 const fromCard = (card: CompanyCard): BrandEdit => ({ name: card.name, tagline: card.brand.tagline ?? "", accent: card.brand.accent ?? "" });
@@ -64,7 +73,15 @@ export function BrandDraftProvider({ children }: { children: ReactNode }) {
     accent: Boolean(edit && base && normalAccent(edit.accent) !== (normalAccent(base.accent) ?? null)),
   };
   const dirty = changed.name || changed.tagline || changed.accent;
-  const blocked = !edit ? null : !edit.name.trim() ? "у компании должно быть название" : normalAccent(edit.accent) === undefined ? "цвет — hex вида #RRGGBB" : null;
+  const blocked = !edit
+    ? null
+    : !edit.name.trim()
+      ? "у компании должно быть название"
+      : normalAccent(edit.accent) === undefined
+        ? "цвет — hex вида #RRGGBB"
+        : accentRefusal(normalAccent(edit.accent), base?.accent)
+          ? "цвет компании похож на цвет состояния задачи"
+          : null;
 
   const value: BrandDraft = {
     card: card.data,

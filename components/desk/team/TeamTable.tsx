@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutGrid, List } from "lucide-react";
+import { LayoutGrid, List, Monitor } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, ViewTransition, type ReactNode } from "react";
@@ -10,7 +10,6 @@ import { useDeskScope } from "@/components/desk/DeskScope";
 import { DataGrid, type Column, type Group } from "@/components/desk/ui/DataGrid";
 import { InPanel } from "@/components/desk/ui/DeskPanel";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
-import { Kbd } from "@/components/desk/ui/Kbd";
 import { useContextMenu, type MenuItem } from "@/components/desk/ui/Menu";
 import { Num } from "@/components/desk/ui/Num";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
@@ -30,25 +29,28 @@ import { todayYmd } from "@/lib/datetime/calendar";
 import { pointsTone } from "@/lib/desk/format";
 import { SWITCH_SWAP } from "@/lib/desk/motion";
 import { useCompanySettings } from "@/lib/dictionary-queries";
-import { canChangeAccess, canEditPerson, canResetLogin, type Who } from "@/lib/people/access";
+import { canChangeAccess, canEditPerson, type Who } from "@/lib/people/access";
 import { usePhones, useSetWorking } from "@/lib/people/card-queries";
 import { useTeamLoads, type Load } from "@/lib/people/loads";
 import { ROLE_LABEL, isTeamMember, usePeople, type Person, type Role } from "@/lib/people/queries";
+import { absenceOf, countTeam, isGoneMember } from "@/lib/people/team";
 import { useTeamBalances } from "@/lib/points/queries";
 import type { Health } from "@/lib/push/health";
 import { usePushHealth } from "@/lib/push/health-query";
 import { useComposeStore } from "@/lib/store/compose";
 import { sortByUrgency, useMe, useSentTasks, type TaskWithPeople } from "@/lib/tasks/queries";
-import { isOverdue, type TaskStatus } from "@/lib/tasks/status-text";
+import { noPushIds, taskAttention } from "@/lib/tasks/attention";
+import { isOverdue, pluralRu, type TaskStatus } from "@/lib/tasks/status-text";
 
 import { HeroBone, DeskHero, type HeroFact } from "./Hero";
 import { arrowOf, onControl, stepKey, useScreenKeys } from "./keys";
+import { PersonMovesBar, usePersonMoves, type MoveHandlers } from "./PersonMoves";
 import { PersonPeek } from "./PersonPeek";
 import { PersonStats } from "./PersonStats";
 import { RemoveDialog, type RemoveMode } from "./RemoveDialog";
 import { TeamCard, type CardTab } from "./TeamCard";
 import { TeamGrid, TilesBone, type TileFacts } from "./TeamGrid";
-import { AwayTag, GridBone, LoadTally, ROLE_ORDER, StateWord, addressOf, counted, loadWords, matchesPerson, tidy, useBoxWidth } from "./shared";
+import { AwayTag, GridBone, LoadTally, ROLE_ORDER, StateWord, addressOf, counted, loadWords, matchesPerson, useBoxWidth } from "./shared";
 
 const NO_LOADS: Record<string, Load> = {};
 const NO_BALANCES: Record<string, number> = {};
@@ -77,7 +79,7 @@ type Filter = "overdue" | "review" | "unreachable" | "away" | "left";
 
 const FILTER_LABEL: Record<Filter, string> = {
   overdue: "с просрочкой",
-  review: "с работой на приёмке",
+  review: "с работой на проверке",
   unreachable: "без уведомлений",
   away: "не на месте",
   left: "ушедшие с задачами",
@@ -131,7 +133,7 @@ function NameCell({ person }: { person: Person }) {
  */
 function LoadCell({ person, load, scale }: { person: Person; load: Load | undefined; scale: number }) {
   const active = load?.active ?? 0;
-  if (active === 0) return <span className="text-muted">{person.availability === "active" ? "свободен" : "—"}</span>;
+  if (active === 0) return <span className="text-muted">{person.availability === "active" ? "дел нет" : "—"}</span>;
   const late = (load?.overdue ?? 0) > 0;
   const waits = (load?.review ?? 0) > 0;
   const tone = late ? TONE_VAR.danger : waits ? TONE_VAR.warn : undefined;
@@ -235,14 +237,29 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
   const [selected, setSelected] = useState<string | null>(openId);
   const search = useRef<HTMLInputElement>(null);
   const menu = useContextMenu();
+  const moves = usePersonMoves("card");
   const [box, width] = useBoxWidth();
   const phones = usePhones();
 
-  const all = useMemo(() => people ?? [], [people]);
+  // the wall's kiosk is a login, not a person (D-194): it stands under the people as one line, never a tile or a row
+  const all = useMemo(() => (people ?? []).filter((p) => p.role !== "tv"), [people]);
+  const screens = useMemo(() => (people ?? []).filter((p) => p.role === "tv"), [people]);
   const roles = useMemo(() => {
     const present = new Set(all.filter((p) => p.is_active).map((p) => p.role));
     return (Object.keys(ROLE_ORDER) as Role[]).filter((r) => present.has(r)).sort((a, b) => ROLE_ORDER[a] - ROLE_ORDER[b]);
   }, [all]);
+
+  // who has a task nobody took past the grace or whose pushes do not reach: the ring turns amber, never green (D-194)
+  const staleIds = useMemo(() => {
+    const noPush = noPushIds(push);
+    const ids = new Set<string>();
+    for (const task of tasks) {
+      if (task.status !== "sent") continue;
+      const reason = taskAttention(task, { now, noPush });
+      if (reason === "unaccepted" || reason === "no_push") ids.add(task.assignee_id);
+    }
+    return ids;
+  }, [tasks, push, now]);
 
   // what each person is on: their most urgent open task, from the director's own orders
   const current = useMemo(() => {
@@ -264,20 +281,23 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
     if (!works(p)) return false;
     if (filter === "overdue") return overdueOf(p) > 0;
     if (filter === "review") return reviewOf(p) > 0;
-    if (filter === "away") return p.availability !== "active";
+    if (filter === "away") return absenceOf(p, now.getTime()) !== null;
     return unreachable(push?.get(p.id));
   };
   const shown = all.filter((p) => (role ? p.role === role : true) && matchesPerson(p, query, phones.data?.[p.id]) && passes(p));
   // who left: in sight when asked for — the toolbar, a search, a filter that is about them
   const goneInSight = showGone || Boolean(query) || filter === "left";
-  const goneCount = all.filter((p) => !p.is_active).length;
+  // «Ушедшие · N» — the people who left the team (lib/people/team.ts `isGoneMember`), the same N as the
+  // табель's «Больше не в команде» and the points' «у ушедших»; a director who left stands apart (D-194)
+  const goneCount = all.filter(isGoneMember).length;
   const byName = (a: Person, b: Person) => a.full_name.localeCompare(b.full_name, "ru");
   // the troubled first: late, then work waiting for the director's «Принято», then by name
   const byTrouble = (a: Person, b: Person) => overdueOf(b) - overdueOf(a) || reviewOf(b) - reviewOf(a) || byName(a, b);
   const groups: Group<Person>[] = [
     { key: "crew", title: null, rows: shown.filter(crew).sort(director ? byTrouble : byName) },
-    { key: "heads", title: "Директора и экран", tone: "muted", rows: shown.filter((p) => p.is_active && !crew(p)).sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || byName(a, b)) },
-    { key: "gone", title: "Ушедшие", tone: "muted", rows: goneInSight ? shown.filter((p) => !p.is_active).sort(byName) : [] },
+    { key: "heads", title: "Директора", tone: "muted", rows: shown.filter((p) => p.is_active && !crew(p)).sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || byName(a, b)) },
+    { key: "gone", title: "Ушедшие", tone: "muted", rows: goneInSight ? shown.filter(isGoneMember).sort(byName) : [] },
+    { key: "gone-heads", title: "Директора, которых больше нет", tone: "muted", rows: goneInSight ? shown.filter((p) => !p.is_active && !isGoneMember(p)).sort(byName) : [] },
   ];
 
   const columns: Column<Person>[] = [
@@ -356,9 +376,11 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
   });
 
   // the hero: who is here, and the trouble — each number a filter of the table
+  // «на месте» and «отсутствуют» by the one rule of the product (lib/people/team.ts, D-194): «отошёл до …» is away too
   const staff = all.filter(isTeamMember);
-  const present = staff.filter((p) => p.availability === "active").length;
-  const away = staff.length - present;
+  const tally = countTeam(staff, now.getTime());
+  const present = tally.here;
+  const away = tally.away;
   const lateCount = staff.filter((p) => overdueOf(p) > 0).length;
   const reviewCount = staff.filter((p) => reviewOf(p) > 0).length;
   const deaf = push ? staff.filter((p) => unreachable(push.get(p.id))).length : 0;
@@ -371,11 +393,11 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
     value > 0 || filter === key ? [{ key, value, label, tone, onClick: toggle(key), active: filter === key, title: filter === key ? "Показать всех" : "Показать только их" }] : [];
   const facts: HeroFact[] = director
     ? [
-        ...trouble("left", orphaned, orphaned === 1 ? "задача у ушедших" : "задач у ушедших", "danger"),
+        ...trouble("left", orphaned, `${pluralRu(orphaned, ["задача", "задачи", "задач"])} у ушедших`, "danger"),
         ...trouble("overdue", lateCount, "с просрочкой", "danger"),
-        ...trouble("review", reviewCount, "на приёмке", "warn"),
+        ...trouble("review", reviewCount, "на проверке", "warn"),
         ...trouble("unreachable", deaf, "без уведомлений", null),
-        { key: "open", value: open, label: "открытых задач", href: "/desk/tasks", title: "Открыть «Задачи»" },
+        { key: "open", value: open, label: pluralRu(open, ["открытая задача", "открытые задачи", "открытых задач"]), href: "/desk/tasks", title: "Открыть «Задачи»" },
       ]
     : [...trouble("unreachable", deaf, "без уведомлений", null), ...trouble("away", away, "не на месте", null)];
   const calm = director && lateCount === 0 && reviewCount === 0 ? "просрочек нет" : null;
@@ -417,33 +439,34 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
     setCardTab("data");
     setEditingId(p.id);
   };
-  const menuOf = (p: Person): MenuItem[] => {
-    const items: MenuItem[] = [
-      { key: "open", label: "Открыть карточку", hint: "Enter", onSelect: () => openCard(p.id) },
-      {
-        key: "peek",
-        label: view === "grid" ? (openId === p.id ? "Закрыть карточку" : "Раскрыть карточку") : openId === p.id ? "Закрыть панель" : "Посмотреть в панели",
-        hint: "Space",
-        onSelect: () => peek(openId === p.id ? null : p.id),
-      },
-    ];
-    if (givable(p)) items.push({ key: "give", label: "Дать задачу", hint: "T", onSelect: () => give(p) });
-    if (director && works(p)) items.push({ key: "tasks", label: "Задачи человека", onSelect: () => router.push(`/desk/tasks?who=${p.id}`) });
-    if (editable(p)) items.push({ key: "edit", label: "Изменить", hint: "E", onSelect: () => edit(p) });
+  // one set of moves on every desk card (D-194): the order and the words from lib/desk/person-moves.ts,
+  // the doing here where «Команда» does it its own way — edits in the card, opens its dialogs
+  const handlersOf = (p: Person): MoveHandlers => ({
+    give: () => give(p),
+    edit: () => edit(p),
+    card: () => openCard(p.id),
+    revive: () => revive(p),
     // the code itself is issued on the card, in front of the person — the menu only leads there
-    if (me && p.is_active && canResetLogin(me, p)) items.push("separator", { key: "login", label: "Выдать код входа…", onSelect: () => router.push(`/desk/team/${p.id}?login=1`) });
-    if (me && canChangeAccess(me, p)) {
-      const kiosk = p.role === "tv";
-      if (p.is_active) items.push("separator", { key: "remove", label: kiosk ? "Выключить экран…" : "Удалить…", hint: "Del", danger: true, onSelect: () => remove(p) });
-      else {
-        items.push("separator");
-        if (director && (loads[p.id]?.active ?? 0) > 0) items.push({ key: "pass", label: "Передать задачи…", onSelect: () => setRemoving({ person: p, mode: "pass" }) });
-        items.push({ key: "revive", label: kiosk ? "Включить экран" : "Вернуть в команду", onSelect: () => revive(p) });
-        items.push({ key: "erase", label: "Удалить насовсем…", hint: "Del", danger: true, onSelect: () => remove(p) });
-      }
-    }
-    return items;
+    login: () => router.push(`/desk/team/${p.id}?login=1`),
+    pass: () => setRemoving({ person: p, mode: "pass" }),
+    remove: () => remove(p),
+  });
+  const heldBy = (p: Person) => (p.is_active ? 0 : (loads[p.id]?.active ?? 0));
+  const menuOf = (p: Person): MenuItem[] => {
+    const items = moves.menu(p, handlersOf(p), heldBy(p));
+    const peekItem: MenuItem = {
+      key: "peek",
+      label: view === "grid" ? (openId === p.id ? "Закрыть карточку" : "Раскрыть карточку") : openId === p.id ? "Закрыть панель" : "Посмотреть в панели",
+      hint: "Space",
+      onSelect: () => peek(openId === p.id ? null : p.id),
+    };
+    // the card under the row (Space) beside the card's page (Enter)
+    const at = items.findIndex((item) => item !== "separator" && item.key === "card");
+    return at < 0 ? [peekItem, ...items] : [...items.slice(0, at + 1), peekItem, ...items.slice(at + 1)];
   };
+  const barOf = (p: Person, testId: string, extra: { onClose?: () => void } = {}) => (
+    <PersonMovesBar person={p} moves={moves} handlers={handlersOf(p)} held={heldBy(p)} testId={testId} keys hide={editing && p.id === editingId ? ["edit"] : []} onClose={extra.onClose} />
+  );
   /** «Удалить…» of a person at work, «Удалить насовсем…» of one who left — the same key for both. */
   const removable = (p: Person) => Boolean(me && canChangeAccess(me, p));
   const remove = (p: Person) => setRemoving({ person: p, mode: p.is_active ? "remove" : "erase" });
@@ -537,6 +560,7 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
   // the dashboard of a person (components/desk/team/PersonStats.tsx, D-172)
   const statsOf = (p: Person): ReactNode => <PersonStats person={p} now={now} />;
   const factsOf = (p: Person): TileFacts => ({
+    stale: staleIds.has(p.id),
     load: load(p) ?? (p.is_active ? undefined : loads[p.id]),
     report: report?.get(p.id),
     balance: pointsOn && crew(p) ? (balances[p.id] ?? 0) : null,
@@ -557,7 +581,6 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
   const count = shown.filter((p) => p.is_active).length;
   const narrowed = Boolean(query || role || filter);
   const opened = failed ? null : byId(openId);
-  const chosen = byId(chosenId);
   const managerOf = (p: Person) => byId(p.manager_id);
   const openTasksOf = (id: string) => sortByUrgency(tasks.filter((task) => task.assignee_id === id && OPEN_STATUSES.includes(task.status)), now);
   const visibleColumns = columns.filter((column) => width === 0 || width >= (ROOM[column.key] ?? 0));
@@ -636,7 +659,7 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
             </option>
           ))}
         </Select>
-        {goneCount > 0 && !query && filter !== "left" ? (
+        {all.some((p) => !p.is_active) && !query && filter !== "left" ? (
           <button
             type="button"
             onClick={() => setShowGone((was) => !was)}
@@ -644,7 +667,7 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
             className={`inline-flex h-8 items-center gap-1.5 text-[14px] leading-5 hover:underline ${showGone ? "text-accent" : "text-muted"}`}
             data-testid="desk-team-gone"
           >
-            Ушедшие · <span className="nums">{goneCount}</span>
+            Ушедшие{goneCount > 0 ? <> · <span className="nums">{goneCount}</span></> : null}
             {showGone ? <span aria-hidden>×</span> : null}
           </button>
         ) : null}
@@ -707,6 +730,7 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
                       phone={phones.data?.[opened.id] ?? null}
                       phonesReady={!phones.isPending}
                       load={load(opened) ?? (opened.is_active ? undefined : loads[opened.id])}
+                      stale={staleIds.has(opened.id)}
                       tasks={director ? openTasksOf(opened.id) : NO_TASKS}
                       push={push?.get(opened.id)}
                       now={now}
@@ -714,12 +738,7 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
                       onTab={setCardTab}
                       editing={editing}
                       onEditing={setEditing}
-                      onClose={() => peek(null)}
-                      moves={{
-                        give: givable(opened) ? () => give(opened) : undefined,
-                        open: () => openCard(opened.id),
-                        more: tidy(menuOf(opened).filter((item) => item === "separator" || !["open", "peek", "give", "edit"].includes(item.key))),
-                      }}
+                      moves={barOf(opened, "team-card", { onClose: () => peek(null) })}
                       stats={director && crew(opened) ? statsOf(opened) : null}
                     />
                   ) : null
@@ -783,45 +802,7 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
         </ViewTransition>
       )}
 
-      {shown.length > 0 && !failed ? (
-        // the moves of the chosen row only — a hint never names a key that does nothing here
-        <p className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-muted" data-testid="desk-keys-hint">
-          <span>
-            {view === "grid" ? (
-              <>
-                <Kbd>←</Kbd> <Kbd>→</Kbd>
-              </>
-            ) : (
-              <>
-                <Kbd>↑</Kbd> <Kbd>↓</Kbd>
-              </>
-            )}{" "}
-            выбор
-          </span>
-          <span>
-            <Kbd>Space</Kbd> {view === "grid" ? "карточка под рядом" : "в панели"}
-          </span>
-          <span>
-            <Kbd>Enter</Kbd> {view === "grid" ? "полная карточка" : "карточка"}
-          </span>
-          {chosen && editable(chosen) ? (
-            <span>
-              <Kbd>E</Kbd> изменить
-            </span>
-          ) : null}
-          {chosen && givable(chosen) ? (
-            <span>
-              <Kbd>T</Kbd> дать задачу
-            </span>
-          ) : null}
-          {chosen && removable(chosen) ? (
-            <span>
-              <Kbd>Del</Kbd> {chosen.is_active ? "удалить" : "удалить насовсем"}
-            </span>
-          ) : null}
-          <span>правая кнопка — все действия</span>
-        </p>
-      ) : null}
+      {!failed && !loading && screens.length > 0 && !query && !filter && !role ? <ScreensLine screens={screens} director={director} /> : null}
 
       {opened && view === "list" ? (
         <InPanel panelKey={`person:${opened.id}`} onClose={() => peek(null)}>
@@ -835,16 +816,12 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
             balance={pointsOn && crew(opened) ? (balances[opened.id] ?? 0) : null}
             push={push?.get(opened.id)}
             now={now}
-            moves={{
-              give: givable(opened) ? () => give(opened) : undefined,
-              edit: editable(opened) ? () => edit(opened) : undefined,
-              open: () => openCard(opened.id),
-              more: tidy(menuOf(opened).filter((item) => item === "separator" || !["open", "peek", "give", "edit"].includes(item.key))),
-            }}
+            moves={barOf(opened, "person-peek")}
           />
         </InPanel>
       ) : null}
       {menu.node}
+      {moves.node}
       {dialog ? (
         <RemoveDialog
           person={dialog.person}
@@ -857,6 +834,33 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
         />
       ) : null}
     </DeskPage>
+  );
+}
+
+/**
+ * The wall's kiosk under the people (D-194): one quiet line, never a tile — its card still holds
+ * the code to connect it and «Выключить экран»; what it shows is «Экран»'s, the director's.
+ */
+function ScreensLine({ screens, director }: { screens: readonly Person[]; director: boolean }) {
+  return (
+    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] leading-5 text-muted" data-testid="desk-team-screens">
+      <Monitor size={15} strokeWidth={2} aria-hidden className="shrink-0" />
+      {screens.map((screen, index) => (
+        <span key={screen.id} className="inline-flex min-w-0 items-center gap-1">
+          {index === 0 ? <span>{screens.length > 1 ? "Экраны на стене:" : "Экран на стене:"}</span> : null}
+          <Link href={`/desk/team/${screen.id}`} className="max-w-[240px] truncate text-text hover:underline" title="Код входа и «Выключить экран» — в его карточке" data-testid="desk-team-screen">
+            {screen.full_name}
+          </Link>
+          {screen.is_active ? null : <span>· выключен</span>}
+          {index < screens.length - 1 ? <span aria-hidden>,</span> : null}
+        </span>
+      ))}
+      {director ? (
+        <Link href="/desk/screen" className="hover:text-text hover:underline">
+          Что на стене — в «Экране» →
+        </Link>
+      ) : null}
+    </p>
   );
 }
 

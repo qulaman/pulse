@@ -29,12 +29,14 @@ async function checkToday(ctx: Ctx) {
     .waitFor({ timeout: 15_000 })
     .catch(() => undefined);
   // the phone's home on the desk (D-164): its balls and the secretary's desk are blocks here
+  // «Ждут вас» stands empty only while nothing needs the director: «Требует внимания» takes its place (D-194)
+  const moveBlock = page.getByTestId("today-decisions").or(page.getByTestId("today-attention"));
+  record("сегодня: «Ждут вас» или «Требует внимания»", (await moveBlock.count()) >= 1, `блоков ${await moveBlock.count()}`);
   for (const [id, name] of [
-    ["today-decisions", "«Ждут вас»"],
     ["today-team", "«Люди»"],
     ["today-agenda", "«Встречи и сроки»"],
     ["home-messages", "«Сообщения»"],
-    ["home-secretary", "«Секретарь»"],
+    ["home-secretary", "«Заявки»"],
     ["home-ether", "«Эфир»"],
     ["today-feed", "«Лента»"],
   ] as const) {

@@ -106,7 +106,8 @@ export function AnnouncementCard({
               >
                 <motion.span
                   className="block h-full w-full origin-left rounded-full"
-                  style={{ background: count >= teamSize ? "var(--ok)" : "var(--accent)" }}
+                  // the filled part is who has read — done, in the state's colour; the brand colour is no state
+                  style={{ background: "var(--state-done)" }}
                   initial={{ scaleX: 0 }}
                   animate={{ scaleX: Math.min(1, count / teamSize) }}
                   transition={{ duration: 0.8, delay: 0.15, ease: [0.2, 0.7, 0.2, 1] }}

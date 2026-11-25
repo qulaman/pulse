@@ -1,3 +1,4 @@
+import { isStaleUnaccepted } from "./attention";
 import { handedInPartly, isWorking, lastNudgeAt, latestSuggestion, latestTimeRequest, WORKING, type Suggestion, type TimeRequest } from "./lifecycle";
 import { REASON_TONE, REASON_WORD, reasonFor, statusWord } from "./overview";
 import type { TaskMessage, TaskWithPeople } from "./query-core";
@@ -96,6 +97,8 @@ export function taskDetailModel(
   reader: { role: string; userId: string },
   now: Date,
   seenAtOpen: number | null | undefined,
+  /** whose pushes do not reach them (`noPushIds`): their new task is amber at once */
+  { noPush }: { noPush?: ReadonlySet<string> } = {},
 ): TaskDetailModel {
   const isDirector = reader.role === "director";
   // a manager opening a subordinate's task and the director keep «О задаче» whole
@@ -128,7 +131,11 @@ export function taskDetailModel(
     reworkComment: !isDirector && task.status === "rework" ? reworkCommentOf(messages) : null,
     // `undefined` — the cursor is still being asked for (a cold open): the word waits for it
     waiting: mine && IN_HAND.includes(task.status) && seenAtOpen !== undefined ? unreadWordOf(messages, reader.userId, seenAtOpen) : null,
-    tone: stage ? REASON_TONE[stage] : toneOf(task.status, overdue),
+    // a new task: the holder's move (amber); to the director amber once nobody has taken it for half an
+    // hour, or at once when the holder's pushes do not reach them
+    tone: stage
+      ? REASON_TONE[stage]
+      : toneOf(task.status, overdue, { attention: mine || (isDirector && (isStaleUnaccepted(task, now) || Boolean(noPush?.has(task.assignee_id)))) }),
     word: stage ? REASON_WORD[stage] : statusWord(task, isDirector ? "director" : "employee", now),
     closed,
     urgentNow: !task.deadline && task.priority === "high" && !closed,

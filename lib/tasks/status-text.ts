@@ -28,7 +28,7 @@ export const SHORT_STATUS: Record<TaskStatus, string> = {
   sent: "новая",
   accepted: "в работе",
   in_progress: "в работе",
-  pending_review: "на приёмке",
+  pending_review: "на проверке",
   done: "готово",
   rework: "на доработке",
   declined: "отказ",
@@ -48,14 +48,15 @@ export const BUTTON = {
   cancel: "Отменить",
   revoke: "Отозвать",
   extend: "Срок",
-  reassign: "Переназначить",
+  reassign: "Передать",
   remove: "Удалить",
   send: "Отправить",
 } as const;
 
 export const TEXT = {
-  emptyFeed: "Пока тихо. Появится задача — разбужу",
-  emptyTasks: "Открытых дел нет. Новое покажу здесь",
+  // the one empty phrase of the product (DESIGN §5, FIX §4.5)
+  emptyFeed: "Дел нет. Придёт задача — я позову",
+  emptyTasks: "Дел нет. Придёт задача — я позову",
   emptyInbox: "Всё спокойно",
   reworkBanner: "Директор вернул задачу. Комментарий внутри",
   /** the task's own screen, before its thread is here: the comment is not «inside» — it is this screen (D-173) */
@@ -73,7 +74,7 @@ export const TEXT = {
   photoPick: "Добавить фото",
   photoRemove: "Убрать фото",
   photoUploading: "Отправляю фото…",
-  photoFailed: "Фото не отправилось. Проверь связь и попробуй ещё раз",
+  photoFailed: "Фото не отправилось. Проверьте связь и попробуйте ещё раз",
   // «Не могу» (D-128): three ways out, each a decision for the director
   cantTitle: "Что мешает?",
   cantTime: "Нужно больше времени",
@@ -96,14 +97,14 @@ export const TEXT = {
   reportPartialSend: "Сдать как есть",
   reworkTitle: "Что доработать?",
   reworkPlaceholder: "Комментарий обязателен — сотрудник увидит его в треде",
-  revokeConfirm: "Отозвать задачу? Сотрудник увидит пометку «отозвано директором»",
-  removeConfirm: "Удалить насовсем? Задача исчезнет у всех вместе с перепиской, без следа. Отзыв — мягче: сотрудник видит пометку",
+  revokeConfirm: "Отозвать задачу? Исполнитель увидит, что она отозвана, а задача останется в истории. Стереть без следа — «Удалить»",
+  removeConfirm: "Удалить насовсем? Задача исчезнет у всех вместе с перепиской, без следа. «Отозвать» мягче: исполнитель увидит, что задача отозвана, и она останется в истории",
   composerPlaceholder: "Написать…",
   /** a tap on the microphone shorter than a recording (D-173) */
   holdToRecord: "Удерживайте, чтобы записать",
   answered: "отвечено",
   question: "вопрос",
-  audioFailed: "Не смог открыть аудио, попробуй ещё раз",
+  audioFailed: "Не смог открыть аудио, попробуйте ещё раз",
 } as const;
 
 export type DeadlineLabel = { text: string; overdue: boolean; none: boolean };
@@ -158,7 +159,7 @@ export function verdict(counts: InboxCounts): { tone: VerdictTone; text: string 
     const n = counts.messages ?? 0;
     parts.push(`${n} ${pluralRu(n, ["сообщение", "сообщения", "сообщений"])}`);
   }
-  if (counts.review > 0) parts.push(`${counts.review} на приёмке`);
+  if (counts.review > 0) parts.push(`${counts.review} на проверке`);
 
   if (parts.length === 0) return { tone: "ok", text: TEXT.emptyInbox };
   // a refusal is red, as its ball on the board (owner, 2026-11-18, D-181)

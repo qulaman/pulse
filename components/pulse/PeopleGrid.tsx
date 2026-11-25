@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PeopleGridBone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { LOAD_COLOR, loadColor, useTeamLoads } from "@/lib/people/loads";
 import { usePeople } from "@/lib/people/queries";
+import { absenceOf, isTeamMember } from "@/lib/people/team";
 import { initialsOf } from "@/lib/people/names";
 
 /** «Команда»: the team at a glance — one dot per person, tap opens the card. */
@@ -13,7 +14,8 @@ export function PeopleGrid({ title = "Люди" }: { title?: string }) {
   // the same cache and socket as the list above it on «Команда» (D-126: it was a second copy)
   const loads = useTeamLoads();
 
-  const team = (people.data ?? []).filter((p) => p.is_active && p.role !== "tv" && p.role !== "director");
+  // the team as every screen counts it (lib/people/team.ts)
+  const team = (people.data ?? []).filter(isTeamMember);
   // where the grid will stand, under its own title; its length is the team's (`grow`, D-122)
   if (people.isLoading) {
     return (
@@ -36,7 +38,8 @@ export function PeopleGrid({ title = "Люди" }: { title?: string }) {
       <ul className="mt-3 grid grid-cols-4 gap-2">
         {team.map((person) => {
           const load = loads.data?.[person.id];
-          const color = loadColor(load, person.availability === "active");
+          // away (vacation, sick, «не на месте до …») is grey whatever the load
+          const color = loadColor(load, absenceOf(person) === null);
           const first = person.full_name.split(/\s+/)[0] ?? person.full_name;
           return (
             <li key={person.id} className="card-in">
@@ -70,7 +73,8 @@ export function PeopleGrid({ title = "Люди" }: { title?: string }) {
         })}
       </ul>
       <p className="mt-2 text-[11px] leading-4 text-muted">
-        зелёный — в срок · жёлтый — дедлайн ближе суток · красный — просрочка · серый — свободен или в отпуске
+        {/* what grey means since loadColor: nothing taken (no tasks, or none accepted yet) or not here */}
+        зелёный — в работе, в срок · жёлтый — срок меньше суток · красный — просрочка · серый — нет дел в работе или не на месте
       </p>
     </section>
   );

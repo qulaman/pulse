@@ -12,6 +12,7 @@ import {
   calendarViewOf,
   CAROUSEL_MS,
   carouselNext,
+  carouselOn,
   carouselScene,
   carouselScenes,
   clockStyleOf,
@@ -108,9 +109,17 @@ describe("sceneOf", () => {
     expect(sceneOf(state({ scene: "calendar" }))).toBe("calendar");
   });
 
-  it("незнакомая сцена и отсутствие строки дают лицо", () => {
+  it("незнакомая сцена даёт лицо", () => {
     expect(sceneOf(state({ scene: "disco" }))).toBe("face");
-    expect(sceneOf(null)).toBe("face");
+  });
+
+  it("стена, которую ещё не настраивали с пульта, листает заставки сама (круг по умолчанию)", () => {
+    expect(carouselOn(null)).toBe(true);
+    expect(roundOn(null, NOW)).toBe(true);
+    expect([0, 1, 2, 3].map((step) => sceneOf(null, new Date(step * CAROUSEL_MS + 1000)))).toEqual(["face", "rating", "face", "calendar"]);
+    // a scene picked by hand stops the round, as the switch says
+    expect(carouselOn(state({ carousel: false, scene: "face" }))).toBe(false);
+    expect(sceneOf(state({ carousel: false, scene: "face" }), new Date(1 * CAROUSEL_MS + 1000))).toBe("face");
   });
 });
 

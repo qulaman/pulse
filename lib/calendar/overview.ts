@@ -125,7 +125,46 @@ export type CalendarScreen = {
   nearest: { id: string; title: string; when: string; tone: Tone } | null;
   /** The meeting the big line is about — a tap on the line opens it (D-143): «Ваш ответ» → the invitation. */
   focusId?: string | null;
+  /** No meeting today at all — the ribbon's own «свободный день» for today would say it twice. */
+  freeToday: boolean;
+  /** Nothing today, nothing ahead, nobody owes an answer: there is nothing to tell but «Встреч нет». */
+  empty: boolean;
 };
+
+/**
+ * What the phone's status card shows of the screen (D-100), each fact once: a calendar with
+ * nothing in it is one line, «Встреч нет»; a free day with something ahead names it once — in the
+ * foot «Ближайшее», not again as «Дальше — …» under «Встреч нет» — and the eyebrow does not say
+ * «свободно» over «Встреч нет»; a zero is no count («0 на неделе», «0 впереди за месяц»). The
+ * desk's line (D-154) keeps the screen's own words: it has no foot.
+ * `ready` — the days ahead are read: until then the card keeps its full height, so the month under
+ * it does not jump when they land.
+ */
+export type CalendarCard =
+  | { compact: true; label: string }
+  | {
+      compact: false;
+      eyebrow: string;
+      label: string;
+      detail: string;
+      /** null — no meeting this week: the corner stays empty */
+      week: number | null;
+      legend: CalendarScreen["legend"];
+    };
+
+export function calendarCard(screen: CalendarScreen, ready: boolean): CalendarCard {
+  if (ready && screen.empty) return { compact: true, label: screen.label };
+  const free = screen.value === null && screen.freeToday;
+  return {
+    compact: false,
+    eyebrow: free ? "Сегодня" : screen.eyebrow,
+    label: screen.label,
+    // the next meeting is the foot's: «Дальше — …» under «Встреч нет» said it twice
+    detail: free ? "" : screen.detail,
+    week: screen.week > 0 ? screen.week : null,
+    legend: screen.legend.filter((item) => item.count > 0),
+  };
+}
 
 const place = (event: CalendarEvent) => (event.location ? ` · ${event.location}` : "");
 
@@ -163,7 +202,9 @@ export function calendarScreen(events: readonly CalendarEvent[], meId: string, n
   const nearest = next
     ? { id: next.id, title: next.title, when: whenAhead(next, now), tone: toneAhead(next, now) }
     : null;
-  const base = { week, strip: dayStrip(sorted, now), legend, nearest };
+  const freeToday = todays.length === 0;
+  const empty = freeToday && !next && unanswered.length === 0;
+  const base = { week, strip: dayStrip(sorted, now), legend, nearest, freeToday, empty };
   const todayWord = (n: number) => pluralRu(n, ["мероприятие сегодня", "мероприятия сегодня", "мероприятий сегодня"]);
 
   // 1. on right now, or about to start

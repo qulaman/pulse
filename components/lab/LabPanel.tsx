@@ -179,7 +179,7 @@ function ModelsCard({ settings }: { settings: LabSettings }) {
       setEdited(null);
       toast("Модели переключил");
     },
-    onError: () => toast("Не получилось сохранить. Попробуй ещё раз"),
+    onError: () => toast("Не получилось сохранить. Попробуйте ещё раз"),
   });
 
   const update = (patch: Partial<LabSettings>) => setEdited({ ...draft, ...patch });
@@ -295,7 +295,7 @@ function RowsTable({ rows }: { rows: LabRow[] }) {
         Последние {rows.length} разборов директора, новые сверху. Строка разбора: модель · вход / из кэша / выход · время · цена.
       </p>
       {rows.length === 0 ? (
-        <p className="mt-3 text-[14px] leading-5 text-muted">Пока ни одного распознавания — надиктуй или напиши поручение.</p>
+        <p className="mt-3 text-[14px] leading-5 text-muted">Пока ни одного распознавания — надиктуйте или напишите поручение.</p>
       ) : (
         <ul className="mt-3 flex flex-col divide-y divide-border">
           {rows.map((row) => (

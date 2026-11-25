@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { awaitingAnswer, calendarScreen, dayStrip, endOf, isRunning, toneAhead, whenAhead } from "./overview";
+import { awaitingAnswer, calendarCard, calendarScreen, dayStrip, endOf, isRunning, toneAhead, whenAhead } from "./overview";
 import type { CalendarEvent } from "./queries";
 
 const NOW = new Date("2026-09-24T11:00:00+05:00"); // Thursday, 11:00 in Aqtobe
@@ -139,5 +139,38 @@ describe("calendar overview", () => {
       eyebrow: "На сегодня всё",
       label: "встреча позади",
     });
+  });
+  it("says an empty calendar in one line, and each fact of a free day once (phone card)", () => {
+    const empty = calendarScreen([], ME, NOW);
+    expect(empty).toMatchObject({ empty: true, freeToday: true });
+    expect(calendarCard(empty, true)).toEqual({ compact: true, label: "Встреч нет" });
+    // until the days ahead are read the card keeps its height — and still no zero counts
+    const loading = calendarCard(empty, false);
+    expect(loading).toMatchObject({ compact: false, eyebrow: "Сегодня", label: "Встреч нет", detail: "", week: null, legend: [] });
+
+    // free today, a meeting tomorrow: the foot names it, the line under «Встреч нет» does not
+    const free = calendarScreen([event("tmrw", "2026-09-25T10:00:00")], ME, NOW);
+    expect(free).toMatchObject({ empty: false, freeToday: true });
+    expect(calendarCard(free, true)).toEqual({
+      compact: false,
+      eyebrow: "Сегодня",
+      label: "Встреч нет",
+      detail: "",
+      week: 1,
+      legend: [{ key: "month", label: "впереди за месяц", count: 1, tone: "accent" }],
+    });
+    expect(free.nearest?.id).toBe("tmrw");
+
+    // a busy day keeps its words, and the desk reads the screen itself unchanged
+    const busy = calendarScreen([event("next", "2026-09-24T15:00:00")], ME, NOW);
+    expect(busy.freeToday).toBe(false);
+    expect(calendarCard(busy, true)).toMatchObject({ compact: false, eyebrow: "Сегодня", detail: "Ближайшее в 15:00 — Встреча next" });
+    expect(free.detail).toBe("Дальше — завтра в 10:00: Встреча tmrw");
+  });
+
+  it("is not empty while somebody owes an answer or the day had meetings", () => {
+    expect(calendarScreen([event("am", "2026-09-24T08:00:00")], ME, NOW)).toMatchObject({ empty: false, freeToday: false });
+    const ask = calendarScreen([event("ask", "2026-10-20T10:00:00", { people: [{ user_id: ME, status: "invited" }] })], ME, NOW);
+    expect(ask.empty).toBe(false);
   });
 });

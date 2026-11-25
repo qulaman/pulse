@@ -77,7 +77,7 @@ describe("personView — человек на стене (D-185)", () => {
   it("три хороших числа: сделано за неделю, в работе, очки недели", () => {
     expect(personView(full()).stats).toEqual([
       { key: "done", value: 9, label: "сделано за неделю" },
-      { key: "open", value: 5, label: "дел в работе" },
+      { key: "open", value: 3, label: "задачи в работе" },
       { key: "points", value: 90, label: "очков за неделю" },
     ]);
   });
@@ -90,9 +90,13 @@ describe("personView — человек на стене (D-185)", () => {
     expect(Object.keys(view.items[0]).sort()).toEqual(["id", "stage", "title", "word"]);
   });
 
-  it("в работе — по всем открытым делам из базы, не по показанным", () => {
+  it("в работе — только взятые, по числам базы, не по показанным: поручено и на проверке — не «в работе»", () => {
     const f = { ...full(), counts: { new: 3, work: 9, review: 3 } };
-    expect(personView(f).stats.find((stat) => stat.key === "open")?.value).toBe(15);
+    expect(personView(f).stats.find((stat) => stat.key === "open")?.value).toBe(9);
+    // only orders not yet accepted: no «в работе» at all, the list names them «Поручено»
+    const fresh = { ...full(), counts: { new: 2, work: 0, review: 0 }, tasks: focus([{ status: "sent" }, { status: "sent" }]).tasks };
+    expect(personView(fresh).stats.find((stat) => stat.key === "open")).toBeUndefined();
+    expect(personView(fresh).items.map((item) => item.word)).toEqual(["Поручено", "Поручено"]);
   });
 
   it("на стене нет ни отказа, ни просрочки, ни «доработки», ни «в срок» — при любой истории и сроке (D-45)", () => {
@@ -147,7 +151,7 @@ describe("personView — человек на стене (D-185)", () => {
     expect([view.items, view.mode]).toEqual([[], "none"]);
     expect(view.stats).toEqual([
       { key: "done", value: 2, label: "сделано сегодня" },
-      { key: "open", value: 2, label: "дела в работе" },
+      { key: "open", value: 1, label: "задача в работе" },
     ]);
   });
 
@@ -180,8 +184,8 @@ describe("taskPath — одно дело во весь экран (D-123, D-185)
     }
   });
 
-  it("без заголовка — «Поручение»", () => {
-    expect(taskTitle({ title: null })).toBe("Поручение");
+  it("без заголовка — «Задача»", () => {
+    expect(taskTitle({ title: null })).toBe("Задача");
     expect(taskTitle({ title: "  Замер окон " })).toBe("Замер окон");
   });
 });

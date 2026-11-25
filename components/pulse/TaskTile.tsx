@@ -15,6 +15,7 @@ import { Composer } from "@/components/tasks/thread/Composer";
 
 import { ThreadTail } from "@/components/tasks/thread/ThreadTail";
 import { hasUnread, LANE_WORD, messageOf, whoOf, type BoardTask, type Lane } from "@/lib/pulse/board";
+import { isStaleUnaccepted } from "@/lib/tasks/attention";
 import { untilWords } from "@/lib/tasks/lifecycle";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import { BUTTON, TEXT } from "@/lib/tasks/status-text";
@@ -31,16 +32,22 @@ const TONE_VAR: Record<Tone, string> = {
   muted: "var(--text-muted)",
 };
 
-/** One colour per lane — the rail, the tint and the lane word all say the same thing. */
+/**
+ * One colour per lane — the rail, the tint and the lane word all say the same thing, by the one map
+ * of states (lib/tasks/tone.ts): handed-in work waits for the director — amber; taken work is green;
+ * never the brand colour, which a client may have green (D-194).
+ */
 const LANE_TONE: Record<Lane, Tone> = {
   overdue: "danger",
   declined: "danger",
   question: "warn",
-  review: "ok",
-  work: "accent",
+  review: "warn",
+  work: "ok",
 };
 
 export type TaskTileProps = {
+  /** The assignee's pushes do not reach them: an untaken order is amber at once, not after half an hour (D-195). */
+  unreachable?: boolean;
   task: BoardTask;
   lane: Lane;
   now: Date;
@@ -94,12 +101,14 @@ function contextOf(task: BoardTask, lane: Lane, now: Date, meId: string): string
  * of context the lane needs, and the director's quick actions right on the tile. A tap
  * on the text opens the full card in place; the tile never navigates on its own.
  */
-export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, actions, companyId, meId, onReply, showReply = false, readOnly = false, anonymized = false, onMore }: TaskTileProps) {
+export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, actions, companyId, meId, onReply, showReply = false, readOnly = false, anonymized = false, onMore, unreachable = false }: TaskTileProps) {
   const [rework, setRework] = useState(false);
-  const tone: Tone = leaving ? (task.status === "done" ? "gold" : "muted") : LANE_TONE[lane];
+  // an order nobody has taken is not «в работе» (D-194): grey, amber after half an hour
+  const untaken = lane === "work" && task.status === "sent";
+  const tone: Tone = leaving ? (task.status === "done" ? "gold" : "muted") : untaken ? (isStaleUnaccepted(task, now) || unreachable ? "warn" : "muted") : LANE_TONE[lane];
   const color = TONE_VAR[tone];
   const who = anonymized ? "Сотрудник" : whoOf(task);
-  const word = leaving ? (task.status === "done" ? "принято" : task.status === "revoked" ? "отозвана" : "закрыта") : LANE_WORD[lane];
+  const word = leaving ? (task.status === "done" ? "принято" : task.status === "revoked" ? "отозвана" : "закрыта") : untaken ? "не принята" : LANE_WORD[lane];
   const interactive = !readOnly && !leaving;
   const more = interactive && onMore ? onMore : null;
   // handed in with words — a report, a photo: they ride on the card of приёмка (D-139)
@@ -162,7 +171,7 @@ export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, 
             {header}
           </button>
           <div className="mt-2">
-            <TaskCard task={task} variant="director" actions={actions} companyId={companyId} href={`/tasks/${task.id}`} question={task.question} declineReason={task.decline_reason} />
+            <TaskCard task={task} variant="director" actions={actions} companyId={companyId} href={`/tasks/${task.id}`} question={task.question} declineReason={task.decline_reason} unreachable={unreachable} />
           </div>
         </div>
       ) : (

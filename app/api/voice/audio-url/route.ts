@@ -47,7 +47,7 @@ export const GET = withAuth("any", async ({ req, profile }) => {
   const signed = await service.storage.from("voice").createSignedUrl(path, TTL_SECONDS);
   if (signed.error || !signed.data) {
     console.error("createSignedUrl failed:", signed.error?.message);
-    return apiError(502, "audio_url_failed", "Не смог открыть аудио, попробуй ещё раз");
+    return apiError(502, "audio_url_failed", "Не смог открыть аудио, попробуйте ещё раз");
   }
 
   return apiOk({ url: signed.data.signedUrl, expires_in: TTL_SECONDS });

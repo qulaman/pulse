@@ -87,7 +87,7 @@ type Props = {
   className?: string;
 };
 
-export function VoicePlayer({ load, durationMs, seed, failedText = "Не открылось. Попробуй позже", className = "" }: Props) {
+export function VoicePlayer({ load, durationMs, seed, failedText = "Не открылось. Попробуйте позже", className = "" }: Props) {
   const audio = useRef<HTMLAudioElement>(null);
   const track = useRef<HTMLDivElement>(null);
   const fill = useRef<HTMLDivElement>(null);

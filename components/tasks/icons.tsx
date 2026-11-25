@@ -25,7 +25,8 @@ export type IconName =
   | "right"
   | "repeat"
   | "plus"
-  | "clockPlus";
+  | "clockPlus"
+  | "phone";
 
 const PATHS: Record<IconName, ReactNode> = {
   clock: (
@@ -51,6 +52,7 @@ const PATHS: Record<IconName, ReactNode> = {
     </>
   ),
   x: <path d="M6 6l12 12M18 6L6 18" />,
+  phone: <path d="M6.6 3.5h2.6l1.4 4-1.9 1.3a11 11 0 0 0 6.5 6.5l1.3-1.9 4 1.4v2.6a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.6 5.7a2 2 0 0 1 2-2.2z" />,
   bell: (
     <>
       <path d="M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.5 1.5h-14z" />

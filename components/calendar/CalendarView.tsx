@@ -45,6 +45,8 @@ type Props = {
   isDirector: boolean;
   /** Yesterday and the month ahead — the status screen speaks of now, whatever month is shown. */
   upcoming: readonly CalendarEvent[];
+  /** `upcoming` has been read: an empty calendar may say so in one line */
+  upcomingReady: boolean;
   /** The month on screen and the one after it (the ribbon runs past the month's end). */
   events: readonly CalendarEvent[];
   loading: boolean;
@@ -58,7 +60,7 @@ type Row =
   | { kind: "head"; key: string; ymd: Ymd; count: number; first: boolean }
   | { kind: "card"; key: string; event: CalendarEvent }
   | { kind: "now"; key: string }
-  | { kind: "free"; key: string; ymd: Ymd }
+  | { kind: "free"; key: string; ymd: Ymd; today: boolean }
   | { kind: "more"; key: string; left: number };
 
 /**
@@ -68,7 +70,7 @@ type Row =
  * something — as cards that open in place. The line of «now» runs through today. The
  * director's «+» (and a free day) opens the meeting form on the chosen day.
  */
-export function CalendarView({ nav, now, meId, isDirector, upcoming, events, loading, openId, onOpenId, headExtra }: Props) {
+export function CalendarView({ nav, now, meId, isDirector, upcoming, upcomingReady, events, loading, openId, onOpenId, headExtra }: Props) {
   const [creating, setCreating] = useState(false);
   const today = todayYmd(now);
 
@@ -93,11 +95,15 @@ export function CalendarView({ nav, now, meId, isDirector, upcoming, events, loa
     const total = groups.reduce((sum, group) => sum + group.events.length, 0);
     const list: Row[] = [];
     let drawn = 0;
-    groups.forEach((group, index) => {
+    groups.forEach((group) => {
       if (drawn >= limit) return;
-      list.push({ kind: "head", key: `head-${group.ymd}`, ymd: group.ymd, count: group.events.length, first: index === 0 });
+      // a free today is the status card's «Встреч нет» already: the employee gets no second
+      // «Ничего не запланировано» under the month; the director keeps the way to fill the day
+      if (group.events.length === 0 && group.ymd === today && !isDirector) return;
+      // the chosen day's head is the lit one (`agendaFrom` puts it first, empty or not)
+      list.push({ kind: "head", key: `head-${group.ymd}`, ymd: group.ymd, count: group.events.length, first: group.ymd === nav.selected });
       if (group.events.length === 0) {
-        list.push({ kind: "free", key: `free-${group.ymd}`, ymd: group.ymd });
+        list.push({ kind: "free", key: `free-${group.ymd}`, ymd: group.ymd, today: group.ymd === today });
         return;
       }
       // today: the line of now runs where the past ends and the rest of the day begins
@@ -112,7 +118,7 @@ export function CalendarView({ nav, now, meId, isDirector, upcoming, events, loa
     });
     if (total > drawn) list.push({ kind: "more", key: "more", left: total - drawn });
     return list;
-  }, [events, nav.selected, now, today, limit]);
+  }, [events, nav.selected, now, today, limit, isDirector]);
 
   useRevealOpen(openId, true);
 
@@ -160,7 +166,7 @@ export function CalendarView({ nav, now, meId, isDirector, upcoming, events, loa
       />
 
       <div className="mt-3">
-        <CalendarStatus screen={screen} onNearest={showNearest} />
+        <CalendarStatus screen={screen} ready={upcomingReady} onNearest={showNearest} />
       </div>
 
       <MonthGrid nav={nav} today={today} marks={marks} now={now} />
@@ -210,6 +216,7 @@ export function CalendarView({ nav, now, meId, isDirector, upcoming, events, loa
                     </button>
                   ) : (
                     <FreeDay
+                      today={row.today}
                       past={compareYmd(row.ymd, today) < 0}
                       isDirector={isDirector}
                       hint={isDirector && events.length === 0}
@@ -291,8 +298,11 @@ function NowLine({ time }: { time: string }) {
   );
 }
 
-/** The chosen day with nothing on it: said once, and for the director — a way to fill it. */
-function FreeDay({ past, isDirector, hint, onAdd }: { past: boolean; isDirector: boolean; hint: boolean; onAdd: () => void }) {
+/**
+ * The chosen day with nothing on it: said once, and for the director — a way to fill it. Today's
+ * «Встреч нет» is the status card's: here today is only the way to fill it.
+ */
+function FreeDay({ today, past, isDirector, hint, onAdd }: { today: boolean; past: boolean; isDirector: boolean; hint: boolean; onAdd: () => void }) {
   if (past || !isDirector) {
     return (
       <p className="rounded-[18px] border border-dashed border-border/80 px-4 py-4 text-center text-[15px] leading-5 text-muted">
@@ -317,10 +327,16 @@ function FreeDay({ past, isDirector, hint, onAdd }: { past: boolean; isDirector:
         </span>
       )}
       <span className="min-w-0">
-        <span className="block font-display text-[15px] font-semibold leading-5">Свободный день</span>
-        <span className="block text-[13px] leading-[18px] text-muted">
-          {hint ? "Маскоту можно сказать: «планёрка завтра в 10 со всеми» — или добавить здесь" : "Добавить мероприятие"}
-        </span>
+        <span className="block font-display text-[15px] font-semibold leading-5">{today ? "Добавить мероприятие" : "Свободный день"}</span>
+        {today && !hint ? null : (
+          <span className="block text-[13px] leading-[18px] text-muted">
+            {today
+              ? "Или скажите маскоту: «планёрка завтра в 10 со всеми»"
+              : hint
+                ? "Маскоту можно сказать: «планёрка завтра в 10 со всеми» — или добавить здесь"
+                : "Добавить мероприятие"}
+          </span>
+        )}
       </span>
     </button>
   );

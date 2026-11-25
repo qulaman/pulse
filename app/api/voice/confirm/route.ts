@@ -59,7 +59,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       if (peopleError) throw new Error(`profiles check failed: ${peopleError.message}`);
       const working = new Set((people ?? []).filter((person) => person.is_active).map((person) => person.id));
       if (assignees.some((id) => !working.has(id))) {
-        return apiError(400, "assignee_inactive", "Этот сотрудник больше не работает — выбери другого");
+        return apiError(400, "assignee_inactive", "Этот сотрудник больше не работает — выберите другого");
       }
     }
 
@@ -82,9 +82,9 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       return rpcFailure(
         error,
         {
-          assignee_required: [400, "Не понял, кому задача — выбери исполнителя"],
-          assignee_inactive: [400, "Этот сотрудник больше не работает — выбери другого"],
-          event_time_required: [400, "Не понял, когда мероприятие — выбери время"],
+          assignee_required: [400, "Не понял, кому задача — выберите исполнителя"],
+          assignee_inactive: [400, "Этот сотрудник больше не работает — выберите другого"],
+          event_time_required: [400, "Не понял, когда мероприятие — выберите время"],
           forbidden: NO_ACCESS,
         },
         "confirm_voice_batch",

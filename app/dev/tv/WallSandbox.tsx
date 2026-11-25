@@ -31,6 +31,7 @@ export type WallCase =
   | "calendar"
   | "calendar-month"
   | "calendar-empty"
+  | "calendar-month-empty"
   | "board"
   | "board-two"
   | "board-pages"
@@ -118,6 +119,13 @@ function storyOf(status: string, base: number, id: string): TvStoryEvent[] {
   return [...story, { k: "done", at: t(18, 5) }];
 }
 
+/** The company's last seven days ending today in Aqtobe, `done` per day — as `tv_summary.week` sends them. */
+function weekOf(base: number, done: readonly number[]): { day: string; done: number }[] {
+  const offset = 5 * 3_600_000;
+  const today = Math.floor((base + offset) / 86_400_000);
+  return done.map((count, i) => ({ day: new Date((today - (done.length - 1 - i)) * 86_400_000).toISOString().slice(0, 10), done: count }));
+}
+
 function fixtures(base: number, guest: boolean) {
   const name = (full: string) => (guest ? full.split(" ")[0] : full);
   const events: TvEvent[] = [
@@ -155,7 +163,7 @@ function fixtures(base: number, guest: boolean) {
     today: { sent: 14, done: 9, in_work: 21 },
     rating: team.slice(0, 5).map(([n], i) => ({ name: name(n), points: guest ? null : 60 - i * 7, rank: i + 1 })),
     load: team.map(([n, active]) => ({ name: name(n), active, overdue: 0 })),
-    week: [],
+    week: weekOf(base, [3, 5, 0, 4, 6, 2, 9]),
     merch: [],
     events: [
       { id: "e-soon", title: guest ? null : "Планёрка", starts_at: at(base, 15), location: guest ? null : "Переговорная", people: 8 },
@@ -352,6 +360,30 @@ function ratingFor(wallCase: WallCase, base: number, guest: boolean, reorder = f
   };
 }
 
+/** «Команда», «Сегодня» and the band of a company of three: one task given and not yet taken (not «в работе»), two done this week, one with points. */
+function smallSummary(summary: TvSummary, guest: boolean, base: number): TvSummary {
+  const name = (full: string) => (guest ? full.split(" ")[0] : full);
+  return {
+    ...summary,
+    today: { sent: 0, done: 0, in_work: 0 },
+    week: weekOf(base, [0, 0, 1, 0, 0, 1, 0]),
+    pulse: [],
+    events: [],
+    rating: [{ name: name("Айболат Нурланов"), points: guest ? null : 15, rank: 1 }],
+    load: [
+      { name: name("Айболат Нурланов"), active: 0, overdue: 0, done_today: 0, done_week: 2, position: guest ? null : "Прораб, участок «Север»" },
+      { name: name("Ербол Сотрудник"), active: 0, overdue: 0, done_today: 0, done_week: 0, position: guest ? null : "Сотрудник" },
+      { name: name("Юля Смирнова"), active: 0, overdue: 0, done_today: 0, done_week: 0, position: guest ? null : "Секретарь" },
+    ],
+  };
+}
+
+/** The rating of the company of three: one leader with points, the week's two tasks. */
+function smallRating(scene: TvRatingScene): TvRatingScene {
+  if (scene.hidden) return scene;
+  return { ...scene, top: scene.top.slice(0, 1).map((row) => ({ ...row, name: "Айболат Нурланов", points: 15, delta: 15 })), riser: null, team: { done: 2, on_time: 2, earned: 15, people: 3 } };
+}
+
 /** One order on the whole wall (D-123): in work after a return, on review, accepted. */
 function taskFor(wallCase: WallCase, focus: TvFocusEmployee, guest: boolean): TvTaskFocus | null {
   const source =
@@ -444,6 +476,7 @@ export function WallSandbox({
   logo = false,
   at: pinned = null,
   zero = false,
+  small = false,
 }: {
   wallCase: WallCase;
   clock: ClockStyle;
@@ -458,6 +491,11 @@ export function WallSandbox({
   at?: string | null;
   /** A day with nothing done yet: «Сегодня» greets instead of a number. */
   zero?: boolean;
+  /**
+   * A company of three with one task in work and one person with points (D-194): the scenes must look finished
+   * with this little — three cards in «Команда», a leader alone in «Рейтинг», a greeting on «Сегодня».
+   */
+  small?: boolean;
 }) {
   // on the minute: the fixtures are built on the server and again in the browser, and
   // they have to be the same fixtures for hydration
@@ -496,7 +534,7 @@ export function WallSandbox({
         ? sceneCase
         : sceneCase === "team-many"
           ? "team"
-        : sceneCase === "calendar" || sceneCase === "calendar-month" || sceneCase === "calendar-empty"
+        : sceneCase === "calendar" || sceneCase === "calendar-month" || sceneCase === "calendar-empty" || sceneCase === "calendar-month-empty"
           ? "calendar"
           : sceneCase.startsWith("board")
             ? "board"
@@ -508,12 +546,18 @@ export function WallSandbox({
   const boardData = useMemo(() => (hasData ? boardFor(sceneCase, base, guest) : null), [hasData, sceneCase, base, guest]);
   const board = useMemo(() => (boardData && demo ? boardDemo(boardData, demo, step) : boardData), [boardData, demo, step]);
   const rating = useMemo(
-    () => (hasData && scene === "rating" ? ratingFor(sceneCase, base, guest, reorder) : null),
-    [hasData, scene, sceneCase, base, guest, reorder],
+    () => (hasData && scene === "rating" ? (small ? smallRating(ratingFor(sceneCase, base, guest, reorder)) : ratingFor(sceneCase, base, guest, reorder)) : null),
+    [hasData, scene, sceneCase, base, guest, reorder, small],
   );
   const calendar = useMemo(
     () =>
-      !hasData ? null : sceneCase === "calendar-empty" ? { ...data.calendar, events: data.calendar.events.filter((e) => e.id === "c4") } : data.calendar,
+      !hasData
+        ? null
+        : sceneCase === "calendar-empty"
+          ? { ...data.calendar, events: data.calendar.events.filter((e) => e.id === "c4") }
+          : sceneCase === "calendar-month-empty"
+            ? { ...data.calendar, events: [] }
+            : data.calendar,
     [hasData, sceneCase, data],
   );
   // the event notice needs the meeting exactly fifteen minutes out; elsewhere keep it clear
@@ -522,7 +566,9 @@ export function WallSandbox({
   const counted = news > 0 ? { ...shownToday, today: { ...shownToday.today, sent: shownToday.today.sent + news, done: shownToday.today.done + news } } : shownToday;
   const many = current === "team-many" ? bigTeam(counted, guest) : counted;
   const photos = useMemo(() => photoFixtures(base, guest), [base, guest]);
-  const summary = busier
+  const summary = small
+    ? smallSummary(counted, guest, base)
+    : busier
     ? {
         ...counted,
         load: counted.load.map((row) =>
@@ -542,7 +588,7 @@ export function WallSandbox({
         clock={clock}
         night={current === "night"}
         offline={false}
-        items={tickerItems(lines, summary)}
+        items={tickerItems(lines, summary, now)}
         speech={speechOf(lines, summary.today, now)}
         summary={summary}
         focus={arrived ? focusFor(current, data.focus) : null}
@@ -550,7 +596,7 @@ export function WallSandbox({
         focusRemainingMs={7 * MIN}
         rating={rating}
         calendar={calendar}
-        calendarView={sceneCase === "calendar-month" ? "month" : "week"}
+        calendarView={sceneCase === "calendar-month" || sceneCase === "calendar-month-empty" ? "month" : "week"}
         board={board}
         overlay={overlayOf(overlayFor(current, base, guest), summary.events, new Date(base))}
         sound={false}

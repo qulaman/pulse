@@ -35,7 +35,7 @@ export function Toolbar({ children, end }: { children: ReactNode; end?: ReactNod
 export const SearchField = forwardRef<HTMLInputElement, { value: string; onChange: (value: string) => void; placeholder?: string; width?: number; "aria-label"?: string }>(
   function SearchField({ value, onChange, placeholder = "Поиск…", width = 240, ...aria }, ref) {
     return (
-      <label className="field relative flex h-9 items-center px-3" style={{ width }}>
+      <label className="field desk-search relative flex h-9 items-center px-3" style={{ width }}>
         <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden className="mr-2 shrink-0 text-muted" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <circle cx="11" cy="11" r="6.5" />
           <path d="m16 16 4 4" />

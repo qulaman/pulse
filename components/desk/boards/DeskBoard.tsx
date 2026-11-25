@@ -51,7 +51,7 @@ import { BOARD_VIEWS, boardExtendTo, boardPointOf, boardViewOf, weekBoardLive, t
 import { useNow } from "@/lib/useNow";
 
 import { boardMenu, boardStateLine, type BoardCounts } from "./boardMenu";
-import { BoardBones, BoardKeys, TitleField } from "./BoardParts";
+import { BoardBones, TitleField } from "./BoardParts";
 import { darkPaper, DeskSketch } from "./DeskSketch";
 import { HandOut } from "./HandOut";
 import { MeetingStage } from "./MeetingStage";
@@ -472,7 +472,6 @@ export function DeskBoard() {
           <div className="board-body">
             <div className="min-w-0">
               {mode === "handout" ? <HandOut rows={rows.filter((row) => !phone.has(row.id))} numbers={numbers} me={meData} taskOf={taskOf} onClose={() => setMode("prep")} /> : outline(false)}
-              {mode === "handout" ? null : <BoardKeys />}
             </div>
             <aside className="board-aside flex min-w-0 flex-col gap-3">
               <section className="board-wall-card" data-testid="board-wall-card">

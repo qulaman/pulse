@@ -1,8 +1,9 @@
 import { z } from "zod";
 
 import { userSupabase, withAuth } from "@/lib/api/handler";
-import { apiOk, NO_ACCESS, rpcFailure } from "@/lib/api/respond";
+import { apiError, apiOk, NO_ACCESS, rpcFailure } from "@/lib/api/respond";
 import { loadBrand } from "@/lib/brand";
+import { accentRefusal } from "@/lib/brand-color";
 import { loadCompanySettings } from "@/lib/roster";
 import { BrandPatchSchema, parseCompanySettings } from "@/lib/settings";
 import type { Json } from "@/lib/supabase/types";
@@ -30,6 +31,12 @@ export const PATCH = withAuth<z.infer<typeof PatchSchema>>(
   ["director", "secretary"],
   async ({ req, profile, body }) => {
     const supabase = await userSupabase(req);
+
+    // a new brand colour may not be taken for a task's state; the one saved before the rule stays
+    // (owner, 2026-11-25) — checked before anything is written, so a refused save changes nothing
+    const stored = body.brand?.accent !== undefined ? parseCompanySettings(await loadCompanySettings(profile.companyId)).brand.accent : null;
+    const refusal = body.brand?.accent !== undefined ? accentRefusal(body.brand.accent, stored) : null;
+    if (refusal) return apiError(400, "accent_means_state", refusal);
 
     if (body.name !== undefined) {
       const { error } = await supabase.rpc("update_company_profile", { p_name: body.name });

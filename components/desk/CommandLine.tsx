@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 
 import { DeskConfirm } from "@/components/desk/DeskConfirm";
 import { InPanel } from "@/components/desk/ui/DeskPanel";
@@ -12,7 +12,7 @@ import { MicButton, RecordingHint } from "@/components/desk/voice/MicButton";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
 import { formatWhen } from "@/lib/desk/when";
 import { COMMAND_FIELD_ID } from "@/lib/desk/keys";
-import { matchCommands, matchSections, matchTasks, taskLookup } from "@/lib/desk/palette";
+import { commandHint, matchCommands, matchSections, matchTasks, taskLookup } from "@/lib/desk/palette";
 import { DESK_NAV, DESK_PROFILE, DESK_PROFILE_KEY } from "@/lib/desk/routes";
 import { suggestPeople, wordAtCaret } from "@/lib/desk/suggest";
 import { IN_FLIGHT, VOICE_KEY } from "@/lib/desk/voice";
@@ -48,6 +48,21 @@ type Row =
 const GROUP: Record<Row["kind"], string> = { command: "Действия", pin: "Поручить", section: "Разделы", person: "Люди", task: "Задачи" };
 
 /** What goes in front of the phrase for a pinned person: the name they are called by (as on Пульс). */
+/** The field's own width, kept up to date as the window or the panel changes it — for its example. */
+function useFieldWidth(ref: RefObject<HTMLElement | null>): number {
+  const [width, setWidth] = useState(Number.POSITIVE_INFINITY);
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const watch = new ResizeObserver(([entry]) => {
+      if (entry.contentRect.width > 0) setWidth(Math.round(entry.contentRect.width));
+    });
+    watch.observe(element);
+    return () => watch.disconnect();
+  }, [ref]);
+  return width;
+}
+
 function addressOf(person: Person): string {
   return `${person.aliases?.[0] ?? person.full_name.trim().split(/\s+/)[0]}, `;
 }
@@ -97,6 +112,7 @@ export function CommandLine() {
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [focused, setFocused] = useState(false);
   const field = useRef<HTMLInputElement>(null);
+  const fieldWidth = useFieldWidth(field);
   const [touched, setTouched] = useState(false);
   const people = usePeople(touched);
   const me = useMe().data;
@@ -314,7 +330,7 @@ export function CommandLine() {
             if (event.key === "Backspace" && !value && pin) setPin(null);
           }}
           // while the microphone listens the hint beside it speaks; an example here would be squeezed to a letter
-          placeholder={recording ? "" : pin ? "Что сделать и к какому сроку — Enter" : "Кому и что сделать: «Ерлану смета по объекту до пятницы» — Enter"}
+          placeholder={recording ? "" : commandHint(fieldWidth, Boolean(pin))}
           aria-label="Поручение"
           role="combobox"
           aria-autocomplete="list"

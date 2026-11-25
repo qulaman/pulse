@@ -51,6 +51,7 @@ export function Sandbox({ role, empty, bones, many }: { role: "director" | "empl
         meId={meId}
         isDirector={role === "director"}
         upcoming={events}
+        upcomingReady
         events={events}
         loading={false}
         openId={openId}

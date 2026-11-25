@@ -18,6 +18,8 @@ export type BriefTask = {
   assignee: string | null;
   /** The assignee's id — two people with the same first name are still two people. */
   assigneeId?: string | null;
+  /** false — handed out and not accepted yet: it is not «в работе» (absent — taken). */
+  taken?: boolean;
 };
 
 const TITLE_MAX = 36;
@@ -51,9 +53,25 @@ function nearestOf(open: BriefTask[]): BriefTask | null {
   return best;
 }
 
+/**
+ * «Пока тихо…» — said only when nothing needs the director (`attentionOf` is ok). An order nobody has
+ * taken yet is not «в работе»: it is counted as «ещё не принята», so the line never calls untaken
+ * work taken.
+ */
 export function quietLine(open: BriefTask[], now: Date): string {
   if (open.length === 0) return "Пока тихо. Задач в работе нет.";
-  const count = `${open.length} ${pluralRu(open.length, ["задача", "задачи", "задач"])} в работе`;
+  const untaken = open.filter((task) => task.taken === false).length;
+  const taken = open.length - untaken;
+  const parts: string[] = [];
+  if (taken > 0) parts.push(`${taken} ${pluralRu(taken, ["задача", "задачи", "задач"])} в работе`);
+  if (untaken > 0) {
+    parts.push(
+      taken > 0
+        ? `${untaken} ещё ${pluralRu(untaken, ["не принята", "не приняты", "не приняты"])}`
+        : `${untaken} ${pluralRu(untaken, ["задача", "задачи", "задач"])} ещё ${pluralRu(untaken, ["не принята", "не приняты", "не приняты"])}`,
+    );
+  }
+  const count = parts.join(", ");
   const nearest = nearestOf(open);
   if (!nearest) return `Пока тихо. ${count}, все без срока.`;
   // names stay in the nominative: the assistant never declines a person's name

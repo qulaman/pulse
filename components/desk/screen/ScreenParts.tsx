@@ -39,13 +39,16 @@ export function Section({ title, children, testId, end }: { title: string; child
   );
 }
 
-/** A setting of the wall: its name on the left, its control on the right. */
+/**
+ * A setting of the wall: its name on the left, its control on the right. The hint stands beside the
+ * name while it fits and goes whole under it when it does not — never «клик — на сте…» (D-194).
+ */
 export function SettingRow({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
   return (
     <div className="screen-setting flex min-h-9 items-center justify-between gap-3">
-      <span className="flex min-w-0 items-baseline gap-2">
+      <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
         <span className="text-[14px] leading-5">{label}</span>
-        {hint ? <span className="truncate text-[12px] leading-4 text-muted">{hint}</span> : null}
+        {hint ? <span className="whitespace-nowrap text-[12px] leading-4 text-muted">{hint}</span> : null}
       </span>
       <span className="shrink-0">{children}</span>
     </div>

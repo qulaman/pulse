@@ -58,7 +58,7 @@ export const ThoughtBubble = memo(function ThoughtBubble({
     <motion.button
       type="button"
       onClick={onOpen ?? onDismiss}
-      aria-label={onOpen ? `Мысль ассистента, тап — ${openLabel}` : "Мысль ассистента, тап — убрать"}
+      aria-label={onOpen ? `Мысль ассистента, нажмите — ${openLabel}` : "Мысль ассистента, нажмите — убрать"}
       initial={{ opacity: 0, scale: 0.85, y: drop + 8 }}
       animate={{ opacity: 1, scale: 1, y: drop }}
       exit={{ opacity: 0, scale: 0.9, y: drop + 4, transition: { duration: 0.18 } }}

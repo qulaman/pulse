@@ -21,9 +21,11 @@ import { SWITCH_SWAP } from "@/lib/desk/motion";
 import { shortName, useNamesKey } from "@/lib/people/names";
 import { useGoneIds, usePeople } from "@/lib/people/queries";
 import { HELD_STATUS, type BoardTask } from "@/lib/pulse/board";
+import { usePushHealth } from "@/lib/push/health-query";
 import { useRecurrenceRulesSettled } from "@/lib/recurrence/queries";
 import { useHydrated } from "@/lib/useHydrated";
 import { useNow } from "@/lib/useNow";
+import { noPushIds } from "@/lib/tasks/attention";
 import { queueOf } from "@/lib/tasks/desk";
 import { usePurgeClosed, useTaskActions } from "@/lib/tasks/mutations";
 import { closedAtOf, directorScreen, directorTabOf, matchesQuery, peopleLoad, type DirectorTab, type Section } from "@/lib/tasks/overview";
@@ -53,11 +55,12 @@ import {
 } from "@/lib/desk/tasks";
 import { taggedActions, useDirectorBoard, useWidthBucket, writeParams } from "./flow";
 import { FailedScreen, LoadFailure, LoadNote } from "./LoadState";
-import { DESK_NEW_TASK, MomentBar, type MomentCounter } from "./MomentBar";
-import { BulkBar, PurgeDialog, TableKeysHint, TasksEmpty, TasksToolbar } from "./TableParts";
+import { DESK_NEW_TASK, MomentBar, momentAct, type MomentCounter } from "./MomentBar";
+import { BulkBar, PurgeDialog, TasksEmpty, TasksToolbar } from "./TableParts";
 import { taskColumns } from "./taskColumns";
 import { pressTaskKey } from "./taskKeys";
 import { TaskPanel } from "./TaskPanel";
+import { useCallFirst } from "./RowMoves";
 import { useRowActs } from "./useRowActs";
 import { rowsOnScreen, useTaskSelection } from "./useTaskSelection";
 
@@ -129,7 +132,7 @@ export function TasksScreen() {
   return <TasksView me={me.data} all={tasks.data ?? []} board={board.data ?? []} load={load} boardLoad={boardLoad} busy={busy} onRetry={retry} />;
 }
 
-type Tile = "yours" | "working" | "today" | "overdue" | "held";
+type Tile = "yours" | "working" | "untaken" | "today" | "overdue" | "held";
 
 const NO_TASKS: TaskWithPeople[] = [];
 const NO_PEOPLE: string[] = [];
@@ -199,13 +202,20 @@ function TasksView({
   const tabOf = useCallback((task: TaskWithPeople) => directorTabOf(task, reasons.get(task.id) ?? null), [reasons]);
 
   const scoped = useMemo(() => (who ? all.filter((task) => task.assignee_id === who) : all), [all, who]);
-  const screen = useMemo(() => directorScreen(scoped, reasons, now), [scoped, reasons, now]);
+  // one verdict for every screen of the director (lib/tasks/attention.ts, D-194): an order lying
+  // untaken, a holder whose pushes do not reach — never «по плану», «решений не ждут»
+  const health = usePushHealth();
+  const noPush = useMemo(() => noPushIds(health.data), [health.data]);
+  const reach = useCallFirst();
+  const screen = useMemo(() => directorScreen(scoped, reasons, now, { noPush }), [scoped, reasons, now, noPush]);
   // the moment counts the person's piles before the filters of the tool bar
   const counts = useMemo(() => {
     const open = scoped.filter((task) => tabOf(task) !== "closed");
     return {
       yours: open.filter((task) => tabOf(task) === "yours").length,
-      working: open.filter((task) => tabOf(task) === "working").length,
+      // taken work only: an order nobody has accepted is no «в работе», and never green (D-194)
+      working: open.filter((task) => tabOf(task) === "working" && task.status !== "sent" && task.status !== HELD_STATUS).length,
+      untaken: open.filter((task) => tabOf(task) === "working" && task.status === "sent").length,
       today: open.filter((task) => matchesDue(task, "today", now)).length,
       overdue: open.filter((task) => isOverdue(task, now)).length,
       held: scoped.filter((task) => task.status === HELD_STATUS).length,
@@ -438,7 +448,7 @@ function TasksView({
     { keys: ["Shift ↑↓"], label: "Отмечать подряд" },
     { keys: ["Ctrl A"], label: "Отметить все строки" },
     { keys: ["Esc"], label: "Снять отметки, затем закрыть панель" },
-    { keys: ["1", "2", "3"], label: "Вкладки: ждут вас · в работе · закрытые" },
+    { keys: ["1", "2", "3"], label: "Вкладки: ждут вас · у команды · закрытые" },
     { keys: ["1…6"], label: "В выборе срока — быстрые варианты" },
   ]);
 
@@ -457,14 +467,20 @@ function TasksView({
 
   const tile = (name: Tile) => {
     const active =
-      name === "yours" || name === "working" ? tab === name && !status && !due : name === "held" ? status === HELD_STATUS : due === name;
+      name === "yours" || name === "working"
+        ? tab === name && !status && !due
+        : name === "held"
+          ? status === HELD_STATUS
+          : name === "untaken"
+            ? status === "sent"
+            : due === name;
     const press = () => {
-      if (active && (name === "today" || name === "overdue" || name === "held")) {
+      if (active && (name === "today" || name === "overdue" || name === "held" || name === "untaken")) {
         writeParams({ status: null, due: null });
         return;
       }
       writeParams({
-        status: name === "held" ? HELD_STATUS : null,
+        status: name === "held" ? HELD_STATUS : name === "untaken" ? "sent" : null,
         due: name === "today" || name === "overdue" ? name : null,
         tab: name === "yours" || name === "overdue" ? "yours" : name === "today" ? (counts.todayYours ? "yours" : "working") : "working",
       });
@@ -473,6 +489,8 @@ function TasksView({
   };
   const counters: MomentCounter[] = [
     { key: "working", label: "В работе", value: counts.working, ...tile("working") },
+    // the untaken apart from the taken, in plain ink; zero is no news, so no counter
+    ...(counts.untaken > 0 ? [{ key: "untaken", label: "Не приняты", value: counts.untaken, ...tile("untaken") }] : []),
     { key: "today", label: "Сегодня", value: counts.today, ...tile("today") },
     { key: "overdue", label: "Просрочено", value: counts.overdue, ...tile("overdue") },
     { key: "held", label: "Отложены", value: counts.held, ...tile("held") },
@@ -570,6 +588,7 @@ function TasksView({
       boardDown={boardDown}
       working={piles.working.length}
       onWorking={() => setTab("working")}
+      attention={screen.attention && !screen.attention.ok ? screen.attention.words : null}
     />
   );
 
@@ -591,6 +610,10 @@ function TasksView({
           detail={calm ? DESK_NEW_TASK : undefined}
           counters={counters}
           queue={queue}
+          act={momentAct(screen, screen.focus ? boardById.get(screen.focus) : undefined, now, {
+            press: (action, task) => acts.press(action, task),
+            open: openTask,
+          }, screen.focus ? reach.phoneOf(boardById.get(screen.focus)?.assignee_id ?? "") : null)}
         />
       )}
 
@@ -649,7 +672,6 @@ function TasksView({
         </div>
       </ViewTransition>
 
-      {ids.length > 0 && picked.size === 0 ? <TableKeysHint /> : null}
 
       {picked.size > 0 ? (
         <BulkBar

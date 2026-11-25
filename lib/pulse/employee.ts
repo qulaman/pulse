@@ -34,14 +34,38 @@ export function tasksBallCount(tasks: readonly Pick<BoardTask, "status" | "deadl
   return tasks.filter((task) => awaitsMyMove(task, now)).length;
 }
 
+/**
+ * The same orders said under the secretary's resting face (D-173, D-87): her Лента at rest is the
+ * request desk — «Дела» is not raised over the requests and «Принял» by the face — so the orders
+ * waiting for her move are one line there, «3 задачи ждут вас · 1 просрочена», a tap away from
+ * «Дела». The count is the ball's (`awaitsMyMove`). null — nothing waits.
+ */
+export function waitingTasksLine(tasks: readonly Pick<BoardTask, "status" | "deadline">[], now: Date): Phrase | null {
+  const waiting = tasks.filter((task) => awaitsMyMove(task, now));
+  if (waiting.length === 0) return null;
+  const overdue = waiting.filter((task) => task.deadline !== null && new Date(task.deadline).getTime() < now.getTime()).length;
+  const head = `${waiting.length} ${pluralRu(waiting.length, ["задача ждёт", "задачи ждут", "задач ждут"])} вас`;
+  if (overdue === 0) return { text: head, tone: "warn" };
+  return { text: `${head} · ${overdue} ${pluralRu(overdue, ["просрочена", "просрочены", "просрочено"])}`, tone: "danger" };
+}
+
 const WORDS_MAX = 80;
 function short(words: string): string {
   const clean = words.trim();
   return clean.length > WORDS_MAX ? `${clean.slice(0, WORDS_MAX - 1).trimEnd()}…` : clean;
 }
 
-/** The greeting and where things stand for the person: new orders, rework, the rest in work. */
-export function employeeOpening(lanes: Lanes, now: Date, name: string, { reportPending = false }: { reportPending?: boolean } = {}): Phrase {
+/**
+ * The greeting and where things stand for the person: new orders, rework, the rest in work.
+ * Nothing on hand is the product's one empty phrase (DESIGN §5), «Дел нет. Придёт задача — я позову»;
+ * over the open «Дела» card, which says it itself (`tasksOpen`), the band only greets — said once.
+ */
+export function employeeOpening(
+  lanes: Lanes,
+  now: Date,
+  name: string,
+  { reportPending = false, tasksOpen = false }: { reportPending?: boolean; tasksOpen?: boolean } = {},
+): Phrase {
   const all = [...lanes.overdue, ...lanes.declined, ...lanes.question, ...lanes.review, ...lanes.work];
   const fresh = all.filter((task) => task.status === "sent").length;
   const rework = all.filter((task) => task.status === "rework").length;
@@ -58,9 +82,11 @@ export function employeeOpening(lanes: Lanes, now: Date, name: string, { reportP
   if (parts.length === 0) {
     // everything handed in is not «дел нет»: the cards wait on review, and «Дела» shows them
     const onReview = all.filter((task) => task.status === "pending_review").length;
+    // the open «Дела» card says it itself: «Дел нет…», or «На проверке у директора · N» over the cards
+    if (inWork === 0 && tasksOpen) return { text: hello, tone: "ok" };
     if (inWork === 0 && onReview > 0) return { text: `${hello} Всё сдано, на проверке у директора — ${onReview}.`, tone: "ok" };
-    // with the day's report still to hand in, «всё сделано» would argue with the next line (D-167)
-    if (inWork === 0) return { text: reportPending ? `${hello} Дел нет.` : `${hello} Дел нет, всё сделано.`, tone: "ok" };
+    // with the day's report still to hand in, «я позову» would argue with the next line (D-167)
+    if (inWork === 0) return { text: reportPending ? `${hello} Дел нет.` : `${hello} Дел нет. Придёт задача — я позову.`, tone: "ok" };
     return { text: `${hello} ${inWork} ${pluralRu(inWork, ["задача", "задачи", "задач"])} в работе, нового нет.`, tone: "ok" };
   }
   return { text: `${hello} ${parts.join(", ")}.`, tone: overdue > 0 ? "danger" : "warn" };

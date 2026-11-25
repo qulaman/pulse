@@ -63,6 +63,11 @@ describe("wallReceipt", () => {
     expect(wallReceipt(row, NOW)).toEqual({ tone: "warn", text: "Экран не отвечает с 09:14" });
   });
 
+  it("молчит со вчера — так и говорит; давно — датой, без часов чужого дня", () => {
+    expect(wallReceipt(state({ seen_at: "2026-09-17T13:40:00Z" }), NOW).text).toBe("Экран не отвечает с 18:40 вчера");
+    expect(wallReceipt(state({ seen_at: "2026-09-15T13:40:00Z" }), NOW).text).toBe("Экран не отвечает с 15 сентября");
+  });
+
   it("команда ушла, но экран её ещё не показал", () => {
     const row = state({ version: 5, applied_version: 4 });
     expect(wallReceipt(row, NOW)).toEqual({ tone: "muted", text: "Отправлено, экран ещё не показал" });
@@ -76,7 +81,8 @@ describe("wallNow", () => {
     expect(wallNow(state({ scene: "team" }), PEOPLE, NOW)).toBe("Эфир · команда");
     expect(wallNow(state({ scene: "calendar" }), PEOPLE, NOW)).toBe("Эфир · календарь");
     expect(wallNow(state({ scene: "calendar", calendar_view: "month" }), PEOPLE, NOW)).toBe("Эфир · календарь · месяц");
-    expect(wallNow(null, PEOPLE, NOW)).toBe("Эфир · сегодня");
+    // a wall nobody has set yet goes round — the remote says so, as the wall does it
+    expect(wallNow(null, PEOPLE, NOW)).toMatch(/^Эфир · .+ · по кругу$/);
   });
 
   it("называет доску на стене и до скольки она там (D-102)", () => {
@@ -186,8 +192,8 @@ describe("wallNow — стена v4 (D-123)", () => {
 
   it("одно дело — название и сколько осталось", () => {
     const row = state({ mode: "task", task_id: "t1", expires_at: "2026-09-18T09:07:00Z" });
-    expect(wallNow(row, PEOPLE, NOW, [], { taskTitle: "Замер окон" })).toBe("Дело «Замер окон» · ещё 7 мин");
-    expect(wallNow(row, PEOPLE, NOW)).toBe("Одно дело · ещё 7 мин");
+    expect(wallNow(row, PEOPLE, NOW, [], { taskTitle: "Замер окон" })).toBe("Задача «Замер окон» · ещё 7 мин");
+    expect(wallNow(row, PEOPLE, NOW)).toBe("Одна задача · ещё 7 мин");
   });
 
   it("круг заставок — сцена и «по кругу»", () => {

@@ -129,7 +129,7 @@ export const DELETE = withAuth(["director", "secretary"], async ({ profile, para
       return apiError(STILL_REFERENCED.status, STILL_REFERENCED.code, STILL_REFERENCED.message);
     }
     console.error("deleteUser failed:", message);
-    return apiError(502, "auth_failed", "Не получилось удалить карточку, попробуй ещё раз");
+    return apiError(502, "auth_failed", "Не получилось удалить карточку, попробуйте ещё раз");
   }
 
   // the photo goes with the card; a file left behind harms nobody, so it does not fail the answer

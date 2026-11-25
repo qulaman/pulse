@@ -88,7 +88,7 @@ export function SettingsDraftProvider({ children }: { children: ReactNode }) {
       if (patch.daily_report !== undefined || patch.points_rules !== undefined) void queryClient.invalidateQueries({ queryKey: ["daily-report"] });
       toast("Сохранил настройки");
     },
-    onError: () => toast("Не получилось сохранить. Попробуй ещё раз"),
+    onError: () => toast("Не получилось сохранить. Попробуйте ещё раз"),
   });
 
   const server = query.data ?? null;

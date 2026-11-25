@@ -74,7 +74,11 @@ export function useTvFeed() {
 export type TvCounts = { overdue: number; declined: number; review: number; questions: number };
 export type TvToday = { sent: number; done: number; in_work: number };
 export type TvRatingRow = { name: string; points: number | null; rank: number };
-export type TvLoadRow = { name: string; active: number; overdue: number };
+/**
+ * A person of the team: tasks in work, accepted today and in the last seven days, the position (a guest — none,
+ * D-33). Older bases send no `done_today` / `done_week` / `position`; `overdue` is 0 (D-45).
+ */
+export type TvLoadRow = { name: string; active: number; overdue: number; done_today?: number; done_week?: number; position?: string | null };
 export type TvWeekDay = { day: string; done: number };
 export type TvMerchRow = { name: string; title: string; at: string };
 
@@ -193,7 +197,7 @@ export type TvStoryEvent = {
 
 export type TvFocusTask = {
   id: string;
-  /** Гостю заголовков не отдают вовсе — экран скажет «Поручение» (D-33). */
+  /** Гостю заголовков не отдают вовсе — экран скажет «Задача» (D-33). */
   title: string | null;
   status: string;
   deadline: string | null;

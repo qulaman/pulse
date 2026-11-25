@@ -104,7 +104,7 @@ export function useAcknowledge(userId: string | undefined) {
     },
     onError: (_error, _id, context) => {
       if (context?.previous) queryClient.setQueryData(etherKeys.feed, context.previous);
-      toast("Не получилось отметить. Попробуй ещё раз");
+      toast("Не получилось отметить. Попробуйте ещё раз");
     },
     onSettled: () => void queryClient.invalidateQueries({ queryKey: etherKeys.feed }),
   });
@@ -128,7 +128,7 @@ export function useDeleteAnnouncement() {
     onSuccess: () => toast("Удалил объявление"),
     onError: (_error, _id, context) => {
       if (context?.previous) queryClient.setQueryData(etherKeys.feed, context.previous);
-      toast("Не получилось удалить. Попробуй ещё раз");
+      toast("Не получилось удалить. Попробуйте ещё раз");
     },
     onSettled: () => void queryClient.invalidateQueries({ queryKey: etherKeys.feed }),
   });
@@ -195,7 +195,7 @@ export function useSendAnnouncementNow() {
     },
     onError: (_error, _id, context) => {
       if (context?.previous) queryClient.setQueryData(heldKeys.announcements, context.previous);
-      toast("Не получилось отправить. Попробуй ещё раз");
+      toast("Не получилось отправить. Попробуйте ещё раз");
     },
     onSettled: () => void queryClient.invalidateQueries({ queryKey: heldKeys.announcements }),
   });
@@ -256,7 +256,7 @@ export function useDeleteEtherEvent() {
     onSuccess: () => toast("Убрал из Эфира"),
     onError: (_error, _id, context) => {
       if (context?.previous) queryClient.setQueryData(etherEventKeys.feed, context.previous);
-      toast("Не получилось убрать. Попробуй ещё раз");
+      toast("Не получилось убрать. Попробуйте ещё раз");
     },
     onSettled: () => void queryClient.invalidateQueries({ queryKey: etherEventKeys.feed }),
   });

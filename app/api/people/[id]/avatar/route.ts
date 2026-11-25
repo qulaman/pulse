@@ -31,7 +31,7 @@ async function writeUrl<T>(ctx: HandlerContext<T>, id: string, url: string | nul
   const { data, error } = await supabase.from("profiles").update({ avatar_url: url }).eq("id", id).eq("company_id", ctx.profile.companyId).select("id");
   if (error) {
     console.error("avatar_url update failed:", error.message);
-    return apiError(502, "update_failed", "Не получилось сохранить фото, попробуй ещё раз");
+    return apiError(502, "update_failed", "Не получилось сохранить фото, попробуйте ещё раз");
   }
   return data?.length ? null : apiError(403, "forbidden", "Эту карточку менять нельзя");
 }

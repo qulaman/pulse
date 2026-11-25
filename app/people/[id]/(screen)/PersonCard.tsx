@@ -15,6 +15,8 @@ import { HeadButton } from "@/components/ui/HeadButton";
 import { PageHead } from "@/components/ui/PageHead";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
+import { formatNum } from "@/lib/desk/format";
+import { closedIn30, finishedOf } from "@/lib/people/counts";
 import { AVAILABILITY_LABEL, ROLE_LABEL, usePerson, usePersonMessages } from "@/lib/people/queries";
 import { useAwardPoints, useBalance, usePointsEnabled } from "@/lib/points/queries";
 import { useComposeStore } from "@/lib/store/compose";
@@ -27,15 +29,16 @@ import { STATUS_LABEL, isOverdue, type TaskStatus } from "@/lib/tasks/status-tex
 import { initialsOf } from "@/lib/people/names";
 
 const OPEN: TaskStatus[] = ["scheduled", "sent", "accepted", "in_progress", "rework"];
-const CLOSED: TaskStatus[] = ["done", "declined", "revoked"];
 
-const STAT_COLOR = { danger: "var(--danger)", ok: "var(--ok)", gold: "var(--gold)" } as const;
+const STAT_COLOR = { danger: "var(--danger)", ok: "var(--ok)", gold: "var(--gold)", muted: "var(--text-muted)" } as const;
 
 function Stat({ value, label, tone }: { value: string | number | null; label: string; tone?: keyof typeof STAT_COLOR }) {
+  // a six- or seven-digit number steps down a size instead of leaving its tile (4.5)
+  const long = typeof value === "string" ? value.length > 5 : value !== null && Math.abs(value) >= 100_000;
   return (
-    <div className="rounded-[12px] bg-surface-2 px-2 py-2 text-center">
+    <div className="min-w-0 rounded-[12px] bg-surface-2 px-1.5 py-2 text-center">
       <p
-        className="nums flex h-[30px] items-center justify-center text-[22px] font-bold leading-[30px]"
+        className={`nums flex h-[30px] items-center justify-center whitespace-nowrap font-bold leading-[30px] ${long ? "text-[15px]" : "text-[22px]"}`}
         style={tone ? { color: STAT_COLOR[tone] } : undefined}
       >
         {value === null ? <Bone h={22} w={28} className="bg-border" /> : value}
@@ -75,11 +78,10 @@ export function PersonCard() {
     return {
       open: all.filter((t) => OPEN.includes(t.status)),
       review: all.filter((t) => t.status === "pending_review"),
-      closed: all.filter((t) => CLOSED.includes(t.status)),
+      // every finished task, all time — «История», never a second «закрыто» (lib/people/counts.ts)
+      closed: finishedOf(all),
       overdue: all.filter((t) => isOverdue(t)).length,
-      done30: all.filter(
-        (t) => t.status === "done" && t.closed_at && now - new Date(t.closed_at).getTime() < 30 * 86_400_000,
-      ).length,
+      done30: closedIn30(all, now),
     };
   }, [tasks.data, now]);
 
@@ -150,16 +152,17 @@ export function PersonCard() {
               {p.availability !== "active" ? (
                 <Chip tone="warn" interactive={false}>{AVAILABILITY_LABEL[p.availability]}</Chip>
               ) : null}
-              {!p.is_active ? <Chip tone="danger" interactive={false}>Не работает</Chip> : null}
+              {!p.is_active ? <Chip tone="muted" interactive={false}>Не в команде</Chip> : null}
             </div>
           </div>
         </div>
 
         <div className="mt-4 grid grid-cols-4 gap-2">
-          <Stat value={tasks.isLoading ? null : groups.open.length + groups.review.length} label="в работе" />
+          {/* not «в работе»: a task nobody has taken yet is open, not in work (§4.4) */}
+          <Stat value={tasks.isLoading ? null : groups.open.length + groups.review.length} label="открыто" />
           <Stat value={tasks.isLoading ? null : groups.overdue} label="просрочено" tone={groups.overdue > 0 ? "danger" : undefined} />
           <Stat value={tasks.isLoading ? null : groups.done30} label="закрыто за 30 дн." tone={groups.done30 > 0 ? "ok" : undefined} />
-          <Stat value={points.isLoading ? null : (points.data ?? 0)} label="очков" tone="gold" />
+          <Stat value={points.isLoading ? null : formatNum(points.data ?? 0)} label="очков" tone={(points.data ?? 0) > 0 ? "gold" : "muted"} />
         </div>
 
         {/* the main action on its own line — three buttons in a row wrap on a 375px phone */}
@@ -210,19 +213,19 @@ export function PersonCard() {
           ) : groups.open.length + groups.review.length === 0 ? (
             <div className="flex items-center gap-3 card px-4 py-3">
               <Mascot state="calm" size={44} />
-              <p className="text-[16px] leading-[22px] text-muted">Открытых задач нет. Дай задачу голосом или текстом</p>
+              <p className="text-[16px] leading-[22px] text-muted">Открытых задач нет. Задачу можно дать голосом или строкой текста</p>
             </div>
           ) : (
             <>
               {groups.review.length > 0 ? (
                 <>
-                  <p className="mb-2 text-[13px] leading-4 text-muted">На приёмке</p>
+                  <p className="mb-2 text-[13px] leading-4 text-muted">На проверке</p>
                   {renderList(groups.review)}
                 </>
               ) : null}
               {groups.open.length > 0 ? (
                 <>
-                  <p className={`mb-2 text-[13px] leading-4 text-muted ${groups.review.length > 0 ? "mt-4" : ""}`}>В работе</p>
+                  <p className={`mb-2 text-[13px] leading-4 text-muted ${groups.review.length > 0 ? "mt-4" : ""}`}>Открытые</p>
                   {renderList(groups.open)}
                 </>
               ) : null}
@@ -238,7 +241,7 @@ export function PersonCard() {
               className="text-[13px] leading-4 text-muted"
               aria-expanded={showClosed}
             >
-              {showClosed ? "Скрыть закрытые" : `Закрытые · ${groups.closed.length}`}
+              {showClosed ? "Скрыть историю" : `История · ${groups.closed.length}`}
             </button>
             {showClosed ? <div className="mt-3">{renderList(groups.closed)}</div> : null}
           </div>
@@ -246,7 +249,7 @@ export function PersonCard() {
       </section>
 
       <section className="mt-6">
-        <h2 className="text-[19px] font-semibold leading-6">Что писал</h2>
+        <h2 className="text-[19px] font-semibold leading-6">Сообщения</h2>
         <div className="mt-3">
           {messages.isLoading ? (
             <SkeletonGroup>

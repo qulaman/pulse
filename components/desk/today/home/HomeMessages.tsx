@@ -76,7 +76,8 @@ export function HomeMessages({ me, onOpenTask }: { me: Me; onOpenTask: (id: stri
         <RowsBone rows={2} height={50} />
       ) : load.kind === "failed" ? null : messages.length === 0 ? (
         <div className="desk-list">
-          <AllClear icon={CheckCheck} ink="ok" hint="Вопросы и просьбы о сроке стоят в «Ждут вас»" testId="home-messages-empty">
+          {/* one line: questions and requests for time are «Ждут вас»'s, this block does not point there (D-194) */}
+          <AllClear icon={CheckCheck} ink="ok" testId="home-messages-empty">
             Всё прочитано
           </AllClear>
         </div>

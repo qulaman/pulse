@@ -38,7 +38,7 @@ export function PasswordRow() {
     if (updateError) {
       // GoTrue refuses a password equal to the current one
       return setError(
-        /different|same/i.test(updateError.message) ? "Это твой нынешний пароль — придумай другой" : "Не получилось сменить пароль. Попробуй ещё раз",
+        /different|same/i.test(updateError.message) ? "Это нынешний пароль — придумайте другой" : "Не получилось сменить пароль. Попробуйте ещё раз",
       );
     }
     toast("Пароль обновлён");

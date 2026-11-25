@@ -33,7 +33,8 @@ describe("backTarget (D-113): «Назад» on every screen that is not a tab's
     expect(backTarget("secretary", "/settings")).toBe("/profile");
     expect(backTarget("secretary", "/lab")).toBe("/profile");
     expect(backTarget("secretary", "/people/new")).toBe("/profile");
-    expect(backTarget("secretary", "/secretary")).toBe("/profile");
+    // her requests live on Лента's ball «Заявки» (D-87): their list leads back there
+    expect(backTarget("secretary", "/secretary")).toBe("/feed");
     expect(backTarget("secretary", "/report")).toBe("/tasks");
     expect(backTarget("employee", "/shop")).toBe("/rating");
     expect(backTarget("employee", "/ether")).toBe("/feed");

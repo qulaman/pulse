@@ -343,7 +343,7 @@ export function useDeskActs({
       node = (
         <Dialog open onClose={close} title={remove ? BUTTON.remove : count > 1 ? `Отозвать ${count} ${pluralRu(count, ["задачу", "задачи", "задач"])}` : BUTTON.revoke} width="sm">
           <p className="text-[14px] leading-5 text-muted">
-            {remove ? TEXT.removeConfirm : count > 1 ? "Каждая уйдёт с пометкой «отозвано директором». Отменить можно сразу — в уведомлении." : TEXT.revokeConfirm}
+            {remove ? TEXT.removeConfirm : count > 1 ? "Исполнители увидят, что задачи отозваны, а задачи останутся в истории. Отменить можно сразу — в уведомлении." : TEXT.revokeConfirm}
           </p>
           {count === 1 ? <p className="mt-2 line-clamp-2 text-[14px] font-medium leading-5">«{first.title}»</p> : null}
           <div className="mt-4 flex justify-end gap-2">

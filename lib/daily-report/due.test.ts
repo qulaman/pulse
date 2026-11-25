@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Draft } from "./draft";
-import { ASK_FROM_DEFAULT, askFromOf, NO_REPORT_DUE, oneTapInput, reportDue } from "./due";
+import { ASK_FROM_DEFAULT, askFromOf, leftSuggestion, NO_REPORT_DUE, oneTapInput, reportDue } from "./due";
 import type { DailyReport, DailyReportTask, MyDailyReportDay } from "./types";
 
 /** An Aqtobe wall-clock moment of 2026-10-28 (a Wednesday), UTC+5. */
@@ -213,5 +213,22 @@ describe("askFromOf", () => {
     expect(askFromOf("9:00")).toBe(ASK_FROM_DEFAULT);
     expect(askFromOf(undefined)).toBe(ASK_FROM_DEFAULT);
     expect(askFromOf(1700)).toBe(ASK_FROM_DEFAULT);
+  });
+});
+
+describe("leftSuggestion (7.6)", () => {
+  it("in the morning «Ушёл» is empty — nobody has left at half past nine", () => {
+    expect(leftSuggestion(day(), at("09:31"))).toBeNull();
+    expect(leftSuggestion(day(), at("16:59"))).toBeNull();
+  });
+
+  it("from the evening (`ask_from`) it is now on the minute", () => {
+    expect(leftSuggestion(day(), at("17:00"))).toBe("17:00");
+    expect(leftSuggestion(day(), at("18:42"))).toBe("18:42");
+    expect(leftSuggestion(day(), at("15:10"), "15:00")).toBe("15:10");
+  });
+
+  it("a day that is not today keeps the database's suggestion", () => {
+    expect(leftSuggestion(day(), at("09:31", "2026-10-29"))).toBe("11:00");
   });
 });

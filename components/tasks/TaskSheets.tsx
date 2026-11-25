@@ -9,6 +9,7 @@ import { DateTimeField } from "@/components/ui/datetime/DateTimeField";
 import { Sheet } from "@/components/ui/Sheet";
 import { PHOTO_MIME, shrinkPhoto, uploadPhotoBlob } from "@/lib/files/photo";
 import { claimMedia, dropMedia, handOverMedia, keepMedia, releaseMedia } from "@/lib/media/pending";
+import { quickQuestionsFor } from "@/lib/tasks/answers";
 import { CANT_REASONS, NOT_MINE, requestButtonLabel, timeChoices } from "@/lib/tasks/lifecycle";
 import { BUTTON, TEXT, type TaskStatus } from "@/lib/tasks/status-text";
 
@@ -21,10 +22,17 @@ type BaseProps = { open: boolean; onClose: () => void };
 /* «Уточнить» — a message with meta.is_question, never a status (D-03)         */
 /* -------------------------------------------------------------------------- */
 
-/** The questions people actually ask — one tap each, the textarea is for the rest. */
-const QUICK_QUESTIONS = ["Когда срок?", "Какой формат?", "Где взять данные?", "Это срочно?"] as const;
-
-export function AskSheet({ open, onClose, onSubmit }: BaseProps & { onSubmit: (text: string) => void }) {
+/**
+ * The questions people actually ask — one tap each, the textarea is for the rest; only those the
+ * task has not answered on its face (`quickQuestionsFor`: no «Когда срок?» under a deadline).
+ */
+export function AskSheet({
+  open,
+  onClose,
+  onSubmit,
+  task,
+}: BaseProps & { onSubmit: (text: string) => void; task?: { deadline: string | null; priority?: string | null } | null }) {
+  const questions = quickQuestionsFor(task ?? { deadline: null, priority: null });
   const [text, setText] = useState("");
 
   const submit = (value = text) => {
@@ -40,7 +48,7 @@ export function AskSheet({ open, onClose, onSubmit }: BaseProps & { onSubmit: (t
       {/* a question chip goes to the director at once — one tap (принцип 1) — so it wears the send
           arrow and a thumb's height; the chips of «Не могу» and «Что сделано?» only choose (D-173) */}
       <div className="mb-3 flex flex-wrap gap-2">
-        {QUICK_QUESTIONS.map((question) => (
+        {questions.map((question) => (
           <Chip key={question} data-testid="ask-quick" className="!min-h-[44px] !pr-2.5" onClick={() => submit(question)}>
             {question}
             <span className="text-accent">

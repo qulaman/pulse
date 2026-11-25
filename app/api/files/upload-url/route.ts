@@ -25,7 +25,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     }
     if (error || !data) {
       console.error("photo upload url failed:", error?.message);
-      return apiError(502, "upload_url_failed", "Не удалось начать загрузку, попробуй ещё раз");
+      return apiError(502, "upload_url_failed", "Не удалось начать загрузку, попробуйте ещё раз");
     }
     return apiOk({ path, signed_url: data.signedUrl, token: data.token });
   },

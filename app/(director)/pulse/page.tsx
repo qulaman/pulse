@@ -38,11 +38,13 @@ import { OrbitBalls, type OrbitBall, type OrbitId } from "@/components/pulse/Orb
 import { AFTER_CARD, recede } from "@/components/pulse/PanelCard";
 import { PickCard, type Picked } from "@/components/pulse/PickCard";
 import { SaidBand } from "@/components/pulse/SaidBand";
+import { SAY_WRITE_SKIRT, SayWrite } from "@/components/pulse/SayWrite";
 import { SecretaryCard } from "@/components/pulse/SecretaryCard";
 import { DESK_FACE, DESK_H, DESK_W, SecretaryDesk } from "@/components/pulse/SecretaryDesk";
 import { useStableActions, useStableCallback } from "@/components/pulse/stable";
 import { thoughtAct } from "@/components/pulse/thoughtActs";
 import { useMascotActs } from "@/components/pulse/useMascotActs";
+import { useNoPush } from "@/components/pulse/useNoPush";
 import { useSpeech } from "@/components/pulse/useSpeech";
 import { RatingPanel } from "@/components/rating/RatingPanel";
 import { useDirectorControls } from "@/components/tasks/list/useDirectorControls";
@@ -326,7 +328,9 @@ export default function PulsePage() {
   // The director's assistant is never angry (D-70, the owner): whatever waits for him — a
   // deadline within the hour, an order unaccepted for half an hour, an unread word — the
   // face just goes watchful. The balls and the line say which of the three it is.
-  const alarm = useMemo(() => alarmOf(rows ?? [], now, meId), [rows, now, meId]);
+  // an order whose assignee hears nothing about it is a reason to watch too (D-114)
+  const noPush = useNoPush();
+  const alarm = useMemo(() => alarmOf(rows ?? [], now, meId, noPush), [rows, now, meId, noPush]);
   // a meeting within the quarter of an hour is worth the same watchful face as a deadline
   const mood: MascotState | null = alarm || eventSoon ? "alert" : null;
   const awake: MascotState = loading
@@ -598,7 +602,7 @@ export default function PulsePage() {
       panel === "tasks" ? (
         // what waits for the morning still has its closing card (D-139)
         taskCount === 0 && heldTasks.length === 0 ? (
-          <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Задач нет. Зажми меня и скажи, что нужно сделать.</p>
+          <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Задач нет. Удержите меня и скажите, что нужно сделать.</p>
         ) : (
           <CardDeck lanes={taskLanes} now={now} since={since} actions={actions} companyId={companyId} meId={meId} onReply={openThread} focus={null} held={heldTasks} onMore={moreTask} />
         )
@@ -610,7 +614,7 @@ export default function PulsePage() {
         )
       ) : panel === "calendar" ? (
         events.length === 0 ? (
-          <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Мероприятий нет. Скажи «планёрка завтра в 10 со всеми».</p>
+          <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Встреч нет. Скажите: «планёрка завтра в 10 со всеми».</p>
         ) : (
           <CalendarList events={events} now={now} meId={meId} onOpen={setOpenEvent} variant="compact" />
         )
@@ -618,7 +622,7 @@ export default function PulsePage() {
         <RatingPanel />
       ) : panel === "ether" ? (
         etherCount === 0 ? (
-          <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Объявлений пока нет. Скажи «всем: …».</p>
+          <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Объявлений пока нет. Скажите: «всем: …».</p>
         ) : (
           <EtherSection variant="page" />
         )
@@ -689,6 +693,11 @@ export default function PulsePage() {
     [exchange, unparsed, startManual, closeExchange, fixUnparsed, resetIngest],
   );
 
+  // «Сказать · Написать» under the resting face (owner, 2026-11-25): the same two ways in as the
+  // face's hold and pull, in sight — not while a phrase is in hand, somebody is picked or the
+  // secretary's buttons are out, each of which has its own ways
+  const sayWrite = mode === "idle" && !phraseInHand && !picked && !asking;
+
   return (
     // the three bands of the home stage (HomeStage) — one exception: a phrase of several things lifts
     // the face, the cards band growing by a CSS transition (`crowded`, D-146). PulseSkeleton draws the
@@ -721,6 +730,8 @@ export default function PulsePage() {
               picked={picked?.id ?? null}
               onPick={onPickOrb}
               onLook={onLookAt}
+              // the idlers' floor starts under the buttons
+              skirt={sayWrite ? SAY_WRITE_SKIRT : undefined}
             />
             </div>
             <MascotLever
@@ -736,10 +747,10 @@ export default function PulsePage() {
               label={
                 phraseInHand
                   ? sendableCount > 0
-                    ? "Маскот: тап — отправить"
-                    : "Маскот: тап — указать, кому"
+                    ? "Маскот: нажмите — отправить"
+                    : "Маскот: нажмите — указать, кому"
                   : picked
-                    ? `Маскот: задача для ${picked.name} — удержи и говори или тапни`
+                    ? `Маскот: задача для ${picked.name} — удержите и говорите или нажмите`
                     : undefined
               }
               pin={pin}
@@ -849,6 +860,7 @@ export default function PulsePage() {
             </LocalPresence>
           </>
       }
+      underFace={<SayWrite show={sayWrite} />}
       // a thought about Эфир or the calendar opens no thread — there is none behind it
       thought={
         thought && thoughtUp
@@ -887,7 +899,12 @@ export default function PulsePage() {
           style={{ bottom: "calc(var(--tabbar-space) + 2px)" }}
           data-testid="lever-hint"
         >
-          удержи — говори · тап — задачи · потяни вниз — текст
+          {/* «Сказать · Написать» above are the same ways in, in sight; the line teaches the face's own:
+              the hold and the pull (the faster way), and what its tap brings out — the balls, by their
+              own labels (D-60) */}
+          лицо: удержите — говорите, потяните вниз — текст
+          <br />
+          нажмите — {balls.map((ball) => ball.label.toLowerCase()).join(", ")}
         </p>
       ) : null}
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { matchCommands, matchSections, matchTasks, taskLookup } from "./palette";
+import { commandHint, matchCommands, matchSections, matchTasks, taskLookup } from "./palette";
 
 const sections = [
   { href: "/desk/today", label: "Сегодня" },
@@ -36,6 +36,15 @@ describe("matchSections", () => {
   it("finds them by their other words", () => {
     expect(matchSections("тв", sections).map((s) => s.href)).toEqual(["/desk/screen"]);
     expect(matchSections("пароль", sections).map((s) => s.href)).toEqual(["/desk/profile"]);
+  });
+
+  it("a section's former name still finds it (D-194)", () => {
+    const renamed = [
+      { href: "/desk/inbox", label: "Ждут вас" },
+      { href: "/desk/ether", label: "Эфир" },
+    ];
+    expect(matchSections("разобрать", renamed).map((s) => s.href)).toEqual(["/desk/inbox"]);
+    expect(matchSections("объявления", renamed).map((s) => s.href)).toEqual(["/desk/ether"]);
   });
 
   it("finds nothing in an order", () => {
@@ -117,5 +126,26 @@ describe("matchCommands — a move named in words (D-160)", () => {
   it("«удалить старые файлы» names nobody: no command, the words stay an order", () => {
     expect(matchCommands("удалить старые файлы", people)).toEqual([]);
     expect(matchCommands("удалить сотрудника", people)).toEqual([{ kind: "team", lead: false }]);
+  });
+});
+
+describe("commandHint (D-194)", () => {
+  it("the whole example on a wide line, a shorter one where it would be cut", () => {
+    expect(commandHint(900, false)).toBe("Кому и что сделать: «Ерлану смета по объекту до пятницы» — Enter");
+    expect(commandHint(400, false)).toBe("Кому и что сделать — Enter");
+    expect(commandHint(150, false)).toBe("Поручение — Enter");
+    expect(commandHint(40, false)).toBe("Поручение — Enter");
+  });
+
+  it("a pinned person: what and by when", () => {
+    expect(commandHint(900, true)).toBe("Что сделать и к какому сроку — Enter");
+    expect(commandHint(200, true)).toBe("Что сделать — Enter");
+  });
+
+  it("the chosen example always fits the width it was chosen for", () => {
+    for (const width of [180, 240, 320, 420, 520, 640]) {
+      const hint = commandHint(width, false);
+      if (hint !== "Поручение — Enter") expect(hint.length * 7.6).toBeLessThanOrEqual(width);
+    }
   });
 });

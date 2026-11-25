@@ -8,22 +8,21 @@ import { humanAqtobe } from "@/lib/ai/time";
 import { shortName } from "@/lib/people/names";
 import { hasUnread, type BoardTask } from "@/lib/pulse/board";
 import { isWorking } from "@/lib/tasks/lifecycle";
-import { statusWord, stepsOf } from "@/lib/tasks/overview";
+import { statusWord } from "@/lib/tasks/overview";
 import type { ReactionCode } from "@/lib/points/reactions";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { TEXT, wordText } from "@/lib/tasks/status-text";
 
 import { Icon } from "../icons";
 import { EmployeeKeys, type EmployeeAction } from "./EmployeeKeys";
-import { pathClockOf, TaskPath } from "../detail/TaskPath";
 import { CardFoot, CardHead, CardShell } from "./TaskList";
 
 /**
- * A card of «Мои дела». Closed: the state mark, the title, «when», the state. Open: what
- * the director wrote and said (the recording and the words), a return for rework, the
- * director's last word, the buttons of FRONTEND «Состояние задачи → набор кнопок» (`EmployeeKeys`,
- * principle 2) — and under them the four steps (D-173: the buttons first, so «Принял» is in sight
- * on a phone).
+ * A card of «Мои дела». Closed: the state mark, the title, «when», who gave it, the state, «срочно» —
+ * the same marks as the Лента card and the task's screen (D-194). Open: what the director wrote
+ * and said (the recording and the words), a return for rework, the director's last word and the
+ * buttons of FRONTEND «Состояние задачи → набор кнопок» (`EmployeeKeys`, principle 2) — nothing more
+ * (D-194): the stages live on the task's own screen, one tap away.
  * A request still waiting is said on the card.
  */
 export function EmployeeTaskCard({
@@ -54,7 +53,6 @@ export function EmployeeTaskCard({
   const last = row?.last_message ?? null;
   const lastText = last ? wordText(last) : "";
   const lastName = last ? (last.sender_id === meId ? "Вы" : (task.author?.full_name ?? "Директор")) : "";
-  const author = shortName(task.author?.full_name);
   // my own request for time, still waiting for the director (D-128); a new task has none to wait on
   const request = row?.time_request && isWorking(task.status) && task.status !== "sent" ? row.time_request : null;
   const suggested = task.status === "declined" ? shortName(row?.suggestion?.name) : undefined;
@@ -80,20 +78,19 @@ export function EmployeeTaskCard({
           task={task}
           now={now}
           open={open}
+          // who gave it — the head of every card says it, as the Лента card and the task's screen do
+          person={task.author?.full_name ?? null}
           unread={unread}
           closed={closed}
           word={statusWord(task, "employee", now)}
-          wordTone={task.status === "sent" ? "accent" : task.status === "rework" ? "warn" : undefined}
+          // a new task is the holder's move — amber like a return, never the brand colour (D-194)
+          wordTone={task.status === "sent" || task.status === "rework" ? "warn" : undefined}
+          attention={task.status === "sent"}
         />
       }
     >
       <div className="pl-[34px]">
         {task.body ? <p className="whitespace-pre-line text-[15px] leading-[21px] text-text/85">{task.body}</p> : null}
-        <p className={`${task.body ? "mt-2" : ""} text-[13px] leading-[18px] text-muted`}>
-          {/* who gave it is the only other side of the assignee's own order: the name says it (D-187) */}
-          {author ? `${author} · ` : ""}
-          <span className="nums">{humanAqtobe(new Date(task.created_at), now)}</span>
-        </p>
 
         {reaction ? <ReactionBadge code={reaction} points={reactionPoints} className="mt-2" /> : null}
 
@@ -118,15 +115,9 @@ export function EmployeeTaskCard({
         <TranscriptSpoiler task={task} />
       </div>
 
-      {/* the buttons come before the steps (D-173): «Принял» stays in sight on a phone, and the
-          steps are where the task stands, not what to do. Handed-in work has no buttons: its
-          steps («Сдана · Проверка») say it waits for the director */}
+      {/* the three buttons, the card's whole job (principle 2); handed-in work has none — its
+          state word «на проверке» says it waits for the director */}
       <EmployeeKeys status={task.status} onPress={(action) => onAction(action, task)} />
-
-      <div className="mt-4">
-        {/* the holder's own steps: a new one «Ждёт вас», not «В работе» (D-173) */}
-        <TaskPath steps={stepsOf(task, now, { forAssignee: true })} now={now} clock={pathClockOf(task, now)} />
-      </div>
 
       <CardFoot href={`/tasks/${task.id}`} />
     </CardShell>

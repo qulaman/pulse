@@ -28,14 +28,14 @@ describe("a handed-over task (D-128)", () => {
   it("a recall after a refusal keeps the refusal on its way (D-142)", () => {
     const refusedAt = "2026-09-20T05:00:00Z";
     expect(stepsFor(base, new Date("2026-09-22T04:00:00Z"), { declinedAt: refusedAt }).map((s) => `${s.label}:${s.state}`)).toEqual([
-      "Выдана:done",
+      "Поручено:done",
       "Отказ:bad",
-      "Сдана:todo",
+      "На проверке:todo",
       "Отозвана:bad",
     ]);
     // refused after it was taken: the refusal stands where the handover would have been
     const taken = { ...base, accepted_at: "2026-09-20T04:30:00Z" };
-    expect(stepsFor(taken, new Date("2026-09-22T04:00:00Z"), { declinedAt: refusedAt }).map((s) => s.label)).toEqual(["Выдана", "В работе", "Отказ", "Отозвана"]);
+    expect(stepsFor(taken, new Date("2026-09-22T04:00:00Z"), { declinedAt: refusedAt }).map((s) => s.label)).toEqual(["Поручено", "В работе", "Отказ", "Отозвана"]);
   });
 
   it("a plain revoke stays «отозвана»", () => {
@@ -50,6 +50,7 @@ import {
   closedTodayCount,
   directorScreen,
   directorTabOf,
+  DIRECTOR_TAB_LABEL,
   employeeScreen,
   employeeTabOf,
   matchesQuery,
@@ -114,6 +115,11 @@ describe("tabs", () => {
     expect(directorTabOf({ status: "revoked" }, null)).toBe("closed");
   });
 
+  it("the director's middle tab is «У команды»: taken and not taken yet live in it (the owner, 2026-11-25)", () => {
+    expect(DIRECTOR_TAB_LABEL).toEqual({ yours: "Ждут вас", working: "У команды", closed: "Закрытые" });
+    expect(directorTabOf({ status: "sent" }, null)).toBe("working");
+  });
+
   it("the employee's piles: to take up (new and returned, D-173), in hand, over", () => {
     expect(employeeTabOf({ status: "sent" })).toBe("new");
     expect(employeeTabOf({ status: "rework" })).toBe("new");
@@ -151,7 +157,7 @@ describe("sections", () => {
       { task: review, reason: "review" },
     ]);
     expect(sections.map((s) => [s.title, s.tone, s.tasks.length])).toEqual([
-      ["На приёмке", "warn", 1],
+      ["На проверке", "warn", 1],
       ["Вопросы", "warn", 1],
       ["Просрочено", "danger", 1],
     ]);
@@ -165,6 +171,18 @@ describe("sections", () => {
     const later = task({ status: "scheduled", scheduled_send_at: at("18", 9) });
     const titles = workingSections([later, none, handedIn, tomorrow, today], NOW).map((s) => s.title);
     expect(titles).toEqual(["Сегодня", "Завтра", "Без срока", "На проверке у директора", "Отправлю позже"]);
+  });
+
+  it("the director's «В работе»: orders nobody has taken stand first as «Не приняты», amber once one waited half an hour", () => {
+    const fresh = task({ status: "sent", created_at: "2026-09-17T06:50:00Z", deadline: at("17") });
+    const taken = task({ status: "accepted", deadline: at("17") });
+    const calm = workingSections([taken, fresh], NOW, { reviewTitle: "На проверке", unacceptedFirst: true });
+    expect(calm.map((s) => [s.title, s.tone, s.tasks.length])).toEqual([
+      ["Не приняты", "muted", 1],
+      ["Сегодня", "muted", 1],
+    ]);
+    const stale = task({ status: "sent" });
+    expect(workingSections([fresh, stale], NOW, { unacceptedFirst: true })[0]).toMatchObject({ title: "Не приняты", tone: "warn" });
   });
 
   it("history by the day it closed, newest first", () => {
@@ -194,27 +212,66 @@ describe("the director's status screen", () => {
     expect(screen.tone).toBe("danger");
     expect(screen.value).toBe(3);
     expect(screen.label).toBe("задачи ждут вас");
-    expect(screen.detail).toBe("1 на приёмке · 1 вопрос · 1 просрочка");
-    expect(screen.segments.map((s) => [s.key, s.count])).toEqual([
-      ["overdue", 1],
-      ["waiting", 2],
-      ["unseen", 1],
-      ["working", 1],
-      ["scheduled", 1],
+    // the order untaken for two days needs him too, said after the queue
+    expect(screen.detail).toBe("1 на проверке · 1 вопрос · 1 просрочка · 1 не принята давно");
+    expect(screen.segments.map((s) => [s.key, s.count, s.tone])).toEqual([
+      ["overdue", 1, "danger"],
+      ["waiting", 2, "warn"],
+      ["working", 1, "ok"],
+      ["unseen", 1, "wait"],
+      ["scheduled", 1, "muted"],
     ]);
     expect(screen.open).toBe(6);
     expect(screen.closedToday).toBe(1);
   });
 
-  it("nothing waits: how much the team carries, and the nearest deadline", () => {
+  it("nothing waits and nothing needs him: «по плану» with the work taken, the nearest deadline", () => {
     const soon = task({ status: "accepted", deadline: at("17", 18), title: "КП для Казхрома" });
-    const tasks = [soon, task({ status: "sent" }), task({ status: "accepted", deadline: at("20") })];
+    // handed out ten minutes ago: inside the half hour it is not a worry yet
+    const fresh = task({ status: "sent", created_at: "2026-09-17T06:50:00Z" });
+    const tasks = [soon, fresh, task({ status: "accepted", deadline: at("20") })];
     const screen = directorScreen(tasks, reasonsOf(tasks), NOW);
+    expect(screen.eyebrow).toBe("Всё идёт по плану");
     expect(screen.tone).toBe("ok");
     expect(screen.value).toBe(3);
     expect(screen.label).toBe("задачи у команды");
-    expect(screen.detail).toBe("1 ещё не принята · решений не ждут");
+    // the legend says «1 не принята» — the words do not say it again
+    expect(screen.detail).toBe("решений от вас не ждут");
+    expect(screen.attention?.ok).toBe(true);
     expect(screen.nearest).toEqual({ id: soon.id, title: "КП для Казхрома", who: "Марат", at: soon.deadline });
+  });
+
+  it("D-194: an order untaken since yesterday is never «всё идёт по плану»", () => {
+    const stale = task({ status: "sent", title: "Тест", created_at: "2026-09-16T12:40:00Z" });
+    const screen = directorScreen([stale], reasonsOf([stale]), NOW);
+    expect(screen.eyebrow).toBe("Требует внимания");
+    expect(screen.tone).toBe("warn");
+    expect([screen.value, screen.label]).toEqual([1, "задача не принята"]);
+    expect(screen.detail).toBe("Тест · не принята с вчера 17:40");
+    expect(screen.focus).toBe(stale.id);
+    expect(screen.detail).not.toMatch(/решений не ждут/);
+    // the bar: nothing taken — one hollow segment, never a full green one
+    expect(screen.segments).toEqual([{ key: "unseen", label: "не принята", count: 1, tone: "wait" }]);
+  });
+
+  it("D-194: pushes that do not reach the holder need the director at once, before the half hour", () => {
+    const fresh = task({ status: "sent", title: "Тест", created_at: "2026-09-17T06:55:00Z" });
+    const screen = directorScreen([fresh], reasonsOf([fresh]), NOW, { noPush: new Set(["marat"]) });
+    expect(screen.eyebrow).toBe("Требует внимания");
+    expect(screen.detail).toBe("Марат · уведомления не доходят");
+    expect(screen.attention?.action).toBe("call");
+  });
+
+  it("nothing taken yet and inside the half hour: «Ждём ответа» in grey, not green", () => {
+    const fresh = task({ status: "sent", created_at: "2026-09-17T06:55:00Z" });
+    const screen = directorScreen([fresh], reasonsOf([fresh]), NOW);
+    expect([screen.eyebrow, screen.tone, screen.label, screen.detail]).toEqual(["Ждём ответа", "muted", "задача у команды", "ещё не принята · решений не ждут"]);
+  });
+
+  it("one task for one reason: the words do not repeat the big «1»", () => {
+    const review = task({ status: "pending_review" });
+    const screen = directorScreen([review], reasonsOf([review]), NOW);
+    expect([screen.value, screen.label, screen.detail]).toEqual([1, "задача ждёт вас", "на проверке"]);
   });
 
   it("all closed: a calm check and today's count", () => {
@@ -222,7 +279,8 @@ describe("the director's status screen", () => {
     const screen = directorScreen(tasks, reasonsOf(tasks), NOW);
     expect(screen.value).toBeNull();
     expect(screen.label).toBe("Открытых задач нет");
-    expect(screen.detail).toBe("Сегодня закрыто: 1");
+    expect(screen.detail).toBe("");
+    expect(screen.closedToday).toBe(1);
     expect(screen.segments).toEqual([]);
   });
 });
@@ -236,18 +294,18 @@ describe("the employee's status screen (D-173)", () => {
     );
     expect(screen.variant).toBe("compact");
     expect(screen.value).toBe(3);
-    expect(screen.label).toBe("дела ждут вас");
-    expect(screen.detail).toBe("1 новое · 1 на доработке · 1 просрочено");
+    expect(screen.label).toBe("задачи ждут вас");
+    expect(screen.detail).toBe("1 новая · 1 на доработке · 1 просрочена");
     expect(screen.tone).toBe("danger");
     // the late one is named, handed-in work (its deadline met) never is
     expect(screen.nearest).toEqual({ id: late.id, title: "Акт сверки", who: "", at: late.deadline, late: true });
   });
 
-  it("a new order alone: one line in the colour of new", () => {
+  it("a new order alone: one line in amber — the person's move, never the brand colour", () => {
     const fresh = task({ status: "sent", deadline: at("17", 18) });
     const screen = employeeScreen([fresh], NOW);
     expect(screen.variant).toBe("compact");
-    expect([screen.value, screen.label, screen.tone]).toEqual([1, "дело ждёт вас", "accent"]);
+    expect([screen.value, screen.label, screen.tone]).toEqual([1, "задача ждёт вас", "warn"]);
     expect(screen.nearest).toMatchObject({ id: fresh.id, late: false });
   });
 
@@ -257,7 +315,7 @@ describe("the employee's status screen (D-173)", () => {
     expect(screen.variant).toBe("lean");
     expect(screen.eyebrow).toBe("Всё по плану");
     expect(screen.value).toBe(3);
-    expect(screen.label).toBe("дела в работе");
+    expect(screen.label).toBe("задачи в работе");
     expect(screen.detail).toBe("из них 1 на проверке у директора");
     expect(screen.tone).toBe("ok");
     // the nearest deadline is the person's own, not the handed-in one at 13:00
@@ -266,14 +324,15 @@ describe("the employee's status screen (D-173)", () => {
 
   it("only handed in: a calm check, the director's move", () => {
     const screen = employeeScreen([task({ status: "pending_review" })], NOW);
-    expect([screen.variant, screen.value, screen.label, screen.detail]).toEqual(["lean", null, "1 дело на проверке", "директор посмотрит и закроет"]);
+    expect([screen.variant, screen.value, screen.label, screen.detail, screen.tone]).toEqual(["lean", null, "1 задача на проверке", "директор посмотрит и закроет", "muted"]);
   });
 
   it("nothing open", () => {
     const screen = employeeScreen([task({ status: "done", closed_at: at("17", 9) })], NOW);
     expect(screen.variant).toBe("lean");
     expect(screen.value).toBeNull();
-    expect(screen.label).toBe("Открытых дел нет");
+    // the one empty phrase of the product (DESIGN §5)
+    expect([screen.eyebrow, screen.label]).toEqual(["Дел нет", "Придёт задача — я позову"]);
     expect(screen.closedToday).toBe(1);
   });
 });
@@ -297,32 +356,36 @@ describe("peopleLoad", () => {
 describe("stepsOf", () => {
   const states = (t: ListTask) => stepsOf(t, NOW).map((s) => `${s.label}:${s.state}`);
 
-  it("follows the task from handed out to closed, stations named by stages, never a button's verb (D-173)", () => {
-    expect(states(task({ status: "sent" }))).toEqual(["Выдана:done", "В работе:current", "Сдана:todo", "Закрыта:todo"]);
-    // the assignee's own view: a new one waits for them, it is not in work yet (D-173)
+  it("the wall's ladder Поручено → В работе → На проверке → Готово, the ring on the stage the task is at now", () => {
+    // D-194: an untaken task stands at «Поручено» — «В работе» has not happened yet
+    const fresh = task({ status: "sent", created_at: "2026-09-17T06:50:00Z" });
+    expect(states(fresh)).toEqual(["Поручено:current", "В работе:todo", "На проверке:todo", "Готово:todo"]);
+    // untaken for two days: the stage turns amber, still not «В работе»
+    expect(states(task({ status: "sent" }))).toEqual(["Поручено:warn", "В работе:todo", "На проверке:todo", "Готово:todo"]);
+    // the assignee's own view: a new one waits for them (D-173)
     const mine = (t: ListTask) => stepsOf(t, NOW, { forAssignee: true }).map((s) => `${s.label}:${s.state}`);
-    expect(mine(task({ status: "sent" }))).toEqual(["Выдана:done", "Ждёт вас:current", "Сдана:todo", "Закрыта:todo"]);
-    expect(mine(task({ status: "sent", deadline: at("16") }))[1]).toBe("Ждёт вас:bad");
+    expect(mine(task({ status: "sent" }))).toEqual(["Ждёт вас:current", "В работе:todo", "На проверке:todo", "Готово:todo"]);
+    expect(mine(task({ status: "sent", deadline: at("16") }))[0]).toBe("Ждёт вас:bad");
     // past «Принял» the assignee reads the same stations as the director
     expect(mine(task({ status: "accepted", accepted_at: at("15", 10) }))).toEqual(states(task({ status: "accepted", accepted_at: at("15", 10) })));
-    expect(states(task({ status: "accepted", accepted_at: at("15", 10) }))).toEqual([
-      "Выдана:done",
-      "В работе:done",
-      "Сдача:current",
-      "Закрыта:todo",
-    ]);
+    expect(states(task({ status: "accepted", accepted_at: at("15", 10) }))).toEqual(["Поручено:done", "В работе:current", "На проверке:todo", "Готово:todo"]);
     expect(states(task({ status: "pending_review", accepted_at: at("15", 10), completed_at: at("16", 10) }))).toEqual([
-      "Выдана:done",
+      "Поручено:done",
       "В работе:done",
-      "Сдана:done",
-      "Проверка:current",
+      "На проверке:current",
+      "Готово:todo",
     ]);
-    expect(states(task({ status: "done", closed_at: at("17", 9) }))).toEqual(["Выдана:done", "В работе:done", "Сдана:done", "Закрыта:done"]);
+    expect(states(task({ status: "done", closed_at: at("17", 9) }))).toEqual(["Поручено:done", "В работе:done", "На проверке:done", "Готово:done"]);
+    // the words of the ladder never say «Сдана», «Сдача», «Выдана» (FIX §4.4)
+    const all = (["sent", "accepted", "pending_review", "done", "rework", "declined", "scheduled"] as const).flatMap((status) =>
+      stepsOf(task({ status, scheduled_send_at: status === "scheduled" ? at("18", 9) : null }), NOW).map((s) => s.label),
+    );
+    expect(all.filter((label) => /Сдан|Сдача|Выдана|Закрыта|Проверка$/.test(label))).toEqual([]);
   });
 
   it("a late step is red, a detour replaces the step it happened at", () => {
-    expect(states(task({ status: "accepted", deadline: at("16") }))[2]).toBe("Сдача:bad");
-    expect(states(task({ status: "rework" }))[2]).toBe("Доработка:warn");
+    expect(states(task({ status: "accepted", deadline: at("16") }))[1]).toBe("В работе:bad");
+    expect(states(task({ status: "rework" }))[1]).toBe("Доработка:warn");
     expect(states(task({ status: "declined" }))[1]).toBe("Отказ:bad");
     expect(states(task({ status: "revoked" }))[3]).toBe("Отозвана:bad");
     expect(states(task({ status: "scheduled", scheduled_send_at: at("18", 9) }))[0]).toBe("Уйдёт:current");
@@ -341,7 +404,7 @@ describe("statusWord", () => {
     expect(statusWord(task({ status: "rework" }), "employee", NOW)).toBe("на доработке");
     expect(statusWord(task({ status: "rework", deadline: at("16") }), "employee", NOW)).toBe("на доработке");
     expect(statusWord(task({ status: "rework" }), "director", NOW)).toBe("на доработке");
-    expect(statusWord(task({ status: "pending_review" }), "director", NOW)).toBe("на приёмке");
+    expect(statusWord(task({ status: "pending_review" }), "director", NOW)).toBe("на проверке");
     expect(statusWord(task({ status: "scheduled", scheduled_send_at: at("18", 9) }), "director", NOW)).toBe("уйдёт завтра 09:00");
   });
 });

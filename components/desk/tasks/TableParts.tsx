@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { ARCHIVE_STATUSES, type DayRange } from "@/lib/desk/archive";
 import { DUE_FILTERS, DUE_LABEL, parseDue, parseStatus, STATUS_FILTERS, statusFilterLabel, type BulkPlan, type DueFilter, type LoadState, type StatusFilter } from "@/lib/desk/tasks";
 import { shortName } from "@/lib/people/names";
-import type { DirectorTab } from "@/lib/tasks/overview";
+import { DIRECTOR_TAB_LABEL, type DirectorTab } from "@/lib/tasks/overview";
 import { pluralRu } from "@/lib/tasks/status-text";
 
 import { DateRangeField } from "./DateRange";
@@ -90,9 +90,10 @@ export function TasksToolbar({
         value={tab}
         onChange={onTab}
         items={[
-          { value: "yours", label: "Ждут вас", count: counts.yours },
-          { value: "working", label: "В работе", count: counts.working },
-          { value: "closed", label: "Закрытые", count: counts.closed },
+          // the tabs' names are the phone's (lib/tasks/overview.ts): «У команды» holds the untaken too
+          { value: "yours", label: DIRECTOR_TAB_LABEL.yours, count: counts.yours },
+          { value: "working", label: DIRECTOR_TAB_LABEL.working, count: counts.working },
+          { value: "closed", label: DIRECTOR_TAB_LABEL.closed, count: counts.closed },
         ]}
       />
       <Select aria-label="Группы" value={group} onChange={(event) => onGroup(event.target.value)} className="w-[140px]" data-testid="desk-group">
@@ -111,8 +112,8 @@ export function TasksToolbar({
           </option>
         ))}
       </Select>
-      <Select aria-label="Статус" value={status ?? ""} onChange={(event) => onStatus(parseStatus(event.target.value))} className="w-[148px]">
-        <option value="">Любой статус</option>
+      <Select aria-label="Стадия" value={status ?? ""} onChange={(event) => onStatus(parseStatus(event.target.value))} className="w-[148px]">
+        <option value="">Любая стадия</option>
         {(archiveTab ? ARCHIVE_STATUSES : STATUS_FILTERS).map((value) => (
           <option key={value} value={value}>
             {statusFilterLabel(value)}
@@ -133,23 +134,6 @@ export function TasksToolbar({
       )}
       <SearchField value={query} onChange={onQuery} placeholder={tight ? "Поиск" : "Поиск по задачам"} width={tight ? 128 : 176} />
     </Toolbar>
-  );
-}
-
-/** Under the table: the chosen row's letters stand on its own buttons, the hint keeps to the walk. */
-export function TableKeysHint() {
-  return (
-    <p className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-muted" data-testid="desk-keys-hint">
-      <span>
-        <Kbd>↑</Kbd> <Kbd>↓</Kbd> выбор
-      </span>
-      <span>
-        <Kbd>Enter</Kbd> открыть
-      </span>
-      <span>
-        <Kbd>?</Kbd> все клавиши
-      </span>
-    </p>
   );
 }
 
@@ -227,6 +211,7 @@ export function TasksEmpty({
   boardDown,
   working,
   onWorking,
+  attention = null,
 }: {
   tab: DirectorTab;
   looking: boolean;
@@ -243,6 +228,8 @@ export function TasksEmpty({
   /** what is in work: «Ждут вас» empty offers it */
   working: number;
   onWorking: () => void;
+  /** the verdict's words while something needs the director (lib/tasks/attention.ts); null — all is well */
+  attention?: string | null;
 }) {
   const archiveTab = tab === "closed";
   const words = query.trim();
@@ -263,16 +250,32 @@ export function TasksEmpty({
   }
   // the statuses are known, the questions and the requests for time are not: no green here
   if (tab === "yours" && boardDown) return <EmptyState title="Вопросы и просьбы о сроке не загрузились" hint="Приёмки, отказов и просрочек нет, остальное станет видно после загрузки" />;
+  // nothing to decide, yet an order lies untaken or a push does not reach: say that, not «ничего не ждёт» (D-194)
+  if (tab === "yours" && attention) {
+    return (
+      <EmptyState
+        title={attention}
+        hint={`Решений здесь нет — задача в «${DIRECTOR_TAB_LABEL.working}»`}
+        action={
+          working > 0 ? (
+            <Button size="sm" variant="secondary" onClick={onWorking}>
+              {DIRECTOR_TAB_LABEL.working} · {working}
+            </Button>
+          ) : undefined
+        }
+      />
+    );
+  }
   if (tab === "yours") {
     return (
       <EmptyState
         tone="ok"
         title="Ваших решений ничего не ждёт"
-        hint="Приёмка, вопросы, отказы и просрочки появятся здесь — и в «Разобрать» по одной"
+        hint="Сданная работа, вопросы, отказы и просрочки появятся здесь"
         action={
           working > 0 ? (
             <Button size="sm" variant="secondary" onClick={onWorking}>
-              Что в работе · {working}
+              {DIRECTOR_TAB_LABEL.working} · {working}
             </Button>
           ) : undefined
         }

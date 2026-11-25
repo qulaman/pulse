@@ -10,7 +10,7 @@ export type DailyReportStatus = "submitted" | "missed";
 export type DailyReportTask = {
   id: string;
   title: string;
-  /** pending_review — «на приёмке», done — «принята». */
+  /** pending_review — «на проверке», done — «принята». */
   status: "pending_review" | "done";
   /** Hand-over time (`tasks.completed_at`). */
   completed_at: string | null;
@@ -125,6 +125,11 @@ export type TeamDayRow = {
    * its receipt as the delivery queue keeps it. null — nobody was reminded that day.
    */
   reminded: DailyReportReminder | null;
+  /**
+   * Left the team since (migration 20261124130000): the row is history, the day's counts are the
+   * team's now (lib/people/team.ts). Absent before that migration — then read from the roster.
+   */
+  gone?: boolean;
 };
 
 export type DailyReportReminder = {
@@ -181,6 +186,14 @@ export type TeamPeriodRow = {
   late: number;
   /** Sum of the report rules' points in the period (+ for submitted, − for missed). */
   points: number;
+  /**
+   * When the person usually hands the report in — the average local time of `submitted_at`, "HH:MM"
+   * (migration 20261124130000); null without reports, absent before the migration. The typed
+   * `avg_arrived` / `avg_left` / `avg_hours` are what the form prefilled — never shown as attendance (D-194).
+   */
+  usual_submitted?: string | null;
+  /** Left the team since: history, out of the period's counts (as `TeamDayRow.gone`). */
+  gone?: boolean;
 };
 
 /** The director's period — `team_daily_report_period(p_from, p_to)`, both days inclusive, at most 92 days. */

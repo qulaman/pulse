@@ -7,6 +7,7 @@ import { DesktopIcon, GearIcon } from "@/components/profile/icons";
 import { Row, RowGroup } from "@/components/ui/Row";
 import { toast } from "@/components/ui/Toast";
 import { goDeskView } from "@/lib/desk/device";
+import { useCompanySettings } from "@/lib/dictionary-queries";
 
 /**
  * «На компьютере» in the phone profile of the director and the secretary (D-153 §11): the desk
@@ -22,6 +23,12 @@ export function DeskRows() {
     return () => clearTimeout(timer);
   }, []);
   const address = origin ? `${origin}/desk` : "";
+  // what to type: the host and the path, the scheme a browser adds itself; never cut (3.1)
+  const shown = address.replace(/^https?:\/\//, "");
+  // «Лаб» is named only where it opens: the developers' tools or the company's test period (D-150) —
+  // a client with the settings off never meets the word (3.3); unknown until the settings come
+  const settings = useCompanySettings();
+  const lab = settings.data?.dev_tools === true || settings.data?.lab_for_all === true;
 
   const copy = async () => {
     try {
@@ -38,8 +45,8 @@ export function DeskRows() {
       <RowGroup className="mt-2">
         <Row icon={<DesktopIcon />} title="Версия для компьютера" onClick={() => goDeskView("/desk")} />
         <div className="flex min-h-[44px] items-center gap-3 px-4 py-2">
-          <span className="nums min-w-0 flex-1 truncate text-[13px] leading-4 text-muted" data-testid="desk-address">
-            {address || " "}
+          <span className="nums min-w-0 flex-1 break-all text-[13px] leading-4 text-muted" data-testid="desk-address">
+            {shown || " "}
           </span>
           <button
             type="button"
@@ -59,7 +66,8 @@ export function DeskRows() {
             <GearIcon />
           </span>
           <span className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate text-[16px] leading-[22px]">Настройки, Команда, Словарь, Лаб</span>
+            {/* two lines rather than «Словарь, Л…»: the list is what the row is for */}
+            <span className="line-clamp-2 text-[16px] leading-[22px]">{lab ? "Настройки, Команда, Словарь, Лаб" : "Настройки, Команда, Словарь"}</span>
             <span className="truncate text-[13px] leading-4 text-muted">на компьютере · открыть здесь</span>
           </span>
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden className="-mr-0.5 shrink-0 text-muted">

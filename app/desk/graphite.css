@@ -1140,3 +1140,12 @@ html[data-surface="desk"] {
     color-scheme: light;
   }
 }
+
+/* No key printed on a button (owner, 2026-11-25; D-156 keys stay): a letter on «Напомнить», «Срок»,
+   a tab or a link was noise for the director and the secretary. A key lives in the button's tooltip
+   and in the «?» sheet; a menu keeps its keys at the right, as menus do. */
+html[data-surface="desk"] :is(button:not([role="menuitem"]), a, [role="tab"], [role="radio"]) kbd,
+html[data-surface="desk"] :is(.desk-cap, .pult-cap, .stoika-cap) {
+  /* over every screen's own key-cap styles (errands, reports, «Графит»): never, anywhere */
+  display: none !important;
+}

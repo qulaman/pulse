@@ -8,7 +8,7 @@ import { Disclosure } from "@/components/ui/Disclosure";
 import { SettingsSectionsBone } from "@/components/ui/Skeleton";
 import { StillLogo } from "@/components/ui/StillLogo";
 import { toast } from "@/components/ui/Toast";
-import { APP_BG, contrastRatio, DEFAULT_ACCENT, MIN_ACCENT_CONTRAST, parseHex } from "@/lib/brand-color";
+import { accentClash, APP_BG, clashWords, contrastRatio, DEFAULT_ACCENT, MIN_ACCENT_CONTRAST, parseHex, SAFE_ACCENTS, savedClashWords } from "@/lib/brand-color";
 
 const FIELD =
   "min-h-[44px] w-full field px-3 text-[16px] leading-[22px] outline-none transition-colors duration-[120ms] focus:border-accent";
@@ -56,6 +56,11 @@ export function CompanyForm({ onDirtyChange }: { onDirtyChange?: (dirty: boolean
   const ratio = accent ? contrastRatio(accent, APP_BG) : null;
   const accentOk = ratio !== null && ratio >= MIN_ACCENT_CONTRAST;
   const accentHex = parseHex(accent) ? `#${parseHex(accent)!.map((c) => c.toString(16).padStart(2, "0")).join("")}` : DEFAULT_ACCENT;
+  // a brand colour never says a state (owner, 2026-11-25): a new one near green, amber or red is
+  // refused (the server refuses it too); the one saved before the rule stays, with a note
+  const clash = accent && parseHex(accent) ? accentClash(accentHex) : null;
+  const kept = Boolean(company && accent && accentHex.toUpperCase() === (company.brand.accent ?? "").toUpperCase());
+  const refused = Boolean(clash && !kept);
 
   const save = async () => {
     setSaving(true);
@@ -69,13 +74,17 @@ export function CompanyForm({ onDirtyChange }: { onDirtyChange?: (dirty: boolean
           brand: { tagline: tagline.trim() || null, accent: accent.trim() ? accentHex.toUpperCase() : null },
         }),
       });
-      if (!res.ok) throw new Error("save failed");
+      if (!res.ok) {
+        const refusal = (await res.json().catch(() => null)) as { error?: { message_ru?: string } } | null;
+        throw new Error(refusal?.error?.message_ru ?? "save failed");
+      }
       setCompany((await res.json()) as Company);
       toast("Сохранил компанию");
       // the header and the accent are painted on the server — a reload shows them
       window.location.reload();
-    } catch {
-      toast("Не получилось сохранить");
+    } catch (error) {
+      // the server's own words when it refused (a colour taken for a state), else the plain failure
+      toast(error instanceof Error && error.message !== "save failed" ? error.message : "Не получилось сохранить");
     } finally {
       setSaving(false);
     }
@@ -205,21 +214,40 @@ export function CompanyForm({ onDirtyChange }: { onDirtyChange?: (dirty: boolean
               </Button>
             ) : null}
           </div>
-          <p className="text-[12px] leading-4" style={{ color: accent && !accentOk ? "var(--warn)" : "var(--text-muted)" }}>
+          <p className="text-[12px] leading-4" style={{ color: refused ? "var(--danger)" : (accent && !accentOk) || clash ? "var(--warn)" : "var(--text-muted)" }} data-testid="company-accent-note">
             {!accent
               ? "Без цвета остаётся фирменный акцент Pulse"
               : ratio === null
                 ? "Нужен hex вида #RRGGBB"
-                : accentOk
-                  ? `Контраст с фоном ${ratio.toFixed(1)}:1 — подходит`
-                  : `Контраст ${ratio.toFixed(1)}:1 — слишком тёмный, нужен не меньше ${MIN_ACCENT_CONTRAST}:1, останется акцент по умолчанию`}
+                : clash
+                  ? refused
+                    ? clashWords(clash)
+                    : savedClashWords(clash)
+                  : accentOk
+                    ? `Контраст с фоном ${ratio.toFixed(1)}:1 — подходит`
+                    : `Контраст ${ratio.toFixed(1)}:1 — слишком тёмный, нужен не меньше ${MIN_ACCENT_CONTRAST}:1, останется акцент по умолчанию`}
           </p>
+          {clash ? (
+            <div className="flex flex-wrap gap-2" data-testid="company-accent-safe">
+              {SAFE_ACCENTS.map((safe) => (
+                <button
+                  key={safe.hex}
+                  type="button"
+                  onClick={() => setAccent(safe.hex)}
+                  className="flex min-h-[36px] items-center gap-2 rounded-full border border-border bg-surface-2 px-3 text-[13px] leading-4"
+                >
+                  <span aria-hidden className="h-4 w-4 rounded-full" style={{ background: safe.hex }} />
+                  {safe.name}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
 
       {dirty ? (
         <div className="card-in mt-4 flex gap-2">
-          <Button block loading={saving} disabled={!name.trim()} onClick={() => void save()}>
+          <Button block loading={saving} disabled={!name.trim() || refused} onClick={() => void save()}>
             Сохранить
           </Button>
           <Button

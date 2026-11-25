@@ -1,11 +1,8 @@
 "use client";
 
 import { motion } from "motion/react";
-import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
-import { NoPushSummary } from "@/components/people/NoPushSummary";
-import { TeamRoster } from "@/components/people/TeamRoster";
 import { CompanyForm } from "@/components/settings/CompanyForm";
 import { SettingsDraftProvider, SettingsReady, useDirtySections } from "@/components/settings/draft";
 import { DirtyDot, SETTINGS_TAB_META, SETTINGS_THUMB, SettingsTiles } from "@/components/settings/SettingsTiles";
@@ -35,13 +32,8 @@ import {
 } from "@/components/settings/sections";
 import { VoiceRetentionSection } from "@/components/settings/VoiceRetentionSection";
 import { SETTINGS_TABS, type SettingsTab } from "@/lib/settings-tabs";
-import { Button } from "@/components/ui/Button";
-import { TeamListBone } from "@/components/ui/PageSkeletons";
 import { Row, RowGroup } from "@/components/ui/Row";
-import { usePeople } from "@/lib/people/queries";
-import { usePushHealth } from "@/lib/push/health-query";
 import type { Role } from "@/lib/routes";
-import { useMe } from "@/lib/tasks/queries";
 import { useBandStuck, useHeaderHeight } from "@/lib/useHeaderHeight";
 
 /** The pinned bar's height, 36px segments in a padded band: a switch from it starts the new tab below it. */
@@ -76,7 +68,7 @@ function useScrolledPast(ref: RefObject<HTMLElement | null>, top: number, onBack
 }
 
 /**
- * «Настройки» as four tabs (D-85): «Компания», «Программа», «Сотрудники», «ИИ-модель». The tiles on
+ * «Настройки» as four tabs (D-85): «Компания», «Программа», «Очки и отчёты», «ИИ-модель». The tiles on
  * top are the tabs — a tap swaps the content below in place, a raised thumb slides to the
  * chosen tile and the new content slides in from its side. Scrolled past the tiles, a
  * compact bar pins under the header, so a long tab (the roster) never strands the director.
@@ -85,15 +77,15 @@ function useScrolledPast(ref: RefObject<HTMLElement | null>, top: number, onBack
  * the draft above all tabs, and a tile wears a dot while its tab holds unsaved edits.
  * The secretary gets the same four tabs (D-104) without the director's own modules.
  */
-export function SettingsTabs({ initialTab, role }: { initialTab: SettingsTab; role: Role }) {
+export function SettingsTabs({ initialTab, role, devTools = false }: { initialTab: SettingsTab; role: Role; devTools?: boolean }) {
   return (
     <SettingsDraftProvider>
-      <TabsBody initialTab={initialTab} director={role === "director"} />
+      <TabsBody initialTab={initialTab} director={role === "director"} devTools={devTools} />
     </SettingsDraftProvider>
   );
 }
 
-function TabsBody({ initialTab, director }: { initialTab: SettingsTab; director: boolean }) {
+function TabsBody({ initialTab, director, devTools }: { initialTab: SettingsTab; director: boolean; devTools: boolean }) {
   const [tab, setTab] = useState(initialTab);
   const [visited, setVisited] = useState<ReadonlySet<SettingsTab>>(() => new Set([initialTab]));
   const [move, setMove] = useState<Move>({ dir: 1, n: 0 });
@@ -175,7 +167,7 @@ function TabsBody({ initialTab, director }: { initialTab: SettingsTab; director:
               {key === "company" ? (
                 <CompanyPanel onCompanyDirty={setCompanyDirty} />
               ) : key === "app" ? (
-                <AppPanel director={director} />
+                <AppPanel director={director} devTools={devTools} />
               ) : key === "team" ? (
                 <TeamPanel director={director} />
               ) : (
@@ -232,7 +224,7 @@ function CompanyPanel({ onCompanyDirty }: { onCompanyDirty: (dirty: boolean) => 
  * The app's modules and the one module with a catalogue of its own — the secretary's
  * buttons. Tasks, the wall remote and the raw tables are the director's screens (D-104).
  */
-function AppPanel({ director }: { director: boolean }) {
+function AppPanel({ director, devTools }: { director: boolean; devTools: boolean }) {
   return (
     <>
       <h2 className="eyebrow px-1">Модули</h2>
@@ -240,7 +232,8 @@ function AppPanel({ director }: { director: boolean }) {
         {director ? <Row icon={<ListIcon />} title="Задачи" value="весь список" href="/sent" /> : null}
         <Row icon={<CupIcon />} title="Заявки" value="кофе, врач, «зайди ко мне»" href="/secretary" />
         {director ? <Row icon={<TvIcon />} title="Экран" value="пульт от телевизора" href="/screen" /> : null}
-        {director ? <Row icon={<TableIcon />} title="Данные" value="таблицы как есть" href="/admin" /> : null}
+        {/* the raw tables are the developers' (settings.dev_tools), as on the desk: a client never sees them */}
+        {director && devTools ? <Row icon={<TableIcon />} title="Данные" value="таблицы как есть" href="/admin" /> : null}
       </RowGroup>
       <div className="mt-2">
         <SettingsReady bones={1}>
@@ -257,16 +250,12 @@ function AppPanel({ director }: { director: boolean }) {
 }
 
 /**
- * The people themselves (D-104): the roster by role, a tap opens the person's editor —
- * role, card, password. The load board («Команда») is the director's: the secretary
- * sees nobody's tasks, so it would show her an idle company.
+ * «Очки и отчёты» (owner, 2026-11-25): the rules of the points and of the daily report, the
+ * morning brief — and the ways to the screens they feed. The people themselves live in «Команда»
+ * (`/people`: the director's load board, the secretary's roster, D-104) — one line leads there,
+ * no second list of people here.
  */
 function TeamPanel({ director }: { director: boolean }) {
-  const people = usePeople();
-  const me = useMe();
-  const push = usePushHealth();
-  const who = me.data ? { id: me.data.userId, role: me.data.role } : null;
-
   return (
     <>
       <div className="flex flex-col gap-2">
@@ -278,7 +267,7 @@ function TeamPanel({ director }: { director: boolean }) {
           {director ? <MorningBriefSection /> : null}
         </SettingsReady>
         <RowGroup>
-          {director ? <Row icon={<LoadIcon />} title="Загрузка команды" value="кто чем занят" href="/people" /> : null}
+          <Row icon={<LoadIcon />} title="Люди" value="в «Команде»" href="/people" />
           {director ? <Row icon={<ReportsIcon />} title="Отчёты" value="кто что сделал за день" href="/reports" /> : null}
           <Row icon={<PodiumIcon />} title="Рейтинг" value="очки и динамика" href="/rating" />
           <Row icon={<GiftIcon />} title="Магазин" value="награды и выдача" href="/shop" />
@@ -287,16 +276,6 @@ function TeamPanel({ director }: { director: boolean }) {
         </RowGroup>
       </div>
 
-      {/* the roster counts itself below; adding a person lives where the people are */}
-      <div className="mt-6 flex items-center justify-between gap-3 px-1">
-        <h2 className="eyebrow">Все сотрудники</h2>
-        <Link href="/people/new" className="shrink-0">
-          <Button size="sm">+ Добавить</Button>
-        </Link>
-      </div>
-      {/* who hears about work only by opening Pulse (D-114), by name, a tap on each (D-190) */}
-      <NoPushSummary people={people.data ?? []} push={push.data} me={who} />
-      {people.isLoading ? <TeamListBone /> : <TeamRoster people={people.data ?? []} me={who} push={push.data} />}
     </>
   );
 }

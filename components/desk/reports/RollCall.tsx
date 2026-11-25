@@ -46,7 +46,8 @@ export type RollCount = {
 const isExcused = (row: TeamDayRow) => Boolean(row.report?.excused_at);
 
 export function rollCount(rows: readonly TeamDayRow[], live: boolean): RollCount {
-  const of = (state: TeamDayRow["state"]) => rows.filter((row) => row.state === state);
+  // the day's counts are the team's now (D-194): a row of who left is history, not a miss of today
+  const of = (state: TeamDayRow["state"]) => rows.filter((row) => row.state === state && !row.gone);
   const missed = of("missed");
   const away = of("away");
   const submitted = of("submitted").length;

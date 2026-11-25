@@ -32,10 +32,10 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       .eq("id", body.person_id)
       .select("id, aliases");
     if (error) {
-      return rpcFailure(error, { forbidden: [403, "Эту карточку тебе менять нельзя"] }, "aliases update");
+      return rpcFailure(error, { forbidden: [403, "Эту карточку вам менять нельзя"] }, "aliases update");
     }
     // RLS filters a row the caller may not touch silently: an empty answer is a refusal
-    if (!data?.length) return apiError(403, "not_permitted", "Эту карточку тебе менять нельзя");
+    if (!data?.length) return apiError(403, "not_permitted", "Эту карточку вам менять нельзя");
     return apiOk({ id: data[0].id, aliases: data[0].aliases });
   },
   BodySchema,

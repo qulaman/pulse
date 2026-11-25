@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { StillLogo } from "@/components/ui/StillLogo";
 import type { TvBoard as TvBoardData } from "@/lib/tv/board";
+import { monthEmptyAhead } from "@/lib/tv/calendar";
 import { tvDate, tvTime } from "@/lib/tv/clock";
 import type { TvMoment as TvMomentData } from "@/lib/tv/moment";
 import type { OverlayView } from "@/lib/tv/overlay";
@@ -134,8 +135,13 @@ export function TvFrame(props: TvFrameProps) {
   const moment = !dim && !focus && !task && !board && !guest && scene !== "clock" ? (props.moment ?? null) : null;
   // the round's «Фото» with nothing to show is «Сегодня» — the same key, so no transition between the two
   const showPhotos = scene === "photos" && photos.length > 0;
-  // in the round an empty week is a turn of nothing: home stands instead (a calendar put up by hand stays)
-  const emptyWeek = props.inRound === true && scene === "calendar" && stage.calendarView === "week" && calendar !== null && calendar.events.length === 0;
+  // in the round an empty calendar is a turn of nothing: home stands instead — a week with no meetings, a month with
+  // none ahead (a calendar put up by hand stays and says «встреч нет»)
+  const emptyWeek =
+    props.inRound === true &&
+    scene === "calendar" &&
+    calendar !== null &&
+    (stage.calendarView === "week" ? calendar.events.length === 0 : monthEmptyAhead(calendar, now));
   // an opaque notice over the wall: the scene under it stays mounted but is not drawn (no mascot
   // frames for the minutes a visitor waits); it is drawn again the moment the notice starts to leave
   const [coverShown, setCoverShown] = useState(false);

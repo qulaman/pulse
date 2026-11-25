@@ -1,17 +1,15 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { Award, ChevronLeft, ChevronRight, Plane, Quote, Send, Thermometer, Undo2, UserCheck, UserRound } from "lucide-react";
+import { ChevronLeft, ChevronRight, Quote, Undo2 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { useDeskScope } from "@/components/desk/DeskScope";
-import { AwardDialog, type AwardFor } from "@/components/desk/settings/points/AwardDialog";
 import { PanelHeader } from "@/components/desk/ui/DeskPanel";
 import { Face } from "@/components/desk/ui/Face";
-import { IconButton, MoreMenu } from "@/components/desk/ui/IconButton";
-import type { MenuItem } from "@/components/desk/ui/Menu";
+import { PersonMovesBar, usePersonMoves } from "@/components/desk/team/PersonMoves";
+import { IconButton } from "@/components/desk/ui/IconButton";
 import { Popover } from "@/components/desk/ui/Popover";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
@@ -47,12 +45,9 @@ import { dailyReportKeys } from "@/lib/daily-report/queries";
 import type { PersonDailyReport } from "@/lib/daily-report/types";
 import { aqtobeIsoToYmdHm, WEEKDAYS_SHORT_RU, weeksInMonth, type Ymd } from "@/lib/datetime/calendar";
 import { useCompanySettings } from "@/lib/dictionary-queries";
-import { isTeamMember, usePeople, useUpdatePerson, type Availability, type Person } from "@/lib/people/queries";
+import { usePeople, type Person } from "@/lib/people/queries";
 import { useResolveDispute } from "@/lib/points/game";
-import { useComposeStore } from "@/lib/store/compose";
 import { useNow } from "@/lib/useNow";
-
-import { addressOf } from "../team/shared";
 
 /** What the page mounts it with, in the shell's right-hand panel, for «День» and «Табель» alike. */
 export type DiaryProps = {
@@ -69,9 +64,9 @@ const personKey = (userId: string, from: Ymd, to: Ymd) => ["daily-report", "team
 
 /**
  * «Дневник» (D-183): one person's daily reports in the desk's right-hand panel, the same for «День»
- * and «Табель». The head — the face, the name, where they are, and the moves after reading:
- * «Дать задачу» (the person pinned in the command line), «Похвалить» (the points dialog, only where
- * the game is on), «⋯» — vacation or sick leave from today, back at work, the card. Under it the
+ * and «Табель». The head — the face, the name, where they are, and the moves every desk card has
+ * (D-194): «Дать задачу» (the person pinned in the command line), «Изменить», «Карточка», «⋯» —
+ * «Начислить очки…» where the game is on, vacation or sick leave from today, back at work. Under it the
  * month as a calendar of day states (the табель's: ✓ handed in, ✕ missed, «у» excused, «о»/«б»
  * away) with ‹ › for the months; then the reports of the month newest first — the words in full and
  * the day's tasks, a report without words in one line, a missed day in one red line and its one
@@ -159,7 +154,7 @@ export function Diary({ userId, focus, today, onDay }: DiaryProps) {
 
   return (
     <article className="rep-diary flex flex-col" data-testid="desk-diary" data-user={userId}>
-      <DiaryHead person={person} pointsOn={pointsEnabled} />
+      <DiaryHead person={person} />
 
       <section className="rep-diary-month" aria-label="Месяц">
         <div className="rep-diary-month-row">
@@ -223,43 +218,10 @@ export function Diary({ userId, focus, today, onDay }: DiaryProps) {
 
 /* ---- the head ---------------------------------------------------------------------------------- */
 
-function DiaryHead({ person, pointsOn }: { person: Person; pointsOn: boolean }) {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const people = usePeople();
-  const update = useUpdatePerson();
-  const [award, setAward] = useState<AwardFor | null>(null);
-  const member = isTeamMember(person);
+/** The person over their diary, with the moves every desk card has (D-194) — «Начислить очки…» and today's availability under «⋯». */
+function DiaryHead({ person }: { person: Person }) {
+  const moves = usePersonMoves("diary");
   const where = awayWord(person.availability, person.is_active);
-  // the people the points are for: everyone working, but the director and the wall (the rating's team)
-  const team = useMemo(
-    () =>
-      (people.data ?? [])
-        .filter(isTeamMember)
-        .map((p) => ({ id: p.id, name: p.full_name, sub: p.position, avatar: p.avatar_url }))
-        .sort((a, b) => a.name.localeCompare(b.name, "ru")),
-    [people.data],
-  );
-
-  const setAvailability = (availability: Availability) =>
-    update.mutate(
-      { id: person.id, patch: { availability } },
-      // the day's roll call and the табель read availability through the reports' own answers
-      { onSuccess: () => void queryClient.invalidateQueries({ queryKey: dailyReportKeys.team }) },
-    );
-
-  // the menu's items carry no test id of their own: the words do (Menu is shared)
-  const away: MenuItem[] = !member
-    ? []
-    : person.availability === "active"
-      ? [
-          { key: "vacation", label: <span data-testid="desk-diary-away">В отпуске с сегодня</span>, icon: <Plane size={15} strokeWidth={2} />, onSelect: () => setAvailability("vacation") },
-          { key: "sick", label: <span data-testid="desk-diary-sick">На больничном с сегодня</span>, icon: <Thermometer size={15} strokeWidth={2} />, onSelect: () => setAvailability("sick") },
-          "separator",
-        ]
-      : [{ key: "back", label: <span data-testid="desk-diary-back">На работе с сегодня</span>, icon: <UserCheck size={15} strokeWidth={2} />, onSelect: () => setAvailability("active") }, "separator"];
-  const items: MenuItem[] = [...away, { key: "card", label: "Карточка", icon: <UserRound size={15} strokeWidth={2} />, onSelect: () => router.push(`/desk/team?p=${person.id}`) }];
-
   return (
     <PanelHeader>
       <div className="flex items-center gap-3.5">
@@ -273,26 +235,8 @@ function DiaryHead({ person, pointsOn }: { person: Person; pointsOn: boolean }) 
           </p>
         </div>
       </div>
-      <div className="rep-diary-moves">
-        {member ? (
-          <Button
-            size="sm"
-            variant="primary"
-            icon={<Send size={14} strokeWidth={2.2} aria-hidden />}
-            onClick={() => useComposeStore.getState().request("", { id: person.id, name: person.full_name, address: addressOf(person) })}
-            data-testid="desk-diary-give"
-          >
-            Дать задачу
-          </Button>
-        ) : null}
-        {member && pointsOn ? (
-          <Button size="sm" variant="secondary" icon={<Award size={14} strokeWidth={2.2} aria-hidden />} onClick={() => setAward({ userId: person.id })} data-testid="desk-diary-praise">
-            Похвалить
-          </Button>
-        ) : null}
-        <MoreMenu items={items} label="Ещё" testId="desk-diary-more" width={240} />
-      </div>
-      {pointsOn ? <AwardDialog target={award} people={team} onClose={() => setAward(null)} /> : null}
+      <PersonMovesBar person={person} moves={moves} testId="desk-diary" className="rep-diary-moves" />
+      {moves.node}
     </PanelHeader>
   );
 }

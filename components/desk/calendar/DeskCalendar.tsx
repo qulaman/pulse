@@ -70,11 +70,13 @@ function meetingWords(text: string): string {
  * a line, loudest first: on now; about to start; invitations waiting; what today holds; a free day.
  * It is print: only an invitation that waits for this person's answer is written in the pen.
  */
-function stateLine(screen: CalendarScreen, running: boolean): { text: string; tone?: Tone } {
+function stateLine(screen: CalendarScreen, running: boolean): { text: string; tone?: Tone } | null {
   const tone: Tone | undefined = screen.focusId ? "warn" : undefined;
   const join = (...parts: (string | null)[]) => parts.filter(Boolean).join(" · ");
   if (running) return { text: meetingWords(`Идёт: ${screen.detail}`), tone };
-  if (screen.value === null) return { text: meetingWords(join(screen.eyebrow, screen.detail || screen.label)), tone };
+  // a free day: the side says «Встреч нет» for the day once; the line only names what comes next.
+  // Never «на неделе тоже пусто» — the week on screen may be another one (D-194)
+  if (screen.value === null) return screen.nearest ? { text: meetingWords(screen.detail), tone } : null;
   if (screen.tone === "warn" && !screen.focusId) return { text: meetingWords(join(screen.eyebrow, screen.detail)), tone };
   const detail = screen.detail ? screen.detail.charAt(0).toLowerCase() + screen.detail.slice(1) : null;
   return { text: meetingWords(join(`${screen.value} ${screen.label}`, screen.focusId ? screen.detail : detail)), tone };
@@ -566,12 +568,8 @@ function DeadlinesToggle({ on, count, tone, onToggle }: { on: boolean; count: nu
 
 /** A segment's word with its key, quiet until hovered — the mouse teaches the keyboard. */
 function KeyLabel({ label, hint }: { label: string; hint: string }) {
-  return (
-    <span className="group/key inline-flex items-center gap-1.5">
-      {label}
-      <span className="nums text-[11px] text-muted transition-colors duration-[120ms] group-hover/key:text-text">{hint}</span>
-    </span>
-  );
+  // the key in the tooltip only — no letter printed on a button (owner, 2026-11-25)
+  return <span title={`${label} · ${hint}`}>{label}</span>;
 }
 
 /**

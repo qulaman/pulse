@@ -26,7 +26,7 @@ export async function call<T>(url: string, init?: RequestInit): Promise<T> {
     headers: init?.body ? { "content-type": "application/json" } : undefined,
   });
   const body = (await res.json().catch(() => null)) as (T & { error?: { code: string; message_ru: string } }) | null;
-  if (!res.ok || !body) throw new ApiFailure(body?.error?.code ?? "internal", body?.error?.message_ru ?? "Не получилось. Попробуй ещё раз");
+  if (!res.ok || !body) throw new ApiFailure(body?.error?.code ?? "internal", body?.error?.message_ru ?? "Не получилось. Попробуйте ещё раз");
   return body;
 }
 

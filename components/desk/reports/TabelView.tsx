@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react";
+import { Fragment, memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 
 import { EmptyState } from "@/components/desk/ui/EmptyState";
@@ -438,7 +438,8 @@ export function TabelView({ tabel, stale, failed, onRetry, match, show, onShow, 
   }, [hasSheet]);
 
   const matched = useMemo(() => (tabel ? tabel.people.filter((person) => match(person.row)) : []), [tabel, match]);
-  const shown = useMemo(() => (show === "gaps" ? matched.filter((person) => person.row.missed > 0) : matched), [matched, show]);
+  // «С пропусками» is about the team now: who left keeps their history under «Все», not a gap of today (D-194)
+  const shown = useMemo(() => (show === "gaps" ? matched.filter((person) => !person.gone && person.row.missed > 0) : matched), [matched, show]);
   const tip = useSheetTip(tabel, shown);
 
   // a person chosen by the keys comes into view under the sticky head
@@ -479,7 +480,9 @@ export function TabelView({ tabel, stale, failed, onRetry, match, show, onShow, 
   const m = measures(width, tabel.days.length, excused);
   const missed = missedByDay(shown, tabel.days.length);
   const foot = tabelTotals(shown);
-  const gaps = tabel.people.filter((person) => person.row.missed > 0).length;
+  // the counts over the team now (lib/daily-report/tabel.ts): who left stands under its own divider
+  const firstGone = shown.findIndex((person) => person.gone);
+  const goneShown = firstGone < 0 ? 0 : shown.length - firstGone;
 
   return (
     <div className="rep-tabel" data-testid="desk-tabel" data-stale={stale ? "" : undefined} aria-busy={stale || undefined}>
@@ -490,8 +493,8 @@ export function TabelView({ tabel, stale, failed, onRetry, match, show, onShow, 
           value={show}
           onChange={onShow}
           items={[
-            { value: "all", label: "Все", count: tabel.people.length },
-            { value: "gaps", label: "С пропусками", count: gaps },
+            { value: "all", label: "Все", count: tabel.totals.people },
+            { value: "gaps", label: "С пропусками", count: tabel.totals.gaps },
           ]}
         />
       </div>
@@ -510,7 +513,7 @@ export function TabelView({ tabel, stale, failed, onRetry, match, show, onShow, 
             onMouseDown={tip.hide}
             onScroll={tip.hide}
           >
-            <div role="table" aria-label={`Табель отчётов, ${tabelPeriodWords(tabel.from, tabel.to)}`} aria-rowcount={shown.length + 2} className="rep-tabel-grid">
+            <div role="table" aria-label={`Табель отчётов, ${tabelPeriodWords(tabel.from, tabel.to)}`} aria-rowcount={shown.length + (firstGone < 0 ? 2 : 3)} className="rep-tabel-grid">
               <div role="rowgroup" className="rep-tabel-head">
                 {m.mode === "dense" ? (
                   <div className="rep-tabel-row rep-tabel-months" aria-hidden>
@@ -538,18 +541,30 @@ export function TabelView({ tabel, stale, failed, onRetry, match, show, onShow, 
               </div>
 
               <div role="rowgroup" className="rep-tabel-body">
-                {shown.map((person) => (
-                  <Row
-                    key={person.row.user_id}
-                    person={person}
-                    days={tabel.days}
-                    mode={m.mode}
-                    excused={excused}
-                    selected={person.row.user_id === selectedId}
-                    open={person.row.user_id === openId}
-                    onSelect={onSelect}
-                    onOpen={onOpen}
-                  />
+                {shown.map((person, index) => (
+                  <Fragment key={person.row.user_id}>
+                    {index === firstGone ? (
+                      // who left: their rows and their own numbers, out of the totals over the sheet and under it
+                      <div role="row" className="rep-tabel-row rep-tabel-gone" data-testid="desk-tabel-gone">
+                        <span role="rowheader" className="rep-tabel-name">
+                          <span className="rep-tabel-gone-text">
+                            Больше не в команде · <span className="nums">{goneShown}</span>
+                          </span>
+                        </span>
+                        <span className="rep-tabel-gone-note">не входят в «сдано» и «Не сдали»</span>
+                      </div>
+                    ) : null}
+                    <Row
+                      person={person}
+                      days={tabel.days}
+                      mode={m.mode}
+                      excused={excused}
+                      selected={person.row.user_id === selectedId}
+                      open={person.row.user_id === openId}
+                      onSelect={onSelect}
+                      onOpen={onOpen}
+                    />
+                  </Fragment>
                 ))}
                 {shown.length === 0 ? (
                   <p className="rep-tabel-none">

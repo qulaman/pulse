@@ -111,7 +111,7 @@ describe("«На приёмке» stands where the next move is", () => {
   it("near the top for the director, whose move it is", () => {
     const groups = groupTasks(rows, "deadline", NOW, { reviewFirst: true });
     expect(groups.map((g) => g.key)).toEqual(["overdue", "review", "tomorrow", "none"]);
-    expect(groups[1].title).toBe("На приёмке");
+    expect(groups[1].title).toBe("На проверке");
   });
 
   it("at the foot for the employee, who cannot move it", () => {

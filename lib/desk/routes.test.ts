@@ -182,3 +182,19 @@ describe("chordHref (D-154 wave 3)", () => {
     }
   });
 });
+
+describe("the navigation's words (D-194: one thing, one word)", () => {
+  const label = (role: "director" | "secretary", href: string) => DESK_NAV[role].find((item) => item.href === href)?.label;
+
+  it("names a section as its screen and the «Сегодня» block do: «Ждут вас», «Эфир», «Заявки»", () => {
+    expect(label("director", "/desk/inbox")).toBe("Ждут вас");
+    expect(label("director", "/desk/ether")).toBe("Эфир");
+    expect(label("secretary", "/desk/ether")).toBe("Эфир");
+    expect(label("director", "/desk/errands")).toBe("Заявки");
+  });
+
+  it("no section keeps a former name", () => {
+    const words = [...DESK_NAV.director, ...DESK_NAV.secretary].map((item) => item.label);
+    for (const old of ["Разобрать", "Объявления", "Секретарь", "Сотрудники"]) expect(words).not.toContain(old);
+  });
+});

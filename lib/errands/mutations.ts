@@ -48,7 +48,7 @@ export function useErrandActions() {
         void queryClient.invalidateQueries({ queryKey: errandKeys.root });
         return;
       }
-      toast("Не получилось. Попробуй ещё раз");
+      toast("Не получилось. Попробуйте ещё раз");
       // the desk's «Отменить» paints the row first (components/desk/errands/cancel.tsx)
       void queryClient.invalidateQueries({ queryKey: errandKeys.root });
     },
@@ -72,7 +72,7 @@ export function useThankErrand() {
       void queryClient.invalidateQueries({ queryKey: errandKeys.root });
     },
     onError: () => {
-      toast("Не получилось. Попробуй ещё раз");
+      toast("Не получилось. Попробуйте ещё раз");
     },
   });
 }
@@ -137,7 +137,7 @@ export function useErrandLink() {
         toast("Так нельзя: заявка уже изменилась");
         return;
       }
-      toast("Не получилось. Попробуй ещё раз");
+      toast("Не получилось. Попробуйте ещё раз");
     },
   });
 }
@@ -169,7 +169,7 @@ export function useSetAway(meId: string, { quiet = false }: { quiet?: boolean } 
     },
     onError: (_error, _until, context) => {
       if (context?.before) queryClient.setQueryData(secretaryKeys.all, context.before);
-      toast("Не получилось. Попробуй ещё раз");
+      toast("Не получилось. Попробуйте ещё раз");
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: secretaryKeys.all });

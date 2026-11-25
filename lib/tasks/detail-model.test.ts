@@ -167,3 +167,14 @@ describe("the task's own screen, derived (D-87)", () => {
     expect(taskDetailModel(task(), messages, DIRECTOR, NOW, undefined).talk).toBe(1);
   });
 });
+
+describe("the tone of a new task on its screen", () => {
+  it("the director: grey while fresh, amber after half an hour or at once when pushes do not reach", () => {
+    const fresh = task({ status: "sent", created_at: "2026-11-20T05:50:00Z" });
+    expect(taskDetailModel(fresh, [], DIRECTOR, NOW, undefined).tone).toBe("muted");
+    expect(taskDetailModel(fresh, [], DIRECTOR, NOW, undefined, { noPush: new Set(["u-emp"]) }).tone).toBe("warn");
+    expect(taskDetailModel(task({ status: "sent" }), [], DIRECTOR, NOW, undefined).tone).toBe("warn");
+    // the holder: a new task is their move
+    expect(taskDetailModel(fresh, [], EMPLOYEE, NOW, 0).tone).toBe("warn");
+  });
+});

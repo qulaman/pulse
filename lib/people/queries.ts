@@ -7,6 +7,8 @@ import { toast } from "@/components/ui/Toast";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/types";
 
+import { countTeam, teamOf, type TeamCount } from "./team";
+
 export type Person = Database["public"]["Tables"]["profiles"]["Row"];
 export type Role = Database["public"]["Enums"]["user_role"];
 export type Availability = Database["public"]["Enums"]["availability_t"];
@@ -41,13 +43,8 @@ export const peopleKeys = {
   one: (id: string) => ["people", id] as const,
 };
 
-/**
- * One count of the team on every screen: working people, without the director and the wall's
- * kiosk — the same set `team_role` gives the reports.
- */
-export function isTeamMember(person: Pick<Person, "is_active" | "role">): boolean {
-  return person.is_active && person.role !== "director" && person.role !== "tv";
-}
+/** One count of the team on every screen — the rule lives in lib/people/team.ts. */
+export { isTeamMember } from "./team";
 
 /** Everybody in the company, inactive last — RLS shows the director the whole roster. */
 export const peopleQuery = {
@@ -75,6 +72,18 @@ const NOBODY: ReadonlySet<string> = new Set();
 export function useGoneIds(): ReadonlySet<string> {
   const people = usePeople();
   return useMemo(() => (people.data ? new Set(people.data.filter((p) => !p.is_active).map((p) => p.id)) : NOBODY), [people.data]);
+}
+
+/**
+ * The team and its counts from the roster read every screen already shares (`usePeople`):
+ * «N в команде», «N на месте», «ушедшие · K» — lib/people/team.ts says who is who.
+ * `count` is undefined until the roster has come.
+ */
+export function useTeam(enabled = true): { members: Person[]; count: TeamCount | undefined; isLoading: boolean; isError: boolean } {
+  const people = usePeople(enabled);
+  const members = useMemo(() => (people.data ? teamOf(people.data) : []), [people.data]);
+  const count = useMemo(() => (people.data ? countTeam(people.data) : undefined), [people.data]);
+  return { members, count, isLoading: people.isLoading, isError: people.isError };
 }
 
 export type PersonMessage = Database["public"]["Tables"]["task_messages"]["Row"] & {
@@ -140,7 +149,7 @@ export function useUpdatePerson() {
         message.includes("forbidden_field_update")
           ? "Это поле менять нельзя"
           : message.includes("not_permitted")
-            ? "Эту карточку тебе менять нельзя"
+            ? "Эту карточку менять нельзя"
             : "Не получилось сохранить",
       );
     },

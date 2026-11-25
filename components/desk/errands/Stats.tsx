@@ -126,8 +126,22 @@ function TopScenes({ rows, catalogue }: { rows: readonly Errand[]; catalogue: re
  * forgotten coffee does not make every coffee slow — what nobody took (the one figure worth fixing,
  * amber only above zero), how they ended, the days as columns, what is asked most, and who took what
  * — only where there is more than one secretary to compare. Every number from the same rows.
+ * `figures` false — the band above already says how many, how fast and what nobody took (the calm
+ * «Сейчас», owner 2026-11-25): each fact once on the screen, the block keeps the rest.
  */
-export function ErrandStats({ rows, now, catalogue, several }: { rows: readonly Errand[]; now: Date; catalogue: readonly SecretaryAction[]; several: boolean }) {
+export function ErrandStats({
+  rows,
+  now,
+  catalogue,
+  several,
+  figures = true,
+}: {
+  rows: readonly Errand[];
+  now: Date;
+  catalogue: readonly SecretaryAction[];
+  several: boolean;
+  figures?: boolean;
+}) {
   const outcomes = outcomesOf(rows);
   const usual = medianDoneMinutes(rows);
   const tally = tallyByPerson(rows);
@@ -137,20 +151,24 @@ export function ErrandStats({ rows, now, catalogue, several }: { rows: readonly 
     <aside className="pult-card pult-month" data-testid="desk-errands-stats">
       <header className="pult-month-head">
         <h2 className="pult-month-title">За 30 дней</h2>
-        <span className="pult-month-total">
-          <RollingNumber value={outcomes.asked} className="nums" /> {pluralRu(outcomes.asked, ["заявка", "заявки", "заявок"])}
-        </span>
+        {figures ? (
+          <span className="pult-month-total">
+            <RollingNumber value={outcomes.asked} className="nums" /> {pluralRu(outcomes.asked, ["заявка", "заявки", "заявок"])}
+          </span>
+        ) : null}
       </header>
-      <div className="pult-month-figures">
-        <div className="pult-figure" title="Медиана «попросил → готово»: половина просьб сделана быстрее">
-          <span className="pult-figure-value nums">{spanWords(usual)}</span>
-          <span className="pult-figure-label">обычно до «готово»</span>
+      {figures ? (
+        <div className="pult-month-figures">
+          <div className="pult-figure" title="Медиана «попросил → готово»: половина просьб сделана быстрее">
+            <span className="pult-figure-value nums">{spanWords(usual)}</span>
+            <span className="pult-figure-label">обычно до «готово»</span>
+          </div>
+          <div className="pult-figure" data-tone={outcomes.unclaimed > 0 ? "warn" : undefined} title="Просьбы, которые никто не взял">
+            <span className="pult-figure-value nums">{outcomes.unclaimed}</span>
+            <span className="pult-figure-label">не взяли</span>
+          </div>
         </div>
-        <div className="pult-figure" data-tone={outcomes.unclaimed > 0 ? "warn" : undefined} title="Просьбы, которые никто не взял">
-          <span className="pult-figure-value nums">{outcomes.unclaimed}</span>
-          <span className="pult-figure-label">не взяли</span>
-        </div>
-      </div>
+      ) : null}
       <p className="pult-month-ends nums" data-testid="desk-errands-outcomes">
         взято {outcomes.taken} · готово {outcomes.done}
         {outcomes.declined > 0 ? ` · отказ ${outcomes.declined}` : ""} · отменено {outcomes.cancelled}

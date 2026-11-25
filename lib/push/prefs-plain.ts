@@ -30,7 +30,7 @@ export const UNSEEN_AFTER = [15, 30, 60] as const;
 export const DAY_SUMMARY_TIMES = ["18:00", "19:00", "20:00", "21:00"] as const;
 
 export const CATEGORY_LABEL: Record<NotifyCategory, string> = {
-  review: "Сдали на приёмку",
+  review: "Сдали на проверку",
   declined: "Отказы «Не могу»",
   questions: "Вопросы по задачам",
   messages: "Сообщения в задачах",

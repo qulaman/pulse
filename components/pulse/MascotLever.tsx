@@ -150,7 +150,7 @@ export const MascotLever = memo(function MascotLever({
   const season = useMascotSeason();
   // a recording started from somebody's orb on the waiting screen has its own card, with its
   // own timer and its own «Готово»: the face only plays the pose, or the screen says it twice
-  // — and the card's recording answers no gesture, so «веди вверх» would be a lie as well
+  // — and the card's recording answers no gesture, so «ведите вверх» would be a lie as well
   const fromOrb = useIngestStore((s) => s.address !== null);
   const recordingStartedAt = useIngestStore((s) => s.recordingStartedAt);
   const startVoice = useIngestStore((s) => s.startVoice);
@@ -181,6 +181,9 @@ export const MascotLever = memo(function MascotLever({
   // this face is being held with the microphone open — the screen may want to know
   const setHeld = useCallback((value: boolean) => onHold?.(value), [onHold]);
   const [cancelArmed, setCancelArmed] = useState(false);
+  // the finger is on this face with the microphone open: only then does «ведите вверх» mean anything —
+  // a recording started by «Сказать» under the face has its own «Отменить»
+  const [holding, setHolding] = useState(false);
   // the voice swells the blob; painted into a CSS variable of the face's wrapper (below)
   const faceRef = useRef<HTMLSpanElement>(null);
   // the face's button: the voice level lives on it, so the face and the rings round it both read it
@@ -255,6 +258,7 @@ export const MascotLever = memo(function MascotLever({
         setShaking(true);
         setTimeout(() => setShaking(false), 220);
         haptic([15, 30, 15]);
+        setHolding(true);
         setHeld(true);
         startPromise.current = pin ? startVoice(pin.address, { id: pin.id, name: pin.name }) : startVoice();
         bumpUses();
@@ -309,6 +313,7 @@ export const MascotLever = memo(function MascotLever({
       return;
     }
     holdFired.current = false;
+    setHolding(false);
     setHeld(false);
     // The microphone permission promise may still be in flight — never stop before it lands.
     await startPromise.current;
@@ -339,6 +344,7 @@ export const MascotLever = memo(function MascotLever({
       holdFired.current = false;
       cancelVoice();
     }
+    setHolding(false);
     setHeld(false);
     setCancelArmed(false);
   }, [cancelVoice, clearHold, setHeld, pull]);
@@ -350,7 +356,7 @@ export const MascotLever = memo(function MascotLever({
   const pipeline = STAGE_FACE[stage];
   const face: MascotState = pipeline ?? state;
   // a recording for a picked person has the pick card as its caption (timer, «Готово»); the
-  // face keeps only the red «Отпусти, чтобы отменить» of its own gesture
+  // face keeps only the red «Отпустите, чтобы отменить» of its own gesture
   const stageLine = caption && (cancelArmed || !(fromOrb && recording)) ? STAGE_LINE[stage] : undefined;
 
   return (
@@ -366,7 +372,7 @@ export const MascotLever = memo(function MascotLever({
           <button
             ref={leverRef}
             type="button"
-            aria-label={recording ? "Идёт запись, отпусти для отправки" : (label ?? (voice ? "Маскот: удержи — говори, тап — задачи, потяни вниз — текст" : "Маскот: тап — дела"))}
+            aria-label={recording ? "Идёт запись, отпустите, чтобы отправить" : (label ?? (voice ? "Маскот: удержите — говорите, нажмите — задачи, сообщения, эфир, календарь, потяните вниз — текст" : "Маскот: нажмите — дела"))}
             disabled={busy}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
@@ -442,14 +448,14 @@ export const MascotLever = memo(function MascotLever({
               className="rounded-full px-3 py-1 text-[14px] font-medium leading-5"
               style={{ background: "color-mix(in srgb, var(--surface) 88%, transparent)", color: cancelArmed ? "var(--danger)" : "var(--text)" }}
             >
-              {cancelArmed ? "Отпусти, чтобы отменить" : stageLine}
+              {cancelArmed ? "Отпустите, чтобы отменить" : stageLine}
               {recording && !cancelArmed ? (
                 <span ref={timerRef} className="nums ml-1.5 text-muted">
                   0:00
                 </span>
               ) : null}
             </span>
-            {recording && !cancelArmed ? <span className="mt-0.5 text-[12px] leading-4 text-muted">веди вверх, чтобы отменить</span> : null}
+            {recording && holding && !cancelArmed ? <span className="mt-0.5 text-[12px] leading-4 text-muted">ведите вверх, чтобы отменить</span> : null}
           </span>
         ) : null}
       </motion.div>

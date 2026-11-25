@@ -212,7 +212,7 @@ export function useDisputePoints(userId: string | undefined) {
           ? "Это начисление уже оспорено"
           : message.includes("already_refunded")
             ? "Этот минус уже вернули"
-            : "Не получилось отправить. Попробуй ещё раз",
+            : "Не получилось отправить. Попробуйте ещё раз",
       );
     },
   });
@@ -241,7 +241,7 @@ export function useResolveDispute() {
     onError: (error, _input, context) => {
       if (context?.before) queryClient.setQueryData(disputeKeys.open, context.before);
       const message = error instanceof Error ? error.message : "";
-      toast(message.includes("already_resolved") ? "На это уже ответили" : "Не получилось. Попробуй ещё раз");
+      toast(message.includes("already_resolved") ? "На это уже ответили" : "Не получилось. Попробуйте ещё раз");
     },
     onSuccess: (_data, input) => {
       void queryClient.invalidateQueries({ queryKey: ["points"] });

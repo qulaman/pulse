@@ -17,10 +17,11 @@ import { PageTitle } from "@/components/desk/ui/PageTitle";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SearchField, SegmentTabs, Select, Toolbar } from "@/components/desk/ui/Toolbar";
 import { Button } from "@/components/ui/Button";
-import { usePeople } from "@/lib/people/queries";
+import { isTeamMember, usePeople } from "@/lib/people/queries";
 import { useOpenDisputes } from "@/lib/points/game";
 import { usePointsEnabled, type RatingPeriod } from "@/lib/points/queries";
 import { isOpenOrder } from "@/lib/shop/format";
+import { splitHands } from "@/lib/shop/hands";
 import { useOrders, useShopSummary } from "@/lib/shop/queries";
 import { useMe } from "@/lib/tasks/queries";
 
@@ -41,7 +42,7 @@ const PERIODS: RatingPeriod[] = ["week", "month", "all"];
  * (the points on hands, what waits for him: orders to hand out, disputes — the screen's light), then
  * the team's balances with «Начислить», the disputes, the company's ledger and the shop with its
  * queue to hand out. The rating's mode and the rules are a settings section (`PointsSection`,
- * the «Сотрудники» tab) — linked, not repeated. Balances are sums of the ledger (principle 4).
+ * the «Очки и отчёты» tab) — linked, not repeated. Balances are sums of the ledger (principle 4).
  */
 export function PointsScreen() {
   const me = useMe().data;
@@ -80,11 +81,13 @@ export function PointsScreen() {
   const on = enabled.data === true;
   const waiting = (orders.data ?? []).filter((order) => isOpenOrder(order.status) && order.user_id !== me?.userId).length;
   const disputeCount = disputes.data?.length ?? 0;
+  // the head says what the rows under it hold — the team's — and who holds the rest (D-194)
+  const hands = useMemo(() => (summary.data && people.data ? splitHands(summary.data.balances, people.data) : undefined), [summary.data, people.data]);
   // the people the points are for: everyone working, but the director and the wall (the rating's team)
   const team = useMemo(
     () =>
       (people.data ?? [])
-        .filter((person) => person.is_active && person.role !== "director" && person.role !== "tv")
+        .filter(isTeamMember)
         .map((person) => ({ id: person.id, name: person.full_name, sub: person.position, avatar: person.avatar_url }))
         .sort((a, b) => a.name.localeCompare(b.name, "ru")),
     [people.data],
@@ -139,7 +142,7 @@ export function PointsScreen() {
               href="/desk/settings?tab=team&focus=points-enabled"
               className="pts-rules-link inline-flex h-9 items-center gap-1.5 px-2.5 text-[13px] font-medium text-muted hover:text-text"
               data-testid="points-rules-link"
-              title="Режим рейтинга и правила — во вкладке «Сотрудники»"
+              title="Режим рейтинга и правила — во вкладке «Очки и отчёты»"
             >
               <SlidersHorizontal size={15} strokeWidth={2} aria-hidden />
               Правила очков
@@ -152,7 +155,7 @@ export function PointsScreen() {
         }
       />
 
-      <PointsHero summary={summary.data} waiting={waiting} disputes={disputeCount} onShop={() => setView("shop")} onDisputes={() => setView("disputes")} />
+      <PointsHero summary={summary.data} hands={hands} waiting={waiting} disputes={disputeCount} onShop={() => setView("shop")} onDisputes={() => setView("disputes")} />
 
       <Toolbar end={tools}>
         <SegmentTabs

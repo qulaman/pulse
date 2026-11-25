@@ -6,7 +6,6 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 
 import { Morph } from "@/components/desk/ui/Morph";
 import { IconButton } from "@/components/desk/ui/IconButton";
-import { Kbd } from "@/components/desk/ui/Kbd";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { When } from "@/components/desk/ui/When";
 import { keysTaken } from "@/components/desk/ui/layers";
@@ -194,21 +193,28 @@ function DayPanel({
           <CalendarClock aria-hidden size={13} strokeWidth={2} className="cal-side-icon" />
           {dayHead(day, now)}
         </p>
-        <div className="flex items-baseline gap-2.5">
-          <span className="cal-side-figure desk-figure nums text-[28px] font-semibold leading-8">{dayEvents.length}</span>
-          <span className="flex min-w-0 flex-col">
-            <span className="text-[14px] font-semibold leading-5">
-              {pluralRu(dayEvents.length, ["встреча", "встречи", "встреч"])}
-              {isToday ? " сегодня" : ""}
-            </span>
-            {busy > 0 ? (
-              <span className="text-[12px] leading-4 text-muted">
-                занято {lengthRu(busy)}
-                {lastEnd !== null && (!isToday || lastEnd > now.getTime()) ? ` · свободно с ${hhmm(new Date(lastEnd).toISOString())}` : ""}
+        {dayEvents.length === 0 ? (
+          // an empty day is one line, not «0 встреч» and «Встреч нет» again under it (D-194)
+          <p className="text-[16px] font-semibold leading-6" data-testid="cal-side-none">
+            Встреч нет
+          </p>
+        ) : (
+          <div className="flex items-baseline gap-2.5">
+            <span className="cal-side-figure desk-figure nums text-[28px] font-semibold leading-8">{dayEvents.length}</span>
+            <span className="flex min-w-0 flex-col">
+              <span className="text-[14px] font-semibold leading-5">
+                {pluralRu(dayEvents.length, ["встреча", "встречи", "встреч"])}
+                {isToday ? " сегодня" : ""}
               </span>
-            ) : null}
-          </span>
-        </div>
+              {busy > 0 ? (
+                <span className="text-[12px] leading-4 text-muted">
+                  занято {lengthRu(busy)}
+                  {lastEnd !== null && (!isToday || lastEnd > now.getTime()) ? ` · свободно с ${hhmm(new Date(lastEnd).toISOString())}` : ""}
+                </span>
+              ) : null}
+            </span>
+          </div>
+        )}
         {dayEvents.length > 0 ? <DayStrip events={dayEvents} meId={meId} now={now} isToday={isToday} /> : null}
       </header>
 
@@ -237,20 +243,23 @@ function DayPanel({
         </section>
       ) : null}
 
-      <section data-testid="cal-side-rest">
-        <SectionLabel>{isToday ? "Дальше сегодня" : past ? "Встречи дня" : "Встречи"}</SectionLabel>
-        {rest.length > 0 ? (
-          <div className="mt-1 flex flex-col">
-            {rest.map((event) => (
-              <Row key={event.id} event={event} now={now} meId={meId} onOpen={onOpen} />
-            ))}
-          </div>
-        ) : (
-          <p className="mt-1 px-1.5 text-[13px] leading-[18px] text-muted">
-            {dayEvents.length === 0 ? "Встреч нет" : isToday && gone > 0 && !running ? `На сегодня всё — ${gone} ${pluralRu(gone, ["встреча позади", "встречи позади", "встреч позади"])}` : "Больше ничего"}
-          </p>
-        )}
-      </section>
+      {/* an empty day said «Встреч нет» in its head: no second «Встреч нет» here */}
+      {dayEvents.length === 0 ? null : (
+        <section data-testid="cal-side-rest">
+          <SectionLabel>{isToday ? "Дальше сегодня" : past ? "Встречи дня" : "Встречи"}</SectionLabel>
+          {rest.length > 0 ? (
+            <div className="mt-1 flex flex-col">
+              {rest.map((event) => (
+                <Row key={event.id} event={event} now={now} meId={meId} onOpen={onOpen} />
+              ))}
+            </div>
+          ) : (
+            <p className="mt-1 px-1.5 text-[13px] leading-[18px] text-muted">
+              {isToday && gone > 0 && !running ? `На сегодня всё — ${gone} ${pluralRu(gone, ["встреча позади", "встречи позади", "встреч позади"])}` : "Больше ничего"}
+            </p>
+          )}
+        </section>
+      )}
 
       {deadlines ? (
         <section data-testid="cal-side-deadlines">
@@ -274,11 +283,6 @@ function DayPanel({
 
       <p className="mt-auto flex flex-wrap items-center gap-1 pt-2 text-[12px] leading-4 text-muted">
         Клик по дате — день крупно
-        <span className="ml-1 inline-flex items-center gap-0.5">
-          <Kbd>Shift</Kbd>
-          <Kbd>←</Kbd>
-          <Kbd>→</Kbd>
-        </span>
       </p>
     </div>
   );
@@ -744,15 +748,6 @@ function Meeting({
             )}
           </div>
         ) : null}
-        <p className="mt-3 flex items-center gap-1 text-[12px] leading-4 text-muted">
-          <Kbd>Esc</Kbd> к дню
-          {isDirector ? (
-            <>
-              <span className="ml-2" />
-              <Kbd>E</Kbd> изменить
-            </>
-          ) : null}
-        </p>
       </div>
     </article>
   );

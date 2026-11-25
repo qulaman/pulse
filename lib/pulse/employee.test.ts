@@ -17,6 +17,7 @@ import {
   reasonOf,
   reportPhrase,
   tasksBallCount,
+  waitingTasksLine,
   weightiest,
 } from "./employee";
 
@@ -390,11 +391,34 @@ describe("employeeOpening — new cases (D-167)", () => {
     const lanes = { ...emptyLanes(), review: [row("pending_review"), row("pending_review")] };
     expect(employeeOpening(lanes, NOW, "Ерлан").text).toContain("Всё сдано, на проверке у директора — 2.");
   });
-  it("with the day's report still to hand in, «всё сделано» is not said", () => {
-    expect(employeeOpening(emptyLanes(), NOW, "Ерлан").text).toContain("Дел нет, всё сделано.");
+  it("nothing on hand is the one empty phrase; with the report still to hand in, no «я позову»", () => {
+    expect(employeeOpening(emptyLanes(), NOW, "Ерлан").text).toMatch(/ Дел нет. Придёт задача — я позову.$/);
     const pending = employeeOpening(emptyLanes(), NOW, "Ерлан", { reportPending: true }).text;
-    expect(pending).toContain("Дел нет.");
-    expect(pending).not.toContain("всё сделано");
+    expect(pending).toMatch(/ Дел нет.$/);
+    expect(pending).not.toContain("позову");
+  });
+  it("over the open «Дела» card that says it, the band only greets (said once)", () => {
+    const hello = employeeOpening(emptyLanes(), NOW, "Ерлан", { tasksOpen: true }).text;
+    expect(hello).not.toContain("Дел нет");
+    expect(hello).toMatch(/Ерлан.$/);
+    const review = { ...emptyLanes(), review: [row("pending_review")] };
+    expect(employeeOpening(review, NOW, "Ерлан", { tasksOpen: true }).text).toBe(hello);
+    // orders in work are still said over their cards
+    const work = { ...emptyLanes(), work: [row("accepted")] };
+    expect(employeeOpening(work, NOW, "Ерлан", { tasksOpen: true }).text).toContain("1 задача в работе");
+  });
+});
+
+describe("waitingTasksLine — the secretary's orders at rest (D-173, D-87)", () => {
+  it("counts what the «Дела» ball counts and names the overdue ones", () => {
+    const past = new Date(NOW.getTime() - 60 * 60_000).toISOString();
+    const later = new Date(NOW.getTime() + 60 * 60_000).toISOString();
+    const tasks = [row("sent"), row("rework", { deadline: later }), row("accepted", { deadline: past }), row("accepted"), row("pending_review", { deadline: past })];
+    expect(tasksBallCount(tasks, NOW)).toBe(3);
+    expect(waitingTasksLine(tasks, NOW)).toEqual({ text: "3 задачи ждут вас · 1 просрочена", tone: "danger" });
+    expect(waitingTasksLine([row("sent")], NOW)).toEqual({ text: "1 задача ждёт вас", tone: "warn" });
+    expect(waitingTasksLine(Array.from({ length: 5 }, () => row("rework")), NOW)?.text).toBe("5 задач ждут вас");
+    expect(waitingTasksLine([row("accepted"), row("pending_review")], NOW)).toBeNull();
   });
 });
 

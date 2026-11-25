@@ -154,6 +154,34 @@ html[data-surface="desk"][data-journal] {
   .rep-tabel-row[data-gone] .rep-tabel-name-text {
     color: var(--rt-ink-3);
   }
+  /* the divider over who left (D-194): a quiet title row, their rows under it out of the totals */
+  .rep-tabel-body .rep-tabel-gone {
+    height: 28px;
+    --rt-row-bg: var(--rt-dim);
+    border-top: 1px solid var(--rule);
+
+    &:hover {
+      --rt-row-bg: var(--rt-dim);
+    }
+  }
+  .rep-tabel-gone-text {
+    overflow: hidden;
+    padding: 0 10px 0 12px;
+    color: var(--rt-ink-3);
+    font-size: 12px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .rep-tabel-gone-note {
+    display: flex;
+    grid-column: 2 / -1;
+    align-items: center;
+    padding: 0 12px;
+    color: var(--rt-ink-3);
+    font-size: 12px;
+    white-space: nowrap;
+  }
   .rep-tabel-row[data-selected] .rep-tabel-name {
     box-shadow:
       inset 3px 0 0 var(--pen),

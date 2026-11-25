@@ -106,7 +106,7 @@ const LAB_TAB: Tab = { href: "/lab", label: "Лаб", icon: ICONS.lab };
 const CALENDAR_TAB: Tab = { href: "/calendar", label: "Календарь", icon: ICONS.calendar };
 
 const EMPLOYEE_TABS: Tab[] = [
-  { href: "/feed", label: "Лента", icon: ICONS.feed },
+  { href: "/feed", label: "Пульс", icon: ICONS.feed },
   { href: "/tasks", label: "Дела", icon: ICONS.tasks },
   CALENDAR_TAB,
   { href: "/rating", label: "Рейтинг", icon: ICONS.rating },
@@ -158,11 +158,13 @@ const SECTIONS: Record<TabRole, Record<string, string>> = {
   },
   // the daily report (D-152) lives in «Дела»
   employee: { "/ether": "/feed", "/shop": "/rating", "/report": "/tasks" },
+  // the secretary's requests are her Лента's ball «Заявки» (D-79, D-87): their list — where a push
+  // about a request lands — lights Лента and «Назад» leads there, not to the admin screens of «Профиль»
   secretary: {
     "/ether": "/feed",
     "/shop": "/rating",
     "/people": ADMIN_HOME,
-    "/secretary": ADMIN_HOME,
+    "/secretary": "/feed",
     "/settings": "/profile",
     "/lab": "/profile",
     "/report": "/tasks",

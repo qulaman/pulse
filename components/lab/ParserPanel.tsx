@@ -194,7 +194,7 @@ export function ParserPanel() {
         onTake={(taken) => {
           setDraft(taken);
           window.scrollTo({ top: 0, behavior: "smooth" });
-          toast("Взял в черновик. Проверь на корпусе и сохрани");
+          toast("Взял в черновик. Проверьте на корпусе и сохраните");
         }}
       />
     </div>

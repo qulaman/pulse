@@ -9,7 +9,7 @@ import { useDraft } from "@/components/settings/draft";
 import { Button } from "@/components/ui/Button";
 import { StillLogo } from "@/components/ui/StillLogo";
 import { toast } from "@/components/ui/Toast";
-import { DEFAULT_ACCENT } from "@/lib/brand-color";
+import { DEFAULT_ACCENT, SAFE_ACCENTS } from "@/lib/brand-color";
 import { useCompanyLogo } from "@/lib/desk/settings-queries";
 
 const LOGO_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
@@ -177,7 +177,7 @@ export function CompanyPanel() {
   const edit = brand.edit;
   const hours = draft.delivery_window;
   const setHours = (patch: Partial<typeof hours>) => update({ delivery_window: { ...hours, ...patch } });
-  const verdict = edit ? accentVerdict(edit.accent) : null;
+  const verdict = edit ? accentVerdict(edit.accent, brand.card?.brand.accent) : null;
   const accent = edit ? normalAccent(edit.accent) : null;
   const shownAccent = accent && verdict?.tone === "ok" ? accent : null;
 
@@ -211,7 +211,13 @@ export function CompanyPanel() {
               label="Акцентный цвет"
               htmlFor="ctl-brand-accent"
               changed={brand.changed.accent}
-              hint={verdict ? <span style={{ color: verdict.tone === "warn" ? "var(--warn)" : undefined }}>{verdict.text}</span> : undefined}
+              hint={
+                verdict ? (
+                  <span data-testid="brand-accent-note" style={{ color: verdict.tone === "danger" ? "var(--danger)" : verdict.tone === "warn" || verdict.clash ? "var(--warn)" : undefined }}>
+                    {verdict.text}
+                  </span>
+                ) : undefined
+              }
             >
               <label className="set-swatch" title="Выбрать цвет" style={{ "--swatch": accent ?? DEFAULT_ACCENT } as CSSProperties}>
                 <input
@@ -237,6 +243,17 @@ export function CompanyPanel() {
                 Сброс
               </Button>
             </SettingRow>
+            {verdict?.clash ? (
+              // the colours that say no state, one click each (owner, 2026-11-25)
+              <div className="set-row set-row-wide flex flex-wrap items-center gap-2" data-testid="brand-accent-safe">
+                <span className="text-[12px] leading-4 text-muted">Подходящие цвета:</span>
+                {SAFE_ACCENTS.map((safe) => (
+                  <Button key={safe.hex} size="sm" variant="secondary" onClick={() => brand.set({ accent: safe.hex })} icon={<span aria-hidden className="h-3.5 w-3.5 rounded-full" style={{ background: safe.hex }} />}>
+                    {safe.name}
+                  </Button>
+                ))}
+              </div>
+            ) : null}
           </>
         )}
       </SettingsGroup>

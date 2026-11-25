@@ -135,7 +135,7 @@ function ReactionPrice({ code, value, onChange }: { code: (typeof REACTION_CODES
 }
 
 /**
- * «Сотрудники» on the desk: the points' rules (D-133, D-152) — on/off and who sees the rating, what
+ * «Очки и отчёты» on the desk: the points' rules (D-133, D-152) — on/off and who sees the rating, what
  * a task, the daily report and the director's reactions pay, what goes to Эфир — and the daily
  * report's days and times (D-152, D-155 §7, the director's). The people themselves are «Команда».
  */
@@ -260,8 +260,8 @@ export function TeamPanel({ director }: { director: boolean }) {
             <span className="text-[13px] text-muted">напомнить в</span>
             <TimeInput label="Напомнить про отчёт в" value={report.remind_at} onChange={(remind_at) => setReport({ remind_at })} />
           </SettingRow>
-          <SettingRow id="report-ask" label="Лента просит отчёт с" hint="С этого часа в Ленте сотрудника заметна строка «Отчёт за день не сдан», и лицо зовёт его сдать — без пуша" htmlFor="ctl-report-ask-at" muted={!report.enabled} changed={report.ask_from !== server.daily_report.ask_from}>
-            <TimeInput id="ctl-report-ask-at" label="Лента просит отчёт с" value={report.ask_from} onChange={(ask_from) => setReport({ ask_from })} />
+          <SettingRow id="report-ask" label="Пульс просит отчёт с" hint="С этого часа на Пульсе сотрудника заметна строка «Отчёт за день не сдан», и лицо зовёт его сдать — без пуша" htmlFor="ctl-report-ask-at" muted={!report.enabled} changed={report.ask_from !== server.daily_report.ask_from}>
+            <TimeInput id="ctl-report-ask-at" label="Пульс просит отчёт с" value={report.ask_from} onChange={(ask_from) => setReport({ ask_from })} />
           </SettingRow>
         </SettingsGroup>
       ) : null}
@@ -270,7 +270,7 @@ export function TeamPanel({ director }: { director: boolean }) {
         <SettingsGroup
           id="morning"
           title="Утренняя сводка"
-          about={`Каждому — его дела на сегодня и встречи одним пушем в ${draft.delivery_window.from}, в начале окна доставки, в рабочие дни «Ежедневного отчёта»; нажал — открылась Лента.`}
+          about={`Каждому — его дела на сегодня и встречи одним пушем в ${draft.delivery_window.from}, в начале окна доставки, в рабочие дни «Ежедневного отчёта»; нажал — открылся Пульс.`}
         >
           <SettingRow
             id="morning-brief"

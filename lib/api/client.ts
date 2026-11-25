@@ -8,7 +8,7 @@ export const GENERIC_ERROR = "Не получилось. Попробую ещё
 
 export type ApiErrorBody = { error?: { code?: string; message_ru?: string } };
 
-const SESSION_GONE = "Сессия истекла. Войди заново";
+const SESSION_GONE = "Сессия истекла. Войдите заново";
 
 /** A refusal of a route: its message is what the person reads, the rest is for the caller to branch on. */
 export class ApiError extends Error {

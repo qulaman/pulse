@@ -12,7 +12,8 @@ import { Icon } from "@/components/tasks/icons";
 
 const TONE = {
   ok: { tile: "color-mix(in srgb, var(--ok) 15%, transparent)", fg: "var(--ok)" },
-  accent: { tile: "color-mix(in srgb, var(--accent) 15%, transparent)", fg: "var(--accent)" },
+  // not in yet: neutral — never green, never the brand colour (lib/tasks/tone.ts)
+  wait: { tile: "var(--surface-2)", fg: "var(--text)" },
   muted: { tile: "var(--surface-2)", fg: "var(--text-muted)" },
 } as const;
 
@@ -28,7 +29,7 @@ export function ReportEntryRow() {
 
   if (day.isError || day.data?.enabled === false) return null;
   const state = day.data ? entryState(day.data) : null;
-  const tone = TONE[state?.tone ?? "accent"];
+  const tone = TONE[state?.tone ?? "wait"];
 
   return (
     <Link

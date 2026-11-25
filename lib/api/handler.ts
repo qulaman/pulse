@@ -22,7 +22,7 @@ type RouteContext = { params: Promise<Record<string, string>> };
 
 type Handler<TBody> = (ctx: HandlerContext<TBody>) => Promise<Response>;
 
-const INTERNAL_MESSAGE = "Что-то пошло не так, попробуй ещё раз";
+const INTERNAL_MESSAGE = "Что-то пошло не так, попробуйте ещё раз";
 
 /** What a route answers when the `[id]` of its address is not an id at all: a 404 with these words. */
 export type IdRefusal = { code: string; message: string };

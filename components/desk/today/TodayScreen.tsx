@@ -7,13 +7,14 @@ import { useDeskParams } from "@/components/desk/DeskAddress";
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { taggedActions, useDirectorBoard, usePanelFlow, writeParams } from "@/components/desk/tasks/flow";
 import { FailedScreen, LoadFailure, LoadNote } from "@/components/desk/tasks/LoadState";
-import { DESK_NEW_TASK, MomentBar, type MomentCounter } from "@/components/desk/tasks/MomentBar";
+import { DESK_NEW_TASK, MomentBar, momentAct, type MomentCounter } from "@/components/desk/tasks/MomentBar";
 import { pressTaskKey } from "@/components/desk/tasks/taskKeys";
 import { TaskPanel } from "@/components/desk/tasks/TaskPanel";
+import { useCallFirst } from "@/components/desk/tasks/RowMoves";
 import { useRowActs } from "@/components/desk/tasks/useRowActs";
 import { useScreenKeys } from "@/components/desk/team/keys";
+import { usePersonMoves } from "@/components/desk/team/PersonMoves";
 import { InPanel } from "@/components/desk/ui/DeskPanel";
-import { Kbd } from "@/components/desk/ui/Kbd";
 import { useContextMenu, type MenuItem } from "@/components/desk/ui/Menu";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
@@ -27,6 +28,7 @@ import { cursorStep, disputeLines, extrasWord, loadStateOf, matchesDue, orderLin
 import { loadColor, useTeamLoads } from "@/lib/people/loads";
 import { shortName, useNamesKey } from "@/lib/people/names";
 import { isTeamMember, usePeople, type Person } from "@/lib/people/queries";
+import { absenceOf } from "@/lib/people/team";
 import { useOpenDisputes, useResolveDispute } from "@/lib/points/game";
 import type { BoardTask } from "@/lib/pulse/board";
 import { HELD_STATUS, hasUnread } from "@/lib/pulse/board";
@@ -38,6 +40,8 @@ import { usePushHealth } from "@/lib/push/health-query";
 import { ordersWaiting } from "@/lib/shop/format";
 import { useOrders, useSetOrderStatus } from "@/lib/shop/queries";
 import { queueOf, type DeskItem } from "@/lib/tasks/desk";
+import { noPushIds, type AttentionReason } from "@/lib/tasks/attention";
+import { BLIND_NUDGE_HINT } from "@/lib/tasks/reasons";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { directorScreen, directorTabOf } from "@/lib/tasks/overview";
 import { useMe, usePulseBoard, useSentTasks, type Me, type TaskWithPeople } from "@/lib/tasks/queries";
@@ -58,7 +62,10 @@ import { HomeRating } from "./home/HomeRating";
 import { HomeSecretary } from "./home/HomeSecretary";
 import { LaunchBone, LaunchChecklist, useLaunchGate } from "./LaunchChecklist";
 import { JustSent, PeopleBone, PeopleNow, PersonHome, type PersonRow } from "./PeopleNow";
-import { Agenda, Decisions, Feed, Overdue, Reception, reportWord, Reports, ReportsFailed, type ExtraDecision } from "./TodayParts";
+import { Agenda, Attention, Decisions, Feed, Overdue, Reception, reportWord, Reports, ReportsFailed, type ExtraDecision } from "./TodayParts";
+
+/** The verdict's reasons «Требует внимания» lists; the decisions and the late ones have blocks of their own. */
+const WATCHED: ReadonlySet<AttentionReason> = new Set(["no_push", "unaccepted", "soon"]);
 
 /** How many decisions stand on the screen before «…ещё N — разобрать по одной». */
 const DECISIONS_SHOWN = 6;
@@ -71,9 +78,14 @@ const ORDERS_HREF = "/desk/settings/points?view=shop";
 
 /**
  * The grid of the day: the director's work on the left, the day around it on the right — one
- * column under the other once the panel takes the room (a container query, not the window's).
+ * column under the other once the panel takes the room (a container query, not the window's). A
+ * wide screen (1920) lays the day's blocks in two columns of their own on the right: seven blocks
+ * one under another left the work short and the screen empty beside them (D-194).
  */
-const LAYOUT = "grid items-start gap-y-6 @min-[960px]:grid-cols-[minmax(0,1fr)_288px] @min-[960px]:gap-x-8 @min-[1100px]:grid-cols-[minmax(0,1fr)_340px] @min-[1500px]:grid-cols-[minmax(0,1fr)_420px]";
+const LAYOUT =
+  "grid items-start gap-y-6 @min-[960px]:grid-cols-[minmax(0,1fr)_288px] @min-[960px]:gap-x-8 @min-[1100px]:grid-cols-[minmax(0,1fr)_340px] @min-[1500px]:grid-cols-[minmax(0,1fr)_420px] @min-[1560px]:grid-cols-[minmax(0,1fr)_minmax(0,800px)]";
+/** The right-hand blocks: one column, or two balanced ones on a wide screen, a block never split. */
+const DAY_COLUMN = "flex min-w-0 flex-col gap-6 @min-[1560px]:block @min-[1560px]:columns-2 @min-[1560px]:gap-x-6 @min-[1560px]:*:mb-6 @min-[1560px]:*:break-inside-avoid";
 
 /** One block of the frame: its label, the rule of ink, rows of the block's own height. */
 function BlockBone({ rows, height, label = "34%", wide = "64%" }: { rows: number; height: number; label?: string; wide?: string }) {
@@ -225,11 +237,27 @@ function TodayView({
 
   /* ---- the moment: the same numbers as «Задачи» ---- */
   const { boardById, reasons } = useDirectorBoard(board, all, me.userId, now);
-  const screen = useMemo(() => directorScreen(all, reasons, now), [all, reasons, now]);
+  // one verdict for every screen of the director (lib/tasks/attention.ts, D-194): an order lying
+  // untaken, a holder whose pushes do not reach — the moment says it, never «по плану»
+  const noPush = useMemo(() => noPushIds(health.data), [health.data]);
+  const reach = useCallFirst();
+  const screen = useMemo(() => directorScreen(all, reasons, now, { noPush }), [all, reasons, now, noPush]);
+  // what needs him besides the decisions and the late ones: they have blocks of their own
+  const watch = useMemo(
+    () =>
+      (screen.attention?.items ?? []).flatMap((item) => {
+        if (!WATCHED.has(item.reason)) return [];
+        const task = boardById.get(item.id);
+        return task ? [{ task, reason: item.reason }] : [];
+      }),
+    [screen.attention, boardById],
+  );
   const open = useMemo(() => all.filter((task) => directorTabOf(task, reasons.get(task.id) ?? null) !== "closed"), [all, reasons]);
   const dueToday = useMemo(() => open.filter((task) => matchesDue(task, "today", now)), [open, now]);
   const counts = {
-    working: open.filter((task) => !reasons.has(task.id)).length,
+    // taken work only: an order nobody has accepted is no «в работе», and never green (D-194)
+    working: open.filter((task) => !reasons.has(task.id) && task.status !== "sent" && task.status !== HELD_STATUS).length,
+    untaken: open.filter((task) => !reasons.has(task.id) && task.status === "sent").length,
     today: dueToday.length,
     overdue: open.filter((task) => isOverdue(task, now)).length,
     held: all.filter((task) => task.status === HELD_STATUS).length,
@@ -237,6 +265,7 @@ function TodayView({
   const todayTab = dueToday.some((task) => reasons.has(task.id)) ? "yours" : "working";
   const counters: MomentCounter[] = [
     { key: "working", label: "В работе", value: counts.working, href: "/desk/tasks?tab=working" },
+    ...(counts.untaken > 0 ? [{ key: "untaken", label: "Не приняты", value: counts.untaken, href: "/desk/tasks?tab=working&status=sent" }] : []),
     { key: "today", label: "Сегодня", value: counts.today, href: `/desk/tasks?tab=${todayTab}&due=today` },
     { key: "overdue", label: "Просрочено", value: counts.overdue, href: "/desk/tasks?tab=yours&due=overdue" },
     { key: "held", label: "Отложены", value: counts.held, href: `/desk/tasks?tab=working&status=${HELD_STATUS}` },
@@ -394,7 +423,7 @@ function TodayView({
       const load = loads.data?.[person.id];
       const color = loadColor(load, person.availability === "active", now.getTime());
       const mine = byPerson.get(person.id) ?? [];
-      // no loads to read: the person is unknown, not «свободен»
+      // no loads to read: the person is unknown, not «дел нет»
       const state = loadsMissing ? { ring: null, line: "—", rank: 4 } : personNow(person, load, color, mine, reasons, now);
       const channel = health.data?.get(person.id);
       return {
@@ -405,7 +434,8 @@ function TodayView({
         active: Math.max(load?.active ?? 0, mine.length),
         report: reportWord(reportRows.get(person.id), now),
         push: channel && (channel.state === "off" || channel.state === "broken") ? (channel.state === "off" ? "уведомления не включены" : "пуш не прошёл") : null,
-        away: person.availability !== "active",
+        // «на месте» is the team's one definition (lib/people/team.ts): «отошёл до …» is away too
+        away: absenceOf(person, now.getTime()) !== null,
         look: lookOf((crew[person.id] ?? []).filter((task) => task.status !== "done")),
       };
     });
@@ -414,11 +444,11 @@ function TodayView({
   const opened = personOf(personId);
   const give = useCallback((person: Person) => useComposeStore.getState().request("", { id: person.id, name: shortName(person.full_name), address: addressOf(person) }), []);
   const givable = (person: Person | null): person is Person => Boolean(person && person.is_active && person.role !== "director" && person.role !== "tv" && person.id !== me.userId);
+  // a person on the desk has one set of moves in one order, wherever they are opened (D-194)
+  const personMoves = usePersonMoves("today");
   const personMenu = (person: Person): MenuItem[] => [
     { key: "peek", label: "Открыть карточку", onSelect: () => openPerson(person.id) },
-    ...(givable(person) ? [{ key: "give", label: "Дать задачу", hint: "T", onSelect: () => give(person) }] : []),
-    { key: "tasks", label: "Все дела", onSelect: () => router.push(`/desk/tasks?who=${encodeURIComponent(person.id)}`) },
-    { key: "card", label: "Карточка", onSelect: () => router.push(`/desk/team/${encodeURIComponent(person.id)}`) },
+    ...personMoves.menu(person, givable(person) ? { give: () => give(person) } : undefined),
   ];
   const onPersonMenu = (id: string, event: MouseEvent) => {
     const person = personOf(id);
@@ -528,7 +558,15 @@ function TodayView({
   const firstName = me.fullName.trim().split(/\s+/)[0] ?? "";
   const brief = calm
     ? quietLine(
-        open.map((task) => ({ id: task.id, title: task.title, deadline: task.deadline, assignee: shortName(task.assignee?.full_name ?? "") || null, assigneeId: task.assignee_id })),
+        open.map((task) => ({
+          id: task.id,
+          title: task.title,
+          deadline: task.deadline,
+          assignee: shortName(task.assignee?.full_name ?? "") || null,
+          assigneeId: task.assignee_id,
+          // an order nobody has taken is not «в работе»
+          taken: task.status !== "sent",
+        })),
         now,
       )
     : null;
@@ -548,7 +586,17 @@ function TodayView({
       ) : launch.state === "checking" ? (
         <LaunchBone />
       ) : (
-        <MomentBar screen={moment} detail={extrasLine ?? (calm ? (brief ?? DESK_NEW_TASK) : undefined)} counters={counters} queue={queue.length} enterKey />
+        <MomentBar
+          screen={moment}
+          detail={extrasLine ?? (calm ? (brief ?? DESK_NEW_TASK) : undefined)}
+          counters={counters}
+          queue={queue.length}
+          enterKey
+          act={momentAct(screen, screen.focus ? boardById.get(screen.focus) : undefined, now, {
+            press: (action, task) => acts.press(action, task),
+            open: openRow,
+          }, screen.focus ? reach.phoneOf(boardById.get(screen.focus)?.assignee_id ?? "") : null)}
+        />
       )}
 
       <div className="@container">
@@ -573,6 +621,26 @@ function TodayView({
               failed={boardDown || launching}
               extrasNote={noteOf(extrasLoad, "Споры и заказы не загрузились", retryExtras)}
               extrasUnknown={extrasLoad.kind === "failed"}
+              // an order lying untaken is no «nothing waits»: «Требует внимания» below says what does
+              watching={watch.length > 0}
+            />
+            <Attention
+              items={watch}
+              openId={openId}
+              // a push that will not reach: «Позвонить» with the number, or «Напомнить» saying the push will not come
+              telOf={(item) => (item.reason === "no_push" ? reach.phoneOf(item.task.assignee_id) : null)}
+              moveOf={(item) => {
+                const move = rowMoves(item.task, null, { nudgedAt: item.task.nudged_at }, now)[0] ?? null;
+                return move && item.reason === "no_push" && move.action === "nudge" ? { ...move, title: BLIND_NUDGE_HINT } : move;
+              }}
+              onMove={(move, task, target) => {
+                if (move.held) return;
+                acts.press(move.action, task, target ? { at: target } : undefined);
+              }}
+              onOpen={openRow}
+              menuOf={(task) => acts.menu(task, { onOpenRow: () => openTask(task.id) })}
+              onMenu={(task, event) => context.open(event, acts.menu(task, { onOpenRow: () => openTask(task.id) }))}
+              now={now}
             />
             <Overdue
               items={late}
@@ -586,19 +654,6 @@ function TodayView({
               now={now}
               drafts={drafts}
             />
-            {decisions.length + late.length > 0 ? (
-              <p className="-mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-muted" data-testid="today-keys-hint">
-                <span>
-                  <Kbd>J</Kbd> <Kbd>K</Kbd> по строкам
-                </span>
-                <span>
-                  <Kbd>Enter</Kbd> открыть
-                </span>
-                <span>
-                  <Kbd>?</Kbd> все клавиши
-                </span>
-              </p>
-            ) : null}
             <PeopleNow
               rows={teamRows}
               loading={peopleLoad.kind === "loading"}
@@ -632,7 +687,7 @@ function TodayView({
             />
           </div>
 
-          <div className="flex min-w-0 flex-col gap-6">
+          <div className={DAY_COLUMN}>
             {/* the phone's home besides the face: who is at the door, the messages, the calendar,
                 the secretary, the ether, the rating — each its own block here (D-164) */}
             <Reception
@@ -678,6 +733,7 @@ function TodayView({
 
       {acts.node}
       {context.node}
+      {personMoves.node}
 
       {openId ? (
         <InPanel panelKey={`task:${openId}`} onClose={closeTask}>

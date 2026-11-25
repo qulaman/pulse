@@ -7,7 +7,6 @@ import { dismissToast, toast } from "@/components/ui/Toast";
 import { useErrandActions } from "@/lib/errands/mutations";
 import { errandKeys, type Errand, type ErrandStatus } from "@/lib/errands/queries";
 
-import { KeyCap } from "./Queue";
 import { cancelWord } from "./words";
 
 /**
@@ -86,9 +85,8 @@ export function CancelErrandButton({ errand }: { errand: Errand }) {
   const cancel = useCancelErrand();
   return (
     <div>
-      <Button size="sm" variant="secondary" onClick={() => cancel(errand)} data-testid="desk-errand-panel-cancel">
+      <Button size="sm" variant="secondary" onClick={() => cancel(errand)} title={`${cancelWord(errand)} · X`} data-testid="desk-errand-panel-cancel">
         {cancelWord(errand)}
-        <KeyCap>X</KeyCap>
       </Button>
     </div>
   );

@@ -20,6 +20,7 @@ import { useGoneIds } from "@/lib/people/queries";
 import { useReactionPrices, useReactToTask, useTaskReactions } from "@/lib/points/game";
 import { isReactable, priceLabel, REACTION_CODES, REACTION_GLYPH, REACTION_LABEL, showsReactionBar } from "@/lib/points/reactions";
 import { answersFor, wantsWords } from "@/lib/tasks/answers";
+import { BLIND_NUDGE_HINT, firstMoveOf, keysBesideCall } from "@/lib/tasks/reasons";
 import { heldLine } from "@/lib/tasks/held";
 import { isWorking, passedWord, untilWords } from "@/lib/tasks/lifecycle";
 import { closedAtOf, stepsOf, timeLeft, type Step } from "@/lib/tasks/overview";
@@ -30,7 +31,7 @@ import { deadlineLabel, TEXT } from "@/lib/tasks/status-text";
 import { deliveryLine, handInVerdict, keyOfAction, stageOf, type Line } from "@/lib/desk/tasks";
 import { focusComposer } from "./DeskThread";
 import { FaceName } from "./Face";
-import { MiniButton } from "./RowMoves";
+import { CallButton, MiniButton, useCallFirst } from "./RowMoves";
 import type { DeskTask } from "./useDeskTask";
 
 /** A line of words — «не открывал с 9:14». A receipt is nobody's move: only a failure takes a colour (D-158). */
@@ -145,15 +146,20 @@ function Receipt({ task, now, onSendNow }: { task: TaskWithPeople; now: Date; on
   ) : null;
 }
 
-/** A step's ink: the pen only where the move is the director's — the check of work handed in. */
+/**
+ * A step's ink (the one map of state colours, lib/tasks/tone.ts): amber where the move is the
+ * director's — work handed in waits «На проверке» — or where the step has stood too long (an order
+ * untaken for half an hour, a return for rework); never green or the brand's for work not yet taken.
+ */
 function stepInk(step: Step): string {
   if (step.state === "bad") return "var(--danger)";
   if (step.state === "todo") return "var(--border)";
-  return step.state === "current" && step.key === "closed" ? "var(--warn)" : "var(--text)";
+  if (step.state === "warn") return "var(--warn)";
+  return step.state === "current" && step.key === "review" ? "var(--warn)" : "var(--text)";
 }
 
 /**
- * The four steps of a task (выдана → в работе → сдана → принята), each with its time, as a
+ * The four steps of a task (Поручено → В работе → На проверке → Готово), each with its time, as a
  * stepper — a node a step, done ones ticked, the one the task stands on ringed in its ink, the line
  * between them drawing itself in.
  */
@@ -253,7 +259,7 @@ export function TaskHead({ desk, now, large = false, scope, fly = false }: { des
           {closed ? (
             <span className="nums">{humanAqtobe(new Date(closedAtOf(task)), now)}</span>
           ) : canDate ? (
-            <FieldButton label="Изменить срок" keys={["D"]} taskId={task.id} act="extend retime" onPress={(target) => desk.acts.press("extend", task, from(target))} testId="desk-field-deadline">
+            <FieldButton label="Срок" keys={["D"]} taskId={task.id} act="extend retime" onPress={(target) => desk.acts.press("extend", task, from(target))} testId="desk-field-deadline">
               <When overdue={due.overdue}>{urgentNow ? TEXT.urgent : due.text}</When>
             </FieldButton>
           ) : (
@@ -497,17 +503,22 @@ export function TaskKeys({ desk, me, now, pointsEnabled, scope }: { desk: DeskTa
   const reacted = Boolean(reactions.data?.[task.id]);
   const canReact = isReactable(task, me.userId) && showsReactionBar(task.status, reacted);
   const [menuAt, setMenuAt] = useState<HTMLElement | null>(null);
-  const wide = desk.keys[0] ? wideLabelOf(desk.keys[0], desk.signals.request, desk.signals.suggestion, now) : null;
+  // a holder whose pushes do not reach: «Позвонить» first, the number copied (owner, 2026-11-25)
+  const reach = useCallFirst();
+  const first = firstMoveOf(task, desk.keys, { noPush: reach.noPush, phone: reach.phoneOf(task.assignee_id) });
+  const keys = first?.kind === "call" ? keysBesideCall(desk.keys) : desk.keys;
+  const wide = keys[0] && first?.kind !== "call" ? wideLabelOf(keys[0], desk.signals.request, desk.signals.suggestion, now) : null;
   return (
     <div data-testid="desk-task-keys">
       <div className="flex flex-wrap items-center gap-1">
-        {desk.keys.map((key, index) => {
+        {first?.kind === "call" ? <CallButton tel={first.tel} size="md" testId="task-action-call" /> : null}
+        {keys.map((key, index) => {
           const cap = keyOfAction(key, desk.letters);
           const label = index === 0 && wide ? wide : ACTION_LABEL[key];
-          const filled = index === 0 && isPrimaryKey(key, desk.reason);
+          const filled = index === 0 && first?.kind !== "call" && isPrimaryKey(key, desk.reason);
           return (
             // a word at the head of the line stands on the sheet's vertical, not its padding
-            <span key={key} data-act-for={task.id} data-act={key === "reassign" || key === "handoff" ? "reassign handoff" : key === "extend" || key === "retime" ? "extend retime" : key} className={`inline-flex ${index === 0 && !filled ? "-ml-2" : ""}`}>
+            <span key={key} data-act-for={task.id} data-act={key === "reassign" || key === "handoff" ? "reassign handoff" : key === "extend" || key === "retime" ? "extend retime" : key} className={`inline-flex ${index === 0 && !filled && first?.kind !== "call" ? "-ml-2" : ""}`}>
               <MiniButton
                 label={label}
                 size="md"
@@ -529,18 +540,20 @@ export function TaskKeys({ desk, me, now, pointsEnabled, scope }: { desk: DeskTa
           data-testid="desk-task-more"
           data-desk-more={task.id}
           // three moves fill the panel's line: the dots stay, the word would push «Ещё» onto a line of its own
-          data-compact={desk.keys.length >= 3 ? "" : undefined}
+          data-compact={keys.length + (first?.kind === "call" ? 1 : 0) >= 3 ? "" : undefined}
           onClick={(event) => setMenuAt(menuAt ? null : event.currentTarget)}
           className={MORE_WORD}
         >
           <Ellipsis aria-hidden size={16} strokeWidth={2.2} className="tasks-ico tasks-more-dots" />
           <span className="tasks-more-word">Ещё</span>
-          <span aria-hidden className="nums text-[11px] leading-4 opacity-60">
-            .
-          </span>
         </button>
         <Menu open={Boolean(menuAt)} onClose={() => setMenuAt(null)} anchor={menuAt} items={desk.acts.menu(task)} align="end" width={280} label="Все действия" />
       </div>
+      {first?.kind === "blind" ? (
+        <p className="mt-1.5 text-[12px] leading-4 text-muted" data-testid="task-blind-hint">
+          {BLIND_NUDGE_HINT}
+        </p>
+      ) : null}
       {canReact ? (
         <div className="mt-2.5">
           <DeskReactions taskId={task.id} pointsEnabled={pointsEnabled} />

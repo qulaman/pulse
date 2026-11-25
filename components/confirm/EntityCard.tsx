@@ -59,7 +59,7 @@ function assigneeChip(entity: PostprocessedEntity, nameOf: (id: string) => strin
 
   if (match.status === "matched" && name) {
     return match.flag === "check"
-      ? { label: `${name} · проверь`, tone: "warn" as ChipTone }
+      ? { label: `${name} · проверьте`, tone: "warn" as ChipTone }
       : { label: name, tone: "neutral" as ChipTone };
   }
   if (match.status === "ambiguous") return { label: "Кто?", tone: "warn" as ChipTone };
@@ -302,13 +302,13 @@ export function EntityCard({
               {/* without a person on it the card read as a task nobody got (D-146) */}
               {entity.kind === "reminder" ? (
                 <Chip tone="muted" interactive={false}>
-                  напоминание — придёт тебе
+                  напоминание — придёт вам
                 </Chip>
               ) : null}
 
               {entity.kind === "note" ? (
                 <Chip tone="muted" interactive={false}>
-                  заметка — видишь только ты
+                  заметка — видите только вы
                 </Chip>
               ) : null}
 
@@ -418,7 +418,7 @@ export function EntityCard({
           {hasAssignee(entity) && entity.assignee?.status !== "matched" && !collapsed ? (
             <div className="mt-3 rounded-[12px] border border-warn/40 bg-warn/10 px-3 py-2">
               <p className="text-[13px] leading-4 text-warn">
-                {entity.assignee?.status === "ambiguous" ? "Не понял, кому из них:" : "Не понял, кому это. Выбери:"}
+                {entity.assignee?.status === "ambiguous" ? "Не понял, кому из них:" : "Не понял, кому это. Выберите:"}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {/* first names on the chips: full names run one per line and push the button off screen */}

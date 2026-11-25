@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import type { TaskStatus } from "@/lib/tasks/status-text";
 import type { BoardTask } from "./board";
+import { attentionOf } from "@/lib/tasks/attention";
+
 import { alarmOf } from "./mood";
 
 /** 2026-09-11 09:30 Aqtobe (UTC+5) — тот же час, что и в board.test.ts */
@@ -98,5 +100,22 @@ describe("alarmOf", () => {
     expect(alarmOf([talking, stale, soon], NOW, ME)).toBe("deadline");
     expect(alarmOf([talking, stale], NOW, ME)).toBe("unaccepted");
     expect(alarmOf([talking], NOW, ME)).toBe("unread");
+  });
+
+  it("D-194: уведомления исполнителю не доходят — тревога сразу, без получаса ожидания", () => {
+    const fresh = row("sent");
+    expect(alarmOf([fresh], NOW, ME)).toBeNull();
+    expect(alarmOf([fresh], NOW, ME, new Set(["u-1"]))).toBe("unaccepted");
+    // у принятой задачи канал уже не тревога: человек о ней знает
+    expect(alarmOf([row("accepted")], NOW, ME, new Set(["u-1"]))).toBeNull();
+  });
+
+  it("D-194: тревога Пульса и вердикт «Задач» — одно правило", () => {
+    const stale = row("sent", { created_at: "2026-09-11T03:00:00Z" });
+    const fresh = row("sent");
+    for (const rows of [[stale], [fresh], [stale, fresh], [row("accepted", { deadline: "2026-09-11T05:00:00Z" })]]) {
+      const verdict = attentionOf(rows, { now: NOW });
+      expect(alarmOf(rows, NOW, ME) !== null).toBe(!verdict.ok);
+    }
   });
 });

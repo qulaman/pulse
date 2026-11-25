@@ -50,6 +50,7 @@ export default function CalendarPage() {
       meId={me.data?.userId ?? ""}
       isDirector={isDirector}
       upcoming={ahead}
+      upcomingReady={upcoming.data !== undefined}
       events={events}
       loading={month.isLoading}
       openId={openId}

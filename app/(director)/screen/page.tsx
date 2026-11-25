@@ -94,7 +94,7 @@ const SCENE_HINT: Record<TvScene, string> = {
   calendar: "Неделя вперёд: что запланировано",
   board: "Пункты директора — до 21:00",
   rating: "Пятёрка лучших, рост и награды",
-  photos: "Фото из отчётов по сданным делам",
+  photos: "Фото из отчётов по сданным задачам",
 };
 
 /** The order on the wall has a name on the remote's display (D-123); the director reads tasks. */
@@ -219,7 +219,7 @@ export default function ScreenPage() {
             <>
               <p className="mt-2 font-display text-[19px] font-bold leading-6 tracking-[-0.02em]">Ещё не подключался</p>
               <LcdDim className="mt-1 block text-[13px] leading-[18px]">
-                Войди на телевизоре под пользователем роли «ТВ-экран» — и он появится здесь
+                Откройте Pulse на телевизоре и подключите его кнопкой «Подключить экран» ниже — он появится здесь
               </LcdDim>
             </>
           ) : (
@@ -400,7 +400,7 @@ export default function ScreenPage() {
             {/* two lines always: «По кругу» spells out the round on two, and the seams below do not jump */}
             <p className="mt-1 min-h-[36px] px-1 text-center text-[13px] leading-[18px] text-muted">
               {covered
-                ? `Поверх заставки — ${mode === "task" ? "дело" : "человек"} · тап по заставке покажет её сразу`
+                ? `Поверх заставки — ${mode === "task" ? "задача" : "человек"} · тап по заставке покажет её сразу`
                 : round
                   ? `${carouselScenes(roundPoints, week, guest).map((value) => SCENE_LABEL[value].toLowerCase()).join(" → ")} · дальше — ${SCENE_LABEL[next.scene].toLowerCase()} в ${tvTime(next.at)}`
                   : SCENE_HINT[scene]}
@@ -556,7 +556,7 @@ export default function ScreenPage() {
           </div>
         ) : (
           <p className="text-[16px] leading-[22px] text-muted">
-            Экрана нет среди сотрудников: «Настройки» → «Сотрудники» → «Новый сотрудник», роль «ТВ-экран». Потом — сюда.
+            Экрана нет среди сотрудников: «Команда» → «Добавить сотрудника», роль «ТВ-экран». Потом — сюда.
           </p>
         )}
       </Sheet>

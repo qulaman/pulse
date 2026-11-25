@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { answersFor, questionKind, wantsWords } from "./answers";
+import { answersFor, questionKind, quickQuestionsFor, wantsWords } from "./answers";
 
 // 2026-10-21 10:00 Aqtobe (UTC+5)
 const MORNING = new Date("2026-10-21T05:00:00Z");
@@ -43,5 +43,15 @@ describe("the director's quick answers fit the question (D-142)", () => {
     expect(labels).toEqual(["Завтра 12:00"]);
     // a deadline already behind is not offered back
     expect(answersFor("Когда срок?", "2026-10-20T07:00:00Z", MORNING).some((a) => a.label.startsWith("Как в задаче"))).toBe(false);
+  });
+});
+
+describe("quickQuestionsFor (D-194)", () => {
+  it("does not ask what the card already says", () => {
+    expect(quickQuestionsFor({ deadline: null, priority: "normal" })).toEqual(["Когда срок?", "Какой формат?", "Где взять данные?", "Это срочно?"]);
+    expect(quickQuestionsFor({ deadline: "2026-09-17T13:00:00Z", priority: "normal" })).toEqual(["Какой формат?", "Где взять данные?", "Это срочно?"]);
+    expect(quickQuestionsFor({ deadline: "2026-09-17T13:00:00Z", priority: "high" })).toEqual(["Какой формат?", "Где взять данные?"]);
+    // «срочно» with no time named: the time is still the open question
+    expect(quickQuestionsFor({ deadline: null, priority: "high" })).toEqual(["Когда срок?", "Какой формат?", "Где взять данные?"]);
   });
 });

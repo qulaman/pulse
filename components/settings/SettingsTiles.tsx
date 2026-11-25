@@ -10,7 +10,7 @@ import { SETTINGS_TABS, type SettingsTab } from "@/lib/settings-tabs";
 export const SETTINGS_TAB_META: Record<SettingsTab, { title: string; short: string; about: string; icon: ReactNode }> = {
   company: { title: "Компания", short: "Компания", about: "название, логотип, часы", icon: <BuildingIcon /> },
   app: { title: "Программа", short: "Программа", about: "модули и секретарь", icon: <AppsIcon /> },
-  team: { title: "Сотрудники", short: "Сотрудники", about: "люди, роли, очки", icon: <PeopleIcon /> },
+  team: { title: "Очки и отчёты", short: "Очки и отчёты", about: "очки, отчёт за день, утренняя сводка", icon: <PeopleIcon /> },
   ai: { title: "ИИ-модель", short: "ИИ", about: "речь, разбор, словарь", icon: <SparkIcon /> },
 };
 

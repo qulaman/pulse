@@ -4,6 +4,7 @@ import { ARCHIVE_STATUSES, type ArchiveStatus } from "@/lib/desk/archive";
 import { formatNum } from "@/lib/desk/format";
 import type { BoardTask } from "@/lib/pulse/board";
 import { isWaiting, receiptText, type DeskAction, type DeskReason } from "@/lib/tasks/desk";
+import { isStaleUnaccepted, sentAtOf, type AttentionReason } from "@/lib/tasks/attention";
 import { compareTasks, groupTasks } from "@/lib/tasks/grouping";
 import { canNudgeAgain, isWorking, untilWords, WORKING } from "@/lib/tasks/lifecycle";
 import {
@@ -138,7 +139,7 @@ export const DESK_STATUS_LABEL: Record<TaskStatus, string> = {
   sent: "Не принята",
   accepted: "В работе",
   in_progress: "В работе",
-  pending_review: "На приёмке",
+  pending_review: "На проверке",
   done: "Готово",
   rework: "На доработке",
   declined: "Отказ",
@@ -175,7 +176,7 @@ export function archiveStatusOf(status: StatusFilter | null): ArchiveStatus | nu
 export type Line = { text: string; tone?: Tone };
 
 /**
- * «Стадия» in one word and the colour of its dot: the director's move by its name (на приёмке,
+ * «Стадия» in one word and the colour of its dot: the director's move by its name (на проверке,
  * отказ, просрочена — the card's own words), else the stage as the director reads it.
  */
 export function stageOf(task: Dated & { scheduled_send_at?: string | null; passed_to?: string | null }, reason: DeskReason | null, now: Date = new Date()): Required<Line> {
@@ -381,7 +382,7 @@ const STAGES: { key: string; title: string; statuses: readonly TaskStatus[]; ton
   { key: "stage-sent", title: "Не приняты", statuses: ["sent"], tone: "accent" },
   { key: "stage-work", title: "В работе", statuses: ["accepted", "in_progress"], tone: "ok" },
   { key: "stage-rework", title: "На доработке", statuses: ["rework"], tone: "warn" },
-  { key: "stage-review", title: "На приёмке", statuses: ["pending_review"], tone: "warn" },
+  { key: "stage-review", title: "На проверке", statuses: ["pending_review"], tone: "warn" },
   { key: "stage-scheduled", title: "Отложены", statuses: ["scheduled"], tone: "muted" },
 ];
 
@@ -464,7 +465,7 @@ export function tableSections<T extends Grouped>(
     }));
   }
   if (mode === "reason") return stageSections(tasks);
-  return workingSections(tasks, now, { reviewTitle: "На приёмке" });
+  return workingSections(tasks, now, { reviewTitle: "На проверке" });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -627,14 +628,14 @@ type Waiting = Pick<
 
 /**
  * The headline of «Разобрать»: how long the director's move has waited — «Просрочена на 7 дней»,
- * «Сдана 40 мин назад — ждёт приёмки». The words themselves (the question, the refusal, the
+ * «Сдана 40 мин назад — ждёт проверки». The words themselves (the question, the refusal, the
  * request) stand in the card under it. The task's gender, never the person's.
  */
 export function reasonHeadline(reason: DeskReason, task: Waiting & { closed_at: string | null; updated_at: string }, now: Date = new Date()): string {
   switch (reason) {
     case "review": {
       const verdict = handInVerdict({ status: "pending_review", deadline: task.deadline, completed_at: task.completed_at });
-      return task.completed_at ? `Сдана ${since(task.completed_at, now)} назад${verdict ? ` · ${verdict.text}` : ""} — ждёт приёмки` : "Сдана — ждёт приёмки";
+      return task.completed_at ? `Сдана ${since(task.completed_at, now)} назад${verdict ? ` · ${verdict.text}` : ""} — ждёт проверки` : "Сдана — ждёт проверки";
     }
     case "question":
       return task.question_at ? `Вопрос ждёт ответа ${since(task.question_at, now)}` : "Вопрос ждёт ответа";
@@ -687,6 +688,29 @@ export function decisionParts(reason: DeskReason, task: Waiting, now: Date = new
 }
 
 /** The same line as plain words. */
+/**
+ * The grey line of a task that needs the director without waiting for his decision (lib/tasks/attention.ts):
+ * «Сегодня» lists them under «Требует внимания» (D-194) — how long it has lain untaken, that a
+ * push will not reach its holder, how soon the deadline is. The decisions and the late ones say their
+ * own lines (`decisionLine`): null here.
+ */
+export function attentionLine(
+  reason: AttentionReason,
+  task: { created_at: string; scheduled_send_at?: string | null; deadline: string | null },
+  now: Date = new Date(),
+): string | null {
+  switch (reason) {
+    case "unaccepted":
+      return `не принята с ${humanAqtobe(new Date(sentAtOf(task)), now).replace(/^сегодня /, "")}`;
+    case "no_push":
+      return "уведомления не доходят — позвоните";
+    case "soon":
+      return task.deadline ? `срок ${humanAqtobe(new Date(task.deadline), now).replace(/^сегодня /, "в ")}` : null;
+    default:
+      return null;
+  }
+}
+
 export function decisionLine(reason: DeskReason, task: Waiting, now: Date = new Date()): string {
   return decisionParts(reason, task, now)
     .map((part) => part.text)
@@ -746,19 +770,21 @@ export type PersonNow = {
   rank: number;
 };
 
-type OpenTask = { id: string; title: string; deadline: string | null; status: TaskStatus };
+type OpenTask = { id: string; title: string; deadline: string | null; status: TaskStatus; created_at?: string; scheduled_send_at?: string | null };
 
 const byDeadline = (a: OpenTask, b: OpenTask) => (a.deadline ?? "9").localeCompare(b.deadline ?? "9");
 
 /**
  * One person of «Команда сейчас»: away — why, late — how many and the first title, the director's
- * move — which, a deadline within a day — when, in work — how much, nothing — «свободен».
+ * move — which, a deadline within a day — when, in work — how much (the taken ones only), given and
+ * not taken — how many and the first title (amber after half an hour, never green: D-194),
+ * nothing — «дел нет».
  * `tasks` — the director's own open tasks of the person (for the titles); the counts are the
  * company's load, the same as the team's circles on the phone (D-118).
  */
 export function personNow(
   person: { availability: string },
-  load: { active: number; overdue: number; nearest: string | null } | undefined,
+  load: { active: number; overdue: number; nearest: string | null; waiting?: number; review?: number } | undefined,
   color: LoadColorName,
   tasks: readonly OpenTask[],
   reasons: ReadonlyMap<string, DeskReason>,
@@ -781,10 +807,26 @@ export function personNow(
     const soon = tasks.find((task) => task.deadline === load.nearest);
     return { ring: "warn", line: `срок ${at(load.nearest, now)}${titled(soon)}`, rank: 2 };
   }
+  // given and not taken: counted apart from the work in hand, by the company's load or the director's own rows
+  const untaken = tasks.filter((task) => task.status === "sent");
+  const waiting = Math.max(load?.waiting ?? 0, untaken.length);
+  const notTaken = waiting > 0 ? `${waiting} не ${pluralRu(waiting, ["принята", "приняты", "приняты"])}` : "";
   if (color === "green" && load) {
-    return { ring: null, line: `${load.active} в работе${load.nearest ? ` · срок ${at(load.nearest, now)}` : ""}`, rank: 3 };
+    // «в работе» is what is in hand: neither the untaken nor what is handed in and waits on the director
+    const review = load.review ?? 0;
+    const taken = Math.max(0, load.active - (load.waiting ?? 0) - review);
+    const parts = [
+      taken > 0 ? `${taken} в работе` : "",
+      review > 0 ? `${review} на проверке` : "",
+      notTaken,
+    ].filter(Boolean);
+    return { ring: null, line: `${parts.join(" · ")}${load.nearest ? ` · срок ${at(load.nearest, now)}` : ""}`, rank: 3 };
   }
-  return { ring: null, line: "свободен", rank: 4 };
+  if (waiting > 0) {
+    const stale = untaken.some((task) => task.created_at !== undefined && isStaleUnaccepted({ status: task.status, created_at: task.created_at, scheduled_send_at: task.scheduled_send_at }, now));
+    return { ring: stale ? "warn" : null, line: `${notTaken}${titled(untaken[0])}`, rank: 3 };
+  }
+  return { ring: null, line: "дел нет", rank: 4 };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -802,13 +844,13 @@ export const ACT_LABEL: Record<DeskAction, string> = {
   insist: "Настоять",
   reassign: "Передать…",
   cancel: "Отменить задачу…",
-  extend: "Изменить срок…",
+  extend: "Срок…",
   revoke: "Отозвать…",
   sendNow: "Отправить сейчас",
   open: "Открыть",
-  remove: "Удалить насовсем…",
+  remove: "Удалить…",
   grant: "Согласовать срок",
-  retime: "Назначить другой срок…",
+  retime: "Другой срок…",
   keep: "Оставить прежний срок",
   handoff: "Передать предложенному",
   nudge: "Напомнить",
@@ -881,17 +923,21 @@ export function fitColumn(texts: readonly string[], { min, max, extra = 24, perC
 
 /**
  * The table's columns by the width the list really has — the panel takes it from the window, a
- * person can drag it wider still. The title never gives way: below each floor a column that only
- * repeats something leaves first — the waiting words (the panel and the stage say them), the
- * receipt (the panel's), the stage (the ring at the title says it), the tick (X and Ctrl-click
- * still mark), the person and, on the very narrowest list, the deadline.
+ * person can drag it wider still. The title and the person never give way — a list of tasks
+ * without who has them says nothing (D-194): below each floor a column that only repeats
+ * something leaves first — the waiting words (the panel and the stage say them), the receipt (the
+ * panel's), the stage (the ring at the title says it), the tick (X and Ctrl-click still mark) and,
+ * on the very narrowest list, the deadline. `who` at 0: it fits every width, a narrow one tighter.
  */
-export const COLUMN_FLOOR = { last: 960, delivery: 760, stage: 640, pick: 500, who: 440, due: 340 } as const;
+export const COLUMN_FLOOR = { last: 960, delivery: 760, stage: 640, pick: 500, due: 340, who: 0 } as const;
+
+/** Under this list width the person's column keeps to the face and a short first name. */
+export const WHO_TIGHT = 440;
 
 export type TableColumn = keyof typeof COLUMN_FLOOR;
 
 /** The width buckets the table is redrawn at: dragging the panel between two of them costs no render. */
-export const COLUMN_FLOORS: readonly number[] = Object.values(COLUMN_FLOOR).sort((a, b) => b - a);
+export const COLUMN_FLOORS: readonly number[] = [...new Set<number>([...Object.values(COLUMN_FLOOR), WHO_TIGHT])].sort((a, b) => b - a);
 
 /** The bucket a width falls in — the highest floor it reaches, 0 under all of them. */
 export function widthBucket(width: number): number {
@@ -900,6 +946,11 @@ export function widthBucket(width: number): number {
 
 export function columnFits(column: TableColumn, bucket: number): boolean {
   return bucket >= COLUMN_FLOOR[column];
+}
+
+/** The person's column at its tight width: the list is narrower than `WHO_TIGHT`. */
+export function whoTight(bucket: number): boolean {
+  return bucket < WHO_TIGHT;
 }
 
 /** The next row under the cursor of a list (J/K): stays at the ends, the first one when none is held. */
