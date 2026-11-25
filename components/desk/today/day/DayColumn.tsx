@@ -21,29 +21,30 @@ const BAND = {
 } as const;
 
 /**
- * The right side of «Сегодня» (D-196): «Сейчас» on top, the quiet strip, the day's figures, then
- * two stacks fixed in code — «Вам» and the company's «Лента дня». Data never moves a block to the
- * other stack: a block that grows pushes only its own neighbours down. One column under a
- * 1560-px container, the same order (app/desk/today.css). The first showing in a tab plays one
- * wave; three minutes without a hand put what rings for ever to sleep.
+ * «Сегодня» as one column (D-196): every card of the screen one under another, centred, of one
+ * width — the moment, the quiet strip, «Сейчас», then the cards in the screen's order (TodayScreen).
+ * Data never reorders the cards: a card that grows pushes the ones under it down. The first showing
+ * in a tab plays one wave down the column; three minutes without a hand put what rings for ever to
+ * sleep (app/desk/today.css).
  */
-export function DaySide({
-  band,
+export function DayColumn({
+  head,
   quiet,
-  figures,
-  you,
-  company,
+  band,
+  children,
 }: {
-  band: readonly { key: string; node: ReactNode }[];
+  /** the moment (or the launch, or the queue's failure): the column's first card */
+  head: ReactNode;
   quiet: readonly QuietItem[];
-  figures: readonly ReactNode[];
-  you: readonly ReactNode[];
-  company: ReactNode;
+  band: readonly { key: string; node: ReactNode }[];
+  children: ReactNode;
 }) {
   const arrive = useFirstArrival();
   const asleep = useDeepRest();
   return (
     <div className="day-side" data-arrive={arrive ? "" : undefined} data-asleep={asleep ? "" : undefined} data-testid="today-day">
+      {head}
+      <QuietStrip items={quiet} />
       <div className="day-now">
         <AnimatePresence initial={false}>
           {band.map((item) => (
@@ -53,16 +54,7 @@ export function DaySide({
           ))}
         </AnimatePresence>
       </div>
-      <QuietStrip items={quiet} />
-      {figures.length > 0 ? <div className="day-figures">{figures}</div> : null}
-      <div className="day-stacks">
-        <div className="day-stack" data-stack="you">
-          {you}
-        </div>
-        <div className="day-stack" data-stack="company">
-          {company}
-        </div>
-      </div>
+      {children}
     </div>
   );
 }

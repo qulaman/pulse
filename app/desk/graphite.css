@@ -962,6 +962,7 @@
       [data-testid="today-decisions"],
       [data-testid="today-overdue"],
       [data-testid="today-just-sent"],
+      [data-testid="today-attention"],
       [data-testid="today-team"]
     ) {
     padding: 14px 16px 12px;
@@ -978,6 +979,7 @@
     :is(
       [data-testid="today-decisions"],
       [data-testid="today-overdue"],
+      [data-testid="today-attention"],
       [data-testid="today-team"]
     )
     [data-testid="desk-empty"] {

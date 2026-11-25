@@ -55,6 +55,10 @@ async function checkToday(ctx: Ctx) {
   const tiles = await page.locator("#desk-main .day-tile").count();
   record("сегодня: у карточек правой стороны — значки", tiles >= 2, `значков ${tiles}`);
   record("сегодня: «Эфир» — внутри «Ленты дня», не отдельным блоком", (await page.getByTestId("home-ether").count()) === 0);
+  // one column (D-196): the cards stand one under another, of one width, their edges on one line
+  const boxes = (await Promise.all(["today-team", "today-feed", "home-secretary"].map((id) => page.getByTestId(id).first().boundingBox().catch(() => null)))).filter((box) => box !== null);
+  const aligned = boxes.length >= 2 && boxes.every((box) => Math.abs(box.x - boxes[0]!.x) <= 1 && Math.abs(box.width - boxes[0]!.width) <= 1);
+  record("сегодня: карточки — одной колонкой одной ширины", aligned, boxes.map((box) => `${Math.round(box.x)}+${Math.round(box.width)}`).join(", "));
   const decisions = await page.getByTestId("today-decision").count();
   const entry = await page.getByTestId("desk-inbox-entry").count();
   record("сегодня: «Разобрать по одной» — только когда есть что разбирать", decisions > 0 ? entry === 1 : true, `решений ${decisions}, кнопка ${entry}`);

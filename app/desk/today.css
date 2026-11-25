@@ -1,9 +1,9 @@
 /* ==========================================================================================
-   «Сегодня», the right side (D-196): the day around the director, drawn over «Графит»
-   (graphite.css) in both themes — components/desk/today/day/*.
-   - «Сейчас» on top (the door, a meeting on or within half an hour), lit from its corner by its ink;
-     the blocks with nothing to say as one strip of capsules; the day's figures as tiles with one big
-     number; «Вам» (messages, meetings and deadlines, the secretary's keypad) beside «Лента дня».
+   «Сегодня» (D-196): every card of the screen in one column, drawn over «Графит» (graphite.css)
+   in both themes — components/desk/today/day/*.
+   - «Сейчас» near the top (the door, a meeting on or within half an hour), lit from its corner by
+     its ink; the blocks with nothing to say as one strip of capsules; the day's figures as tiles with
+     one big number; the secretary's keypad, the people, «Лента дня» — all of one width.
    - Colour means «something is in the block»: a card's plate wears its ink, a capsule stays quiet.
    - Motion by transform and opacity; a row's height only once, as it comes and as it goes. Nothing
      loops where nothing happens: a state is a still dot, news rings three times, only what waits for
@@ -15,20 +15,22 @@
   --day-in: cubic-bezier(0.4, 0, 1, 1);
   --day-pop: cubic-bezier(0.34, 1.4, 0.64, 1);
 
-  /* ---- the side: «Сейчас», the strip, the figures, two stacks (D-196) ----------------------
-     One column under a 1560-px container: Вам → Цифры дня → Лента дня. From 1560: the figures a row
-     over both stacks, «Вам» and «Лента дня» side by side, each stack keeping its own blocks. */
+  /* ---- the column: every card of «Сегодня» one under another, of one width (D-196) ----------- */
   .day-side {
     display: flex;
     min-width: 0;
     flex-direction: column;
-    gap: 14px;
+    gap: 16px;
   }
+  /* «Сейчас»: two cards side by side, each its own height; none — no room taken */
   .day-now {
     display: grid;
     align-items: start;
-    gap: 14px;
+    gap: 16px;
 
+    &:has(> :nth-child(2)) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
     &:empty {
       display: none;
     }
@@ -38,39 +40,6 @@
     overflow: clip;
     overflow-clip-margin: 24px;
   }
-  .day-stacks {
-    display: contents;
-  }
-  .day-stack {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: 14px;
-  }
-  .day-stack[data-stack="you"] {
-    order: 1;
-  }
-  .day-figures {
-    order: 2;
-  }
-  .day-stack[data-stack="company"] {
-    order: 3;
-  }
-  @container (min-width: 1560px) {
-    .day-now:has(> :nth-child(2)) {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .day-figures {
-      order: 1;
-    }
-    .day-stacks {
-      display: grid;
-      order: 3;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      align-items: start;
-      gap: 14px;
-    }
-  }
 
   /* ---- a card ----------------------------------------------------------------------------- */
   .day-card {
@@ -79,7 +48,7 @@
     display: flex;
     min-width: 0;
     flex-direction: column;
-    padding: 12px 14px 10px;
+    padding: 14px 16px 12px;
     border-radius: 14px;
     background: var(--raise);
     box-shadow: var(--shadow-card);
@@ -521,10 +490,15 @@
   }
 
   /* ---- the secretary's keypad ----------------------------------------------------------- */
+  /* keys of one size in full rows: three to a row in the column, two where it is narrow */
   .day-pad {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
+
+    @container (max-width: 560px) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
   .day-key {
     position: relative;
@@ -792,7 +766,7 @@
   .day-figures {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 14px;
+    gap: 16px;
   }
   .day-figure {
     display: inline-flex;
@@ -999,11 +973,24 @@
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 18%, transparent);
   }
 
-  /* ---- the first showing: one wave down each stack, the plates do not spin ----------------- */
-  .day-side[data-arrive] .day-card,
-  .day-side[data-arrive] .day-cap {
+  /* ---- the first showing in a tab: one wave down the column, card by card; nothing spins ----- */
+  .day-side[data-arrive] > * {
     animation: day-card-in 260ms var(--day-snap) both;
-    animation-delay: calc(min(var(--card-i, 0), 5) * 40ms);
+  }
+  .day-side[data-arrive] > :nth-child(2) {
+    animation-delay: 35ms;
+  }
+  .day-side[data-arrive] > :nth-child(3) {
+    animation-delay: 70ms;
+  }
+  .day-side[data-arrive] > :nth-child(4) {
+    animation-delay: 105ms;
+  }
+  .day-side[data-arrive] > :nth-child(5) {
+    animation-delay: 140ms;
+  }
+  .day-side[data-arrive] > :nth-child(n + 6) {
+    animation-delay: 175ms;
   }
 }
 

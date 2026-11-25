@@ -67,7 +67,7 @@ import { DayFeed } from "./day/DayFeed";
 import { ReportsFailedTile, ReportsTile, WeekTile } from "./day/DayFigures";
 import { DayMessages } from "./day/DayMessages";
 import { DayPult } from "./day/DayPult";
-import { DaySide } from "./day/DaySide";
+import { DayColumn } from "./day/DayColumn";
 import { Card, Head } from "./day/kit";
 import { DoorCard, MeetingCard, meetingNow } from "./day/NowBand";
 import type { QuietItem } from "./day/QuietStrip";
@@ -89,13 +89,11 @@ const DISPUTES_HREF = "/desk/settings/points?view=disputes";
 const ORDERS_HREF = "/desk/settings/points?view=shop";
 
 /**
- * The grid of the day: the director's work on the left, the day around it on the right — one
- * column under the other once the panel takes the room (a container query, not the window's). A
- * wide screen (1920) gives the day up to 760 px — never wider than the work beside it — and the
- * side lays its blocks in two stacks of its own there (app/desk/today.css, D-196).
+ * «Сегодня» is one column (D-196): every card one under another, centred, of one width, the same
+ * margins on both sides — the work first, then the day around it. The column narrows with the panel
+ * open; its cards keep their order whatever the data does.
  */
-const LAYOUT =
-  "grid items-start gap-y-6 @min-[960px]:grid-cols-[minmax(0,1fr)_288px] @min-[960px]:gap-x-8 @min-[1100px]:grid-cols-[minmax(0,1fr)_340px] @min-[1500px]:grid-cols-[minmax(0,1fr)_420px] @min-[1560px]:grid-cols-[minmax(0,1fr)_minmax(0,760px)]";
+const COLUMN = "mx-auto flex w-full min-w-0 max-w-[880px] flex-col gap-[18px]";
 
 /** One block of the frame: its label, the rule of ink, rows of the block's own height. */
 function BlockBone({ rows, height, label = "34%", wide = "64%" }: { rows: number; height: number; label?: string; wide?: string }) {
@@ -115,49 +113,36 @@ function BlockBone({ rows, height, label = "34%", wide = "64%" }: { rows: number
   );
 }
 
-/** The frame while the first data lands: the head, the moment, the two columns. */
+/** The frame while the first data lands: the head, the moment, the column's first cards (D-122). */
 export function TodaySkeleton() {
   return (
     <DeskPage>
-      {/* the date line's room is kept: the head does not move when the day lands */}
-      <PageTitle title="Сегодня" state={{ text: "\u00a0" }} />
-      <SkeletonGroup className="flex flex-col gap-3.5" grow>
-        <div className="flex h-11 items-center gap-4">
-          <Bone h={36} w={32} />
-          <Bone h={18} w={240} />
-        </div>
-        <div className="@container">
-          <div className={LAYOUT}>
-            <div className="flex min-w-0 flex-col gap-6">
-              <BlockBone rows={4} height={47} />
-              <div className="flex flex-col gap-1">
-                <div className="flex h-6 items-center">
-                  <Bone h={12} w="22%" />
-                </div>
-                <PeopleBone />
-              </div>
-            </div>
-            <div className="day-side">
-              <div className="flex h-[30px] items-center gap-2">
-                <Bone h={30} w={140} />
-                <Bone h={30} w={210} />
-              </div>
-              <div className="day-figures">
-                <BlockBone rows={2} height={35} label="40%" wide="60%" />
-                <BlockBone rows={2} height={35} label="40%" wide="70%" />
-              </div>
-              <div className="day-stacks">
-                <div className="day-stack" data-stack="you">
-                  <BlockBone rows={4} height={42} label="30%" wide="84%" />
-                </div>
-                <div className="day-stack" data-stack="company">
-                  <BlockBone rows={4} height={35} label="34%" wide="84%" />
-                </div>
-              </div>
-            </div>
+      <div className={COLUMN}>
+        {/* the date line's room is kept: the head does not move when the day lands */}
+        <PageTitle title="Сегодня" state={{ text: " " }} />
+        <SkeletonGroup className="day-side" grow>
+          <div className="flex h-11 items-center gap-4">
+            <Bone h={36} w={32} />
+            <Bone h={18} w={240} />
           </div>
-        </div>
-      </SkeletonGroup>
+          <div className="flex h-[30px] items-center gap-2">
+            <Bone h={30} w={140} />
+            <Bone h={30} w={210} />
+          </div>
+          <BlockBone rows={4} height={47} />
+          <div className="day-figures">
+            <BlockBone rows={2} height={35} label="40%" wide="60%" />
+            <BlockBone rows={2} height={35} label="40%" wide="70%" />
+          </div>
+          <BlockBone rows={4} height={42} label="22%" wide="84%" />
+          <div className="flex flex-col gap-1">
+            <div className="flex h-6 items-center">
+              <Bone h={12} w="22%" />
+            </div>
+            <PeopleBone />
+          </div>
+        </SkeletonGroup>
+      </div>
     </DeskPage>
   );
 }
@@ -660,10 +645,11 @@ function TodayView({
     );
   } else if (pointsEnabled && leaders.length > 0) figures.push(<WeekTile key="rating" rows={rating.data ?? []} index={1} />);
 
-  const you: ReactNode[] = [];
-  if (words.length > 0) you.push(<DayMessages key="messages" me={me} messages={words} now={now} onOpenTask={openTask} index={you.length} />);
+  // the day's own words and hours: cards only when they have something (else capsules above)
+  const yours: ReactNode[] = [];
+  if (words.length > 0) yours.push(<DayMessages key="messages" me={me} messages={words} now={now} onOpenTask={openTask} index={0} />);
   if (!calendarKnown || !agendaEmpty) {
-    you.push(
+    yours.push(
       <DayAgenda
         key="agenda"
         events={agendaEvents}
@@ -672,43 +658,41 @@ function TodayView({
         onOpenTask={openTask}
         now={now}
         note={calendarLoad.kind === "loading" ? <RowsBone rows={2} /> : noteOf(calendarLoad, "Встречи не загрузились", () => void calendar.refetch())}
-        index={you.length}
+        index={0}
       />,
     );
   }
-  if (!noSecretary) you.push(<DayPult key="secretary" me={me} index={you.length} />);
+
+  const head = boardDown ? (
+    <LoadFailure what="очередь решений" offline={boardLoad.offline} busy={busy} onRetry={onRetry} />
+  ) : launch.state === "on" ? (
+    <LaunchChecklist people={people.data ?? []} health={health.data} healthKnown={!health.isPending} onHide={launch.hide} />
+  ) : launch.state === "checking" ? (
+    <LaunchBone />
+  ) : (
+    <MomentBar
+      screen={moment}
+      detail={extrasLine ?? (calm ? (brief ?? DESK_NEW_TASK) : undefined)}
+      counters={counters}
+      queue={queue.length}
+      enterKey
+      act={momentAct(screen, screen.focus ? boardById.get(screen.focus) : undefined, now, {
+        press: (action, task) => acts.press(action, task),
+        open: openRow,
+      }, screen.focus ? reach.phoneOf(boardById.get(screen.focus)?.assignee_id ?? "") : null)}
+    />
+  );
 
   return (
     <DeskPage>
-      <PageTitle
-        title="Сегодня"
-        state={{ text: `${dateLine(now)} · ${greeting(now, firstName)}` }}
-        actions={load.kind === "stale" ? <LoadNote state={load} failed="" now={now} onRetry={onRetry} /> : undefined}
-      />
-
-      {boardDown ? (
-        <LoadFailure what="очередь решений" offline={boardLoad.offline} busy={busy} onRetry={onRetry} />
-      ) : launch.state === "on" ? (
-        <LaunchChecklist people={people.data ?? []} health={health.data} healthKnown={!health.isPending} onHide={launch.hide} />
-      ) : launch.state === "checking" ? (
-        <LaunchBone />
-      ) : (
-        <MomentBar
-          screen={moment}
-          detail={extrasLine ?? (calm ? (brief ?? DESK_NEW_TASK) : undefined)}
-          counters={counters}
-          queue={queue.length}
-          enterKey
-          act={momentAct(screen, screen.focus ? boardById.get(screen.focus) : undefined, now, {
-            press: (action, task) => acts.press(action, task),
-            open: openRow,
-          }, screen.focus ? reach.phoneOf(boardById.get(screen.focus)?.assignee_id ?? "") : null)}
+      <div className={COLUMN}>
+        <PageTitle
+          title="Сегодня"
+          state={{ text: `${dateLine(now)} · ${greeting(now, firstName)}` }}
+          actions={load.kind === "stale" ? <LoadNote state={load} failed="" now={now} onRetry={onRetry} /> : undefined}
         />
-      )}
-
-      <div className="@container">
-        <div className={LAYOUT}>
-          <div className="flex min-w-0 flex-col gap-6">
+        <div className="@container">
+          <DayColumn head={head} quiet={quiet} band={band}>
             <JustSent tasks={justSent} now={now} onOpen={openTask} openId={openId} />
             <Decisions
               items={decisions}
@@ -761,6 +745,9 @@ function TodayView({
               now={now}
               drafts={drafts}
             />
+            {yours}
+            {figures.length > 0 ? <div className="day-figures">{figures}</div> : null}
+            {noSecretary ? null : <DayPult me={me} index={0} />}
             <PeopleNow
               rows={teamRows}
               loading={peopleLoad.kind === "loading"}
@@ -792,27 +779,18 @@ function TodayView({
                 ) : null
               }
             />
-          </div>
-
-          <DaySide
-            band={band}
-            quiet={quiet}
-            figures={figures}
-            you={you}
-            company={
-              <DayFeed
-                events={feed.data ?? []}
-                loading={feedLoad.kind === "loading"}
-                failed={feedLoad.kind === "failed"}
-                note={noteOf(feedLoad, "Лента не загрузилась", () => void feed.refetch())}
-                now={now}
-                taskOf={taskOfTitle}
-                onOpenTask={openTask}
-                onAnnounce={() => useComposeStore.getState().request("Всем: ")}
-                index={1}
-              />
-            }
-          />
+            <DayFeed
+              events={feed.data ?? []}
+              loading={feedLoad.kind === "loading"}
+              failed={feedLoad.kind === "failed"}
+              note={noteOf(feedLoad, "Лента не загрузилась", () => void feed.refetch())}
+              now={now}
+              taskOf={taskOfTitle}
+              onOpenTask={openTask}
+              onAnnounce={() => useComposeStore.getState().request("Всем: ")}
+              index={0}
+            />
+          </DayColumn>
         </div>
       </div>
 
