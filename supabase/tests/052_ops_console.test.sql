@@ -126,6 +126,10 @@ begin
 end;
 $$;
 
+-- new functions start closed to the client roles (20261124120000_functions_closed_by_default.sql);
+-- the helpers above are called under them too
+grant execute on all functions in schema pg_temp to public;
+
 -- ---------------------------------------------------------------------------
 -- Fixtures: company A and company B; operators outside both
 -- ---------------------------------------------------------------------------

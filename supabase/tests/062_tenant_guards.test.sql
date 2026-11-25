@@ -1,9 +1,10 @@
 -- The company boundary (20261124090000_tenant_guards.sql, principle 6): a signed-in person of
 -- company A cannot move a card into B, put B's people on A's tasks, meetings or errands, call the
 -- internal helpers, list the brand bucket, or ask about B's people; what A does inside A still
--- works. Fixtures are this file's own (two companies): dev data never leans in.
+-- works. New functions start closed (20261124120000_functions_closed_by_default.sql). Fixtures
+-- are this file's own (two companies): dev data never leans in.
 begin;
-select plan(30);
+select plan(36);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures: company A — a director, a manager, an employee; company B — a director, an employee
@@ -219,6 +220,61 @@ select lives_ok(
   'and still edits his own card'
 );
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- 8. New functions start closed (20261124120000_functions_closed_by_default.sql): callable by
+--    the service role only until a migration grants them; what anon may call is a list by name
+-- ---------------------------------------------------------------------------
+-- a function created the way a migration creates one (as postgres, in public)
+create function public.pgtap_closed_probe() returns int language sql as $$ select 1 $$;
+
+select ok(
+  not has_function_privilege('authenticated', 'public.pgtap_closed_probe()', 'execute'),
+  'a new function is closed to a signed-in client'
+);
+select ok(
+  not has_function_privilege('anon', 'public.pgtap_closed_probe()', 'execute'),
+  'and to anon'
+);
+select ok(
+  has_function_privilege('service_role', 'public.pgtap_closed_probe()', 'execute'),
+  'the service role keeps it'
+);
+
+grant execute on function public.pgtap_closed_probe() to authenticated;
+select ok(
+  has_function_privilege('authenticated', 'public.pgtap_closed_probe()', 'execute'),
+  'a migration opens it to people with its own grant'
+);
+
+-- a function postgres creates in `extensions` (an extension installed later) stays open as usual
+create function extensions.pgtap_ext_probe() returns int language sql as $$ select 1 $$;
+select ok(
+  has_function_privilege('authenticated', 'extensions.pgtap_ext_probe()', 'execute'),
+  'an extension''s function in extensions stays callable'
+);
+
+-- everything anon may call, by name: the policy helpers (the policies that name no role call
+-- them for anon too) and pure helpers that read only their arguments
+select is(
+  (select coalesce(string_agg(p.proname, ' ' order by p.proname), '')
+     from pg_proc p
+    where p.pronamespace = 'public'::regnamespace
+      and p.prokind = 'f'
+      and p.prorettype <> 'trigger'::regtype
+      and p.proname <> 'pgtap_closed_probe'
+      and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
+      and has_function_privilege('anon', p.oid, 'execute')
+      and p.proname not in (
+        'auth_company_id', 'auth_role', 'auth_session_live', 'subordinates', 'team_role',
+        'daily_report_checked_on', 'daily_report_clock', 'daily_report_holiday', 'daily_report_on',
+        'daily_report_started_on', 'daily_report_state', 'daily_report_workday',
+        'director_digest_slot', 'director_quiet_until', 'morning_brief_on', 'notify_hhmm',
+        'notify_prefs_defaults', 'points_rule', 'reaction_glyph', 'reaction_points', 'ru_plural',
+        'tv_board_cap', 'tv_stage', 'tv_week_end'
+      )),
+  '', 'anon can call nothing but the listed helpers'
+);
 
 select * from finish();
 rollback;

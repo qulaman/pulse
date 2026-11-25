@@ -59,7 +59,7 @@
 
 ## 2. pgTAP
 
-`pnpm test:rls` — `supabase test db --linked`: файлы `supabase/tests/` идут в dev-проекте, каждый внутри `begin … rollback`. CLI запускает их в контейнере — нужен Docker Desktop; без него в WORKLOG пишется, что pgTAP не прогнан. Расширение ставит сид.
+`pnpm test:rls` — `supabase test db --linked`: файлы `supabase/tests/` идут в dev-проекте, каждый внутри `begin … rollback`. Новые функции закрыты для клиентских ролей (DATABASE.md, «Гранты функций»): помощник теста в `pg_temp`, который вызывается под `anon` или `authenticated`, открывается строкой `grant execute on all functions in schema pg_temp to public`. CLI запускает их в контейнере — нужен Docker Desktop; без него в WORKLOG пишется, что pgTAP не прогнан. Расширение ставит сид.
 
 Что держит набор (номера файлов):
 
