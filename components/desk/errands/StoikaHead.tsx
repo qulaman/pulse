@@ -4,7 +4,6 @@ import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { Menu, type MenuItem } from "@/components/desk/ui/Menu";
-import { SegmentTabs } from "@/components/desk/ui/Toolbar";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import { useSetAway } from "@/lib/errands/mutations";
@@ -12,12 +11,12 @@ import { useSecretaries, type Errand, type SecretaryPerson } from "@/lib/errands
 import { AWAY_SPANS, awayUntil, isAway, justThanked, untilLine } from "@/lib/errands/scene";
 import { shortName } from "@/lib/people/names";
 
-import { writeParams } from "../tasks/flow";
 import { PersonFace } from "./look";
 import { RingState } from "./Ring";
+import { SecretaryTabs, type SecretaryView } from "./SecretaryTabs";
 
 /*
- * The head of «Стойка» (D-175): «Заявки», «Очередь | История», her presence as a control, and
+ * The head of «Стойка» (D-175, D-197): «Секретарь», the section's four tabs, her presence as a control, and
  * whether this computer rings (RingState, the signals' hand). Under it, only while she is away, a
  * band that says so with «Я на месте».
  */
@@ -95,21 +94,13 @@ function PresencePill({ meId, people, now }: { meId: string; people: readonly Se
   );
 }
 
-/** The page's head: the title, the two views, the presence, whether this computer rings. */
-export function StoikaHead({ meId, history, count, now, settled }: { meId: string; history: boolean; count: number; now: Date; settled: boolean }) {
+/** The page's head: the title, the section's tabs, the presence, whether this computer rings. */
+export function StoikaHead({ meId, view, count, now, settled }: { meId: string; view: SecretaryView; count: number; now: Date; settled: boolean }) {
   const secretaries = useSecretaries();
   return (
     <div className="stoika-head desk-page-title" data-testid="stoika-head">
-      <h1 className="font-display text-[28px] font-bold leading-[34px] tracking-[-0.025em]">Заявки</h1>
-      <SegmentTabs<"queue" | "history">
-        aria-label="Вид"
-        value={history ? "history" : "queue"}
-        onChange={(view) => writeParams(view === "history" ? { view: "history" } : { view: null, from: null, to: null }, { type: "desk-switch" })}
-        items={[
-          { value: "queue", label: "Очередь", count: count > 0 ? count : undefined },
-          { value: "history", label: "История" },
-        ]}
-      />
+      <h1 className="font-display text-[28px] font-bold leading-[34px] tracking-[-0.025em]">Секретарь</h1>
+      <SecretaryTabs view={view} count={count} />
       <span className="flex-1" />
       <RingState />
       {/* drawn as the server drew it until the page has hydrated: «На месте» is not known before */}

@@ -11,7 +11,7 @@ import { chordHref } from "@/lib/desk/routes";
 const CHORD_MS = 1500;
 
 /** The part of the Navigation API used here; a browser without it simply is not asked. */
-type NavigateEvent = Event & { navigationType: string; cancelable: boolean; destination: { key: string } };
+type NavigateEvent = Event & { navigationType: string; cancelable: boolean; destination: { key: string; url?: string } };
 type TabNavigation = EventTarget & { traverseTo: (key: string) => unknown };
 
 /**
@@ -23,13 +23,16 @@ type TabNavigation = EventTarget & { traverseTo: (key: string) => unknown };
  * router's own listener). `router.push` from elsewhere cannot be seen — the palette, the profile
  * menu — and neither can Back where the browser does not let it be cancelled: that way out is
  * caught by the form itself as it unmounts (`keepDraft`). `passed` — the form lets go by itself.
+ * `stays` — an address the form lives on too (another tab of the same screen, D-197): no question.
  */
-export function useLeaveGuard(dirty: boolean, passed: RefObject<boolean>, ask: (go: () => void) => void) {
+export function useLeaveGuard(dirty: boolean, passed: RefObject<boolean>, ask: (go: () => void) => void, stays?: (url: URL) => boolean) {
   const router = useRouter();
   const { role } = useDeskScope();
   const latest = useRef(ask);
+  const latestStays = useRef(stays);
   useLayoutEffect(() => {
     latest.current = ask;
+    latestStays.current = stays;
   });
 
   useEffect(() => {
@@ -43,6 +46,7 @@ export function useLeaveGuard(dirty: boolean, passed: RefObject<boolean>, ask: (
       const url = new URL(link.href);
       if (url.origin !== window.location.origin) return;
       if (url.pathname === window.location.pathname && url.search === window.location.search) return;
+      if (latestStays.current?.(url)) return;
       // before Next's own handler on the root
       event.preventDefault();
       event.stopPropagation();
@@ -76,6 +80,7 @@ export function useLeaveGuard(dirty: boolean, passed: RefObject<boolean>, ask: (
     const onNavigate = (raw: Event) => {
       const event = raw as NavigateEvent;
       if (free() || event.navigationType !== "traverse" || !event.cancelable) return;
+      if (event.destination.url && latestStays.current?.(new URL(event.destination.url))) return;
       event.preventDefault();
       const { key } = event.destination;
       latest.current(() => tab?.traverseTo(key));

@@ -21,7 +21,7 @@ const SECTION_WORDS: Record<string, string> = {
   // the sections' former names still find them: «разобрать» → «Ждут вас», «объявления» → «Эфир»
   "/desk/inbox": "решения входящие разобрать",
   "/desk/team": "люди сотрудники",
-  "/desk/errands": "секретарь приёмная кофе посетитель просьбы",
+  "/desk/errands": "заявки приёмная кофе посетитель просьбы кнопки охрана",
   "/desk/ether": "объявление объявления новости сообщение",
   "/desk/reports": "отчет день",
   "/desk/calendar": "встречи мероприятия",

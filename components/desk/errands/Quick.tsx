@@ -26,8 +26,8 @@ import { ALARM_HOLD_MS, isAlarmAction, isDndAction, useHold, type DeskAsk } from
  * asks.
  */
 
-/** Where the catalogue is set: «Настройки → Программа → Кнопки секретаря». */
-const CATALOGUE_HREF = "/desk/settings?tab=app";
+/** Where the catalogue is set: «Секретарь → Кнопки» (D-197). */
+const CATALOGUE_HREF = "/desk/errands?view=buttons";
 /** The digit keys: 1–7, the first seven keys. */
 const DIGITS = 7;
 
@@ -212,7 +212,7 @@ export function Keypad({ asks, alarmLive }: { asks: DeskAsk; alarmLive: boolean 
         <p className="pult-keypad-note">
           Кнопок у секретаря пока нет —{" "}
           <Link href={CATALOGUE_HREF} prefetch className="text-text underline-offset-2 hover:underline">
-            задать в «Настройках»
+            задать во вкладке «Кнопки»
           </Link>
         </p>
       ) : (

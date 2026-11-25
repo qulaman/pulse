@@ -166,7 +166,7 @@ function SettingsNav({ searchRef }: { searchRef: RefObject<HTMLInputElement | nu
 
   const dirty: Record<SettingsTab, boolean> = {
     company: brand.dirty || !!sections.window,
-    app: !!(sections.secretary || sections.mascot),
+    app: !!sections.mascot,
     team: !!(sections.points || sections.daily_report || sections.morning_brief),
     ai: !!(sections.stt || sections.parser || sections.conventions || sections.voice_retention),
   };

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { SettingsSectionsBone } from "@/components/ui/Skeleton";
@@ -52,7 +52,8 @@ type Draft = {
   /** The conventions as they will be saved: one row per fixed key (task 026). */
   conventions: CompanySettings["conventions"];
   dirty: Record<SectionKey, boolean>;
-  save: (patch: SettingsPatch) => void;
+  /** `onSaved` — once the server has it (a way out that waited for the save, D-197). */
+  save: (patch: SettingsPatch, onSaved?: () => void) => void;
   /** Which section is in flight: the spinner belongs to the button that was pressed. */
   saving: (key: keyof SettingsPatch) => boolean;
 };
@@ -63,11 +64,15 @@ const DraftContext = createContext<Draft | null>(null);
  * The company settings being edited, held above the tabs: a section's unsaved edits live
  * here, not in the section, so switching to another tab and back loses nothing and a tile
  * can show which tab still holds edits. Until the first edit the draft mirrors the server.
+ * `enabled={false}` — a screen that edits only now and then (D-197) reads the settings once it
+ * asks for them; a copy already in the cache is the draft meanwhile.
  */
-export function SettingsDraftProvider({ children }: { children: ReactNode }) {
+export function SettingsDraftProvider({ children, enabled = true }: { children: ReactNode; enabled?: boolean }) {
   const queryClient = useQueryClient();
-  const query = useQuery({ queryKey: settingsKey, queryFn: fetchSettings });
+  const query = useQuery({ queryKey: settingsKey, queryFn: fetchSettings, enabled });
   const [edited, setEdited] = useState<CompanySettings | null>(null);
+  // the draft as it was sent: a saved section still holding exactly that takes the server's copy
+  const sent = useRef<CompanySettings | null>(null);
 
   const save = useMutation({
     mutationFn: patchSettings,
@@ -75,6 +80,21 @@ export function SettingsDraftProvider({ children }: { children: ReactNode }) {
     // left open in other sections survive.
     onSuccess: (settings, patch) => {
       queryClient.setQueryData(settingsKey, settings);
+      // The server keeps a normalised copy — a new button's code filled, an empty row dropped, a
+      // phone trimmed — so the saved sections follow it, or they would stay «не сохранено» for
+      // good. A section edited again while the save was on its way keeps the newer edit.
+      const before = sent.current;
+      setEdited((draft) => {
+        if (!draft || !before) return draft;
+        const next: Record<string, unknown> = { ...draft };
+        // the cache's own copy: it may keep an equal older object, and the draft must match it to the letter
+        const fresh = (queryClient.getQueryData<CompanySettings>(settingsKey) ?? settings) as unknown as Record<string, unknown>;
+        const was = before as unknown as Record<string, unknown>;
+        for (const key of Object.keys(patch)) {
+          if (key in fresh && same(next[key], was[key])) next[key] = fresh[key];
+        }
+        return next as unknown as CompanySettings;
+      });
       // the rating, the team list and the award buttons read the switch on their own
       if (patch.points_enabled !== undefined) void queryClient.invalidateQueries({ queryKey: ["company", "points_enabled"] });
       // the home faces read the holiday switch on their own (D-119)
@@ -118,7 +138,10 @@ export function SettingsDraftProvider({ children }: { children: ReactNode }) {
         morning_brief: draft.morning_brief.enabled !== server.morning_brief.enabled,
         voice_retention: !same(draft.voice_retention, server.voice_retention),
       },
-      save: (patch) => save.mutate(patch),
+      save: (patch, onSaved) => {
+        sent.current = draft;
+        save.mutate(patch, onSaved ? { onSuccess: () => onSaved() } : undefined);
+      },
       saving: (key) => save.isPending && save.variables?.[key] !== undefined,
     };
   }
@@ -131,6 +154,11 @@ export function useDraft(): Draft {
   const draft = useContext(DraftContext);
   if (!draft) throw new Error("useDraft outside SettingsReady");
   return draft;
+}
+
+/** The draft, or null while the settings load — for a screen that draws its own bones meanwhile. */
+export function useOptionalDraft(): Draft | null {
+  return useContext(DraftContext);
 }
 
 /** Which sections hold unsaved edits; nothing is dirty before the settings arrive. */

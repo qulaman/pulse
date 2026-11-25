@@ -134,11 +134,6 @@ html[data-surface="desk"][data-journal] {
     padding: 12px 14px 14px;
   }
 
-  /* the director's buttons as they will stand on his screen */
-  .set-errand-chip {
-    border: 1px solid var(--rule, var(--border));
-  }
-
   /* the save bar's dot is «Графит»'s */
   .set-savebar-dot {
     display: none;
@@ -268,6 +263,11 @@ html[data-surface="desk"][data-journal] {
     margin: 0;
     padding: 18px 20px 14px;
     border-bottom: 1px solid var(--rule-soft);
+  }
+  /* a card with no rows — only where the settings went (D-197): no rule under its head */
+  .set-card[data-bare] .set-card-head {
+    padding-bottom: 18px;
+    border-bottom: 0;
   }
   .set-card-title {
     font-size: 15px;
@@ -584,7 +584,7 @@ html[data-surface="desk"][data-journal] {
     color: var(--ink-3);
   }
 
-  /* the secretary's buttons: a small table of fields, the chips as the director will see them */
+  /* the secretary's buttons (in «Секретарь», D-197) and the words of deadlines: small tables of fields */
   .set-actions-head,
   .set-conventions-head {
     padding-bottom: 6px;
@@ -619,20 +619,6 @@ html[data-surface="desk"][data-journal] {
       scale: 0.9;
       transition-duration: 70ms;
     }
-  }
-  .set-errand-chip {
-    display: inline-flex;
-    height: 30px;
-    align-items: center;
-    gap: 6px;
-    padding: 0 12px;
-    border-radius: 9px;
-    background: var(--surface-2);
-    box-shadow: 0 0 0 1px var(--rule);
-    font-size: 13px;
-    font-weight: 500;
-    line-height: 16px;
-    animation: settings-pop 220ms var(--ease-snap) both;
   }
 
   /* what a reaction pays: two columns of rows */

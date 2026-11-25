@@ -5,7 +5,7 @@ import { commandHint, matchCommands, matchSections, matchTasks, taskLookup } fro
 const sections = [
   { href: "/desk/today", label: "Сегодня" },
   { href: "/desk/tasks", label: "Задачи" },
-  { href: "/desk/errands", label: "Заявки" },
+  { href: "/desk/errands", label: "Секретарь" },
   { href: "/desk/notes", label: "Заметки" },
   { href: "/desk/screen", label: "Экран" },
   { href: "/desk/settings", label: "Настройки" },
@@ -29,13 +29,16 @@ const tasks = [
 
 describe("matchSections", () => {
   it("finds sections by the start of the name", () => {
-    expect(matchSections("за", sections).map((s) => s.href)).toEqual(["/desk/tasks", "/desk/errands", "/desk/notes"]);
+    expect(matchSections("за", sections).map((s) => s.href)).toEqual(["/desk/tasks", "/desk/notes", "/desk/errands"]);
+    expect(matchSections("секр", sections).map((s) => s.href)).toEqual(["/desk/errands"]);
     expect(matchSections("наст", sections).map((s) => s.href)).toEqual(["/desk/settings"]);
   });
 
   it("finds them by their other words", () => {
     expect(matchSections("тв", sections).map((s) => s.href)).toEqual(["/desk/screen"]);
     expect(matchSections("пароль", sections).map((s) => s.href)).toEqual(["/desk/profile"]);
+    // «Секретарь» was «Заявки» (D-197): the old word still finds it
+    expect(matchSections("заявки", sections).map((s) => s.href)).toEqual(["/desk/errands"]);
   });
 
   it("a section's former name still finds it (D-194)", () => {

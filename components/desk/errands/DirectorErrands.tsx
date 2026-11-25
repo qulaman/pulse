@@ -1,14 +1,11 @@
 "use client";
 
-import { History, Radio } from "lucide-react";
 import { useEffect, useMemo, useState, ViewTransition } from "react";
 
-import { useDeskParams } from "@/components/desk/DeskAddress";
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
-import { SegmentTabs } from "@/components/desk/ui/Toolbar";
 import { Bone } from "@/components/ui/Skeleton";
 import { SWITCH_SWAP } from "@/lib/desk/motion";
 import { useErrandLink } from "@/lib/errands/mutations";
@@ -19,7 +16,6 @@ import { useNow } from "@/lib/useNow";
 import { useVisits } from "@/lib/visits/queries";
 import { awaitingDirector, unreadMessages } from "@/lib/visits/text";
 
-import { writeParams } from "../tasks/flow";
 import type { HeroFact } from "../team/Hero";
 import { arrowOf, stepKey, useScreenKeys } from "../team/keys";
 import { useCancelErrand } from "./cancel";
@@ -31,12 +27,12 @@ import { asksMe, bandOf, closedToday, isAlarmErrand, isRecent } from "./pult";
 import { DoneList } from "./PultRecent";
 import { WaitList, waitKey, waitsOf, yesNoOf } from "./PultWait";
 import { Keypad } from "./Quick";
+import { SecretarySettings } from "./SecretarySettings";
+import { isSettingsView, SecretaryTabs, SETTINGS_SHORTCUTS, switchSecretaryView, type SecretaryView } from "./SecretaryTabs";
 import { ErrandStats } from "./Stats";
 import { useDeskAsk } from "./useAsk";
 import { canCancel, today } from "./words";
 import { ErrandPanel, LoadFailedHero, NO_ACTIONS, NO_ERRANDS } from "./Shared";
-
-type View = "now" | "history";
 
 /** A finished request stays on its card this long — green, the track drawn to «Готово» — then leaves for «Только что». */
 const LINGER_MS = 1_100;
@@ -87,7 +83,7 @@ function useQuiet(key: string): boolean {
 }
 
 /**
- * The director's «Заявки» — «Пульт» (D-175): a remote and an order tracker. «Сейчас»: the band —
+ * The director's «Секретарь» (D-197), its «Заявки» — «Пульт» (D-175): a remote and an order tracker. «Сейчас»: the band —
  * what the secretary is doing in one sentence; «Ждут вас» — what waits for his word, answered in its
  * card and only there; «В пути» — every request as a tracker card; «Только что» and «Сегодня» — what
  * was closed, with «Спасибо ♥» and «Попросить снова»; on the right a keypad that never moves, the
@@ -95,10 +91,8 @@ function useQuiet(key: string): boolean {
  * server and the thirty days. ↑/↓ walk the cards with the panel following, X takes the open request
  * back, Y / N answer a yes-or-no, 1–7 press the keys.
  */
-export function DirectorErrands({ meId, openId, onOpen }: { meId: string; openId: string | null; onOpen: (id: string) => void }) {
+export function DirectorErrands({ meId, openId, onOpen, view }: { meId: string; openId: string | null; onOpen: (id: string) => void; view: SecretaryView }) {
   const { pointsEnabled } = useDeskScope();
-  const params = useDeskParams();
-  const view: View = params.get("view") === "history" ? "history" : "now";
   const now = useNow(30_000);
   const history = useErrandHistory(30);
   const visits = useVisits();
@@ -148,19 +142,18 @@ export function DirectorErrands({ meId, openId, onOpen }: { meId: string; openId
         ]
       : null;
 
-  const switchView = (next: View) => writeParams({ view: next === "history" ? "history" : null }, { type: "desk-switch" });
   const yesNo = yesNoOf(waits);
 
   useScreenKeys((event) => {
     const arrow = arrowOf(event);
-    if (arrow) {
+    if (arrow && !isSettingsView(view)) {
       const scope = view === "history" ? '[data-testid="desk-errands-history"] [data-row-key]' : ".pult-main [data-row-key]";
       const keys = [...document.querySelectorAll<HTMLElement>(scope)].map((row) => row.dataset.rowKey ?? "");
       const next = stepKey(keys, openId, arrow === "down");
       if (next) onOpen(next);
       return Boolean(next);
     }
-    if (event.code === "KeyX") {
+    if (event.code === "KeyX" && !isSettingsView(view)) {
       const open = active.find((errand) => errand.id === openId);
       if (!open || !canCancel(open, meId)) return false;
       cancel(open);
@@ -172,49 +165,26 @@ export function DirectorErrands({ meId, openId, onOpen }: { meId: string; openId
     }
     return false;
   });
-  useShortcuts("Заявки", [
-    { keys: ["↑", "↓"], label: "Соседняя заявка в панели" },
-    { keys: ["Y", "N"], label: "Ответить секретарю «Да» / «Нет»" },
-    { keys: ["X"], label: "Отменить открытую заявку" },
-    { keys: ["Ctrl K"], label: "Попросить строкой: «чай без сахара»" },
-  ]);
+  useShortcuts(
+    isSettingsView(view) ? "Секретарь · кнопки и настройки" : "Заявки",
+    isSettingsView(view)
+      ? SETTINGS_SHORTCUTS
+      : [
+          { keys: ["↑", "↓"], label: "Соседняя заявка в панели" },
+          { keys: ["Y", "N"], label: "Ответить секретарю «Да» / «Нет»" },
+          { keys: ["X"], label: "Отменить открытую заявку" },
+          { keys: ["Ctrl K"], label: "Попросить строкой: «чай без сахара»" },
+        ],
+  );
 
   return (
     <DeskPage>
-      <PageTitle
-        title="Заявки"
-        actions={
-          <SegmentTabs<View>
-            aria-label="Вид"
-            value={view}
-            onChange={switchView}
-            items={[
-              {
-                value: "now",
-                label: (
-                  <span className="inline-flex items-center gap-1.5">
-                    <Radio size={14} strokeWidth={2.25} aria-hidden />
-                    Сейчас
-                  </span>
-                ),
-                count: live > 0 ? live : undefined,
-              },
-              {
-                value: "history",
-                label: (
-                  <span className="inline-flex items-center gap-1.5">
-                    <History size={14} strokeWidth={2.25} aria-hidden />
-                    История
-                  </span>
-                ),
-              },
-            ]}
-          />
-        }
-      />
-      {/* «Сейчас» and «История» swap as two pictures (D-184) */}
+      <PageTitle title="Секретарь" actions={<SecretaryTabs view={view} count={live} />} />
+      {/* the tabs swap as pictures (D-184) */}
       <ViewTransition update={SWITCH_SWAP} default="none">
-        {view === "now" ? (
+        {isSettingsView(view) ? (
+          <SecretarySettings key={view} view={view} />
+        ) : view === "now" ? (
           <div className="pult-frame">
             <div className="pult" data-still={still ? "" : undefined} data-testid="desk-errands-pult">
               <div className="pult-main">
@@ -242,7 +212,7 @@ export function DirectorErrands({ meId, openId, onOpen }: { meId: string; openId
                       fresh={NOTHING_NEW}
                       onOpen={onOpen}
                       onAgain={asks.again}
-                      onHistory={() => switchView("history")}
+                      onHistory={() => switchSecretaryView("history")}
                       testId="desk-errands-today"
                     />
                     {/* a calm day on a wide screen: the thirty days of «История» under the band rather than
@@ -278,7 +248,7 @@ export function DirectorErrands({ meId, openId, onOpen }: { meId: string; openId
           </div>
         )}
       </ViewTransition>
-      <ErrandPanel rows={rows} openId={openId} viewer="director" meId={meId} now={now} catalogue={actions} pointsOn={pointsEnabled} />
+      {isSettingsView(view) ? null : <ErrandPanel rows={rows} openId={openId} viewer="director" meId={meId} now={now} catalogue={actions} pointsOn={pointsEnabled} />}
     </DeskPage>
   );
 }

@@ -13,7 +13,7 @@ export function isDeskRole(role: Role | undefined): role is DeskRole {
   return role === "director" || role === "secretary";
 }
 
-/** The desk's home of each role: the director's day at a glance (D-154), the secretary's errands. */
+/** The desk's home of each role: the director's day at a glance (D-154), the secretary's «Секретарь» with her queue. */
 export const DESK_HOME: Record<DeskRole, string> = {
   director: "/desk/today",
   secretary: "/desk/errands",
@@ -41,7 +41,7 @@ export const DESK_NAV: Record<DeskRole, DeskNavItem[]> = {
     { href: "/desk/tasks", label: "Задачи", badge: "tasks", key: "T" },
     { href: "/desk/inbox", label: "Ждут вас", key: "I" },
     { href: "/desk/team", label: "Команда", key: "K" },
-    { href: "/desk/errands", label: "Заявки", badge: "errands", key: "Z" },
+    { href: "/desk/errands", label: "Секретарь", badge: "errands", key: "Z" },
     { href: "/desk/ether", label: "Эфир", key: "A" },
     { href: "/desk/reports", label: "Отчёты", key: "O" },
     { href: "/desk/calendar", label: "Календарь", badge: "calendar", key: "C" },
@@ -51,7 +51,7 @@ export const DESK_NAV: Record<DeskRole, DeskNavItem[]> = {
     { href: "/desk/settings", label: "Настройки", key: "H" },
   ],
   secretary: [
-    { href: "/desk/errands", label: "Заявки", badge: "errands", key: "Z" },
+    { href: "/desk/errands", label: "Секретарь", badge: "errands", key: "Z" },
     { href: "/desk/team", label: "Команда", key: "K" },
     { href: "/desk/ether", label: "Эфир", key: "A" },
     { href: "/desk/calendar", label: "Календарь", badge: "calendar", key: "C" },

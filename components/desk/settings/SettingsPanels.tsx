@@ -6,7 +6,8 @@ import { useEffect, useLayoutEffect, useRef, useState, ViewTransition, type Reac
 import { useDeskParams, writeDeskAddress } from "@/components/desk/DeskAddress";
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { useBrandDraft } from "@/components/desk/settings/brand";
-import { rowAnchor, SaveBar } from "@/components/desk/settings/form";
+import { landOn, SaveBar } from "@/components/desk/settings/form";
+import { patchOf, resetOf, SECTION_NAME } from "@/components/desk/settings/sections";
 import { AiPanel } from "@/components/desk/settings/panels/AiPanel";
 import { AppPanel } from "@/components/desk/settings/panels/AppPanel";
 import { CompanyPanel } from "@/components/desk/settings/panels/CompanyPanel";
@@ -23,99 +24,23 @@ import { Bone } from "@/components/ui/Skeleton";
 import { SWITCH_SWAP } from "@/lib/desk/motion";
 import { useCompanySettings } from "@/lib/dictionary-queries";
 import type { CompanySettings, SettingsPatch } from "@/lib/settings";
-import { withSecretaryCodes } from "@/lib/settings-plain";
 import { SETTINGS_TABS, type SettingsTab } from "@/lib/settings-tabs";
 
-/** The sections of the company settings each tab holds — what its one «Сохранить» sends. */
+/**
+ * The sections of the company settings each tab holds — what its one «Сохранить» sends. The
+ * secretary's section lives in «Секретарь» on the desk (D-197), not under «Программа».
+ */
 const TAB_SECTIONS: Record<SettingsTab, SectionKey[]> = {
   company: ["window"],
-  app: ["secretary", "mascot"],
+  app: ["mascot"],
   team: ["points", "daily_report", "morning_brief"],
   ai: ["stt", "parser", "conventions", "voice_retention"],
 };
 
-const SECTION_NAME: Record<SectionKey, string> = {
-  window: "Тихие часы",
-  secretary: "Секретарь",
-  mascot: "Маскот",
-  points: "Очки",
-  daily_report: "Ежедневный отчёт",
-  morning_brief: "Утренняя сводка",
-  stt: "Распознавание речи",
-  parser: "Разбор поручений",
-  conventions: "Слова о сроках",
-  voice_retention: "Хранение записей",
+/** A tab's line under its title on the desk, where it differs from the phone's tile (D-197). */
+const DESK_ABOUT: Partial<Record<SettingsTab, string>> = {
+  app: "маскот; кнопки и настройки секретаря — в разделе «Секретарь»",
 };
-
-/** What a section sends — the same shape the phone's own «Сохранить» of that section sends. */
-function patchOf(key: SectionKey, draft: CompanySettings, conventions: CompanySettings["conventions"]): SettingsPatch {
-  switch (key) {
-    case "window":
-      return { delivery_window: draft.delivery_window };
-    case "secretary":
-      return {
-        secretary: {
-          escalate_after_min: draft.secretary.escalate_after_min,
-          security_phone: draft.secretary.security_phone.trim(),
-          // an empty row is scratch space; a new row gets its code here, once and for good
-          actions: withSecretaryCodes(draft.secretary.actions),
-        },
-      };
-    case "mascot":
-      return { mascot_seasons: draft.mascot_seasons, mascot_telegraph: draft.mascot_telegraph };
-    case "points":
-      return { points_enabled: draft.points_enabled, rating_mode: draft.rating_mode, points_rules: draft.points_rules, ether_events: draft.ether_events };
-    case "daily_report": {
-      const report = draft.daily_report;
-      return {
-        daily_report: {
-          enabled: report.enabled,
-          workdays: report.workdays,
-          holidays: report.holidays,
-          work_start: report.work_start,
-          remind_at: report.remind_at,
-          ask_from: report.ask_from,
-        },
-      };
-    }
-    case "morning_brief":
-      return { morning_brief: { enabled: draft.morning_brief.enabled } };
-    case "stt":
-      return { stt: draft.stt };
-    case "parser":
-      return { parser: draft.parser };
-    case "conventions":
-      return { conventions };
-    case "voice_retention":
-      return { voice_retention: draft.voice_retention };
-  }
-}
-
-/** What «Отменить» puts back for a section: the server's values of the same keys. */
-function resetOf(key: SectionKey, server: CompanySettings): Partial<CompanySettings> {
-  switch (key) {
-    case "window":
-      return { delivery_window: server.delivery_window };
-    case "secretary":
-      return { secretary: server.secretary };
-    case "mascot":
-      return { mascot_seasons: server.mascot_seasons, mascot_telegraph: server.mascot_telegraph };
-    case "points":
-      return { points_enabled: server.points_enabled, rating_mode: server.rating_mode, points_rules: server.points_rules, ether_events: server.ether_events };
-    case "daily_report":
-      return { daily_report: server.daily_report };
-    case "morning_brief":
-      return { morning_brief: server.morning_brief };
-    case "stt":
-      return { stt: server.stt };
-    case "parser":
-      return { parser: server.parser };
-    case "conventions":
-      return { conventions: server.conventions };
-    case "voice_retention":
-      return { voice_retention: server.voice_retention };
-  }
-}
 
 /** The shape of a tab while the settings load: its cards and their rows, nothing that will jump. */
 function PanelBone() {
@@ -206,20 +131,6 @@ function Panels({ tab, visited, director }: { tab: SettingsTab; visited: Readonl
   );
 }
 
-/** The row a search result points at: in sight, lit for a moment, its first control under the caret. */
-function landOn(id: string) {
-  const row = document.getElementById(rowAnchor(id));
-  if (!row || row.offsetParent === null) return false;
-  row.scrollIntoView({ block: "center", behavior: "smooth" });
-  row.animate(
-    [{ backgroundColor: "color-mix(in srgb, var(--accent) 16%, transparent)" }, { backgroundColor: "transparent" }],
-    { duration: 1600, easing: "ease-out" },
-  );
-  // the desk's select keeps the system's one inside, unseen: the caret goes to its button
-  row.querySelector<HTMLElement>("input, select:not(.desk-select-native), button, a[href]")?.focus({ preventScroll: true });
-  return true;
-}
-
 /** The draft is there exactly when the settings are: the same cache entry feeds both. */
 function Ready({ children }: { children: ReactNode }) {
   const settings = useCompanySettings();
@@ -288,7 +199,7 @@ export function SettingsPanels({ tab }: { tab: SettingsTab }) {
     // another tab changes the page in place (D-184): the title and the tab's settings cross-fade
     <ViewTransition update={SWITCH_SWAP} default="none">
       <div className="flex w-full max-w-[880px] flex-col gap-5">
-        <PageTitle title={meta.title} state={{ text: meta.about }} />
+        <PageTitle title={meta.title} state={{ text: DESK_ABOUT[tab] ?? meta.about }} />
         <Ready>
           <Panels tab={tab} visited={visited} director={director} />
         </Ready>

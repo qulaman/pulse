@@ -24,6 +24,23 @@ import { Button } from "@/components/ui/Button";
  */
 export const rowAnchor = (id: string) => `set-${id}`;
 
+/**
+ * The row a search result points at: in sight, lit for a moment, its first control under the caret.
+ * False while the row is not drawn yet (its tab still loading) — the caller tries again.
+ */
+export function landOn(id: string) {
+  const row = document.getElementById(rowAnchor(id));
+  if (!row || row.offsetParent === null) return false;
+  row.scrollIntoView({ block: "center", behavior: "smooth" });
+  row.animate(
+    [{ backgroundColor: "color-mix(in srgb, var(--accent) 16%, transparent)" }, { backgroundColor: "transparent" }],
+    { duration: 1600, easing: "ease-out" },
+  );
+  // the desk's select keeps the system's one inside, unseen: the caret goes to its button
+  row.querySelector<HTMLElement>("input, select:not(.desk-select-native), button, a[href]")?.focus({ preventScroll: true });
+  return true;
+}
+
 const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45";
 
 /**
@@ -44,10 +61,11 @@ export function SettingsGroup({
   /** On the right of the title: a link to where the rest of it lives. */
   action?: ReactNode;
   tone?: "danger";
-  children: ReactNode;
+  /** No rows — a card that only says where the settings went and leads there (D-197). */
+  children?: ReactNode;
 }) {
   return (
-    <section id={rowAnchor(id)} data-settings-group={id} data-tone={tone} aria-label={title} className="set-card scroll-mt-6">
+    <section id={rowAnchor(id)} data-settings-group={id} data-tone={tone} data-bare={children ? undefined : ""} aria-label={title} className="set-card scroll-mt-6">
       <header className="set-card-head">
         <div className="min-w-0 flex-1">
           <h2 className="set-card-title">{title}</h2>
@@ -55,7 +73,7 @@ export function SettingsGroup({
         </div>
         {action ? <div className="set-card-action">{action}</div> : null}
       </header>
-      <div className="set-card-rows desk-list">{children}</div>
+      {children ? <div className="set-card-rows desk-list">{children}</div> : null}
     </section>
   );
 }

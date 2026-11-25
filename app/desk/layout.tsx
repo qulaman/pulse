@@ -19,10 +19,12 @@ import "./team.css";
 // the desk polish wave (D-174): one file a screen group, each owned by one hand
 import "./tasks.css";
 import "./errands.css";
-// «Заявки» as a station and a remote (D-175): the director, the secretary, the alarm
+// «Секретарь» (D-197), its requests as a station and a remote (D-175): the director, the secretary, the alarm
 import "./errands-pult.css";
 import "./errands-stoika.css";
 import "./errands-alarm.css";
+// «Секретарь»: its «Кнопки» and «Настройки» tabs (D-197)
+import "./errands-settings.css";
 import "./planning.css";
 // «Заметки» and «Доски» apart (D-177): one file a section, after planning.css so they win a tie
 import "./notes.css";

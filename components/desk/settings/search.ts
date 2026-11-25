@@ -26,10 +26,12 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { id: "brand-logo", tab: "company", place: "Компания", title: "Логотип", words: "лого картинка файл бренд" },
   { id: "brand-accent", tab: "company", place: "Компания", title: "Акцентный цвет", words: "цвет бренд акцент контраст" },
   { id: "window-hours", tab: "company", place: "Компания", title: "Тихие часы — когда доставлять уведомления", words: "пуш ночь утро уведомления доставка окно" },
+  // «Секретарь» — a section of its own beside the settings (D-197)
+  { id: "secretary-buttons", href: "/desk/errands?view=buttons&focus=secretary-buttons", place: "Секретарь", title: "Кнопки секретаря", words: "кофе чай охрана врач заявки зайди просьбы" },
+  { id: "secretary-who", href: "/desk/errands?view=settings&focus=secretary-who", place: "Секретарь", title: "Кто секретарь", words: "роль приёмная" },
+  { id: "secretary-phone", href: "/desk/errands?view=settings&focus=secretary-phone", place: "Секретарь", title: "Телефон охраны", words: "тревога позвонить" },
+  { id: "secretary-repeat", href: "/desk/errands?view=settings&focus=secretary-repeat", place: "Секретарь", title: "Повтор пуша секретарю", words: "напомнить заявка минут" },
   // «Программа»
-  { id: "secretary-buttons", tab: "app", place: "Программа", title: "Кнопки секретаря", words: "кофе чай охрана врач заявки зайди" },
-  { id: "secretary-phone", tab: "app", place: "Программа", title: "Телефон охраны", words: "тревога позвонить" },
-  { id: "secretary-repeat", tab: "app", place: "Программа", title: "Повтор пуша секретарю", words: "напомнить заявка минут" },
   { id: "mascot-seasons", tab: "app", place: "Программа", title: "Праздничные наряды маскота", words: "новый год наурыз колпак лицо" },
   { id: "mascot-telegraph", tab: "app", place: "Программа", title: "Лицо сотрудника переживает за дела", words: "маскот волнуется зовёт" },
   // «Очки и отчёты»

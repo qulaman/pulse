@@ -59,8 +59,8 @@ export function ActionSign({ action }: { action: SecretaryAction }) {
 
 /** How many of the director's requests stand before «…ещё N». */
 const SHOWN = 5;
-/** Where the catalogue is set: «Настройки → Программа → Кнопки секретаря». */
-const CATALOGUE_HREF = "/desk/settings?tab=app";
+/** Where the catalogue is set: «Секретарь → Кнопки» (D-197). */
+const CATALOGUE_HREF = "/desk/errands?view=buttons";
 /** How long a key says «Отправлено» once its request has gone. */
 const SENT_FLASH_MS = 1_300;
 /** A line older than this when it shows was not asked here just now (kept from a reload): nothing flies. */
@@ -299,7 +299,7 @@ function Desk({ mine, now }: { mine: readonly Errand[]; now: Date }) {
           <Quiet testId="home-secretary-empty">
             Кнопок у секретаря пока нет —{" "}
             <Link href={CATALOGUE_HREF} prefetch className="text-text underline-offset-2 hover:underline">
-              задать в «Настройках»
+              задать в «Секретаре»
             </Link>
           </Quiet>
         ) : plain.length > 0 ? (

@@ -580,6 +580,39 @@ export async function checkErrands(ctx: Ctx) {
     const pult = await page.getByTestId("desk-pult-keypad").waitFor({ timeout: 5_000 }).then(() => true, () => false);
     record("заявки: «Сейчас» возвращает пульт", back && pult, page.url());
 
+    // «Секретарь» (D-197): «Кнопки» — the table beside the keypad it makes; «Настройки» — who, the
+    // repeat push, the guard's phone. Looked at only: an edit is put back, nothing is saved
+    const named = (await page.locator('nav a[href="/desk/errands"]').first().innerText().catch(() => "")).trim();
+    await page.getByTestId("seg-buttons").click();
+    const buttonsAt = await page.waitForURL((url) => url.searchParams.get("view") === "buttons", { timeout: 5_000 }).then(() => true, () => false);
+    const table = await visible(ctx, "secretary-actions", 10_000);
+    const picture = await page.getByTestId("secretary-actions-preview").isVisible().catch(() => false);
+    record("секретарь: раздел так и назван, «Кнопки» — таблица и клавиши, как их увидит директор", named === "Секретарь" && buttonsAt && table && picture, `«${named}»`);
+    await ctx.shot("secretary-buttons");
+    const firstLabel = page.locator('[data-action-row="0"] [data-col="label"]');
+    if (await firstLabel.count()) {
+      const was = await firstLabel.inputValue();
+      await firstLabel.fill(`${was} ·`);
+      const dot = await page.locator('[data-testid="seg-buttons"] [data-dirty]').waitFor({ timeout: 3_000 }).then(() => true, () => false);
+      const bar = await visible(ctx, "settings-savebar", 3_000);
+      await page.getByTestId("seg-now").click();
+      await page.getByTestId("seg-buttons").click();
+      const kept = (await firstLabel.inputValue().catch(() => "")) === `${was} ·`;
+      await page.getByTestId("settings-reset").click();
+      const undone = (await firstLabel.inputValue().catch(() => "")) === was && (await page.getByTestId("settings-savebar").count()) === 0;
+      record("секретарь: правка кнопки — точка на вкладке и полоса «Сохранить», переживает «Заявки», «Отменить» возвращает", dot && bar && kept && undone);
+    } else {
+      skip("секретарь: правка кнопки", "кнопок нет");
+    }
+    await page.getByTestId("seg-settings").click();
+    const settingsAt = await page.waitForURL((url) => url.searchParams.get("view") === "settings", { timeout: 5_000 }).then(() => true, () => false);
+    const phone = await visible(ctx, "secretary-tab-settings", 10_000);
+    const rows = await page.locator('[data-setting="secretary-who"], [data-setting="secretary-repeat"], [data-setting="secretary-phone"]').count();
+    record("секретарь: «Настройки» — кто секретарь, повтор пуша, телефон охраны", settingsAt && phone && rows === 3, `строк ${rows}`);
+    await ctx.shot("secretary-settings");
+    await page.getByTestId("seg-now").click();
+    await page.getByTestId("desk-pult-keypad").waitFor({ timeout: 5_000 }).catch(() => undefined);
+
     // «Объявления» (D-174): the feed of cards or its empty state; a card opens in the panel from the
     // keys (↓, Enter) and goes with Esc — nothing is acknowledged, sent or deleted
     await open(page, "/desk/ether");
@@ -750,7 +783,7 @@ export async function checkSecretary(ctx: Ctx) {
   const release = await guardWrites(page);
   try {
     await open(page, "/desk/errands");
-    // «Стойка» (D-175): the head with «Очередь | История» and her presence, the director's door, the queue
+    // «Стойка» (D-175): the head with the section's tabs (D-197) and her presence, the director's door, the queue
     const queue = await visible(ctx, "desk-errand-queue");
     const head = await page.getByTestId("stoika-head").isVisible().catch(() => false);
     const presence = await page.getByTestId("desk-presence").isVisible();

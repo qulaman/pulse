@@ -1,0 +1,114 @@
+/* ==========================================================================================
+   «Секретарь» on the desk (D-197): the two settings tabs — «Кнопки» (the table beside the keypad
+   it makes) and «Настройки» (who the secretary is, the repeat push, the guard's phone). The rows and
+   the cards are the settings' own (settings.css); the keypad's picture borrows the keys of «Пульт»
+   (errands-pult.css). Here only the layout and the few marks of these two tabs.
+   ========================================================================================== */
+
+html[data-surface="desk"][data-journal] {
+  .sec-settings {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 20px;
+    container: sec-settings / inline-size;
+  }
+
+  /* «Кнопки»: the table, and the keypad on the right while the screen is wide enough for both */
+  .sec-buttons {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 24px;
+    max-width: 1240px;
+  }
+  @container sec-settings (min-width: 1040px) {
+    .sec-buttons {
+      grid-template-columns: minmax(0, 1fr) 360px;
+    }
+    /* the picture stays in sight while a long table scrolls */
+    .sec-picture {
+      position: sticky;
+      top: 16px;
+    }
+  }
+
+  /* «Настройки»: the settings' column, as wide as a tab of «Настройки» */
+  .sec-options {
+    display: flex;
+    max-width: 880px;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* the keypad as the director will see it: the keys of «Пульт», a picture — nothing presses */
+  .sec-picture {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .sec-picture-head {
+    display: flex;
+    min-height: 24px;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 8px;
+  }
+  .sec-picture-title {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 18px;
+  }
+  .sec-picture-hint {
+    color: var(--ink-3, var(--text-muted));
+    font-size: 12px;
+    line-height: 16px;
+  }
+  /* keys of the keypad's own size: two a row in the 360 px column, as on «Пульт»; under the table
+     on a narrower screen — as many as fit, never stretched across it */
+  .sec-picture-pad {
+    max-width: 760px;
+    pointer-events: none;
+
+    .pult-keys {
+      grid-template-columns: repeat(auto-fill, minmax(156px, 1fr));
+    }
+    .pult-key {
+      animation: settings-pop 220ms var(--ease-snap, ease-out) both;
+    }
+  }
+
+  /* who the secretary is: faces in a row, each with where they are now */
+  .sec-who {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px 20px;
+  }
+  .sec-who-person {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 10px;
+  }
+  .sec-who-state {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--ok-ink, var(--text-muted));
+    font-size: 12px;
+    line-height: 16px;
+
+    &::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    &[data-away] {
+      color: var(--ink-3, var(--text-muted));
+    }
+  }
+}

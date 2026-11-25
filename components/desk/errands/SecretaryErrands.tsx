@@ -21,6 +21,8 @@ import { ErrandHistory } from "./ErrandHistory";
 import { PersonFace, SceneTile, useArrivals } from "./look";
 import { QueueList, resultsOf, StoikaLabel, WaitPill } from "./Queue";
 import { ReceptionCard } from "./Reception";
+import { SecretarySettings } from "./SecretarySettings";
+import { isSettingsView, SETTINGS_SHORTCUTS, type SecretaryView } from "./SecretaryTabs";
 import { ErrandPanel, LoadFailedHero, NO_ACTIONS, NO_ERRANDS } from "./Shared";
 import { dayClosedOf, DayJournal, DayTally } from "./StoikaDay";
 import { AwayBand, StoikaHead, useThanksToast } from "./StoikaHead";
@@ -74,9 +76,10 @@ function StoikaBone() {
  * once work comes; the requests that wait for her as tickets, the alarm first; what is in her hands
  * as rows with «Что передать директору?» on top; a colleague's work muted; «Приёмная» on the right;
  * «Сегодня» — her journal, or one tally line while she is busy. Presence is a control in the head,
- * an away band says when she is gone. Her history is the second view (`?view=history`).
+ * an away band says when she is gone. «История», «Кнопки» and «Настройки» are the section's other
+ * tabs (`?view=history|buttons|settings`, D-197).
  */
-export function SecretaryErrands({ meId, openId, onOpen, history }: { meId: string; openId: string | null; onOpen: (id: string) => void; history: boolean }) {
+export function SecretaryErrands({ meId, openId, onOpen, view }: { meId: string; openId: string | null; onOpen: (id: string) => void; view: SecretaryView }) {
   const now = useNow(30_000);
   const errands = useErrands();
   const visits = useVisits();
@@ -120,7 +123,7 @@ export function SecretaryErrands({ meId, openId, onOpen, history }: { meId: stri
   const day = dayClosedOf(rows, meId, now, actions);
   const busy = settled && (queue.length > 0 || results.length > 0);
 
-  useShortcuts("Заявки", [
+  useShortcuts(isSettingsView(view) ? "Секретарь · кнопки и настройки" : "Заявки", isSettingsView(view) ? SETTINGS_SHORTCUTS : [
     { keys: ["↑", "↓"], label: "Выбрать заявку" },
     { keys: ["Enter"], label: "Принял / Готово" },
     { keys: ["1", "4"], label: "«Будет через…» — когда заявка у вас" },
@@ -137,11 +140,13 @@ export function SecretaryErrands({ meId, openId, onOpen, history }: { meId: stri
 
   return (
     <DeskPage>
-      <StoikaHead meId={meId} history={history} count={loading ? 0 : queue.length} now={now} settled={settled} />
+      <StoikaHead meId={meId} view={view} count={loading ? 0 : queue.length} now={now} settled={settled} />
       {settled ? <AwayBand meId={meId} now={now} /> : null}
-      {/* the queue and «История» swap as two pictures (D-184) */}
+      {/* the tabs swap as pictures (D-184) */}
       <ViewTransition update={SWITCH_SWAP} default="none">
-        {history ? (
+        {isSettingsView(view) ? (
+          <SecretarySettings key={view} view={view} />
+        ) : view === "history" ? (
           <ErrandHistory viewer="secretary" meId={meId} openId={openId} onOpen={onOpen} now={now} pointsOn={false} catalogue={actions} />
         ) : (
           /* two columns while the screen's own width allows — the panel takes 440 px of the window */
@@ -183,7 +188,7 @@ export function SecretaryErrands({ meId, openId, onOpen, history }: { meId: stri
           </div>
         )}
       </ViewTransition>
-      <ErrandPanel rows={rows} openId={openId} viewer="secretary" meId={meId} now={now} catalogue={actions} pointsOn={false} />
+      {isSettingsView(view) ? null : <ErrandPanel rows={rows} openId={openId} viewer="secretary" meId={meId} now={now} catalogue={actions} pointsOn={false} />}
     </DeskPage>
   );
 }
