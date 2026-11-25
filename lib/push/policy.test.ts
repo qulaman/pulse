@@ -27,6 +27,8 @@ describe("transportFor — the fixed policy (D-114)", () => {
     expect(transportFor({ event_kind: "event_reminder", meta: {} }).ttl).toBe(3_600);
     // D-152: the evening's «сдайте отчёт» is not news the next morning
     expect(transportFor({ event_kind: "daily_report_remind", meta: {} })).toEqual({ ttl: 14_400, urgency: "high", silent: false });
+    // D-191: the morning brief is the morning's — with sound, no doze-jumping, gone by noon
+    expect(transportFor({ event_kind: "morning_brief", meta: {} })).toEqual({ ttl: 14_400, urgency: "normal", silent: false });
   });
 
   it("keeps the alarm loud and short-lived, whatever the director chose", () => {

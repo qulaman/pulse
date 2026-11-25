@@ -20,15 +20,18 @@ const FIELD =
 
 const noSubscribe = () => () => {};
 
+const CLOSED = "Ваш вход закрыт. Если это ошибка — скажите директору или секретарю";
+
 export type LoginBrand = { name: string; logoUrl: string | null; tagline: string | null; accent?: string };
 
 /**
  * The sign-in screen. The main door is a one-time code from the director or the secretary
  * (D-135): eight digits and the person is in. Email and password stay a quiet link — the
  * director, the secretary and everyone who already has a password (G.21). On a company's own
- * address (`/c/<slug>`, the QR of a code) the screen wears that company's brand.
+ * address (`/c/<slug>`, the QR of a code) the screen wears that company's brand. `closed` — the
+ * browser still holds the session of a switched-off person (D-160): the screen says so first.
  */
-export function LoginForm({ brand }: { brand: LoginBrand }) {
+export function LoginForm({ brand, closed = false }: { brand: LoginBrand; closed?: boolean }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<"code" | "email">("code");
@@ -74,8 +77,15 @@ export function LoginForm({ brand }: { brand: LoginBrand }) {
           <PulseMark size={branded ? "md" : "lg"} />
           <p className="mt-2 text-[16px] leading-[22px] text-muted">{brand.tagline ?? "Голосовое управление компанией"}</p>
         </div>
-        <Mascot state={error ? "thinking" : pending ? "listening" : "calm"} size={72} />
+        <Mascot state={error || closed ? "thinking" : pending ? "listening" : "calm"} size={72} />
       </div>
+
+      {/* above both forms and the iPhone's «Сначала — на главный экран», which hides a form's own error */}
+      {closed ? (
+        <p role="alert" className="mt-6 text-[15px] leading-5 text-danger" data-testid="login-closed">
+          {CLOSED}
+        </p>
+      ) : null}
 
       {mode === "code" ? (
         <CodeForm

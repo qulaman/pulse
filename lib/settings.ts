@@ -305,6 +305,15 @@ export const VoiceRetentionSchema = z.object({
   orphan_days: z.number().int().min(7).max(3650).default(30),
 });
 
+/**
+ * D-191 (И-34): the employee's morning brief — one push as the delivery window opens on a working
+ * day, «2 дела на сегодня, 1 просрочено · встреча в 15:00». The database reads the same key with the
+ * same default (`morning_brief_on()`, migration 20261124110000).
+ */
+export const MorningBriefSchema = z.object({
+  enabled: z.boolean().default(true),
+});
+
 /** D-133 (И-46): which good news goes public on Эфир. */
 export const EtherEventsSchema = z.object({
   merch: z.boolean().default(true),
@@ -362,6 +371,8 @@ export const CompanySettingsSchema = z.object({
   dictionary: DictionarySettingsSchema.prefault({}),
   /** The daily report (D-152); a broken section reads as the defaults, never the whole settings. */
   daily_report: DailyReportSettingsSchema.prefault({}).catch(DAILY_REPORT_DEFAULTS),
+  /** The employee's morning brief (D-191); a broken section reads as on, never the whole settings. */
+  morning_brief: MorningBriefSchema.prefault({}).catch({ enabled: true }),
   /** How long voice recordings are kept (D-155 §3); a broken section reads as the defaults. */
   voice_retention: VoiceRetentionSchema.prefault({}).catch({ closed_days: 90, orphan_days: 30 }),
 });
@@ -396,6 +407,7 @@ export const SettingsPatchSchema = z
     secretary: SecretarySettingsSchema.partial(),
     brand: BrandPatchSchema,
     daily_report: DailyReportPatchSchema,
+    morning_brief: z.object({ enabled: z.boolean() }),
   })
   .partial()
   .strict();

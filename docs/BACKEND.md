@@ -66,7 +66,7 @@
 | `/api/files/url` | GET | все | URL файла сообщения | Storage |
 | `/api/push/subscribe` | POST, DELETE | все | подписка браузера | `push_subscriptions` |
 | `/api/push/devices` | GET, PATCH, DELETE | Д | свои устройства | `push_subscriptions` |
-| `/api/push/test` | POST, GET | все; другому — Д, С | проверка пушей | outbox |
+| `/api/push/test` | POST, GET | все; другому — Д, С | проверка пушей; `url: "/setup"` — тап по пушу возвращает в «Подключение» (D-190), иначе `/profile` | outbox |
 | `/api/push/kick` | POST | все | пинок воркера | `kickDeliveries()` |
 | `/api/push/badge` | GET | все | число на иконке | `tasks` |
 | `/api/push/seen` | POST | все | «увидел» | outbox |
@@ -148,7 +148,7 @@
 
 **Пинок** — `kickDeliveries()` через `after()`, отправляет весь готовый хвост очереди. Зовут: `/api/voice/confirm`, `/api/tasks/[id]/transition`, `send-now`, `deadline`, `reassign`, `deadline-request`, `deadline-answer`, `nudge`, `/api/errands`, `/api/visits`, `/api/visits/[id]/answer`, `/api/push/test`. Записи мимо роутов (тред, кнопки секретаря, встречи, магазин, Эфир, досылка из офлайна) зовут `/api/push/kick` через `kickPush()`. Страховка — тик.
 
-**Транспорт** — `RULES` в `lib/push/policy.ts`: по виду события срок жизни у push-сервиса и срочность. Работа (новая задача, доработка, отзыв, сообщение, на приёмку, отказ) — 24 ч, громко; хорошие новости (принято, срок продлён, реакция, готовый заказ) — тихо; «скоро срок» и «скоро встреча» — 1 ч; заявки и визиты секретаря — 20–30 мин; тревога (`meta.urgent`) — 5 мин, громко всегда; вид вне таблицы — 12 ч.
+**Транспорт** — `RULES` в `lib/push/policy.ts`: по виду события срок жизни у push-сервиса и срочность. Работа (новая задача, доработка, отзыв, сообщение, на приёмку, отказ) — 24 ч, громко; хорошие новости (принято, срок продлён, реакция, готовый заказ) — тихо; «скоро срок» и «скоро встреча» — 1 ч; утренняя сводка `morning_brief` — 4 ч, `normal` (D-191); заявки и визиты секретаря — 20–30 мин; тревога (`meta.urgent`) — 5 мин, громко всегда; вид вне таблицы — 12 ч.
 
 **Окно и тихие часы.** Когда строка может уйти, решает база при вставке, триггером `trg_notification_deliveries_deliver_after`. Всем, кроме директора, — окно компании `settings.delivery_window` (по умолчанию 08:00–21:00 Asia/Aqtobe, D-38): что может подождать (отклик на задачу, сообщения исполнителю, Эфир, календарь, магазин), получает `deliver_after = next_delivery_slot(...)`; новая задача, напоминания о встречах и заметках, заявки и визиты идут сразу. Задача вне окна пуша не рождает: она лежит `scheduled`, тик выпускает её при открытии окна. Директору — его правила «Уведомления» в профиле (`lib/push/prefs.ts`, D-114): режим по категории («Сразу», «Тихо», «Сводкой», «Не присылать»), своя тишина, встречи, важные люди; тревога и системные не настраиваются; `set_notify_prefs` перестраивает ждущую очередь.
 
@@ -209,12 +209,13 @@ Cron из `vercel.json` зовёт `/api/push/sweep` (`GET` или `POST`) с `A
 1. `daily_reports_due_missed` — первым: утро начинается с закрытого вчера (D-152).
 2. `recurrence_spawn` — до выпуска: задача повтора под окно уходит этим же вызовом (D-148).
 3. `publish_due_scheduled` — отложенные задачи в `sent` (D-38).
-4. `events_due_reminders`, `errands_due_escalation`, `errands_expire`, `errands_due_remind`, `notes_due_reminders`, `notes_purge_trash`, `visits_due_expiry`.
-5. Сигналы: `unseen_task_alerts_due`, `overdue_alerts_due`, `deadline_reminders_due`, `daily_report_reminders_due`, `team_channel_alerts_due`, `director_day_summaries_due`, последними `director_digests_due` — придержанный сигнал попадает в сводку (D-114).
-6. `notification_deliveries_purge`, `tv_events_prune`.
-7. `purgeVoice()` (D-155): `voice_purge_due` до 500 файлов, удаление пачками по 100, `voice_mark_purged` только для пачек без ошибки.
-8. `drainStorage()` — файлы удалённых компаний, до 5 с (§14).
-9. `sweepDeliveries()` на 40 с: поставленное выше уходит этим же вызовом.
+4. `employee_morning_briefs_due` — утренняя сводка команде (D-191): после выпуска, чтобы посчитать выданное этим же вызовом. Раз в местный рабочий день человеку (`daily_report.workdays` и праздники), внутри окна доставки компании, при `settings.morning_brief.enabled`; только активным, не в отпуске и не на больничном, с включённым устройством (иначе строка лишь упала бы `no_subscription` и разбудила «Уведомления не доходят»); директору и киоску — никогда. Свои дела человека — просроченные, на доработке, новые, со сроком позже сегодня — и сегодняшние встречи впереди; пусто — пуша нет. Строка `morning_brief`: «Доброе утро» · «2 дела на сегодня, 1 просрочено · встреча в 15:00», `url` `/feed`; второй строки за день не даёт уникальный ключ (человек, `meta.date`), даже при двух вызовах в одну секунду.
+5. `events_due_reminders`, `errands_due_escalation`, `errands_expire`, `errands_due_remind`, `notes_due_reminders`, `notes_purge_trash`, `visits_due_expiry`.
+6. Сигналы: `unseen_task_alerts_due`, `overdue_alerts_due`, `deadline_reminders_due`, `daily_report_reminders_due`, `team_channel_alerts_due`, `director_day_summaries_due`, последними `director_digests_due` — придержанный сигнал попадает в сводку (D-114).
+7. `notification_deliveries_purge`, `tv_events_prune`.
+8. `purgeVoice()` (D-155): `voice_purge_due` до 500 файлов, удаление пачками по 100, `voice_mark_purged` только для пачек без ошибки.
+9. `drainStorage()` — файлы удалённых компаний, до 5 с (§14).
+10. `sweepDeliveries()` на 40 с: поставленное выше уходит этим же вызовом.
 
 ## 11. Переменные окружения в коде
 
@@ -287,7 +288,7 @@ Cron из `vercel.json` зовёт `/api/push/sweep` (`GET` или `POST`) с `A
 
 ## Известные ограничения
 
-- Тик на стенде идёт раз в сутки (`0 3 * * *`, 08:00 Asia/Aqtobe): Vercel Hobby (В-8, D-125). Всё, что ждёт времени, ждёт утра; пуши после мутаций уходят сразу пинком.
+- Тик на стенде идёт раз в сутки (`0 3 * * *`, 08:00 Asia/Aqtobe): Vercel Hobby (В-8, D-125). Всё, что ждёт времени, ждёт утра; пуши после мутаций уходят сразу пинком. Утренняя сводка приходит в 08:00 при окне доставки с 08:00; у компании, чьё окно открывается позже, её нет до минутного тика.
 - Не каждая мутация пинает: отзыв задачи и запись из браузера без `kickPush()` ждут чужого пинка или тика.
 - Воркер пушей проверяет весь серверный env: без `OPENAI_API_KEY` или `ANTHROPIC_API_KEY` он падает, и пуши не уходят вовсе.
 - Ошибки не собираются: только логи Vercel, Sentry и алертов нет.

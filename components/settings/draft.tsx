@@ -30,6 +30,7 @@ export type SectionKey =
   | "secretary"
   | "mascot"
   | "daily_report"
+  | "morning_brief"
   | "voice_retention";
 
 /** The keys of the daily report the screen edits; `started_on` and `checked_on` are the server's (D-152). */
@@ -114,6 +115,7 @@ export function SettingsDraftProvider({ children }: { children: ReactNode }) {
         secretary: !same(draft.secretary, server.secretary),
         mascot: draft.mascot_seasons !== server.mascot_seasons || draft.mascot_telegraph !== server.mascot_telegraph,
         daily_report: !same(reportKeys(draft.daily_report), reportKeys(server.daily_report)),
+        morning_brief: draft.morning_brief.enabled !== server.morning_brief.enabled,
         voice_retention: !same(draft.voice_retention, server.voice_retention),
       },
       save: (patch) => save.mutate(patch),

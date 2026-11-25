@@ -9,14 +9,19 @@ import { lessonOf } from "@/lib/dictionary-learn";
 import { useCompanySettings, useEditAliases } from "@/lib/dictionary-queries";
 import { usePeople } from "@/lib/people/queries";
 
+/** How long «Отменить» stays under a learned name — the same five seconds as every undo (D-139). */
+export const LEARN_UNDO_MS = 5_000;
+
 /**
- * «Запомнить?» right where the director fixes a name (D-111, second wave): the AI could
- * not place «Жаке», the director chose Жандос on the card — a toast offers to remember the
- * form, one tap and the next «Жаке» is his. Nothing is remembered without that tap: one
- * slip of the finger must not teach the dictionary a wrong name. The offer is a toast, so
- * the main flow gains no step (принцип 1); no lesson — no toast (see `lessonOf`).
+ * The dictionary learns without a tap (D-192, И-107): the AI could not place «Жаке», the director
+ * chose Жандос on the card — the form is his at once, and a toast «Запомнил: «Жаке» — Жандос»
+ * holds «Отменить» for five seconds. Changing the person on a card was the director's most
+ * frequent extra action; the «Запомнить?» tap of D-111 made it two. A slip of the finger is
+ * guarded by `lessonOf`: nothing is learned when the matcher was sure and the director simply
+ * chose somebody else (a change of mind, not a mishearing), when the form is somebody else's, or
+ * when it would still not make the matcher sure of this very person.
  */
-export function useRememberOffer() {
+export function useLearnName() {
   const people = usePeople();
   const settings = useCompanySettings();
   const edit = useEditAliases();
@@ -34,14 +39,12 @@ export function useRememberOffer() {
     const queries = "assignee_queries" in entity ? entity.assignee_queries : [];
     const form = lessonOf({ queries, match: entity.assignee }, person.user_id, roster, settings.data?.matching);
     if (!form) return;
-    toast(`Запомнить «${form}» — ${person.full_name}?`, {
-      lifetimeMs: 6_000,
+    edit.mutate({ id: person.user_id, add: [form] });
+    toast(`Запомнил: «${form}» — ${person.full_name}`, {
+      lifetimeMs: LEARN_UNDO_MS,
       action: {
-        label: "Запомнить",
-        onClick: () => {
-          edit.mutate({ id: person.user_id, add: [form] });
-          toast(`Запомнил: «${form}» — ${person.full_name}`);
-        },
+        label: "Отменить",
+        onClick: () => edit.mutate({ id: person.user_id, remove: [form] }),
       },
     });
   };

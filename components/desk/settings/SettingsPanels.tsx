@@ -30,7 +30,7 @@ import { SETTINGS_TABS, type SettingsTab } from "@/lib/settings-tabs";
 const TAB_SECTIONS: Record<SettingsTab, SectionKey[]> = {
   company: ["window"],
   app: ["secretary", "mascot"],
-  team: ["points", "daily_report"],
+  team: ["points", "daily_report", "morning_brief"],
   ai: ["stt", "parser", "conventions", "voice_retention"],
 };
 
@@ -40,6 +40,7 @@ const SECTION_NAME: Record<SectionKey, string> = {
   mascot: "Маскот",
   points: "Очки",
   daily_report: "Ежедневный отчёт",
+  morning_brief: "Утренняя сводка",
   stt: "Распознавание речи",
   parser: "Разбор поручений",
   conventions: "Слова о сроках",
@@ -77,6 +78,8 @@ function patchOf(key: SectionKey, draft: CompanySettings, conventions: CompanySe
         },
       };
     }
+    case "morning_brief":
+      return { morning_brief: { enabled: draft.morning_brief.enabled } };
     case "stt":
       return { stt: draft.stt };
     case "parser":
@@ -101,6 +104,8 @@ function resetOf(key: SectionKey, server: CompanySettings): Partial<CompanySetti
       return { points_enabled: server.points_enabled, rating_mode: server.rating_mode, points_rules: server.points_rules, ether_events: server.ether_events };
     case "daily_report":
       return { daily_report: server.daily_report };
+    case "morning_brief":
+      return { morning_brief: server.morning_brief };
     case "stt":
       return { stt: server.stt };
     case "parser":

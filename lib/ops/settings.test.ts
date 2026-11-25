@@ -45,6 +45,10 @@ describe("mergeSettingsPatch", () => {
     expect(mergeSettingsPatch(current, { voice_retention: retention }, "2026-11-04")).toEqual({ voice_retention: retention });
   });
 
+  it("stores the morning brief's switch as its whole section (D-191)", () => {
+    expect(mergeSettingsPatch(current, { morning_brief: { enabled: false } }, "2026-11-24")).toEqual({ morning_brief: { enabled: false } });
+  });
+
   it("starts the daily report's fines from today when the module is switched on", () => {
     const off = CompanySettingsSchema.parse({ daily_report: { enabled: false } });
     const patch = mergeSettingsPatch(off, { daily_report: { enabled: true } }, "2026-11-04");

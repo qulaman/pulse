@@ -1,4 +1,5 @@
 import { LoginForm } from "@/components/auth/LoginForm";
+import { sessionIsClosed } from "@/lib/auth";
 import { loadBrandBySlug } from "@/lib/brand";
 
 /**
@@ -8,7 +9,7 @@ import { loadBrandBySlug } from "@/lib/brand";
  */
 export default async function CompanyLoginPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const brand = await loadBrandBySlug(slug.toLowerCase());
+  const [brand, closed] = await Promise.all([loadBrandBySlug(slug.toLowerCase()), sessionIsClosed()]);
   return (
     <LoginForm
       brand={{
@@ -17,6 +18,7 @@ export default async function CompanyLoginPage({ params }: { params: Promise<{ s
         tagline: brand.tagline,
         accent: brand.customAccent ? brand.accent : undefined,
       }}
+      closed={closed}
     />
   );
 }

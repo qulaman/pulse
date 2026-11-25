@@ -26,6 +26,10 @@ const TICKS = [
   // then the tasks held for the delivery window (D-38, tasks/017): their «task_sent» rows
   // then go out with this very sweep, not a minute later
   ["publish_due_scheduled", "published"],
+  // the employee's morning brief (D-191): after the two above, so it counts the tasks this very
+  // sweep gave out; once a working day a person, inside the window. On the daily Hobby cron
+  // (08:xx Aqtobe) it goes at 08:00 for a window opening at 08:00; a later window waits for В-8
+  ["employee_morning_briefs_due", "morning_briefs"],
   ["events_due_reminders", "reminders"], // D-78
   ["errands_due_escalation", "escalations"], // D-79
   ["errands_expire", null], // «не беспокоить на 30 мин» ends by itself, D-99

@@ -1,4 +1,5 @@
 import { LoginForm } from "@/components/auth/LoginForm";
+import { sessionIsClosed } from "@/lib/auth";
 import { loadBrand } from "@/lib/brand";
 
 /**
@@ -7,6 +8,6 @@ import { loadBrand } from "@/lib/brand";
  * `/c/<slug>` (D-135).
  */
 export default async function LoginPage() {
-  const brand = await loadBrand();
-  return <LoginForm brand={{ name: brand.name, logoUrl: brand.logoUrl, tagline: brand.tagline }} />;
+  const [brand, closed] = await Promise.all([loadBrand(), sessionIsClosed()]);
+  return <LoginForm brand={{ name: brand.name, logoUrl: brand.logoUrl, tagline: brand.tagline }} closed={closed} />;
 }

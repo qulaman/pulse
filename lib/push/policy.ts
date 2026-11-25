@@ -43,6 +43,9 @@ const RULES: Record<string, Rule> = {
   deadline_soon: { ttl: 1 * HOUR, urgency: "high" },
   // D-152: «Сдайте отчёт за день» — worth it while the evening lasts, not the next morning
   daily_report_remind: { ttl: 4 * HOUR, urgency: "high" },
+  // D-191: «Доброе утро · 2 дела на сегодня» — a plan for the morning: it need not jump the
+  // phone's doze, and past lunch it is no longer news (Лента says the same when opened)
+  morning_brief: { ttl: 4 * HOUR, urgency: "normal" },
   // the director's side of a task
   pending_review: { ttl: 24 * HOUR, urgency: "high" },
   declined: { ttl: 24 * HOUR, urgency: "high" },

@@ -4,7 +4,6 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
-import { InstallHint } from "@/components/InstallHint";
 import { ACT_MS, ACT_TOUCH, type MascotAct, type MascotState } from "@/components/brand/Mascot";
 import { CalendarList } from "@/components/calendar/CalendarList";
 import { EtherSection } from "@/components/ether/EtherSection";
@@ -43,10 +42,11 @@ import { useStableActions, useStableCallback } from "@/components/pulse/stable";
 import { EVENT_ACT, useEmployeeEvents } from "@/components/pulse/useEmployeeEvents";
 import { useMascotActs } from "@/components/pulse/useMascotActs";
 import { useSpeechWith, type Voice } from "@/components/pulse/useSpeech";
-import { PushCard } from "@/components/push/PushCard";
 import { ErrandCards } from "@/components/secretary/ErrandCards";
 import { SecretaryFace } from "@/components/secretary/SecretaryFace";
 import { useSecretaryActs } from "@/components/secretary/useSecretaryActs";
+import { SetupEntry } from "@/components/setup/SetupEntry";
+import { SetupLaunch } from "@/components/setup/SetupLaunch";
 import { TaskCard } from "@/components/tasks/TaskCard";
 import { nextEvent, startsSoon, todayCount } from "@/lib/calendar/agenda";
 import { pendingInvites } from "@/lib/calendar/invites";
@@ -108,13 +108,11 @@ const CHEER_AFTER_MS = 1_100;
 const PILL_MS = 4_000;
 /** A pile of events is played one after another, but never more than this far behind. */
 const QUEUE_MAX_MS = 3_000;
-/** The cards that tell the person the phone is not set up yet — one element, never drawn again by a tap. */
-const SERVICE = (
-  <>
-    <PushCard bubble />
-    <InstallHint bubble />
-  </>
-);
+/**
+ * The one line that tells the person the phone is not set up yet — the way into «Подключение»
+ * (D-190), where the push and install cards were; one element, never drawn again by a tap.
+ */
+const SERVICE = <SetupEntry />;
 /** The copy of a card taken in hand has reached the face. */
 const landed = () => haptic(8);
 /** What leaves with the face dozing off, or the balls coming out, goes in a short fade, not in one frame. */
@@ -727,7 +725,8 @@ export default function FeedPage() {
             for the card, so a switch of balls does not mount them anew; at the card's bottom
             while the panel is short, and when another panel moves them they glide there (D-178) */}
         <motion.div layout="position" transition={BAND_SPRING} className="mt-auto flex flex-col gap-2 pt-4 empty:hidden" data-testid="card-service">
-          {SERVICE}
+          {/* the phone's line under «Дела» only, not under every ball (D-190) */}
+          {panel === "tasks" ? SERVICE : null}
         </motion.div>
       </div>
     ),
@@ -876,6 +875,9 @@ export default function FeedPage() {
           тап — дела, сообщения, эфир, календарь, заявки
         </p>
       ) : null}
+
+      {/* the first sign-in on a phone opens «Подключение» once (D-190) */}
+      <SetupLaunch />
 
       <QuietEventSheet event={openEvent} onClose={closeEvent} meId={meId} isDirector={false} />
 

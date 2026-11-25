@@ -6,7 +6,8 @@ import { firstNameOf, stems } from "@/lib/text/normalize";
 /**
  * The dictionary learns from the director's own corrections (D-111, second wave): a name
  * the AI could not place, and the person the director placed it on, is a form worth
- * remembering. Pure — the board's «Запомнить?» and the «Из ваших записей» list share it.
+ * remembering. Pure — the confirmation's learning without a tap (D-192) and the «Из ваших записей»
+ * list share it.
  */
 
 /** What was heard for one entity: the verbatim mentions and how the matcher took them. */

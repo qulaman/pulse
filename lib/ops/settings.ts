@@ -34,6 +34,7 @@ export function mergeSettingsPatch(current: CompanySettings, body: SettingsPatch
   if (body.points_rules) patch.points_rules = body.points_rules;
   if (body.ether_events) patch.ether_events = body.ether_events;
   if (body.voice_retention) patch.voice_retention = body.voice_retention;
+  if (body.morning_brief) patch.morning_brief = { ...current.morning_brief, ...body.morning_brief };
   // D-152: `started_on` / `checked_on` are the server's
   if (body.daily_report) patch.daily_report = mergeDailyReport(current.daily_report, body.daily_report, today);
   return patch;

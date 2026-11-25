@@ -3,17 +3,18 @@
 import Link from "next/link";
 import { memo } from "react";
 
-import { InstallHint } from "@/components/InstallHint";
-import { PushCard } from "@/components/push/PushCard";
+import { SetupEntry } from "@/components/setup/SetupEntry";
 import { Button } from "@/components/ui/Button";
 
 import type { Exchange } from "./useQuestionExchange";
 
 /**
- * The service lines (a draft not sent, nobody in the team yet, push, the home screen): under the
+ * The service lines (a draft not sent, nobody in the team yet, the phone not set up): under the
  * band's words on the ring, under the open ball in the card. Their own part — a tap does not touch them (D-178).
+ * The phone is one line into «Подключение» (D-190) where the push and install cards were — `setup`
+ * false leaves it out: the card shows it under «Дела» only, not under every ball.
  */
-export const ServiceLines = memo(function ServiceLines({ draftCount, noTeam }: { draftCount: number; noTeam: boolean }) {
+export const ServiceLines = memo(function ServiceLines({ draftCount, noTeam, setup = true }: { draftCount: number; noTeam: boolean; setup?: boolean }) {
   return (
     <>
       {draftCount > 0 ? (
@@ -26,11 +27,10 @@ export const ServiceLines = memo(function ServiceLines({ draftCount, noTeam }: {
       {noTeam ? (
         <Link href="/people/new" className="card-in relative block py-1 pl-4 text-[15px] leading-5">
           <span aria-hidden className="absolute left-0 top-[8px] h-2 w-2 rounded-full bg-accent" />
-          В команде пока никого. Добавь первого сотрудника. <span className="text-accent">Добавить ›</span>
+          В команде пока никого. Добавьте первого сотрудника. <span className="text-accent">Добавить ›</span>
         </Link>
       ) : null}
-      <PushCard bubble />
-      <InstallHint bubble />
+      {setup ? <SetupEntry from="pulse" /> : null}
     </>
   );
 });

@@ -82,13 +82,14 @@ export async function proxy(request: NextRequest) {
   if (pathname === "/" || isSignInPath(pathname)) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, is_active")
       .eq("id", userId)
       .maybeSingle();
-    // An auth user without a profile (not onboarded yet) stays on /login instead of
-    // bouncing between /login -> home -> layout guard -> /login forever.
-    if (!profile) {
-      return pathname === "/login" ? response : redirectTo(request, response, "/login");
+    // An auth user without a profile (not onboarded yet) or a switched-off one («Ушедшие», D-160)
+    // stays on the sign-in screen instead of bouncing between /login -> home -> layout guard
+    // (403 inactive) -> /login forever; the screen says the account is closed.
+    if (!profile || !profile.is_active) {
+      return isSignInPath(pathname) ? response : redirectTo(request, response, "/login");
     }
     // a computer goes straight to the desk's home: one hop instead of two (D-153)
     const desk = onDesk(request) && canManageTeam(profile.role);

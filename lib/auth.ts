@@ -115,6 +115,20 @@ async function loadProfile(supabase: SupabaseClient<Database>, token?: string): 
   };
 }
 
+/**
+ * The browser holds a live session of a switched-off person («Ушедшие», D-160): the sign-in
+ * screen says so instead of looking as if nothing happened. Any other state — no session, a
+ * working one — is false.
+ */
+export async function sessionIsClosed(): Promise<boolean> {
+  try {
+    await cookieProfile();
+    return false;
+  } catch (error) {
+    return error instanceof AuthError && error.code === "inactive";
+  }
+}
+
 /** Throws 403 unless the profile carries one of the allowed roles. */
 export function requireRole(profile: SessionProfile, ...roles: Role[]): void {
   if (!roles.includes(profile.role)) {

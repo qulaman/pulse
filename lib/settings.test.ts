@@ -176,6 +176,26 @@ describe("voice retention (D-155 §3)", () => {
   });
 });
 
+describe("the employee's morning brief (D-191)", () => {
+  it("is on for a fresh company and for settings saved before the key existed", () => {
+    expect(parseCompanySettings({}).morning_brief).toEqual({ enabled: true });
+    expect(parseCompanySettings({ points_enabled: true, daily_report: { enabled: false } }).morning_brief).toEqual({ enabled: true });
+  });
+
+  it("keeps a company's «off»; a broken section reads as on and costs no other setting", () => {
+    expect(parseCompanySettings({ morning_brief: { enabled: false } }).morning_brief).toEqual({ enabled: false });
+    const settings = parseCompanySettings({ morning_brief: "nope", points_enabled: true });
+    expect(settings.morning_brief).toEqual({ enabled: true });
+    expect(settings.points_enabled).toBe(true);
+  });
+
+  it("the patch takes the section whole, with a boolean only", () => {
+    expect(SettingsPatchSchema.safeParse({ morning_brief: { enabled: false } }).success).toBe(true);
+    expect(SettingsPatchSchema.safeParse({ morning_brief: {} }).success).toBe(false);
+    expect(SettingsPatchSchema.safeParse({ morning_brief: { enabled: "no" } }).success).toBe(false);
+  });
+});
+
 describe("the lab for the whole team (D-150)", () => {
   it("is closed for a fresh company and keeps what the company stored", () => {
     expect(parseCompanySettings({}).lab_for_all).toBe(false);

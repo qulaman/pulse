@@ -6,7 +6,7 @@ import { useState } from "react";
 import { ReportIcon } from "@/components/daily-report/icons";
 import { ScenePicker } from "@/components/secretary/ScenePicker";
 import { useDraft } from "@/components/settings/draft";
-import { BookIcon, ClockIcon, CupIcon, MicIcon, MoonIcon, ParseIcon, StarIcon } from "@/components/settings/icons";
+import { BookIcon, ClockIcon, CupIcon, MicIcon, MoonIcon, ParseIcon, StarIcon, SunriseIcon } from "@/components/settings/icons";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { DateField } from "@/components/ui/datetime/DateField";
@@ -904,6 +904,39 @@ export function DailyReportSection() {
             })
           }
           onReset={() => update({ daily_report: server.daily_report })}
+        />
+      ) : null}
+    </Disclosure>
+  );
+}
+
+/**
+ * The employee's morning brief (D-191): one push as the delivery window opens on a working day —
+ * the person's tasks for today and meetings, a tap opens Лента. On or off for the whole company;
+ * the time is the window's start, the days are the daily report's working days.
+ */
+export function MorningBriefSection() {
+  const { draft, server, update, dirty, save, saving } = useDraft();
+  const on = draft.morning_brief.enabled;
+  return (
+    <Disclosure
+      icon={<SunriseIcon />}
+      title="Утренняя сводка"
+      dirty={dirty.morning_brief}
+      summary={on ? `в ${draft.delivery_window.from}, в рабочие дни` : "выключена"}
+      hint="Каждому — его дела на сегодня и встречи одним пушем; нажал — открылась Лента."
+    >
+      <Toggle
+        label="Утренняя сводка сотрудникам"
+        hint="В начале окна доставки; пустой день — без пуша"
+        checked={on}
+        onChange={(enabled) => update({ morning_brief: { enabled } })}
+      />
+      {dirty.morning_brief ? (
+        <SectionActions
+          pending={saving("morning_brief")}
+          onSave={() => save({ morning_brief: { enabled: draft.morning_brief.enabled } })}
+          onReset={() => update({ morning_brief: server.morning_brief })}
         />
       ) : null}
     </Disclosure>

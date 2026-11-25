@@ -77,6 +77,17 @@ export const MoonIcon = () => (
   </svg>
 );
 
+/** The sun over the horizon: the morning brief (D-191). */
+export const SunriseIcon = () => (
+  <svg {...stroke}>
+    <path d="M5.8 13.5a4.2 4.2 0 0 1 8.4 0" />
+    <line x1="3" y1="16.2" x2="17" y2="16.2" />
+    <line x1="10" y1="3.6" x2="10" y2="5.8" />
+    <line x1="4.6" y1="7.4" x2="6" y2="8.8" />
+    <line x1="15.4" y1="7.4" x2="14" y2="8.8" />
+  </svg>
+);
+
 export const CupIcon = () => (
   <svg {...stroke}>
     <path d="M3.6 7.6h10v4.6a4 4 0 0 1-4 4h-2a4 4 0 0 1-4-4z" />

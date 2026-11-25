@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 
-import { InstallHint } from "@/components/InstallHint";
 import { ReportIcon } from "@/components/daily-report/icons";
 import { PulseMark } from "@/components/brand/PulseMark";
 import { HapticsRow } from "@/components/profile/HapticsRow";
@@ -12,6 +11,7 @@ import { SignOutOthersRow } from "@/components/profile/SignOutOthersRow";
 import { PasswordRow } from "@/components/profile/PasswordRow";
 import { PointsCard } from "@/components/profile/PointsCard";
 import { ProfileCard } from "@/components/profile/ProfileCard";
+import { SetupRow } from "@/components/setup/SetupRow";
 import { PageHead } from "@/components/ui/PageHead";
 import { Row, RowGroup } from "@/components/ui/Row";
 import { SignOutRow } from "@/components/profile/SignOutRow";
@@ -70,11 +70,11 @@ export default async function ProfilePage() {
 
         <h2 className="eyebrow mt-6 px-1">Приложение</h2>
         <RowGroup className="mt-2">
+          {/* «Подключение · 2 из 4» until the phone is set up, then «Проверить телефон» (D-190) —
+              the home screen, push, a test push and the microphone in one place */}
+          <SetupRow />
           <VersionRow />
         </RowGroup>
-
-        {/* the way in stays here until installed, whatever was dismissed on Пульс (D-125) */}
-        <InstallHint sticky />
 
         <SignOutRow action={signOut} userId={profile.userId} className="mt-6" />
 

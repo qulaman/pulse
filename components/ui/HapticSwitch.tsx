@@ -19,7 +19,7 @@ export function useIosHapticMode(): IosHapticMode {
  * ticks when the finger itself toggles it — since iOS 26.5 never from script. So a tap
  * primitive carries one, transparent over the whole control: the tap lands on it, it ticks,
  * and the click goes on to the control as the tap's own. Which way ticks — the switch inside
- * a label, or the bare switch stretched — is checked on a real iPhone in «Лаб → Вибрация»;
+ * a label, or the bare switch stretched — the person picks on the phone in Профиль → «Вибрация» (D-193);
  * until a phone picks one there, nothing is drawn. The host is `position: relative`.
  */
 export function HapticSwitch({ mode: forced }: { mode?: Exclude<IosHapticMode, "off"> }) {

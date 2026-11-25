@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { Golos_Text } from "next/font/google";
 import localFont from "next/font/local";
 
 import { AppUpdate } from "@/components/AppUpdate";
@@ -22,10 +21,22 @@ import { INSTALL_CATCHER } from "@/lib/push/install-catcher";
 import { ToastHost } from "@/components/ui/Toast";
 import "./globals.css";
 
-// Self-hosted at build time (no runtime request, works offline). One face for every letter on every
-// screen, phone and desk alike: Golos Text, variable 400–900; `cyrillic-ext` holds the Kazakh
-// letters (Ә Ғ Қ Ң Ө Ү Һ) and is preloaded, so a name reads in one face offline too (D-179).
-const golos = Golos_Text({ subsets: ["cyrillic", "cyrillic-ext", "latin"], variable: "--font-golos", display: "swap" });
+// One face for every letter on every screen, phone and desk alike: Golos Text, variable 400–900
+// (D-179). The file lives in the repo, so a build never asks Google for it (the way IBM Plex once
+// failed the Vercel build, below). It is Google Fonts' GolosText[wght].ttf v2.004 cut to the union
+// of the four ranges Google serves the family in (cyrillic, cyrillic-ext, latin, latin-ext) —
+// 70 KB, one preloaded file where Google's three preloaded ones were 77 KB; cyrillic-ext holds
+// the Kazakh letters (Ә Ғ Қ Ң Ө Ү Һ), so a name reads in one face offline too:
+//   pyftsubset GolosText[wght].ttf --unicodes=<the four ranges> --layout-features='*'
+//     --name-IDs='*' --notdef-outline --no-hinting --flavor=woff2
+// The fallback while it loads is Arial brought to Golos's metrics, as next/font/google made it.
+const golos = localFont({
+  src: "./fonts/golos-text.woff2",
+  weight: "400 900",
+  variable: "--font-golos",
+  display: "swap",
+  adjustFontFallback: "Arial",
+});
 // Golos's figures are of uneven width (a timer jitters, a column will not line up), so every digit
 // comes from a cut of Inter that holds only 0–9 : + − % — Inter's latin file (opsz, wght) from
 // Google Fonts cut with

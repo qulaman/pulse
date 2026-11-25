@@ -564,6 +564,11 @@ export default function PulsePage() {
 
   const noTeam = Boolean(peopleRows) && team.length === 0;
   const serviceLines = useMemo(() => <ServiceLines draftCount={draftCount} noTeam={noTeam} />, [draftCount, noTeam]);
+  // in the card the phone's line stands under «Дела» only, not under every ball (D-190)
+  const cardService = useMemo(
+    () => <ServiceLines draftCount={draftCount} noTeam={noTeam} setup={panel === "tasks"} />,
+    [draftCount, noTeam, panel],
+  );
 
   // somebody at the door, the secretary's words on the wall: above whatever is open (D-96, D-116)
   const { refetchErrands, actions: deskActions, dndAction } = desk;
@@ -649,11 +654,11 @@ export default function PulsePage() {
             the card, so a switch of balls does not mount them anew; at the card's bottom while
             the panel is short, and when another panel moves them they glide there (D-178) */}
         <motion.div layout="position" transition={BAND_SPRING} className="mt-auto flex flex-col gap-2 pt-2 empty:hidden" data-testid="card-service">
-          {serviceLines}
+          {cardService}
         </motion.div>
       </div>
     ),
-    [asks, panel, panelContent, serviceLines],
+    [asks, panel, panelContent, cardService],
   );
 
   // the balls live in the head and travel with the face (D-178): the ring dives into it as the row

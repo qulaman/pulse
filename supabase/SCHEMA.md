@@ -4,7 +4,7 @@
 
 Зачем он нужен. Схема базы — результат всех миграций по порядку. Функция при каждой правке записывается целиком заново, поэтому одно имя встречается в нескольких файлах, а действует только последнее определение. Указатель говорит, где оно лежит. Перед правкой функции открой файл из столбца «Действует» и копируй тело оттуда, а не из первого найденного поиском.
 
-Миграций — 85, строк — 24240. Функций — 214, их определений — 337; устаревших тел — 9231 строк (38 % текста миграций).
+Миграций — 87, строк — 24883. Функций — 217, их определений — 343; устаревших тел — 9651 строк (39 % текста миграций).
 
 ## Функции
 
@@ -49,6 +49,7 @@
 | `dispute_points` | `20261118120000_daily_report_remind_excuse.sql:167` | 3 |
 | `drop_announcement_pushes` | `20260924150000_push_foundation.sql:154` | 1 |
 | `edit_event` | `20260923200000_calendar_edit_delete.sql:108` | 1 |
+| `employee_morning_briefs_due` | `20261124110000_morning_brief.sql:111` | 1 |
 | `errand_answer` | `20260923235000_secretary_link.sql:172` | 1 |
 | `errand_ask` | `20260923235000_secretary_link.sql:126` | 1 |
 | `errand_eta` | `20260923235000_secretary_link.sql:95` | 1 |
@@ -67,7 +68,7 @@
 | `events_reset_reminder` | `20260918150000_calendar_events.sql:216` | 1 |
 | `excuse_daily_report` | `20261118120000_daily_report_remind_excuse.sql:74` | 1 |
 | `extend_task_deadline` | `20261123120000_deadline_fixes.sql:17` | 3 |
-| `fn_rating` | `20260922120100_errands.sql:44` | 2 |
+| `fn_rating` | `20261124100000_on_time_by_handover.sql:12` | 3 |
 | `is_event_participant` | `20260918150000_calendar_events.sql:80` | 1 |
 | `issue_login_code` | `20261104130000_ops_console.sql:1510` | 2 |
 | `mark_thread_read` | `20260917130000_message_deliveries.sql:136` | 2 |
@@ -77,6 +78,8 @@
 | `mind_board_copy` | `20261021100000_board_sketch.sql:213` | 2 |
 | `mind_board_point_changed` | `20260924090000_mind_boards.sql:396` | 1 |
 | `mind_board_touch_tv` | `20261021150000_board_live_week.sql:232` | 2 |
+| `morning_brief_body` | `20261124110000_morning_brief.sql:45` | 1 |
+| `morning_brief_on` | `20261124110000_morning_brief.sql:34` | 1 |
 | `my_daily_report` | `20261103120000_daily_report_soft_start.sql:51` | 2 |
 | `my_daily_report_history` | `20261028120000_daily_reports.sql:379` | 1 |
 | `next_delivery_slot` | `20260911220000_reassign_window_reply_dedupe.sql:10` | 1 |
@@ -200,7 +203,7 @@
 | `tv_events_points` | `20261014120000_points_game.sql:578` | 2 |
 | `tv_events_prune` | `20260917190000_tv_events.sql:168` | 1 |
 | `tv_events_task` | `20260917190000_tv_events.sql:84` | 1 |
-| `tv_focus` | `20260925180000_tv_wall_v4.sql:357` | 4 |
+| `tv_focus` | `20261124100000_on_time_by_handover.sql:201` | 5 |
 | `tv_guest_on` | `20260923230000_tv_wall_v2.sql:59` | 1 |
 | `tv_heartbeat` | `20261118140000_tv_wall_v5.sql:271` | 3 |
 | `tv_overlay` | `20261118140000_tv_wall_v5.sql:307` | 3 |
@@ -208,7 +211,7 @@
 | `tv_pair_issue` | `20261118140100_tv_pairing.sql:91` | 1 |
 | `tv_pair_poll` | `20261118140100_tv_pairing.sql:163` | 1 |
 | `tv_pair_release` | `20261118140100_tv_pairing.sql:199` | 1 |
-| `tv_rating` | `20261118120000_daily_report_remind_excuse.sql:693` | 4 |
+| `tv_rating` | `20261124100000_on_time_by_handover.sql:77` | 5 |
 | `tv_stage` | `20261021150000_board_live_week.sql:38` | 1 |
 | `tv_state_board_point_reset` | `20260925150000_mind_board_v2.sql:137` | 1 |
 | `tv_summary` | `20261118150000_tv_summary_excused.sql:6` | 7 |

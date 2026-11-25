@@ -54,7 +54,7 @@ Push в `main` — выкатка для всех компаний: Vercel то�
 
 ## 3. С нуля
 
-Нужны Node 20+, pnpm и Supabase CLI.
+Нужны Node 24 (`engines` в `package.json` закреплён на `24.x`, так же собирает Vercel), pnpm и Supabase CLI.
 
 1. `pnpm install`, `.env.example` скопировать в `.env.local`.
 2. Проект Supabase во Франкфурте с асимметричным ключом JWT: с ним `getClaims()` проверяет сессию без похода в Auth (`lib/auth.ts`). `supabase link --project-ref <ref>`.

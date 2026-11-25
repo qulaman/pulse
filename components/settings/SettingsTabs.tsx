@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
+import { NoPushSummary } from "@/components/people/NoPushSummary";
 import { TeamRoster } from "@/components/people/TeamRoster";
 import { CompanyForm } from "@/components/settings/CompanyForm";
 import { SettingsDraftProvider, SettingsReady, useDirtySections } from "@/components/settings/draft";
@@ -25,6 +26,7 @@ import {
   DailyReportSection,
   DictionarySection,
   MascotSection,
+  MorningBriefSection,
   ParserSection,
   PointsSection,
   SecretarySection,
@@ -100,7 +102,7 @@ function TabsBody({ initialTab, director }: { initialTab: SettingsTab; director:
   const dirty: Record<SettingsTab, boolean> = {
     company: companyDirty || !!sections.window,
     app: !!(sections.secretary || sections.mascot),
-    team: !!(sections.points || sections.daily_report),
+    team: !!(sections.points || sections.daily_report || sections.morning_brief),
     ai: !!(sections.stt || sections.parser || sections.conventions || sections.voice_retention),
   };
 
@@ -263,18 +265,17 @@ function TeamPanel({ director }: { director: boolean }) {
   const people = usePeople();
   const me = useMe();
   const push = usePushHealth();
-  // people who hear about work only by opening Pulse (D-114); the wall has no phone
-  const deaf = (people.data ?? []).filter(
-    (p) => p.is_active && p.role !== "tv" && ["off", "broken"].includes(push.data?.get(p.id)?.state ?? "ok"),
-  ).length;
+  const who = me.data ? { id: me.data.userId, role: me.data.role } : null;
 
   return (
     <>
       <div className="flex flex-col gap-2">
-        <SettingsReady bones={director ? 2 : 1}>
+        <SettingsReady bones={director ? 3 : 1}>
           <PointsSection />
           {/* the daily report is the director's policy (D-152): days, reminder, the module switch */}
           {director ? <DailyReportSection /> : null}
+          {/* so is the employees' morning brief (D-191) */}
+          {director ? <MorningBriefSection /> : null}
         </SettingsReady>
         <RowGroup>
           {director ? <Row icon={<LoadIcon />} title="Загрузка команды" value="кто чем занят" href="/people" /> : null}
@@ -293,21 +294,9 @@ function TeamPanel({ director }: { director: boolean }) {
           <Button size="sm">+ Добавить</Button>
         </Link>
       </div>
-      {deaf > 0 ? (
-        <p className="mt-2 rounded-[12px] border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] leading-[18px] text-danger">
-          {deaf === 1 ? "У 1 человека не работают уведомления" : `У ${deaf} человек не работают уведомления`} — о задачах они узнают, только
-          открыв Pulse. Откройте карточку: там «Прислать проверку».
-        </p>
-      ) : null}
-      {people.isLoading ? (
-        <TeamListBone />
-      ) : (
-        <TeamRoster
-          people={people.data ?? []}
-          me={me.data ? { id: me.data.userId, role: me.data.role } : null}
-          push={push.data}
-        />
-      )}
+      {/* who hears about work only by opening Pulse (D-114), by name, a tap on each (D-190) */}
+      <NoPushSummary people={people.data ?? []} push={push.data} me={who} />
+      {people.isLoading ? <TeamListBone /> : <TeamRoster people={people.data ?? []} me={who} push={push.data} />}
     </>
   );
 }

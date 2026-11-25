@@ -266,6 +266,24 @@ export function TeamPanel({ director }: { director: boolean }) {
         </SettingsGroup>
       ) : null}
 
+      {director ? (
+        <SettingsGroup
+          id="morning"
+          title="Утренняя сводка"
+          about={`Каждому — его дела на сегодня и встречи одним пушем в ${draft.delivery_window.from}, в начале окна доставки, в рабочие дни «Ежедневного отчёта»; нажал — открылась Лента.`}
+        >
+          <SettingRow
+            id="morning-brief"
+            label="Утренняя сводка сотрудникам"
+            hint="«2 дела на сегодня, 1 просрочено · встреча в 15:00»; пустой день — без пуша"
+            htmlFor="ctl-morning-brief"
+            changed={draft.morning_brief.enabled !== server.morning_brief.enabled}
+          >
+            <Switch id="ctl-morning-brief" label="Утренняя сводка сотрудникам" checked={draft.morning_brief.enabled} onChange={(enabled) => update({ morning_brief: { enabled } })} />
+          </SettingRow>
+        </SettingsGroup>
+      ) : null}
+
       <GroupNote>
         Люди, роли и пароли — в разделе{" "}
         <Link href="/desk/team" className="font-medium text-text underline underline-offset-2">

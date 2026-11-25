@@ -79,7 +79,7 @@
 
 ### 4.4. Доставка
 
-**`notification_deliveries`** — outbox пушей. `meta` несёт готовые `title`, `body`, `url` и ключи производителя — воркер ничего не сочиняет. `event_kind` — вид (BACKEND §4); `deliver_after` — окно доставки данными; `sent_at`, `seen_at`, `acted_at` — квитанции «отправлено / увидел / принял» (D-32); `claimed_at` — захват воркером; `category`, `mode`, `held`, `silent`, `private`, `digest_id` — маршрут по правилам директора (§8.3). Читают адресат и директор. Ушедшие живут 30 дней, неушедшие — 7.
+**`notification_deliveries`** — outbox пушей. `meta` несёт готовые `title`, `body`, `url` и ключи производителя — воркер ничего не сочиняет. `event_kind` — вид (BACKEND §4); `deliver_after` — окно доставки данными; `sent_at`, `seen_at`, `acted_at` — квитанции «отправлено / увидел / принял» (D-32); `claimed_at` — захват воркером; `category`, `mode`, `held`, `silent`, `private`, `digest_id` — маршрут по правилам директора (§8.3). Читают адресат и директор. Ушедшие живут 30 дней, неушедшие — 7. Уникальный частичный ключ `notification_deliveries_morning_brief_key` (`user_id`, `meta->>'date'`) при `event_kind = 'morning_brief'` — одна утренняя сводка человеку в день (D-191).
 
 **`push_subscriptions`** — браузер с пушами: `endpoint` уникален, `enabled`, `last_ok_at`, `last_error`. Читают сам и директор; пишет `app/api/push/subscribe/route.ts` под service role от имени вызывающего.
 
@@ -155,6 +155,7 @@
 | `delivery_window` | `from`, `to`, умолчание 08:00–21:00 | `next_delivery_slot()` | D-38 |
 | `secretary` | кнопки, повтор пуша, телефон охраны | `lib/errands/` | D-79, D-99 |
 | `daily_report` | дни, праздники, часы; `ask_from` — с какого часа Лента просит отчёт (читает только телефон, D-167); `started_on`, `checked_on` — сервера | функции отчёта | D-152, D-155, D-167 |
+| `morning_brief` | `enabled`, по умолчанию включена: утренняя сводка команде | `morning_brief_on()`, `employee_morning_briefs_due` | D-191 |
 | `voice_retention` | `closed_days`, `orphan_days` | `lib/voice/retention.ts` | D-155 |
 
 ## 6. RLS
@@ -277,6 +278,7 @@ create policy things_select on things for select using (
 | `daily_reports_due_missed` | прошедший рабочий день без отчёта — `missed`, минус — только сдававшему раньше (D-155 п.1) |
 | `recurrence_spawn` | задачи и встречи повторов, день — одна вещь; проспанный день не выдаётся |
 | `publish_due_scheduled` | отложенные с наступившим `scheduled_send_at` уходят в `sent` |
+| `employee_morning_briefs_due` | утренняя сводка команде (D-191): раз в местный рабочий день человеку с включённым устройством, в окне доставки, при `morning_brief.enabled`; просроченные, доработки, новые, срок сегодня и встречи впереди, слова — `morning_brief_body()`; пусто — без строки; ключ (человек, день) |
 | `events_due_reminders`, `notes_due_reminders` | «Скоро» участникам и на стену, «напомни мне» |
 | `errands_due_escalation`, `errands_expire`, `errands_due_remind`, `visits_due_expiry` | повтор ничьей просьбы, конец просьбы со сроком, напоминание о сроке, истечение визита |
 | `unseen_task_alerts_due`, `overdue_alerts_due`, `deadline_reminders_due` | «Задача не принята», «Просрочено», «Скоро срок» за час |
@@ -286,7 +288,7 @@ create policy things_select on things for select using (
 
 ### 7.8. Служебные
 
-Клиент их не зовёт: помощники RLS (`auth_session_live`, `subordinates`, `team_role`); чтение настроек (`points_rule`, `daily_report_workday`, `voice_retention_days`, `notify_prefs_of`); доставка (`next_delivery_slot`, `delivery_category`, `push_when` — слова срока как `lib/ai/time.ts`); очки (`task_sent_at`, `task_streak_of`); стена (`tv_emit`, `tv_touch`, `tv_task_story`); календарь (`event_release`); заявки (`errand_recipients`); функции триггеров.
+Клиент их не зовёт: помощники RLS (`auth_session_live`, `subordinates`, `team_role`); чтение настроек (`points_rule`, `daily_report_workday`, `voice_retention_days`, `notify_prefs_of`, `morning_brief_on`); доставка (`next_delivery_slot`, `delivery_category`, `push_when` — слова срока как `lib/ai/time.ts`, `morning_brief_body` — слова утренней сводки); очки (`task_sent_at`, `task_streak_of`); стена (`tv_emit`, `tv_touch`, `tv_task_story`); календарь (`event_release`); заявки (`errand_recipients`); функции триггеров.
 
 ## 8. Триггеры
 
@@ -357,7 +359,7 @@ Service role проходит стражи `tasks` и `profiles` без пров
 
 **Сид** (только dev). Компания «Demo Group», девять профилей (директор, менеджер, завхоз, киоск `tv`, четыре сотрудника, тестовый директор). Фикстуры тестов: два «Ерлана» с общими алиасами, подчинённый менеджера, сотрудница в отпуске, задачи во всех статусах, файл в чужой папке `voice`. Токен-колонки `auth.users` — пустые строки: с `null` GoTrue отвечает 500. pgTAP ставит сид, чтобы фреймворк не уехал в прод. Реальную компанию заводит `pnpm seed:client` (SETUP §5).
 
-**pgTAP.** Файл на фичу, номер — порядок появления: RLS ядра и стражи (001–005, 014, 026, 053, 055), функции задач (007, 008, 011, 013, 017, 037, 038, 040, 049), конвейер (006, 018, 043 про минус голосом, 047), сообщения и доставка (010, 012, 015, 016, 029–032, 036), очки (009, 039, 041), календарь, заявки и визиты (020–024, 028, 054), стена и доски (019, 022, 024, 025, 027, 033–035, 044–046), отчёт (048, 050, 057), вход (042, 043), голос (051), консоль (052), граница компаний и гранты (062). Вторую компанию создают сами 015, 042 и 044–055. Функции магазина тестов не имеют. 052 сверяет гранты функций консоли со своим списком.
+**pgTAP.** Файл на фичу, номер — порядок появления: RLS ядра и стражи (001–005, 014, 026, 053, 055), функции задач (007, 008, 011, 013, 017, 037, 038, 040, 049), конвейер (006, 018, 043 про минус голосом, 047), сообщения и доставка (010, 012, 015, 016, 029–032, 036, 061 — утренняя сводка), очки (009, 039, 041), календарь, заявки и визиты (020–024, 028, 054), стена и доски (019, 022, 024, 025, 027, 033–035, 044–046), отчёт (048, 050, 057), вход (042, 043), голос (051), консоль (052), граница компаний и гранты (062). Вторую компанию создают сами 015, 042, 044–055 и 061. Функции магазина тестов не имеют. 052 сверяет гранты функций консоли со своим списком.
 
 ## 12. Не построено
 

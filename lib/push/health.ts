@@ -43,15 +43,42 @@ export function channelHealth(row: HealthRow | undefined, now: Date = new Date()
 
 /** «Проверка связи»: the one test push's fate, read every couple of seconds. */
 export type TestRow = { status: string; seen_at: string | null; sent_at: string | null; last_error: string | null };
-export type TestVerdict = { done: boolean; tone: "ok" | "muted" | "warn"; text: string };
+/**
+ * `cause` of a verdict that went wrong: `channel` — the phone's subscription is dead (switch it on
+ * anew), `late` — nothing showed in time (the phone holds it: battery, focus), `send` — the test
+ * itself did not leave. «Подключение» picks its next move by it (D-190).
+ */
+export type TestVerdict = { done: boolean; tone: "ok" | "muted" | "warn"; text: string; cause?: "channel" | "late" | "send" };
 
 export function testVerdict(row: TestRow | null, at: (iso: string) => string): TestVerdict {
   if (!row) return { done: false, tone: "muted", text: "Отправляю…" };
   if (row.seen_at) return { done: true, tone: "ok", text: `Пришло на телефон · ${at(row.seen_at)}` };
   if (row.status === "failed") {
-    if (row.last_error === "no_subscription") return { done: true, tone: "warn", text: "Уведомления не включены на телефоне" };
-    return { done: true, tone: "warn", text: "Пуш не прошёл — включите уведомления заново" };
+    if (row.last_error === "no_subscription") return { done: true, tone: "warn", text: "Уведомления не включены на телефоне", cause: "channel" };
+    return { done: true, tone: "warn", text: "Пуш не прошёл — включите уведомления заново", cause: "channel" };
   }
   if (row.status === "sent") return { done: false, tone: "muted", text: "Отправлено, ждём телефон…" };
   return { done: false, tone: "muted", text: "Отправляю…" };
+}
+
+/** One person whose pushes do not reach them, with the reason in words (D-190). */
+export type NoPush = { id: string; fullName: string; text: string; state: HealthState };
+
+/**
+ * «Без уведомлений: Айгуль, Ерлан» — the active people of the company (not the wall) whose channel
+ * is off or broken, by name. The director and the secretary read it over the roster; no button
+ * pings them: a push would not reach them anyway.
+ */
+export function noPushPeople(
+  people: readonly { id: string; full_name: string; is_active: boolean; role: string }[],
+  health: ReadonlyMap<string, Health> | undefined,
+): NoPush[] {
+  if (!health) return [];
+  return people
+    .filter((p) => p.is_active && p.role !== "tv")
+    .flatMap((p) => {
+      const verdict = health.get(p.id);
+      return verdict && (verdict.state === "off" || verdict.state === "broken") ? [{ id: p.id, fullName: p.full_name, text: verdict.text, state: verdict.state }] : [];
+    })
+    .sort((a, b) => a.fullName.localeCompare(b.fullName, "ru"));
 }

@@ -2730,6 +2730,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      employee_morning_briefs_due: { Args: { p_now?: string }; Returns: number }
       errand_answer: {
         Args: { client_request_id?: string; p_answer: string; p_id: string }
         Returns: Json

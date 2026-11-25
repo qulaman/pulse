@@ -58,15 +58,25 @@ async function readDirector(since: string) {
   return { done30: 0, onTimePct: null, open: open.count ?? 0, strip: stripOf(created.map((task) => task.created_at)), people: people.count ?? 0, sent30: created.length };
 }
 
+/**
+ * «В срок» is the moment of the hand-in, not of the director's acceptance (D-189), as the rating and
+ * the wall count it; a task closed without a hand-in is judged by its closing; no deadline — on time.
+ */
+export function handedInOnTime(task: { deadline: string | null; completed_at: string | null; closed_at: string | null }): boolean {
+  if (!task.deadline) return true;
+  const at = task.completed_at ?? task.closed_at;
+  return at !== null && Date.parse(at) <= Date.parse(task.deadline);
+}
+
 /** A person's month: what they handed in and how much of it by the deadline, what is still open. */
 async function readPerson(userId: string, since: string) {
   const supabase = createBrowserSupabase();
   const [done, open] = await Promise.all([
-    supabase.from("tasks").select("deadline, closed_at").eq("assignee_id", userId).eq("status", "done").gte("closed_at", since),
+    supabase.from("tasks").select("deadline, completed_at, closed_at").eq("assignee_id", userId).eq("status", "done").gte("closed_at", since),
     supabase.from("tasks").select("id", { count: "exact", head: true }).eq("assignee_id", userId).in("status", OPEN),
   ]);
   const rows = done.data ?? [];
-  const onTime = rows.filter((task) => !task.deadline || (task.closed_at && task.closed_at <= task.deadline)).length;
+  const onTime = rows.filter(handedInOnTime).length;
   return { done30: rows.length, onTimePct: rows.length ? Math.round((100 * onTime) / rows.length) : null, open: open.count ?? 0, strip: stripOf(rows.map((task) => task.closed_at)) };
 }
 

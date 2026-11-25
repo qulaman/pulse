@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import { DeadlineSheet } from "@/components/confirm/DeadlineSheet";
 import { EntityCard } from "@/components/confirm/EntityCard";
-import { useRememberOffer } from "@/components/dictionary/useRememberOffer";
+import { useLearnName } from "@/components/dictionary/useLearnName";
 import { PeoplePicker } from "@/components/people/PeoplePicker";
 import { namesById } from "@/lib/confirm/entities";
 import { useRoster } from "@/lib/people/roster";
@@ -50,12 +50,12 @@ export function ConfirmList({
     [roster.data, myId],
   );
 
-  const offerToRemember = useRememberOffer();
+  const learnName = useLearnName();
 
   const pickAssignee = (index: number, user: { user_id: string; full_name: string }) => {
-    // a name the AI could not place, now placed by hand: offer to remember it (D-111)
+    // a name the AI could not place, now placed by hand: remembered at once, «Отменить» 5 s (D-192)
     const before = entities[index];
-    if (before) offerToRemember(before, user);
+    if (before) learnName(before, user);
     editEntity(index, {
       assignee_id: user.user_id,
       assignee_name: null,

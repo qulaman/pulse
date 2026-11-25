@@ -1,3 +1,5 @@
+import { inAppBrowser } from "@/lib/setup/device";
+
 const KEY = "pulse.device";
 
 /**
@@ -35,7 +37,7 @@ export function signInPlace(): SignInPlace {
   const ua = nav.userAgent;
   const standalone = window.matchMedia("(display-mode: standalone)").matches || nav.standalone === true;
   if (standalone) return "ready";
-  if (/FBAN|FBAV|Instagram|Line\/|Telegram|WhatsApp|VKClient|OKApp|; wv\)/i.test(ua)) return "in-app";
+  if (inAppBrowser(ua) !== null) return "in-app";
   const ios = /iPhone|iPad|iPod/i.test(ua) || (nav.platform === "MacIntel" && nav.maxTouchPoints > 1);
   return ios ? "ios-browser" : "ready";
 }

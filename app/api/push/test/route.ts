@@ -11,6 +11,8 @@ const BodySchema = z.strictObject({
   client_request_id: z.uuid(),
   /** Somebody else's phone — only the people who run the team (D-104) may ring it. */
   user_id: z.guid().optional(),
+  /** Where a tap on the push leads: «Подключение» asks for its own screen back (D-190). */
+  url: z.enum(["/setup"]).optional(),
 });
 
 /**
@@ -56,7 +58,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
         meta: {
           title: "Проверка связи",
           body: other ? "Проверяем, доходят ли уведомления. Ничего делать не нужно" : "Уведомления работают",
-          url: "/profile",
+          url: body.url ?? "/profile",
           tag: "push-test",
           crid: body.client_request_id,
         },

@@ -14,7 +14,7 @@ import { Kbd } from "@/components/desk/ui/Kbd";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { startDeskVoice } from "@/components/desk/voice/control";
 import { InFlight } from "@/components/desk/voice/InFlight";
-import { useRememberOffer } from "@/components/dictionary/useRememberOffer";
+import { useLearnName } from "@/components/dictionary/useLearnName";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import { COMMAND_FIELD_ID, isTypingTarget } from "@/lib/desk/keys";
@@ -129,7 +129,7 @@ export function DeskConfirm() {
   const { quiet, opensAt } = useQuietHours();
   const roster = useRoster();
   const myId = useMe().data?.userId;
-  const offerToRemember = useRememberOffer();
+  const learnName = useLearnName();
   const [draft, setDraft] = useState<string | null>(null);
   const reply = useDeskAnswer(stage === "question" ? question || transcript : null);
   const section = useRef<HTMLElement>(null);
@@ -187,9 +187,9 @@ export function DeskConfirm() {
   );
 
   const pickAssignee = (index: number, person: PickPerson) => {
-    // a name the AI could not place, now placed by hand: offer to remember it (D-111)
+    // a name the AI could not place, now placed by hand: remembered at once, «Отменить» 5 s (D-192)
     const before = useIngestStore.getState().entities[index];
-    if (before) offerToRemember(before, { user_id: person.id, full_name: person.full_name });
+    if (before) learnName(before, { user_id: person.id, full_name: person.full_name });
     editEntity(index, {
       assignee_id: person.id,
       assignee_name: null,

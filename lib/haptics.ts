@@ -11,7 +11,8 @@
  * from script — so an iPhone ticks only where a tap primitive carries one (`HapticSwitch`),
  * and patterns are lost there. A missing API is a no-op, never a crash (docs/DESIGN.md §3).
  *
- * The person switches it all off on this phone: Профиль → «Вибрация при нажатии».
+ * The person switches it all off on this phone: Профиль → «Вибрация при нажатии»; an iPhone's way
+ * is picked on the same screen (D-193).
  */
 
 /** The tap's own tick: short enough to feel like a press, not a buzz. */
@@ -84,11 +85,16 @@ export function isIosWeb(): boolean {
   return /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 }
 
-/** The iPhone's way chosen on this phone; off until «Лаб → Вибрация» says which one ticks. */
+/** The iPhone's way chosen on this phone; off until the person picks one (Профиль → «Вибрация», D-193). */
 export function iosHapticMode(): IosHapticMode {
   if (!isIosWeb() || !hapticsOn()) return "off";
   const mode = read(IOS_KEY);
   return mode === "label" || mode === "input" ? mode : "off";
+}
+
+/** The person has picked a way on this phone — «Без щелчка» included (Профиль → «Вибрация», D-193). */
+export function iosHapticPicked(): boolean {
+  return read(IOS_KEY) !== null;
 }
 
 export function setIosHapticMode(mode: IosHapticMode): void {

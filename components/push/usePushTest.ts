@@ -12,9 +12,10 @@ const GIVE_UP_MS = 30_000;
  * «Проверить уведомления» (D-114): one real push through the outbox, then its fate read back
  * until the phone shows it — «Пришло на телефон · 09:14», «Уведомления не включены», or
  * after half a minute an honest «не пришло за 30 секунд». `userId` rings somebody else's
- * phone (the director and the secretary, from a person's card).
+ * phone (the director and the secretary, from a person's card); `url` — where a tap on the push
+ * leads, «Подключение» brings the person back to itself (D-190).
  */
-export function usePushTest(userId?: string) {
+export function usePushTest(userId?: string, url?: "/setup") {
   const [verdict, setVerdict] = useState<TestVerdict | null>(null);
   const [busy, setBusy] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -35,7 +36,7 @@ export function usePushTest(userId?: string) {
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ client_request_id: crypto.randomUUID(), ...(userId ? { user_id: userId } : {}) }),
+        body: JSON.stringify({ client_request_id: crypto.randomUUID(), ...(userId ? { user_id: userId } : {}), ...(url ? { url } : {}) }),
       });
       if (!res.ok) throw new Error(String(res.status));
       const { id } = (await res.json()) as { id: string };
@@ -52,7 +53,7 @@ export function usePushTest(userId?: string) {
           }
           if (Date.now() - started > GIVE_UP_MS) {
             // a sleeping Android with a battery saver holds pushes too, not only a dead phone (D-125)
-            setVerdict({ done: true, tone: "warn", text: "Не пришло за 30 секунд — телефон выключен, без связи или экономит батарею" });
+            setVerdict({ done: true, tone: "warn", text: "Не пришло за 30 секунд — телефон выключен, без связи или экономит батарею", cause: "late" });
             setBusy(false);
             return;
           }
@@ -64,7 +65,7 @@ export function usePushTest(userId?: string) {
       };
       timer.current = setTimeout(poll, POLL_MS);
     } catch {
-      setVerdict({ done: true, tone: "warn", text: "Не получилось отправить проверку" });
+      setVerdict({ done: true, tone: "warn", text: "Не получилось отправить проверку", cause: "send" });
       setBusy(false);
     }
   };
