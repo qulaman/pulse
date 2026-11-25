@@ -5,7 +5,7 @@ import type { KeyboardEvent } from "react";
 
 import { GroupLink, NumberInput, SettingRow, SettingsGroup, TextInput } from "@/components/desk/settings/form";
 import { Face } from "@/components/desk/ui/Face";
-import { ActionSign } from "@/components/desk/today/home/HomeSecretary";
+import { ActionSign } from "@/components/desk/today/day/DayPult";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { Switch } from "@/components/desk/ui/Switch";
 import { Select } from "@/components/desk/ui/Toolbar";

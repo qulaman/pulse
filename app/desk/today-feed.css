@@ -1,0 +1,32 @@
+/* «Сегодня» → «Лента дня» (D-196, components/desk/today/day/DayFeed.tsx): what the day's feed needs beyond app/desk/today.css. */
+
+:root[data-surface="desk"][data-journal][data-graphite] {
+  /* the pinned announcement is the way to it in «Эфир»: its pen a step deeper under the hand */
+  a.day-pinned {
+    color: inherit;
+    transition:
+      background-color 120ms linear,
+      box-shadow 120ms linear;
+
+    &:hover {
+      background: color-mix(in srgb, var(--pen) 10%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 30%, transparent);
+    }
+    /* a new announcement in its place: the marker of «только что», settling back on its own pen */
+    &[data-fresh] {
+      animation: day-pinned-in 1.8s var(--ease-out) 0.15s backwards;
+    }
+  }
+
+  /* the pin and a row each sit in a box that clips while it unfolds: the focus ring goes inside */
+  a.day-pinned:focus-visible,
+  :is(a, button).day-feed-row:focus-visible {
+    outline-offset: -2px;
+  }
+}
+
+@keyframes day-pinned-in {
+  from {
+    background-color: color-mix(in srgb, var(--pen) 18%, transparent);
+  }
+}

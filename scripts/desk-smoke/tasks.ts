@@ -34,19 +34,27 @@ async function checkToday(ctx: Ctx) {
   record("сегодня: «Ждут вас» или «Требует внимания»", (await moveBlock.count()) >= 1, `блоков ${await moveBlock.count()}`);
   for (const [id, name] of [
     ["today-team", "«Люди»"],
-    ["today-agenda", "«Встречи и сроки»"],
-    ["home-messages", "«Сообщения»"],
-    ["home-secretary", "«Заявки»"],
-    ["home-ether", "«Эфир»"],
-    ["today-feed", "«Лента»"],
+    ["today-feed", "«Лента дня»"],
   ] as const) {
     const block = page.getByTestId(id);
     const inside = await block.locator('[role="button"], li, [data-testid="desk-empty"], p').count();
     record(`сегодня: блок ${name}`, (await block.count()) === 1 && inside > 0, `элементов ${inside}`);
   }
-  // the right column (D-169): every block wears its icon on a tile of its ink
-  const tiles = await page.locator("#desk-main .desk-tile").count();
-  record("сегодня: у блоков правой колонки — значки", tiles >= 5, `значков ${tiles}`);
+  // the right side (D-196): a block with nothing to say stands as a capsule of the quiet strip, the
+  // meeting of the moment as a card of «Сейчас» — each block is there in exactly one of its forms
+  for (const [forms, name] of [
+    [["home-messages", "today-quiet-messages"], "«Сообщения»"],
+    [["today-agenda", "today-quiet-agenda", "today-meeting"], "«Встречи и сроки»"],
+    [["home-secretary", "today-quiet-secretary"], "«Заявки»"],
+  ] as const) {
+    const counts = await Promise.all(forms.map((id) => page.getByTestId(id).count()));
+    const shown = forms.filter((_, at) => (counts[at] ?? 0) > 0);
+    record(`сегодня: блок ${name} — карточкой или капсулой`, shown.length >= 1, shown.join(", ") || "нет");
+  }
+  // a card wears its icon on a plate of its ink; «Эфир» lives inside «Лента дня»
+  const tiles = await page.locator("#desk-main .day-tile").count();
+  record("сегодня: у карточек правой стороны — значки", tiles >= 2, `значков ${tiles}`);
+  record("сегодня: «Эфир» — внутри «Ленты дня», не отдельным блоком", (await page.getByTestId("home-ether").count()) === 0);
   const decisions = await page.getByTestId("today-decision").count();
   const entry = await page.getByTestId("desk-inbox-entry").count();
   record("сегодня: «Разобрать по одной» — только когда есть что разбирать", decisions > 0 ? entry === 1 : true, `решений ${decisions}, кнопка ${entry}`);

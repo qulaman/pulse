@@ -1,5 +1,6 @@
 "use client";
 
+import { CheckCheck, ConciergeBell, Trophy, Coffee } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 
@@ -20,9 +21,14 @@ import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { formatNum } from "@/lib/desk/format";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
+import { nextEvent, ymdOfEvent } from "@/lib/calendar/agenda";
 import { useCalendar } from "@/lib/calendar/queries";
+import { humanAqtobe } from "@/lib/ai/time";
 import { useTeamDailyReportDay } from "@/lib/daily-report/queries";
 import { todayYmd } from "@/lib/datetime/calendar";
+import { messagesOf, topOf } from "@/lib/desk/home";
+import { useSecretaries } from "@/lib/errands/queries";
+import { useRating } from "@/lib/points/queries";
 import { useDraftTasks } from "@/lib/desk/drafts";
 import { cursorStep, disputeLines, extrasWord, loadStateOf, matchesDue, orderLines, personNow, rowKeys, rowMoves, worstLoad, type LoadState, type Move, type QueryView } from "@/lib/desk/tasks";
 import { loadColor, useTeamLoads } from "@/lib/people/loads";
@@ -56,13 +62,19 @@ import { awaitingDirector, unreadMessages } from "@/lib/visits/text";
 
 import { addressOf } from "@/components/desk/team/shared";
 
-import { HomeEther } from "./home/HomeEther";
-import { HomeMessages } from "./home/HomeMessages";
-import { HomeRating } from "./home/HomeRating";
-import { HomeSecretary } from "./home/HomeSecretary";
+import { DayAgenda, agendaOf } from "./day/DayAgenda";
+import { DayFeed } from "./day/DayFeed";
+import { ReportsFailedTile, ReportsTile, WeekTile } from "./day/DayFigures";
+import { DayMessages } from "./day/DayMessages";
+import { DayPult } from "./day/DayPult";
+import { DaySide } from "./day/DaySide";
+import { Card, Head } from "./day/kit";
+import { DoorCard, MeetingCard, meetingNow } from "./day/NowBand";
+import type { QuietItem } from "./day/QuietStrip";
+import { RowsBone } from "./home/parts";
 import { LaunchBone, LaunchChecklist, useLaunchGate } from "./LaunchChecklist";
 import { JustSent, PeopleBone, PeopleNow, PersonHome, type PersonRow } from "./PeopleNow";
-import { Agenda, Attention, Decisions, Feed, Overdue, Reception, reportWord, Reports, ReportsFailed, type ExtraDecision } from "./TodayParts";
+import { Attention, Decisions, Overdue, reportWord, type ExtraDecision } from "./TodayParts";
 
 /** The verdict's reasons «Требует внимания» lists; the decisions and the late ones have blocks of their own. */
 const WATCHED: ReadonlySet<AttentionReason> = new Set(["no_push", "unaccepted", "soon"]);
@@ -79,13 +91,11 @@ const ORDERS_HREF = "/desk/settings/points?view=shop";
 /**
  * The grid of the day: the director's work on the left, the day around it on the right — one
  * column under the other once the panel takes the room (a container query, not the window's). A
- * wide screen (1920) lays the day's blocks in two columns of their own on the right: seven blocks
- * one under another left the work short and the screen empty beside them (D-194).
+ * wide screen (1920) gives the day up to 760 px — never wider than the work beside it — and the
+ * side lays its blocks in two stacks of its own there (app/desk/today.css, D-196).
  */
 const LAYOUT =
-  "grid items-start gap-y-6 @min-[960px]:grid-cols-[minmax(0,1fr)_288px] @min-[960px]:gap-x-8 @min-[1100px]:grid-cols-[minmax(0,1fr)_340px] @min-[1500px]:grid-cols-[minmax(0,1fr)_420px] @min-[1560px]:grid-cols-[minmax(0,1fr)_minmax(0,800px)]";
-/** The right-hand blocks: one column, or two balanced ones on a wide screen, a block never split. */
-const DAY_COLUMN = "flex min-w-0 flex-col gap-6 @min-[1560px]:block @min-[1560px]:columns-2 @min-[1560px]:gap-x-6 @min-[1560px]:*:mb-6 @min-[1560px]:*:break-inside-avoid";
+  "grid items-start gap-y-6 @min-[960px]:grid-cols-[minmax(0,1fr)_288px] @min-[960px]:gap-x-8 @min-[1100px]:grid-cols-[minmax(0,1fr)_340px] @min-[1500px]:grid-cols-[minmax(0,1fr)_420px] @min-[1560px]:grid-cols-[minmax(0,1fr)_minmax(0,760px)]";
 
 /** One block of the frame: its label, the rule of ink, rows of the block's own height. */
 function BlockBone({ rows, height, label = "34%", wide = "64%" }: { rows: number; height: number; label?: string; wide?: string }) {
@@ -127,10 +137,23 @@ export function TodaySkeleton() {
                 <PeopleBone />
               </div>
             </div>
-            <div className="flex min-w-0 flex-col gap-6">
-              <BlockBone rows={3} height={35} label="48%" wide="84%" />
-              <BlockBone rows={2} height={35} label="38%" wide="72%" />
-              <BlockBone rows={4} height={35} label="26%" wide="84%" />
+            <div className="day-side">
+              <div className="flex h-[30px] items-center gap-2">
+                <Bone h={30} w={140} />
+                <Bone h={30} w={210} />
+              </div>
+              <div className="day-figures">
+                <BlockBone rows={2} height={35} label="40%" wide="60%" />
+                <BlockBone rows={2} height={35} label="40%" wide="70%" />
+              </div>
+              <div className="day-stacks">
+                <div className="day-stack" data-stack="you">
+                  <BlockBone rows={4} height={42} label="30%" wide="84%" />
+                </div>
+                <div className="day-stack" data-stack="company">
+                  <BlockBone rows={4} height={35} label="34%" wide="84%" />
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -571,6 +594,90 @@ function TodayView({
       )
     : null;
 
+  /* ---- the day around the director (D-196): «Сейчас», the quiet strip, the figures, two stacks ---- */
+  const events = calendar.data ?? [];
+  const calendarFailed = calendarLoad.kind === "failed";
+  const calendarKnown = calendarLoad.kind !== "loading" && !calendarFailed;
+  // the meeting of the moment stands in «Сейчас»; «Встречи и сроки» keeps the rest of the day
+  const meeting = calendarFailed ? null : meetingNow(events, now);
+  const agendaEvents = calendarKnown ? agendaOf(events, now, meeting) : [];
+  // the words of the director's tasks: questions and requests for time are «Ждут вас»'s on the left
+  const words = useMemo(() => messagesOf(board, me.userId, now).filter((message) => message.kind === "word"), [board, me.userId, now]);
+  const secretaries = useSecretaries();
+  const rating = useRating("week", pointsEnabled);
+  const leaders = useMemo(() => topOf(rating.data ?? []), [rating.data]);
+  const ratingLoad = blockLoad(rating);
+
+  const band: { key: string; node: ReactNode }[] = [];
+  if (visitors.length > 0 || messages.length > 0 || receptionLoad.kind === "failed") {
+    band.push({
+      key: "door",
+      node: (
+        <DoorCard
+          visitors={visitors}
+          messages={messages}
+          now={now}
+          onAnswer={answer}
+          busyId={answerVisit.isPending ? (answerVisit.variables?.id ?? null) : null}
+          note={noteOf(receptionLoad, "Посетители не загрузились", () => void visits.refetch())}
+          index={0}
+        />
+      ),
+    });
+  }
+  if (meeting) band.push({ key: `meeting:${meeting.id}`, node: <MeetingCard event={meeting} now={now} index={band.length} /> });
+
+  // a block with nothing to say is a capsule — never one that did not load (it keeps its card, D-194)
+  const quiet: QuietItem[] = [];
+  if (!boardDown && words.length === 0) quiet.push({ key: "messages", icon: CheckCheck, ink: "ok", text: "Всё прочитано" });
+  const agendaEmpty = agendaEvents.length === 0 && dueList.length === 0 && reminders.count === 0;
+  if (calendarKnown && agendaEmpty && !meeting) {
+    const later = nextEvent(events.filter((event) => ymdOfEvent(event) > today), now);
+    quiet.push({
+      key: "agenda",
+      icon: Coffee,
+      ink: "sky",
+      text: "Встреч сегодня нет",
+      more: later ? `ближайшая ${humanAqtobe(new Date(later.starts_at), now)} — «${later.title}»` : undefined,
+      href: "/desk/calendar",
+    });
+  }
+  const noSecretary = secretaries.data !== undefined && secretaries.data.length === 0;
+  if (noSecretary) quiet.push({ key: "secretary", icon: ConciergeBell, ink: "muted", text: "Секретаря нет", more: "добавить в «Команде»", href: "/desk/team" });
+  if (pointsEnabled && rating.data && leaders.length === 0) {
+    quiet.push({ key: "rating", icon: Trophy, ink: "muted", text: "Очков за неделю пока нет", hint: "Начислите строкой поручения: «Марату 50 очков за объект»", href: "/desk/settings/points" });
+  }
+
+  const figures: ReactNode[] = [];
+  if (reportsLoad.kind === "failed") figures.push(<ReportsFailedTile key="reports" note={noteOf(reportsLoad, "Отчёты не загрузились", () => void reports.refetch())} index={0} />);
+  else if (reportDay) figures.push(<ReportsTile key="reports" day={reportDay} index={0} />);
+  if (pointsEnabled && (ratingLoad.kind === "failed" || rating.isPending)) {
+    figures.push(
+      <Card key="rating" ink="gold" index={1} testId="home-rating">
+        <Head icon={Trophy} title="Неделя" href="/desk/settings/points" />
+        {rating.isPending ? <RowsBone rows={3} wide="64%" /> : noteOf(ratingLoad, "Рейтинг не загрузился", () => void rating.refetch())}
+      </Card>,
+    );
+  } else if (pointsEnabled && leaders.length > 0) figures.push(<WeekTile key="rating" rows={rating.data ?? []} index={1} />);
+
+  const you: ReactNode[] = [];
+  if (words.length > 0) you.push(<DayMessages key="messages" me={me} messages={words} now={now} onOpenTask={openTask} index={you.length} />);
+  if (!calendarKnown || !agendaEmpty) {
+    you.push(
+      <DayAgenda
+        key="agenda"
+        events={agendaEvents}
+        due={dueList}
+        reminders={reminders}
+        onOpenTask={openTask}
+        now={now}
+        note={calendarLoad.kind === "loading" ? <RowsBone rows={2} /> : noteOf(calendarLoad, "Встречи не загрузились", () => void calendar.refetch())}
+        index={you.length}
+      />,
+    );
+  }
+  if (!noSecretary) you.push(<DayPult key="secretary" me={me} index={you.length} />);
+
   return (
     <DeskPage>
       <PageTitle
@@ -687,47 +794,25 @@ function TodayView({
             />
           </div>
 
-          <div className={DAY_COLUMN}>
-            {/* the phone's home besides the face: who is at the door, the messages, the calendar,
-                the secretary, the ether, the rating — each its own block here (D-164) */}
-            <Reception
-              visitors={visitors}
-              messages={messages}
-              now={now}
-              onAnswer={answer}
-              busyId={answerVisit.isPending ? (answerVisit.variables?.id ?? null) : null}
-              note={noteOf(receptionLoad, "Посетители не загрузились", () => void visits.refetch())}
-              failed={receptionLoad.kind === "failed"}
-            />
-            <HomeMessages me={me} onOpenTask={openTask} />
-            <Agenda
-              events={calendar.data ?? []}
-              loading={calendarLoad.kind === "loading"}
-              note={noteOf(calendarLoad, "Встречи не загрузились", () => void calendar.refetch())}
-              failed={calendarLoad.kind === "failed"}
-              due={dueList}
-              onOpenTask={openTask}
-              now={now}
-              reminders={reminders}
-            />
-            <HomeSecretary me={me} />
-            <HomeEther onAnnounce={() => useComposeStore.getState().request("Всем: ")} />
-            <HomeRating />
-            <Feed
-              events={feed.data ?? []}
-              loading={feedLoad.kind === "loading"}
-              now={now}
-              note={noteOf(feedLoad, "Лента не загрузилась", () => void feed.refetch())}
-              failed={feedLoad.kind === "failed"}
-              taskOf={taskOfTitle}
-              onOpenTask={openTask}
-            />
-            {reportsLoad.kind === "failed" ? (
-              <ReportsFailed note={noteOf(reportsLoad, "Отчёты не загрузились", () => void reports.refetch())} />
-            ) : reportDay ? (
-              <Reports day={reportDay} />
-            ) : null}
-          </div>
+          <DaySide
+            band={band}
+            quiet={quiet}
+            figures={figures}
+            you={you}
+            company={
+              <DayFeed
+                events={feed.data ?? []}
+                loading={feedLoad.kind === "loading"}
+                failed={feedLoad.kind === "failed"}
+                note={noteOf(feedLoad, "Лента не загрузилась", () => void feed.refetch())}
+                now={now}
+                taskOf={taskOfTitle}
+                onOpenTask={openTask}
+                onAnnounce={() => useComposeStore.getState().request("Всем: ")}
+                index={1}
+              />
+            }
+          />
         </div>
       </div>
 

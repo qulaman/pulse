@@ -956,21 +956,13 @@
     opacity: 1;
   }
 
-  /* ---- «Сегодня»: the blocks are cards on the work area ------------------------------------- */
+  /* ---- «Сегодня»: the work's blocks are cards on the work area; the right side draws its own (today.css) */
   #desk-main
     :is(
       [data-testid="today-decisions"],
       [data-testid="today-overdue"],
       [data-testid="today-just-sent"],
-      [data-testid="today-team"],
-      [data-testid="today-reception"],
-      [data-testid="home-messages"],
-      [data-testid="today-agenda"],
-      [data-testid="home-secretary"],
-      [data-testid="home-ether"],
-      [data-testid="home-rating"],
-      [data-testid="today-feed"],
-      [data-testid="today-reports"]
+      [data-testid="today-team"]
     ) {
     padding: 14px 16px 12px;
     border-radius: 14px;

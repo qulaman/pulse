@@ -37,6 +37,10 @@ import "./reports-day.css";
 import "./reports-tabel.css";
 import "./reports-diary.css";
 import "./settings.css";
+// «Сегодня», the right side (D-196): the day around the director; the keypad and the day's feed own a file each
+import "./today.css";
+import "./today-pult.css";
+import "./today-feed.css";
 // the transitions of the screen and of «Команда» (D-184): last, they style only ::view-transition-*
 import "./transitions.css";
 

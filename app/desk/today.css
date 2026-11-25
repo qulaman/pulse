@@ -1,0 +1,1151 @@
+/* ==========================================================================================
+   «Сегодня», the right side (D-196): the day around the director, drawn over «Графит»
+   (graphite.css) in both themes — components/desk/today/day/*.
+   - «Сейчас» on top (the door, a meeting on or within half an hour), lit from its corner by its ink;
+     the blocks with nothing to say as one strip of capsules; the day's figures as tiles with one big
+     number; «Вам» (messages, meetings and deadlines, the secretary's keypad) beside «Лента дня».
+   - Colour means «something is in the block»: a card's plate wears its ink, a capsule stays quiet.
+   - Motion by transform and opacity; a row's height only once, as it comes and as it goes. Nothing
+     loops where nothing happens: a state is a still dot, news rings three times, only what waits for
+     the director now rings on — and sleeps after three minutes without a hand (D-188: for everyone).
+   ========================================================================================== */
+
+:root[data-surface="desk"][data-journal][data-graphite] {
+  --day-snap: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --day-in: cubic-bezier(0.4, 0, 1, 1);
+  --day-pop: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  /* ---- the side: «Сейчас», the strip, the figures, two stacks (D-196) ----------------------
+     One column under a 1560-px container: Вам → Цифры дня → Лента дня. From 1560: the figures a row
+     over both stacks, «Вам» and «Лента дня» side by side, each stack keeping its own blocks. */
+  .day-side {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .day-now {
+    display: grid;
+    align-items: start;
+    gap: 14px;
+
+    &:empty {
+      display: none;
+    }
+  }
+  /* a card of «Сейчас» unfolds its height: the clip keeps room for its ring and its shadow */
+  .day-now-item {
+    overflow: clip;
+    overflow-clip-margin: 24px;
+  }
+  .day-stacks {
+    display: contents;
+  }
+  .day-stack {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .day-stack[data-stack="you"] {
+    order: 1;
+  }
+  .day-figures {
+    order: 2;
+  }
+  .day-stack[data-stack="company"] {
+    order: 3;
+  }
+  @container (min-width: 1560px) {
+    .day-now:has(> :nth-child(2)) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .day-figures {
+      order: 1;
+    }
+    .day-stacks {
+      display: grid;
+      order: 3;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start;
+      gap: 14px;
+    }
+  }
+
+  /* ---- a card ----------------------------------------------------------------------------- */
+  .day-card {
+    --tone: var(--ink-2);
+    position: relative;
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    padding: 12px 14px 10px;
+    border-radius: 14px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+  }
+  /* what happens now: one step up, lit from its corner by its ink — the Moment's own recipe */
+  .day-card[data-now] {
+    background:
+      radial-gradient(120% 150% at 0% 0%, color-mix(in srgb, var(--tone) 13%, transparent), transparent 58%),
+      var(--sheet);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--tone) 38%, transparent),
+      var(--lift),
+      0 10px 28px -14px rgb(0 0 0 / 0.55);
+  }
+  &[data-desk-theme="light"] .day-card[data-now] {
+    background:
+      radial-gradient(120% 150% at 0% 0%, color-mix(in srgb, var(--tone) 8%, transparent), transparent 58%),
+      var(--sheet);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--tone) 30%, transparent),
+      0 6px 18px -10px rgb(15 17 22 / 0.18);
+  }
+  /* ---- a card's head: the tile in its ink, the name that is a way on, the moves ----------- */
+  .day-head {
+    display: flex;
+    min-height: 28px;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .day-head-link {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+    border-radius: 6px;
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 18px;
+    white-space: nowrap;
+  }
+  .day-count {
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--tone) 16%, transparent);
+    color: var(--tone);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 18px;
+    text-align: center;
+  }
+  .day-chev {
+    flex-shrink: 0;
+    color: var(--ink-3);
+    opacity: 0;
+    transform: translateX(-3px);
+    transition:
+      opacity 140ms linear,
+      transform 180ms var(--day-snap),
+      color 140ms linear;
+  }
+  .day-card:hover .day-chev,
+  .day-head-link:focus-visible .day-chev {
+    opacity: 1;
+    transform: none;
+  }
+  .day-head-link:hover .day-chev {
+    color: var(--ink);
+    transform: translateX(3px);
+  }
+  .day-head-acts {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+  }
+
+  /* the block's icon on a plate of its ink: a card with something in it wears its colour */
+  .day-tile {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--tone) 15%, transparent);
+    color: var(--tone);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 24%, transparent);
+
+    /* «there is something»: a still dot on the corner; news makes it beat twice */
+    &[data-live]::after {
+      content: "";
+      position: absolute;
+      top: -3px;
+      right: -3px;
+      width: 7px;
+      height: 7px;
+      border-radius: 9999px;
+      background: var(--tone);
+      box-shadow: 0 0 0 2px var(--raise);
+    }
+    &[data-live="news"]::after {
+      animation: day-corner 1.1s var(--day-pop) 2;
+    }
+  }
+  .day-card[data-now] .day-tile[data-live]::after {
+    box-shadow: 0 0 0 2px var(--sheet);
+  }
+  .day-card:hover .day-tile svg {
+    animation: day-wiggle 420ms var(--day-snap) 1;
+  }
+
+  /* ---- buttons ----------------------------------------------------------------------------- */
+  /* a small move in a head: a ghost; the director's own move in the pen */
+  .day-ghost {
+    position: relative;
+    display: inline-flex;
+    height: 26px;
+    align-items: center;
+    gap: 5px;
+    padding: 0 8px;
+    border-radius: 7px;
+    color: var(--ink-2);
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    transition:
+      background-color 120ms linear,
+      color 120ms linear,
+      scale 300ms var(--day-pop);
+
+    &:hover:not(:disabled) {
+      background: var(--hover);
+      color: var(--ink);
+    }
+    &:active:not(:disabled) {
+      scale: 0.94;
+      transition-duration: 70ms;
+    }
+    &:disabled {
+      opacity: 0.55;
+    }
+    &[data-pen] {
+      background: color-mix(in srgb, var(--pen) 12%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 32%, transparent);
+      color: var(--pen-deep);
+      font-weight: 600;
+    }
+    &[data-pen]:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--pen) 20%, transparent);
+      color: var(--pen-deep);
+    }
+    &[data-done] {
+      color: var(--ok-deep);
+    }
+    &[data-done] svg {
+      animation: day-pop 300ms var(--day-pop) both;
+    }
+    /* «Объявить»: two arcs go out of the megaphone */
+    .day-arcs {
+      position: absolute;
+      top: 50%;
+      left: 15px;
+      width: 14px;
+      height: 14px;
+      margin: -7px 0 0 -7px;
+      pointer-events: none;
+
+      &::before,
+      &::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border: 1.5px solid var(--pen);
+        border-radius: 9999px;
+        opacity: 0;
+        animation: day-arc 560ms var(--ease-out) both;
+      }
+      &::after {
+        animation-delay: 100ms;
+      }
+    }
+  }
+  .day-btn {
+    display: inline-flex;
+    height: 30px;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 12px;
+    font-size: 13px;
+    line-height: 18px;
+    white-space: nowrap;
+    transition:
+      scale 300ms var(--day-pop),
+      filter 120ms linear,
+      box-shadow 160ms linear;
+
+    &:active:not(:disabled) {
+      scale: 0.95;
+      transition-duration: 70ms;
+    }
+  }
+
+  /* ---- rows ----------------------------------------------------------------------------- */
+  /* the list stands 6 px out of the card's text on each side: a row's hover plate has room, and a
+     row that unfolds (its li clips while it grows) never cuts that plate */
+  .day-list {
+    display: flex;
+    flex-direction: column;
+    margin-inline: -6px;
+
+    &.day-list-flush {
+      margin-inline: 0;
+    }
+
+    > li + li .day-row {
+      box-shadow: inset 0 1px 0 var(--rule-soft);
+    }
+  }
+  .day-row {
+    display: grid;
+    width: 100%;
+    grid-template-columns: 58px minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 10px;
+    padding: 7px 6px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 20px;
+    text-align: left;
+    transition: background-color 120ms linear;
+
+    &:is(button, a, [data-press]) {
+      cursor: pointer;
+    }
+    &:is(button, a, [data-press]):hover {
+      background: var(--hover);
+    }
+    :focus-visible {
+      outline-offset: -2px;
+    }
+    /* «только что»: the journal's marker, once */
+    &[data-fresh] {
+      animation: day-marker 1.8s var(--ease-out) 0.15s backwards;
+    }
+  }
+  .day-when {
+    color: var(--ink-3);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .day-when[data-late] {
+    color: var(--pencil);
+    font-weight: 500;
+  }
+  .day-muted {
+    color: var(--ink-2);
+  }
+  .day-faint {
+    color: var(--ink-3);
+  }
+
+  /* a word on a plate of its ink */
+  .day-pill {
+    display: inline-flex;
+    height: 20px;
+    align-items: center;
+    gap: 4px;
+    padding: 0 7px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--tone) 15%, transparent);
+    color: var(--tone);
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* a share as a bar that fills */
+  .day-bar {
+    position: relative;
+    display: block;
+    height: 4px;
+    overflow: hidden;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--tone) 20%, transparent);
+
+    > i {
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: var(--tone);
+      transform-origin: left center;
+      transform: scaleX(var(--fill));
+      transition: transform 600ms var(--day-snap);
+      animation: day-fill calc(150ms + var(--fill) * 850ms) var(--day-snap) 120ms both;
+    }
+  }
+
+  /* ---- alive: a state is still, news rings three times, «now, for you» rings slowly -------- */
+  .day-live {
+    position: relative;
+    display: inline-block;
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background: var(--tone);
+
+    &::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: var(--tone);
+      opacity: 0;
+    }
+    &[data-mode="news"]::after {
+      animation: day-ring 1.4s var(--ease-out) 3;
+    }
+    &[data-mode="now"]::after {
+      animation: day-ring 2.4s var(--ease-out) infinite;
+    }
+  }
+  /* three minutes without a hand: what rings for ever stops where it is; news still plays */
+  [data-asleep] .day-live[data-mode="now"]::after,
+  [data-asleep] .day-face-ring {
+    animation-play-state: paused;
+  }
+
+  /* ---- the strip of quiet blocks ---------------------------------------------------------- */
+  .day-quiet {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+
+    /* a capsule never leaves its column: the detail gives way to an ellipsis */
+    > li {
+      min-width: 0;
+      max-width: 100%;
+    }
+  }
+  .day-cap {
+    display: inline-flex;
+    max-width: 100%;
+    height: 30px;
+    align-items: center;
+    gap: 7px;
+    padding: 0 12px 0 10px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--ink) 3%, var(--raise));
+    box-shadow: 0 0 0 1px var(--rule-soft), var(--lift);
+    color: var(--ink-2);
+    font-size: 12.5px;
+    line-height: 16px;
+    white-space: nowrap;
+    transition:
+      background-color 140ms linear,
+      box-shadow 160ms linear,
+      color 140ms linear,
+      scale 300ms var(--day-pop);
+
+    /* only a capsule that leads somewhere answers the hand */
+    &:is(a):hover {
+      color: var(--ink);
+      background: color-mix(in srgb, var(--ink) 6%, var(--raise));
+      box-shadow: 0 0 0 1px var(--line), var(--lift);
+    }
+    &:is(a):active {
+      scale: 0.95;
+      transition-duration: 70ms;
+    }
+    .day-cap-icon {
+      display: inline-flex;
+      color: var(--tone);
+    }
+    .day-cap-more {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--ink-3);
+    }
+  }
+
+  /* ---- «Сейчас»: the door, the meeting --------------------------------------------------- */
+  .day-visitor {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 12px;
+    padding: 8px 0 4px;
+  }
+  .day-face-wrap {
+    position: relative;
+    display: inline-flex;
+    border-radius: 9999px;
+  }
+  /* a ring breathes out of the face of whoever waits — three times, then slowly while it lasts */
+  .day-face-ring {
+    position: absolute;
+    inset: -4px;
+    border: 2px solid var(--tone);
+    border-radius: 9999px;
+    opacity: 0;
+    pointer-events: none;
+    animation: day-face-ring 1.3s var(--ease-out) 3;
+  }
+  .day-face-ring[data-mode="now"] {
+    animation:
+      day-face-ring 1.3s var(--ease-out) 3,
+      day-face-ring 2.6s var(--ease-out) 3.9s infinite;
+  }
+  .day-answers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px 0 4px;
+  }
+  .day-stack-faces {
+    display: inline-flex;
+
+    > * + * {
+      margin-left: -6px;
+    }
+    .team-face {
+      box-shadow: 0 0 0 2px var(--sheet);
+    }
+  }
+  .day-door-swing svg {
+    transform-origin: 30% 50%;
+    animation: day-door 640ms var(--day-snap) 1;
+  }
+
+  /* ---- the secretary's keypad ----------------------------------------------------------- */
+  .day-pad {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+    gap: 6px;
+  }
+  .day-key {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    min-height: 42px;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+    overflow: hidden;
+    border-radius: 10px;
+    background: var(--surface-2);
+    box-shadow: 0 0 0 1px var(--rule), var(--lift);
+    color: var(--ink);
+    text-align: left;
+    user-select: none;
+    transition:
+      scale 300ms var(--day-pop),
+      background-color 140ms linear,
+      box-shadow 160ms linear;
+
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--ink) 7%, var(--surface-2));
+      box-shadow: 0 0 0 1px var(--line), var(--lift);
+    }
+    &:hover .day-key-icon svg {
+      animation: day-wiggle 420ms var(--day-snap) 1;
+    }
+    &:active:not(:disabled) {
+      scale: 0.95;
+      transition-duration: 70ms;
+    }
+    /* a state outweighs the hover: the key under the hand still says what it is doing */
+    &[data-state="held"]:not(:disabled) {
+      background: color-mix(in srgb, var(--pen) 10%, var(--surface-2));
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--pen) 60%, transparent);
+    }
+    &[data-state="sent"]:not(:disabled) {
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--ok-ink) 55%, transparent);
+
+      .day-key-icon {
+        color: var(--ok-ink);
+        animation: day-pop 260ms var(--day-pop) both;
+      }
+      .day-key-word {
+        color: var(--ok-deep);
+      }
+    }
+    &[data-state="on"]:not(:disabled) {
+      background: color-mix(in srgb, var(--violet) 13%, var(--surface-2));
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--violet) 45%, transparent);
+
+      .day-key-note {
+        color: var(--violet);
+      }
+    }
+  }
+  &[data-desk-theme="light"] .day-key:not([data-state]) {
+    background: var(--sheet);
+    box-shadow: 0 0 0 1px var(--rule), 0 1px 2px rgb(15 17 22 / 0.06);
+  }
+  &[data-desk-theme="light"] .day-key:not([data-state]):hover {
+    background: color-mix(in srgb, var(--ink) 4%, var(--sheet));
+  }
+  .day-key-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+  }
+  .day-key-word {
+    display: block;
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 17px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .day-key-note {
+    display: block;
+    overflow: hidden;
+    color: var(--ink-3);
+    font-size: 11px;
+    line-height: 14px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* the five seconds running out at the key's foot (the keypad of «Заявки», errands-pult.css) */
+  .day-key-window {
+    position: absolute;
+    right: 10px;
+    bottom: 4px;
+    left: 10px;
+    height: 2px;
+    overflow: hidden;
+    border-radius: 1px;
+    background: color-mix(in srgb, var(--pen) 18%, transparent);
+
+    > i {
+      position: absolute;
+      inset: 0;
+      background: var(--pen);
+      transform-origin: left center;
+      animation: day-window var(--window, 5s) linear both;
+    }
+  }
+
+  /* «Охрана»: a bar of its own, sent by a hold; the fill grows from the left like a fuse */
+  .day-alarm {
+    position: relative;
+    display: flex;
+    width: 100%;
+    height: 36px;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    overflow: hidden;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--pencil) 7%, var(--raise));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--pencil) 38%, transparent);
+    color: var(--pencil-deep);
+    font-size: 13px;
+    font-weight: 600;
+    user-select: none;
+    touch-action: none;
+    transition:
+      scale 300ms var(--day-pop),
+      background-color 140ms linear;
+
+    > :not(.day-alarm-fill) {
+      position: relative;
+    }
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--pencil) 11%, var(--raise));
+    }
+    &:hover .day-alarm-hint {
+      opacity: 1;
+    }
+    &[data-holding] {
+      scale: 0.985;
+    }
+    &[data-holding] .day-alarm-siren {
+      animation: day-shake 380ms ease-in-out 1.4s 2;
+    }
+    &[data-gone] {
+      background: var(--pencil);
+      box-shadow: 0 0 0 1px var(--pencil);
+      color: var(--on-pencil);
+      animation: day-pop-soft 360ms var(--day-pop) both;
+    }
+  }
+  .day-alarm-fill {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--pencil) 26%, transparent);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 180ms var(--ease-out);
+  }
+  .day-alarm[data-holding] .day-alarm-fill {
+    transform: scaleX(1);
+    transition: transform var(--hold, 2s) linear;
+  }
+  .day-alarm-siren {
+    display: inline-flex;
+  }
+  .day-alarm-hint {
+    margin-left: auto;
+    color: var(--ink-3);
+    font-size: 11px;
+    font-weight: 500;
+    opacity: 0;
+    transition: opacity 140ms linear;
+  }
+  .day-alarm[data-gone] .day-alarm-hint {
+    opacity: 1;
+    color: inherit;
+  }
+
+  /* «Своими словами»: the send sits in the field and wakes when there are words */
+  .day-ask {
+    display: flex;
+    height: 36px;
+    align-items: center;
+    padding: 0 5px 0 12px;
+    border-radius: 10px;
+    background: var(--surface-2);
+    box-shadow: 0 0 0 1px var(--rule);
+    transition: box-shadow 160ms linear;
+
+    &:focus-within {
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--pen) 60%, transparent),
+        0 0 0 3px color-mix(in srgb, var(--pen) 14%, transparent);
+    }
+  }
+  .day-ask-input {
+    min-width: 0;
+    flex: 1;
+    background: none;
+    color: var(--ink);
+    font-size: 13px;
+    outline: none;
+
+    &::placeholder {
+      color: var(--ink-3);
+    }
+  }
+  .day-ask-send {
+    display: inline-flex;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    color: var(--ink-3);
+    transition:
+      scale 200ms var(--day-pop),
+      background-color 140ms linear,
+      color 140ms linear;
+
+    &:disabled {
+      scale: 0.82;
+      opacity: 0.55;
+    }
+  }
+  .day-ask[data-ready] .day-ask-send {
+    background: var(--btn-main);
+    color: var(--btn-main-ink);
+    box-shadow: var(--btn-main-edge);
+  }
+
+  /* a request on its way: the scene's plate, the words that change in place, the way to the promised time */
+  .day-errand-icon {
+    display: inline-flex;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+    color: var(--ink-2);
+  }
+  .day-row[data-step="done"] {
+    animation: day-arrive-ok 1.4s var(--ease-out) both;
+
+    .day-errand-icon {
+      background: color-mix(in srgb, var(--ok-ink) 16%, var(--surface-2));
+      color: var(--ok-ink);
+      animation: day-pop 360ms var(--day-pop) both;
+    }
+  }
+  .day-eta {
+    --tone: var(--ok-ink);
+    margin-top: 5px;
+  }
+  .day-eta > i {
+    animation: none;
+    transition: transform 900ms linear;
+  }
+
+  /* ---- the day's figures: tiles with one big number --------------------------------------- */
+  .day-figures {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 14px;
+  }
+  .day-figure {
+    display: inline-flex;
+    align-items: baseline;
+    white-space: nowrap;
+    font-size: 34px;
+    font-weight: 600;
+    line-height: 38px;
+    letter-spacing: -0.035em;
+    color: var(--ink);
+  }
+  .day-card[data-ok] .day-figure {
+    color: var(--ok-ink);
+  }
+  .day-figure-of {
+    margin-left: 2px;
+    color: var(--ink-3);
+    font-size: 19px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+  }
+  .day-faces {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .day-hand {
+    display: inline-flex;
+    border-radius: 9999px;
+    animation: day-face-in 260ms var(--day-pop) both;
+    transition: opacity 300ms linear;
+
+    .team-face {
+      transition: box-shadow 300ms linear;
+    }
+    &[data-state="submitted"] .team-face {
+      box-shadow: 0 0 0 2px var(--raise), 0 0 0 3.5px var(--ok-ink);
+    }
+    &[data-state="missed"] .team-face {
+      box-shadow: 0 0 0 2px var(--raise), 0 0 0 3.5px var(--pencil);
+    }
+    &[data-state="pending"] {
+      opacity: 0.45;
+    }
+  }
+  /* one segment a person, filled from the left as they hand in; everyone in — one sweep of light */
+  .day-segs {
+    position: relative;
+    display: flex;
+    height: 4px;
+    gap: 2px;
+    overflow: hidden;
+    border-radius: 2px;
+
+    &[data-all]::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.55), transparent);
+      transform: translateX(-100%);
+      animation: day-sweep 900ms var(--ease-in-out) 250ms both;
+    }
+  }
+  .day-seg {
+    position: relative;
+    flex: 1;
+    overflow: hidden;
+    border-radius: 1px;
+    background: color-mix(in srgb, var(--ink-2) 24%, transparent);
+
+    > i {
+      position: absolute;
+      inset: 0;
+      background: var(--seg);
+      transform-origin: left center;
+      transform: scaleX(var(--on, 0));
+      transition: transform 460ms var(--day-snap);
+    }
+  }
+  .day-side[data-arrive] .day-seg > i {
+    animation: day-fill 380ms var(--day-snap) both;
+    animation-delay: calc(260ms + var(--i) * 35ms);
+  }
+  .day-all {
+    animation: day-pop 380ms var(--day-pop) both;
+  }
+
+  /* the week's race: the leader wears the crown, a new leader breathes one gold ring */
+  .day-racer-face {
+    position: relative;
+    display: inline-flex;
+  }
+  .day-crown {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    display: inline-flex;
+    color: var(--gold-ink);
+    pointer-events: none;
+  }
+  .day-lead-ring {
+    position: absolute;
+    inset: -4px;
+    border: 2px solid var(--gold-ink);
+    border-radius: 9999px;
+    opacity: 0;
+    animation: day-face-ring 1.2s var(--ease-out) 2;
+  }
+
+  /* ---- «Лента дня»: the day's pulse line and the rows on an axis --------------------------- */
+  .day-pulse {
+    position: relative;
+    height: 30px;
+    margin: 2px 0 6px;
+  }
+  .day-pulse-axis {
+    position: absolute;
+    top: 11px;
+    right: 0;
+    left: 0;
+    height: 1px;
+    background: var(--rule);
+  }
+  .day-pulse-past {
+    position: absolute;
+    top: 11px;
+    left: 0;
+    height: 1px;
+    background: color-mix(in srgb, var(--pen) 55%, transparent);
+    transform-origin: left center;
+    animation: day-fill 700ms var(--day-snap) both;
+  }
+  .day-pulse-dot {
+    position: absolute;
+    top: 8px;
+    width: 7px;
+    height: 7px;
+    margin-left: -3.5px;
+    border-radius: 9999px;
+    background: var(--tone);
+    box-shadow: 0 0 0 2px var(--raise);
+    animation: day-pop 300ms var(--day-pop) both;
+  }
+  .day-pulse-now {
+    position: absolute;
+    top: 4px;
+    width: 2px;
+    height: 15px;
+    margin-left: -1px;
+    border-radius: 1px;
+    background: var(--pen);
+  }
+  .day-pulse-tick {
+    position: absolute;
+    top: 18px;
+    color: var(--ink-3);
+    font-size: 10.5px;
+    font-variant-numeric: tabular-nums;
+    transform: translateX(-50%);
+  }
+  .day-feed-scroll {
+    position: relative;
+    min-height: 0;
+    flex: 1;
+    overflow: hidden;
+  }
+  .day-feed-row {
+    grid-template-columns: 44px 14px minmax(0, 1fr) auto;
+  }
+  .day-axis {
+    position: relative;
+    display: flex;
+    height: 100%;
+    min-height: 20px;
+    align-items: center;
+    justify-content: center;
+
+    &::before {
+      content: "";
+      position: absolute;
+      top: -8px;
+      bottom: -8px;
+      left: 50%;
+      width: 1px;
+      background: var(--rule);
+    }
+    > i {
+      position: relative;
+      width: 8px;
+      height: 8px;
+      border-radius: 9999px;
+      background: var(--tone);
+      box-shadow: 0 0 0 2px var(--raise);
+    }
+  }
+  .day-pinned {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr);
+    column-gap: 10px;
+    margin-bottom: 6px;
+    padding: 9px 10px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--pen) 6%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 18%, transparent);
+  }
+
+  /* ---- the first showing: one wave down each stack, the plates do not spin ----------------- */
+  .day-side[data-arrive] .day-card,
+  .day-side[data-arrive] .day-cap {
+    animation: day-card-in 260ms var(--day-snap) both;
+    animation-delay: calc(min(var(--card-i, 0), 5) * 40ms);
+  }
+}
+
+@keyframes day-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes day-corner {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.7);
+  }
+}
+@keyframes day-wiggle {
+  0%,
+  100% {
+    transform: none;
+  }
+  30% {
+    transform: rotate(-10deg) translateY(-1px);
+  }
+  65% {
+    transform: rotate(6deg);
+  }
+}
+@keyframes day-arc {
+  0% {
+    opacity: 0.7;
+    transform: scale(0.6);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+}
+@keyframes day-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+@keyframes day-pop-soft {
+  0% {
+    scale: 0.97;
+  }
+  50% {
+    scale: 1.02;
+  }
+  100% {
+    scale: 1;
+  }
+}
+@keyframes day-marker {
+  from {
+    background-color: color-mix(in srgb, var(--pen) 16%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+@keyframes day-arrive-ok {
+  from {
+    background-color: color-mix(in srgb, var(--ok-ink) 18%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+@keyframes day-fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes day-ring {
+  0% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+@keyframes day-face-ring {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  80%,
+  100% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
+@keyframes day-door {
+  0% {
+    transform: none;
+  }
+  35% {
+    transform: perspective(60px) rotateY(-38deg);
+  }
+  70% {
+    transform: perspective(60px) rotateY(12deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes day-window {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+@keyframes day-shake {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  25% {
+    transform: rotate(-12deg);
+  }
+  75% {
+    transform: rotate(12deg);
+  }
+}
+@keyframes day-face-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+@keyframes day-sweep {
+  to {
+    transform: translateX(100%);
+  }
+}

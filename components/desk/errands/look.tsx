@@ -31,7 +31,7 @@ import type { SecretaryAction } from "@/lib/settings";
  * warms. Drawn by app/desk/errands.css.
  */
 
-/** Each request of the catalogue as a picture — the language of «Сегодня» (HomeSecretary, D-169). */
+/** Each request of the catalogue as a picture — the language of «Сегодня» (DayPult, D-196). */
 export const SCENE_ICON: Record<DeskScene, LucideIcon> = {
   coffee: Coffee,
   tea: CupSoda,

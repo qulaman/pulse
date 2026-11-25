@@ -1,0 +1,58 @@
+/* «Сегодня» → «Заявки» (D-196, components/desk/today/day/DayPult.tsx): what the keypad needs beyond app/desk/today.css. */
+
+:root[data-surface="desk"][data-journal][data-graphite] {
+  /* who is at the desk sits in the head: the name of the block keeps its width, the presence gives way */
+  .day-pult .day-head-link {
+    flex-shrink: 0;
+  }
+  .day-pult .day-head-acts {
+    min-width: 0;
+    flex-shrink: 1;
+  }
+  .day-pult-who {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 6px;
+    padding-left: 4px;
+    font-size: 12px;
+    line-height: 16px;
+  }
+  .day-pult-who-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* the secretary's circle with a still dot on its foot: at the desk, or stepped away */
+  .day-pult-face {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+
+    > .day-live {
+      position: absolute;
+      right: -2px;
+      bottom: -2px;
+      width: 7px;
+      height: 7px;
+      box-shadow: 0 0 0 2px var(--raise);
+    }
+  }
+
+  /* «…ещё N — в «Заявках»» under the rows */
+  .day-pult-more {
+    display: flex;
+    height: 28px;
+    align-items: center;
+    align-self: flex-start;
+    border-radius: 6px;
+    color: var(--ink-3);
+    font-size: 12.5px;
+    transition: color 120ms linear;
+
+    &:hover {
+      color: var(--ink);
+    }
+  }
+}
