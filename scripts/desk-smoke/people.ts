@@ -1,7 +1,7 @@
 /**
  * Role B of tasks/022, waves 2–3 of D-154: /desk/team as the dispatcher's board (the peek in the
  * panel, the row's menu, the keys), the person's card with the editor in place, /desk/team/new,
- * /desk/reports «День» / «Период» with the filters and the panel, /desk/errands of the director
+ * /desk/reports «Подряд» / «Табель» with the filters and the panel, /desk/errands of the director
  * (history filters) and the secretary's queue. Read only — nothing is saved, nobody is created, no
  * code is issued, no request is asked, taken, declined or thanked: the quick requests are counted,
  * never clicked; the forms are typed into and cancelled; the menus are opened and closed. Writes the
@@ -642,92 +642,145 @@ export async function checkErrands(ctx: Ctx) {
   }
 }
 
+/**
+ * The director's marks of the reports (D-198) never reach the database from the smoke: «Просмотрено»
+ * (the feed marks what stayed on screen), «Проверено», «Напомнить», «Уважительная» are answered in
+ * the browser — the check echoes the marks so the screen behaves as with a server.
+ */
+async function guardReportWrites(page: Page): Promise<() => Promise<void>> {
+  const pattern = /\/api\/reports\/|\/rest\/v1\/rpc\/(mark_daily_reports_seen|check_daily_reports|remind_daily_report|excuse_daily_report)\b/;
+  const handler = async (route: Parameters<Parameters<Page["route"]>[1]>[0]) => {
+    const request = route.request();
+    if (request.method() === "GET" || request.method() === "HEAD") return route.continue();
+    const body = (request.postDataJSON() ?? {}) as { ids?: string[]; on?: boolean; p_ids?: string[] };
+    const now = new Date().toISOString();
+    const ids = body.ids ?? body.p_ids ?? [];
+    const marks = ids.map((id) => ({ id, seen_at: now, checked_at: body.on ? now : null, checked_by: null, changed_after_check_at: null }));
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ reports: marks }) });
+  };
+  await page.route(pattern, handler);
+  return () => page.unroute(pattern, handler);
+}
+
 export async function checkReports(ctx: Ctx) {
   const { page } = ctx;
+  const release = await guardReportWrites(page);
+  try {
+    await reportsFeed(ctx);
+    await reportsTabel(ctx);
+  } finally {
+    await release();
+  }
+}
+
+/** «Подряд» (D-198): the days in a row with their heads, the roll call, the filters in the address, the diary, the marks. */
+async function reportsFeed(ctx: Ctx) {
+  const { page } = ctx;
   await open(page, "/desk/reports");
-  const tabs = (await page.getByTestId("seg-day").isVisible()) && (await page.getByTestId("seg-tabel").isVisible());
-  record("отчёты: вкладки «День» и «Табель»", tabs);
-  // D-183: «Сводка» — the journal of reports and the roll call beside it; no hero of zeros, no table
-  const day = await visible(ctx, "desk-reports-day", 15_000);
+  const tabs = (await page.getByTestId("seg-feed").isVisible()) && (await page.getByTestId("seg-tabel").isVisible());
+  record("отчёты: вкладки «Подряд» и «Табель»", tabs);
+  const list = await visible(ctx, "desk-feed-list", 15_000);
+  if (!list) {
+    const failed = await page.getByText("Не получилось загрузить").isVisible().catch(() => false);
+    record("отчёты «Подряд»: лента загрузилась", false, failed ? "лента не пришла — функция team_daily_reports_feed есть на базе? (миграция D-198)" : "нет desk-feed-list");
+    return;
+  }
+  const heads = page.getByTestId("desk-feed-day-head");
+  const morning = await page.getByTestId("desk-feed-morning").count();
   const roll = await visible(ctx, "desk-rollcall", 10_000);
   const rollText = roll ? ((await page.getByTestId("desk-rollcall").innerText()) ?? "").replace(/\s+/g, " ") : "";
   record(
-    "отчёты «День»: журнал и перекличка «N из M сдали», без плиток и таблицы",
-    day && roll && (await page.getByTestId("desk-day-hero").count()) === 0 && (await page.locator('[data-testid="desk-reports-day"] [role="grid"]').count()) === 0 && /из \d+ сдали|выходной|праздник|не нужен/i.test(rollText),
-    rollText.slice(0, 140),
+    "отчёты «Подряд»: дни подряд под своими заголовками, перекличка «N из M сдали»",
+    (await heads.count()) + morning > 0 && roll && /из \d+ сдали|выходной|праздник|не должен/i.test(rollText),
+    `дней ${await heads.count()}${morning ? " + утренняя строка" : ""}; ${rollText.slice(0, 80)}`,
   );
-  // the morning rule: before the evening the page opens the last working day and says so
-  const band = page.getByTestId("desk-day-band");
-  if (await band.isVisible().catch(() => false)) {
-    const before = (await page.getByTestId("desk-day-title").innerText()).trim();
-    await band.getByRole("button").first().click();
-    await page.waitForTimeout(500);
-    const after = (await page.getByTestId("desk-day-title").innerText()).trim();
-    record("отчёты «День»: утром — прошлый рабочий день и «Открыть сегодня»", before !== after && page.url().includes("day="), `${before} → ${after}`);
+  const feedText = (await page.getByTestId("desk-feed-list").innerText()).replace(/\s+/g, " ");
+  record("отчёты «Подряд»: ни прихода, ни ухода, ни часов", !/\d{1,2}:\d\d\s*[–-]\s*\d{1,2}:\d\d|\d,\d ч\b|Пришёл|Ушёл/.test(feedText), feedText.slice(0, 100));
+  await ctx.shot("reports-feed");
+
+  // ← goes to an older day and writes ?day=, a reload keeps it, T comes back to the top
+  const days = await page.locator("[data-feed-day]").count();
+  if (days > 1) {
+    await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press("ArrowLeft");
+    const written = await page.waitForURL((url) => url.searchParams.has("day"), { timeout: 5_000 }).then(() => true, () => false);
+    const day = new URL(page.url()).searchParams.get("day");
+    await page.reload();
+    await visible(ctx, "desk-feed-list", 15_000);
+    const kept = new URL(page.url()).searchParams.get("day") === day && (await page.locator(`[data-feed-day="${day}"]`).count()) > 0;
+    await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press("KeyT");
+    const top = await page.waitForURL((url) => !url.searchParams.has("day"), { timeout: 5_000 }).then(() => true, () => false);
+    record("отчёты «Подряд»: ← пишет ?day=, перезагрузка открывает тот же день, T — к сегодня", written && kept && top, `${day}`);
   } else {
-    skip("отчёты «День»: утреннее правило", "вечер или выходной — открыт сегодняшний день");
-  }
-  await ctx.shot("reports-day");
-
-  // the address keeps the day: ← writes ?day=, a reload opens the same day, T comes back to today
-  const title = page.getByTestId("desk-day-title");
-  await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
-  await page.keyboard.press("KeyT");
-  await page.waitForTimeout(300);
-  const today = (await title.innerText().catch(() => "")).trim();
-  await page.keyboard.press("ArrowLeft");
-  await page.waitForTimeout(500);
-  const earlier = (await title.innerText().catch(() => "")).trim();
-  const addressed = new URL(page.url()).searchParams.get("day");
-  await page.reload();
-  const reread = await page.getByTestId("desk-day-title").waitFor({ timeout: 15_000 }).then(
-    async () => (await title.innerText()).trim(),
-    () => "",
-  );
-  await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
-  await page.keyboard.press("KeyT");
-  await page.waitForTimeout(400);
-  const back = (await title.innerText().catch(() => "")).trim();
-  record("отчёты «День»: ← пишет ?day=, перезагрузка открывает тот же день, T — сегодня", earlier !== today && Boolean(addressed) && reread === earlier && back === today, `${today} → ${earlier} (${addressed}) → ${reread} → ${back}`);
-
-  // the search (F) narrows the journal and the roll call alike
-  const people = page.locator('[data-testid="desk-reports-day"] [data-row-key]');
-  const count = await people.count();
-  if (count > 0) {
-    await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
-    await page.keyboard.press("KeyF");
-    await page.keyboard.type("яяяяя");
-    await page.waitForTimeout(300);
-    const none = (await people.count()) === 0;
-    await page.keyboard.press("Escape");
-    await page.waitForTimeout(300);
-    record("отчёты «День»: поиск (F) сужает журнал и перекличку, Esc возвращает всех", none && (await people.count()) === count, `людей ${count}`);
-
-    // a person opens the diary in the panel (?p=), Esc closes it
-    await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
-    await page.keyboard.press("ArrowDown");
-    await page.keyboard.press("Enter");
-    const diary = await visible(ctx, "desk-diary", 8_000);
-    record("отчёты «День»: ↓ и Enter открывают дневник человека (?p=)", diary && page.url().includes("p="), page.url());
-    await ctx.shot("reports-diary");
-    await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
-    await page.keyboard.press("Escape");
-    const closed = await page.getByTestId("desk-panel").waitFor({ state: "detached", timeout: 5_000 }).then(() => true, () => false);
-    const cleared = await page.waitForURL((url) => !url.searchParams.has("p"), { timeout: 5_000 }).then(() => true, () => false);
-    record("отчёты «День»: Esc закрывает дневник и снимает ?p=", closed && cleared, page.url());
-  } else {
-    skip("отчёты «День»: поиск и дневник", "в этот день в отчётах никого");
+    skip("отчёты «Подряд»: ← → и T", "в ленте один день");
   }
 
-  // «Табель»: people × days of the calendar month, the month in the address
-  await page.getByTestId("seg-tabel").click();
-  const tabel = await page.waitForURL((url) => url.searchParams.get("tab") === "tabel", { timeout: 5_000 }).then(() => true, () => false);
+  const entries = page.getByTestId("desk-feed-entry");
+  if ((await entries.count()) === 0) {
+    skip("отчёты «Подряд»: человек, дневник, отметки", "в ленте нет ни одного отчёта");
+    return;
+  }
+  // F — a person from the list under the field: the label «Имя ×», ?who=, the feed of that person alone
+  const first = entries.first();
+  const userId = (await first.getAttribute("data-user")) ?? "";
+  const name = (await first.getAttribute("aria-label")) ?? "";
+  await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press("KeyF");
+  await page.keyboard.type(name.split(" ")[0] ?? "");
+  const listed = await visible(ctx, "desk-feed-suggest", 5_000);
+  await page.keyboard.press("Enter");
+  const who = await page.waitForURL((url) => url.searchParams.get("who") === userId, { timeout: 5_000 }).then(() => true, () => false);
+  await visible(ctx, "desk-feed-who", 5_000);
+  await page.waitForTimeout(800);
+  const users = await page.locator('[data-testid="desk-feed-entry"]').evaluateAll((rows) => [...new Set(rows.map((row) => (row as HTMLElement).dataset.user))]);
+  record("отчёты «Подряд»: F — человек из списка, метка «Имя ×», ?who=, лента только его", listed && who && users.every((id) => id === userId), `${name}: ${users.length} чел.`);
+  await page.getByTestId("desk-feed-who").getByRole("button").click();
+  const cleared = await page.waitForURL((url) => !url.searchParams.has("who"), { timeout: 5_000 }).then(() => true, () => false);
+  // «Не проверены» — in the address
+  await page.getByTestId("seg-new").click();
+  const only = await page.waitForURL((url) => url.searchParams.get("only") === "new", { timeout: 5_000 }).then(() => true, () => false);
+  await page.getByTestId("seg-all").click();
+  record("отчёты «Подряд»: × снимает человека, «Не проверены» — ?only=new", cleared && only, page.url());
+
+  // a click on a report opens the diary on its day (?p=&day=), with «Все отчёты ›»; Esc closes it
+  await visible(ctx, "desk-feed-entry", 10_000);
+  await page.getByTestId("desk-feed-entry").first().locator(".rep-day-who").click();
+  const diary = await visible(ctx, "desk-diary", 8_000);
+  const all = await page.getByTestId("desk-diary-all").isVisible().catch(() => false);
+  record("отчёты «Подряд»: щелчок по отчёту открывает дневник (?p=), в нём «Все отчёты ›»", diary && all && page.url().includes("p="), page.url());
+  await ctx.shot("reports-diary");
+  await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press("Escape");
+  const closed = await page.waitForURL((url) => !url.searchParams.has("p"), { timeout: 5_000 }).then(() => true, () => false);
+  record("отчёты «Подряд»: Esc закрывает дневник и снимает ?p=", closed, page.url());
+
+  // «Проверить» on and off (answered in the browser): the button says it at once
+  const button = page.getByTestId("desk-feed-check").first();
+  if (await button.isVisible().catch(() => false)) {
+    const before = await button.getAttribute("aria-pressed");
+    await button.click();
+    await page.waitForTimeout(300);
+    const after = await page.getByTestId("desk-feed-check").first().getAttribute("aria-pressed");
+    await page.getByTestId("desk-feed-check").first().click();
+    await page.waitForTimeout(300);
+    const back = await page.getByTestId("desk-feed-check").first().getAttribute("aria-pressed");
+    record("отчёты «Подряд»: «Проверить» ↔ «Проверено» сразу (запись — в браузере)", before !== after && back === before, `${before} → ${after} → ${back}`);
+  } else {
+    skip("отчёты «Подряд»: «Проверить»", "кнопок отметки нет (не директор?)");
+  }
+}
+
+/** «Табель»: people × days of the calendar month, the month in the address, the paper, the diary from a cell. */
+async function reportsTabel(ctx: Ctx) {
+  const { page } = ctx;
+  await open(page, "/desk/reports?tab=tabel");
   const grid = await visible(ctx, "desk-tabel", 15_000);
   const rows = page.locator('[data-testid="desk-tabel-row"]');
   await rows.first().waitFor({ timeout: 10_000 }).catch(() => undefined);
   const dates = (await page.getByTestId("desk-period-dates").innerText().catch(() => "")).trim();
   const heads = await page.getByTestId("desk-tabel-day").count();
-  record("отчёты «Табель»: ?tab=tabel, месяц календарный, люди × дни", tabel && grid && /^[А-Я][а-я]+ \d{4}$/.test(dates) && heads >= 28 && heads <= 31 && (await rows.count()) > 0, `${dates}; дней ${heads}; людей ${await rows.count()}`);
+  record("отчёты «Табель»: ?tab=tabel, месяц календарный, люди × дни", grid && /^[А-Я][а-я]+ \d{4}$/.test(dates) && heads >= 28 && heads <= 31 && (await rows.count()) > 0, `${dates}; дней ${heads}; людей ${await rows.count()}`);
   const states = await page.locator('[data-testid="desk-tabel-cell"]').evaluateAll((cells) => [...new Set(cells.map((c) => (c as HTMLElement).dataset.state ?? ""))]);
   record("отчёты «Табель»: в клетках состояния, без часов", states.length > 0 && !(await page.locator('[data-testid="desk-tabel-cell"]').first().innerText()).match(/\d,\d|ч\b/), states.join(", "));
   await ctx.shot("reports-tabel");
@@ -763,7 +816,7 @@ export async function checkReports(ctx: Ctx) {
     skip("отчёты «Табель»: выгрузка и печать", "в табеле никого нет");
   }
 
-  // a name opens the diary; a day's head opens «День» on that day
+  // a name opens the diary; a cell — the diary on that day; a day's head — «Подряд» at that day
   if ((await rows.count()) > 0) {
     await rows.first().locator("button, a").first().click();
     const diary = await visible(ctx, "desk-diary", 8_000);
@@ -771,10 +824,16 @@ export async function checkReports(ctx: Ctx) {
     await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
     await page.keyboard.press("Escape");
     await page.getByTestId("desk-panel").waitFor({ state: "detached", timeout: 5_000 }).catch(() => undefined);
+    await rows.first().locator('[data-testid="desk-tabel-cell"]').first().click();
+    const onDay = await page.waitForURL((url) => url.searchParams.has("p") && url.searchParams.has("day"), { timeout: 5_000 }).then(() => true, () => false);
+    record("отчёты «Табель»: клетка открывает дневник на этом дне (?p=&day=)", onDay && (await visible(ctx, "desk-diary", 8_000)), page.url());
+    await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press("Escape");
+    await page.getByTestId("desk-panel").waitFor({ state: "detached", timeout: 5_000 }).catch(() => undefined);
   }
   await page.getByTestId("desk-tabel-day").first().click();
-  const toDay = await page.waitForURL((url) => url.searchParams.get("tab") !== "tabel" && url.searchParams.has("day"), { timeout: 5_000 }).then(() => true, () => false);
-  record("отчёты «Табель»: заголовок дня открывает «День» на этом дне", toDay && (await visible(ctx, "desk-day-title", 5_000)), page.url());
+  const toFeed = await page.waitForURL((url) => url.searchParams.get("tab") !== "tabel" && url.searchParams.has("day"), { timeout: 5_000 }).then(() => true, () => false);
+  record("отчёты «Табель»: заголовок дня открывает «Подряд» на этом дне", toFeed && (await visible(ctx, "desk-feed", 8_000)), page.url());
 }
 
 /** On the secretary's desk (her page is signed in already). */

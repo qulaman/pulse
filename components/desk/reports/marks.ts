@@ -20,10 +20,11 @@ async function readMarks(from: Ymd, to: Ymd): Promise<PeriodMarks> {
   const marks = new Map<string, Map<string, TabelMark>>();
   for (let start = 0; ; start += PAGE) {
     // the director reads the company's reports under RLS (daily_reports_select); nobody else's;
-    // `excused_*` — the director's excuse of a missed day (D-183)
+    // `excused_*` — the director's excuse of a missed day (D-183). The form's «Пришёл / Ушёл» are
+    // not read: no cell and no hint of the табель says arrival, leaving or hours (D-194, D-198)
     const { data, error } = await supabase
       .from("daily_reports")
-      .select("user_id, report_date, status, arrived_at, left_at, excused_at, excused_reason")
+      .select("user_id, report_date, status, excused_at, excused_reason")
       .gte("report_date", from)
       .lte("report_date", to)
       .order("report_date")
@@ -36,8 +37,8 @@ async function readMarks(from: Ymd, to: Ymd): Promise<PeriodMarks> {
       if (!days) marks.set(row.user_id, (days = new Map()));
       days.set(row.report_date, {
         status: row.status as DailyReportStatus,
-        arrived_at: row.arrived_at,
-        left_at: row.left_at,
+        arrived_at: null,
+        left_at: null,
         excused_at: row.excused_at,
         excused_reason: row.excused_reason,
       });

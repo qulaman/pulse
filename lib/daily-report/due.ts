@@ -7,7 +7,6 @@
 import { nowHm, parseHm, todayYmd, type Hm } from "@/lib/datetime/calendar";
 
 import type { Draft } from "./draft";
-import { isoAt, isoToHm, minutesBetween } from "./format";
 import type { MyDailyReportDay, SubmitDailyReportInput } from "./types";
 
 /** `settings.daily_report.ask_from` when the company has not set it (lib/settings.ts). */
@@ -28,6 +27,8 @@ export type ReportDue = {
   submitted: boolean;
   /** When it was handed in, ISO; null before. */
   submittedAt: string | null;
+  /** D-198: the director checked today's report — «Сдан · проверен»; only what happened is said. */
+  checked: boolean;
   /** Not in yet and the clock is at or past `ask_from`: the row stands out, the face calls. */
   asking: boolean;
   /**
@@ -36,9 +37,8 @@ export type ReportDue = {
    */
   evening: boolean;
   /**
-   * Not in yet and «Сдать» can hand it in as it is: the day has tasks, the person's own words wait
-   * in a draft typed on /report (D-183: words are asked for always), and leaving now is after the
-   * arrival.
+   * Not in yet and «Сдать» can hand it in as it is: the day has tasks and the person's own words
+   * wait in a draft typed on /report (D-183: words are asked for always).
    */
   oneTap: boolean;
   /** The day's tasks written into the report by themselves. */
@@ -52,6 +52,7 @@ export const NO_REPORT_DUE: ReportDue = {
   evening: false,
   submitted: false,
   submittedAt: null,
+  checked: false,
   asking: false,
   oneTap: false,
   tasks: 0,
@@ -60,11 +61,10 @@ export const NO_REPORT_DUE: ReportDue = {
 
 /**
  * What «Сдать» from Лента sends: the words of a draft of the same day typed on /report
- * (`lib/daily-report/draft.ts`; the draft is dropped after the submit), its «Пришёл» and «Ушёл»
- * where they are set and make a length, else the suggested arrival (the last report's time of day
- * or the company's start, `my_daily_report`) and leaving now on the minute. null — one tap cannot:
- * the day is not today any more, it has no tasks, there are no words yet (D-183: the row then says
- * «Написать ›»), or now is not after the arrival (the form on /report says why).
+ * (`lib/daily-report/draft.ts`; the draft is dropped after the submit). The report is the words,
+ * the day's tasks and the moment it went — no «Пришёл / Ушёл» (D-198): both go as null. null — one
+ * tap cannot: the day is not today any more, it has no tasks, or there are no words yet (D-183: the
+ * row then says «Написать ›»).
  */
 export function oneTapInput(
   day: MyDailyReportDay,
@@ -73,36 +73,11 @@ export function oneTapInput(
   draft: Draft | null = null,
 ): SubmitDailyReportInput | null {
   if (day.tasks.length === 0 || day.date !== todayYmd(now)) return null;
-  const arrivedHm = isoToHm(day.suggest.arrived_at);
-  const arrived = arrivedHm ? isoAt(day.date, arrivedHm) : null;
-  const left = isoAt(day.date, nowHm(now));
   const own = draft?.date === day.date ? draft : null;
   const summary = own && typeof own.summary === "string" ? own.summary.trim() : "";
   if (!summary) return null;
-  if (own) {
-    const ownArrived = own.arrived ? isoAt(day.date, own.arrived) : arrived;
-    const ownLeft = own.left ? isoAt(day.date, own.left) : left;
-    const minutes = minutesBetween(ownArrived, ownLeft);
-    if (ownArrived && ownLeft && minutes !== null && minutes > 0) {
-      return { arrived_at: ownArrived, left_at: ownLeft, summary, client_request_id: clientRequestId };
-    }
-  }
-  const minutes = minutesBetween(arrived, left);
-  if (!arrived || !left || minutes === null || minutes <= 0) return null;
-  return { arrived_at: arrived, left_at: left, summary, client_request_id: clientRequestId };
-}
-
-/**
- * «Ушёл» on the form before anything is typed (7.6): now on the minute — but only from `ask_from`,
- * the product's evening. Earlier the person has not left: a prefilled «now» read as «31 мин на
- * работе» at half past nine, and a report handed in so carried a leaving time nobody chose. Before
- * the evening — empty: the field says «Время», the length line stays quiet. A day that is not today
- * keeps what the database suggested (only today's report can be written anyway).
- */
-export function leftSuggestion(day: MyDailyReportDay, now: Date, askFrom: string = ASK_FROM_DEFAULT): Hm | null {
-  if (day.date !== todayYmd(now)) return isoToHm(day.suggest.left_at);
-  const clock = nowHm(now);
-  return clock >= askFromOf(askFrom) ? clock : null;
+  // `date` — the day of the tap: only it tells a report sent offline before midnight from the next day's
+  return { arrived_at: null, left_at: null, date: day.date, summary, client_request_id: clientRequestId };
 }
 
 /**
@@ -128,11 +103,14 @@ export function reportDue(
   // "HH:MM" strings compare as the clock does
   const evening = nowHm(now) >= askFromOf(askFrom);
   const base = { show: true, evening, tasks: day.tasks.length, reward: day.points.enabled ? Math.max(0, day.points.reward) : 0 };
-  if (report) return { ...base, submitted: true, submittedAt: report.submitted_at, asking: false, oneTap: false };
+  if (report) {
+    return { ...base, submitted: true, submittedAt: report.submitted_at, checked: Boolean(report.checked_at), asking: false, oneTap: false };
+  }
   return {
     ...base,
     submitted: false,
     submittedAt: null,
+    checked: false,
     asking: evening,
     oneTap: oneTapInput(day, now, "", draft) !== null,
   };

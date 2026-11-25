@@ -16,7 +16,7 @@ import { addDays, MONTHS_RU, parseYmd, ymdHmToAqtobeIso, type Ymd } from "@/lib/
 
 import { kzHolidayName } from "./holidays";
 
-import { isoWeekday, rangeText, spanText } from "./format";
+import { isoWeekday, rangeText } from "./format";
 import type { DailyReportStatus, TeamPeriodRow } from "./types";
 
 /** What the табель needs of a day's report — the raw read of `daily_reports` (marks.ts). */
@@ -323,12 +323,11 @@ function offWords(cell: TabelCell, day: TabelDay, rules: ReportRules, person: Re
   return "отчёт не нужен";
 }
 
-/** A cell in words — the табель's tooltip and the diary's day: «сдан · 9:20–18:02», «уважительная: …». */
+/** A cell in words — the табель's tooltip and the diary's day: «сдан», «уважительная: …»; no typed times (D-198). */
 export function cellWords(cell: TabelCell, day: TabelDay, rules: ReportRules, person?: ReportPerson): string {
   switch (cell.state) {
     case "submitted": {
-      const times = spanText(cell.arrived_at, cell.left_at);
-      return ["сдан", times, cell.due ? "" : day.holiday ? "в праздник, не в счёт" : "в выходной, не в счёт"].filter(Boolean).join(" · ");
+      return ["сдан", cell.due ? "" : day.holiday ? "в праздник, не в счёт" : "в выходной, не в счёт"].filter(Boolean).join(" · ");
     }
     case "missed":
       return "не сдан";

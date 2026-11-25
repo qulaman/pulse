@@ -18,6 +18,7 @@ import { phoneHref } from "@/lib/people/phone";
 import { AVAILABILITY_LABEL, ROLE_LABEL, type Person } from "@/lib/people/queries";
 import type { Health } from "@/lib/push/health";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
+import { personFeedHref } from "@/lib/desk/reports-address";
 import { isOverdue } from "@/lib/tasks/status-text";
 
 import type { HeroFact } from "./Hero";
@@ -204,7 +205,7 @@ export function PersonPeek({
           ) : null}
           {director && word ? (
             <FactRow label="Отчёт сегодня">
-              <Link href={`/desk/reports?day=${todayYmd(now)}&p=${person.id}`} className="hover:underline" style={word.tone ? { color: TONE_VAR[word.tone] } : undefined} data-testid="person-peek-report">
+              <Link href={personFeedHref(person.id, todayYmd(now))} className="hover:underline" style={word.tone ? { color: TONE_VAR[word.tone] } : undefined} data-testid="person-peek-report">
                 {word.text} →
               </Link>
             </FactRow>

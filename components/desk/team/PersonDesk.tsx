@@ -46,6 +46,7 @@ import { useTeamBalances } from "@/lib/points/queries";
 import { usePushHealth } from "@/lib/push/health-query";
 import { useComposeStore } from "@/lib/store/compose";
 import { useMe, useSentTasks, type TaskWithPeople } from "@/lib/tasks/queries";
+import { personFeedHref } from "@/lib/desk/reports-address";
 import { deadlineLabel, isOverdue, type TaskStatus } from "@/lib/tasks/status-text";
 
 import { deskDraftOf, deskPatchOf } from "./draft";
@@ -196,7 +197,7 @@ function TodayReport({ personId, companyId, now }: { personId: string; companyId
             ? "на больничном"
             : "в отпуске";
   return (
-    <Link href={`/desk/reports?day=${todayYmd(now)}&p=${personId}`} className="person-report" data-state={row.state} data-testid="desk-person-report">
+    <Link href={personFeedHref(personId, todayYmd(now))} className="person-report" data-state={row.state} data-testid="desk-person-report">
       <ClipboardCheck size={16} strokeWidth={2.25} className="person-report-icon" aria-hidden />
       <span className="flex min-w-0 flex-col">
         <span className="person-report-value">{text}</span>

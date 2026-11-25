@@ -2,36 +2,35 @@
 
 import { PageHead } from "@/components/ui/PageHead";
 import type { PeriodKind } from "@/lib/daily-report/format";
-import type { TeamDay, TeamPeriod } from "@/lib/daily-report/types";
+import type { ReportsFeed } from "@/lib/daily-report/review";
+import type { ReportsAddress, ReportsTab } from "@/lib/daily-report/team-feed";
+import type { TeamPeriod } from "@/lib/daily-report/types";
 import type { Ymd } from "@/lib/datetime/calendar";
 
 import { Segments } from "./Segments";
-import { TeamDayPanel } from "./TeamDayPanel";
+import { TeamFeedPanel } from "./TeamFeedPanel";
 import { TeamPeriodPanel } from "./TeamPeriodPanel";
 
-export type ReportsTab = "day" | "period";
-
-const TABS = [
-  { key: "day", label: "День" },
+export const REPORTS_TABS = [
+  { key: "feed", label: "Подряд" },
   { key: "period", label: "Период" },
-] as const;
+] as const satisfies readonly { key: ReportsTab; label: string }[];
 
 /**
- * «Отчёты» of the director (D-152): «День» — who handed the report in today (or any day), what
- * each did; «Период» — the team's productivity over a week, a month or any stretch. The data is
- * the page's (`useTeamDailyReportDay`, `useTeamDailyReportPeriod`).
+ * «Отчёты» of the director on the phone (D-152, D-198): «Подряд» — every report, days in a row
+ * down, today on top, the words in sight, «Проверить» on each; «Период» — the team over a week,
+ * a month or any stretch, a person's row leads to their reports. The data is the page's.
  */
 export function TeamReportsView({
-  tab,
+  address,
   onTab,
+  onPerson,
+  onUnchecked,
   today,
   now,
-  date,
-  onDate,
-  day,
-  dayStale,
-  dayFailed,
-  onRetryDay,
+  companyId,
+  feed,
+  uncheckedCount,
   periodKind,
   onPeriodKind,
   range,
@@ -40,18 +39,16 @@ export function TeamReportsView({
   periodStale,
   periodFailed,
   onRetryPeriod,
-  bare = false,
 }: {
-  tab: ReportsTab;
+  address: ReportsAddress;
   onTab: (tab: ReportsTab) => void;
+  onPerson: (userId: string | null) => void;
+  onUnchecked: (on: boolean) => void;
   today: Ymd;
   now: Date;
-  date: Ymd;
-  onDate: (date: Ymd) => void;
-  day: TeamDay | undefined;
-  dayStale?: boolean;
-  dayFailed?: boolean;
-  onRetryDay?: () => void;
+  companyId: string | undefined;
+  feed: ReportsFeed;
+  uncheckedCount: number | undefined;
   periodKind: PeriodKind;
   onPeriodKind: (kind: PeriodKind) => void;
   range: { from: Ymd; to: Ymd };
@@ -60,37 +57,43 @@ export function TeamReportsView({
   periodStale?: boolean;
   periodFailed?: boolean;
   onRetryPeriod?: () => void;
-  /** The view alone, for a screen with a frame of its own (the desk, D-153): no <main>, no head. */
-  bare?: boolean;
 }) {
-  const view = (
-    <>
-      <Segments id="reports-tab" label="Вид отчётов" items={TABS} value={tab} onChange={onTab} className="mt-3" />
-      <div className="mt-4">
-        {tab === "day" ? (
-          <TeamDayPanel date={date} today={today} onDate={onDate} day={day} stale={dayStale} failed={dayFailed} onRetry={onRetryDay} />
-        ) : (
-          <TeamPeriodPanel
-            kind={periodKind}
-            onKind={onPeriodKind}
-            range={range}
-            onRange={onRange}
-            today={today}
-            period={period}
-            stale={periodStale}
-            failed={periodFailed}
-            onRetry={onRetryPeriod}
-            now={now}
-          />
-        )}
-      </div>
-    </>
-  );
-  if (bare) return view;
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
       <PageHead title="Отчёты" />
-      {view}
+      <Segments id="reports-tab" label="Вид отчётов" items={REPORTS_TABS} value={address.tab} onChange={onTab} className="mt-3" />
+      <div className="mt-2.5">
+        {address.tab === "feed" ? (
+          <TeamFeedPanel
+            // a filter starts its own list: the reports folded under «Не проверены» belong to it
+            key={`${address.who ?? ""}:${address.unchecked}`}
+            address={address}
+            onPerson={onPerson}
+            onUnchecked={onUnchecked}
+            today={today}
+            now={now}
+            companyId={companyId}
+            feed={feed}
+            uncheckedCount={uncheckedCount}
+          />
+        ) : (
+          <div className="mt-1.5">
+            <TeamPeriodPanel
+              kind={periodKind}
+              onKind={onPeriodKind}
+              range={range}
+              onRange={onRange}
+              today={today}
+              period={period}
+              stale={periodStale}
+              failed={periodFailed}
+              onRetry={onRetryPeriod}
+              now={now}
+              onPerson={(userId) => onPerson(userId)}
+            />
+          </div>
+        )}
+      </div>
     </main>
   );
 }

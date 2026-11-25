@@ -7,11 +7,21 @@ import { DAILY_REPORT_RPC } from "@/lib/daily-report/types";
 import { TEAM_ROLES } from "@/lib/routes";
 
 const BodySchema = z.strictObject({
-  arrived_at: z.string().min(1),
-  left_at: z.string().min(1),
+  // D-198: the report asks no «Пришёл / Ушёл» — a new client sends neither; a submit of an older
+  // build waiting in an outbox still carries both, and the RPC keeps them as typed
+  arrived_at: z.string().min(1).nullish(),
+  left_at: z.string().min(1).nullish(),
   summary: z.string(),
   client_request_id: z.uuid(),
+  /**
+   * The Aqtobe day of the tap: a submit kept in the outbox past midnight lands on the day it was
+   * made while that day is still open (without times the arrival no longer says it).
+   */
+  date: z.iso.date().optional(),
 });
+
+/** The RPC's times default to null; the generated args do not spell null, the SQL takes it. */
+const NO_TIME = null as unknown as string;
 
 /**
  * «Сдать отчёт» (D-152): the body is `SubmitDailyReportInput`, the answer `SubmitDailyReportResult`.
@@ -24,10 +34,11 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
   async ({ req, body }) => {
     const supabase = await userSupabase(req);
     const { data, error } = await supabase.rpc(DAILY_REPORT_RPC.submit, {
-      p_arrived_at: body.arrived_at,
-      p_left_at: body.left_at,
+      p_arrived_at: body.arrived_at ?? NO_TIME,
+      p_left_at: body.left_at ?? NO_TIME,
       p_summary: body.summary,
       client_request_id: body.client_request_id,
+      ...(body.date ? { p_day: body.date } : {}),
     });
 
     if (error) {

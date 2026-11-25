@@ -12,6 +12,7 @@ import {
   RotateCcw,
   type LucideIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useId, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 
 import { useDeskScope } from "@/components/desk/DeskScope";
@@ -45,6 +46,7 @@ import {
   type TaskStats,
   type WeekPoint,
 } from "@/lib/people/stats";
+import { personFeedHref } from "@/lib/desk/reports-address";
 import { pluralRu } from "@/lib/tasks/status-text";
 
 import { Block, LoadFailed, useBoxWidth } from "./shared";
@@ -97,7 +99,7 @@ export function PersonStats({ person, now }: { person: Person; now: Date }) {
           <NowTile source={stats.load} now={now} index={order("now")} className={place("now")} />
           <SpeedTile source={stats.tasks} index={order("speed")} className={place("speed")} />
           {stats.points ? <PointsTile source={stats.points} personId={person.id} index={order("points")} className={place("points")} /> : null}
-          {stats.reports ? <ReportsTile source={stats.reports} now={now} index={order("reports")} className={place("reports")} /> : null}
+          {stats.reports ? <ReportsTile source={stats.reports} personId={person.id} now={now} index={order("reports")} className={place("reports")} /> : null}
         </div>
       </div>
     </Block>
@@ -671,9 +673,21 @@ const DAY_WORD: Record<ReportDayState, string> = {
   future: "впереди",
 };
 
-function ReportsTile({ source, now, index, className }: { source: Source<ReportStats>; now: Date; index: number; className: string }) {
+function ReportsTile({ source, personId, now, index, className }: { source: Source<ReportStats>; personId: string; now: Date; index: number; className: string }) {
   return (
-    <Tile tileKey="reports" icon={ClipboardCheck} label="Отчёты за день" index={index} className={className}>
+    <Tile
+      tileKey="reports"
+      icon={ClipboardCheck}
+      label="Отчёты за день"
+      index={index}
+      className={className}
+      // the words of every report of the person, day after day (D-198)
+      end={
+        <Link href={personFeedHref(personId)} className="text-[12px] font-medium leading-4 text-muted hover:text-text hover:underline" data-testid="person-stat-reports-all">
+          Все отчёты →
+        </Link>
+      }
+    >
       <Body source={source} what="отчёты" bones={<ReportsBones />}>
         {(stats) => {
           const period = stats.period;

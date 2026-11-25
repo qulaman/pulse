@@ -30,6 +30,7 @@ import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { TONE_VAR, type Tone } from "@/components/desk/ui/tone";
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { DESK_NAV, DESK_PROFILE, DESK_PROFILE_KEY, deskNavActive, type DeskBadge, type DeskRole } from "@/lib/desk/routes";
+import { useUncheckedReportsCount } from "@/lib/daily-report/review";
 import { activeCount, useErrands } from "@/lib/errands/queries";
 import { afterHydration } from "@/lib/offline/persist";
 import { useOpenDisputes } from "@/lib/points/game";
@@ -130,9 +131,20 @@ function NavIcon({ href }: { href: string }) {
  */
 const NAV_GLIDE = { type: "spring", stiffness: 520, damping: 42, mass: 0.8 } as const;
 
-/** A count is a number on the binding; only something overdue takes the red pencil. */
-function badgeColors(tone: Tone | undefined) {
+/** A count is a number on the binding; only something overdue takes the red pencil; a quiet one is grey (D-198). */
+function badgeColors(tone: Tone | undefined, quiet = false) {
+  if (quiet) return { color: "var(--ink-3, var(--text-muted))" };
   return tone === "danger" ? { background: TONE_VAR.danger, color: "#fff" } : { color: "inherit" };
+}
+
+/**
+ * «Отчёты» — the director's reports not checked yet over the last week (D-198): a grey number, never
+ * red; a report waiting is no alarm. Asked once the screen has hydrated, the director's only.
+ */
+function useUncheckedBadge(role: DeskRole): number | undefined {
+  const me = useMe().data;
+  const settled = useSettled();
+  return useUncheckedReportsCount(me?.companyId, role === "director" && settled);
 }
 
 function NavLink({
@@ -140,6 +152,7 @@ function NavLink({
   label,
   count,
   tone,
+  quiet = false,
   active,
   chord,
   folded,
@@ -148,6 +161,8 @@ function NavLink({
   label: string;
   count?: number;
   tone?: Tone;
+  /** The number is grey: something to look at, not something wrong. */
+  quiet?: boolean;
   active: boolean;
   chord?: string;
   folded: boolean;
@@ -168,14 +183,14 @@ function NavLink({
         <span className="desk-nav-icon relative z-[1] inline-flex shrink-0">
           <NavIcon href={href} />
           {folded && shown ? (
-            <span className="nums absolute -right-2.5 -top-2 min-w-[16px] text-center text-[10px] leading-[15px]" style={badgeColors(tone)} data-testid="nav-badge" data-tone={tone}>
+            <span className="nums absolute -right-2.5 -top-2 min-w-[16px] text-center text-[10px] leading-[15px]" style={badgeColors(tone, quiet)} data-testid="nav-badge" data-tone={quiet ? "quiet" : tone}>
               {shown}
             </span>
           ) : null}
         </span>
         {folded ? null : <span className="relative z-[1] min-w-0 flex-1 truncate">{label}</span>}
         {!folded && shown ? (
-          <span className="nums relative z-[1] text-center" style={badgeColors(tone)} data-testid="nav-badge" data-tone={tone}>
+          <span className="nums relative z-[1] text-center" style={badgeColors(tone, quiet)} data-testid="nav-badge" data-tone={quiet ? "quiet" : tone}>
             {shown}
           </span>
         ) : null}
@@ -214,6 +229,7 @@ function PulseGlyphMark() {
 export function SideNav({ role, brand, folded = false, onToggle }: { role: DeskRole; brand: DeskBrand; folded?: boolean; onToggle?: () => void }) {
   const pathname = usePathname();
   const badges = useDeskBadges(role);
+  const unchecked = useUncheckedBadge(role);
   const active = deskNavActive(pathname, role);
   const logo = brand.logoUrl;
   const named = !logo && brand.name !== "Pulse";
@@ -239,8 +255,9 @@ export function SideNav({ role, brand, folded = false, onToggle }: { role: DeskR
             <NavLink
               href={item.href}
               label={item.label}
-              count={item.badge ? badges.counts[item.badge] : undefined}
+              count={item.badge ? badges.counts[item.badge] : item.href === "/desk/reports" ? unchecked : undefined}
               tone={item.badge ? badges.tones[item.badge] : undefined}
+              quiet={!item.badge && item.href === "/desk/reports"}
               active={active === item.href}
               chord={item.key}
               folded={folded}

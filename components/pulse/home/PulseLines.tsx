@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { memo } from "react";
 
+import { TeamReportsLine } from "@/components/daily-report/TeamReportsLine";
 import { SetupEntry } from "@/components/setup/SetupEntry";
 import { Button } from "@/components/ui/Button";
 
@@ -12,9 +13,21 @@ import type { Exchange } from "./useQuestionExchange";
  * The service lines (a draft not sent, nobody in the team yet, the phone not set up): under the
  * band's words on the ring, under the open ball in the card. Their own part — a tap does not touch them (D-178).
  * The phone is one line into «Подключение» (D-190) where the push and install cards were — `setup`
- * false leaves it out: the card shows it under «Дела» only, not under every ball.
+ * false leaves it out: the card shows it under «Дела» only, not under every ball. The reports not
+ * checked yet are one grey line into «Отчёты» (D-198) — `reports` false leaves it out: the card
+ * shows it under «Сообщения» only.
  */
-export const ServiceLines = memo(function ServiceLines({ draftCount, noTeam, setup = true }: { draftCount: number; noTeam: boolean; setup?: boolean }) {
+export const ServiceLines = memo(function ServiceLines({
+  draftCount,
+  noTeam,
+  setup = true,
+  reports = true,
+}: {
+  draftCount: number;
+  noTeam: boolean;
+  setup?: boolean;
+  reports?: boolean;
+}) {
   return (
     <>
       {draftCount > 0 ? (
@@ -30,6 +43,7 @@ export const ServiceLines = memo(function ServiceLines({ draftCount, noTeam, set
           В команде пока никого. Добавьте первого сотрудника. <span className="text-accent">Добавить ›</span>
         </Link>
       ) : null}
+      {reports ? <TeamReportsLine /> : null}
       {setup ? <SetupEntry from="pulse" /> : null}
     </>
   );

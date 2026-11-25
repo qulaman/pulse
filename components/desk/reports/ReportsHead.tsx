@@ -1,14 +1,17 @@
 "use client";
 
+import { CalendarDays } from "lucide-react";
 import { useRef, useState } from "react";
 
+import { IconButton } from "@/components/desk/ui/IconButton";
+import { Popover } from "@/components/desk/ui/Popover";
 import { SegmentTabs } from "@/components/desk/ui/Toolbar";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { Icon } from "@/components/tasks/desk/icons";
 import { Button } from "@/components/ui/Button";
 import { Calendar } from "@/components/ui/datetime/Calendar";
 import { useDismiss } from "@/components/ui/datetime/PickerShell";
-import { addDaysYmd, dayTitle, PERIOD_MAX_DAYS, rangeText } from "@/lib/daily-report/format";
+import { PERIOD_MAX_DAYS, rangeText } from "@/lib/daily-report/format";
 import { compactYmd, type Ymd } from "@/lib/datetime/calendar";
 import { clampCustom, monthTitle, periodRange, type TabelPeriod } from "@/lib/desk/reports-address";
 
@@ -28,22 +31,38 @@ function TodayMove({ at, label, hint, onToday }: { at: boolean; label: string; h
   );
 }
 
-/** ‹ Вторник, 3 ноября › — the day of «Сводка»; tomorrow is not a day yet; ← and → step too. */
-export function DayStepper({ date, today, onDate }: { date: Ymd; today: Ymd; onDate: (date: Ymd) => void }) {
-  const isToday = date === today;
+/**
+ * The feed's jump to a date (D-198): a calendar icon in the head, the month under it; a picked day
+ * scrolls the feed «Подряд» to it (older weeks load on the way). Tomorrow is not a day yet.
+ */
+export function JumpToDay({ value, today, now, onPick }: { value: Ymd; today: Ymd; now: Date; onPick: (day: Ymd) => void }) {
+  const box = useRef<HTMLSpanElement>(null);
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   return (
-    <div className="reports-stepper flex items-center gap-1" data-testid="desk-day-stepper">
-      <button type="button" className={STEP} aria-label="Предыдущий день" title="Предыдущий день (←)" onClick={() => onDate(addDaysYmd(date, -1))}>
-        <Icon name="left" size={16} />
-      </button>
-      <span key={date} className="reports-stepper-title min-w-[176px] text-center text-[14px] font-semibold leading-5" data-testid="desk-day-title">
-        {dayTitle(date)}
+    <>
+      <span ref={box} className="inline-flex">
+        <IconButton
+          label="Перейти к дню"
+          icon={<CalendarDays size={16} strokeWidth={2} aria-hidden />}
+          pressed={Boolean(anchor)}
+          onClick={() => setAnchor(anchor ? null : box.current)}
+          testId="desk-feed-jump"
+        />
       </span>
-      <button type="button" className={STEP} aria-label="Следующий день" title="Следующий день (→)" disabled={isToday} onClick={() => onDate(addDaysYmd(date, 1))}>
-        <Icon name="right" size={16} />
-      </button>
-      <TodayMove at={isToday} label="Сегодня" hint="К сегодняшнему дню" onToday={() => onDate(today)} />
-    </div>
+      <Popover open={Boolean(anchor)} onClose={() => setAnchor(null)} anchor={anchor} align="end" width={320} label="Перейти к дню">
+        <div className="p-3" data-testid="desk-feed-jump-calendar">
+          <Calendar
+            value={value}
+            max={today}
+            now={now}
+            onPick={(day) => {
+              setAnchor(null);
+              onPick(day);
+            }}
+          />
+        </div>
+      </Popover>
+    </>
   );
 }
 

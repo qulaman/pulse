@@ -60,7 +60,8 @@ const SWAP = {
  * «Отчёт за день» at the top of «Дела» on Лента (D-167) — the whole day, from the data alone:
  * before `ask_from` a quiet line; from it a card that says the report is not in; on a day with
  * tasks «Сдать» hands it in at once (the tasks are the report, D-155 §7) with «Изменить ›» to
- * /report beside it; without tasks «Написать ›» leads to the form; handed in — «Сдан в 17:42 ✓».
+ * /report beside it; without tasks «Написать ›» leads to the form; handed in — «Сдан в 17:42 ✓»,
+ * checked by the director — «Сдан · проверен ✓» (D-198, live: the day's socket).
  * Not there on a day off, a holiday, with reports off or for a person on leave (`reportDue`).
  * `now` — the screen's minute clock.
  */
@@ -84,8 +85,7 @@ export function ReportDueRow({ now }: { now: Date }) {
   const send = () => {
     if (!day.data || day.data.report || sending.current) return;
     const date = day.data.date;
-    // the moment of the tap, not the screen's minute: «Ушёл» is now — unless the person set it on
-    // /report: what they typed there goes in (tasks/032)
+    // the words typed on /report go in (tasks/032, D-183); no «Пришёл / Ушёл» (D-198)
     const input = oneTapInput(day.data, new Date(), crypto.randomUUID(), readDraft(date));
     if (!input) return;
     sending.current = true;
@@ -138,8 +138,9 @@ export function ReportDueRowView({
 
   const title = asking ? "Отчёт за день не сдан" : "Отчёт за день";
   const sub = due.submitted ? (
-    <span className="inline-flex items-center gap-1 font-semibold text-ok" data-testid="report-due-done">
-      {waiting ? "Сдан · ждёт связи" : `Сдан в ${timeOf(due.submittedAt)}`}
+    <span className="inline-flex items-center gap-1 font-semibold text-ok" data-testid="report-due-done" data-checked={due.checked && !waiting ? "" : undefined}>
+      {/* D-198: the director's check is said when it happened — never «не проверен» */}
+      {waiting ? "Сдан · ждёт связи" : due.checked ? "Сдан · проверен" : `Сдан в ${timeOf(due.submittedAt)}`}
       {waiting ? null : <Icon name="check" size={14} />}
     </span>
   ) : due.oneTap ? (

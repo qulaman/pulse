@@ -568,9 +568,10 @@ export default function PulsePage() {
 
   const noTeam = Boolean(peopleRows) && team.length === 0;
   const serviceLines = useMemo(() => <ServiceLines draftCount={draftCount} noTeam={noTeam} />, [draftCount, noTeam]);
-  // in the card the phone's line stands under «Дела» only, not under every ball (D-190)
+  // in the card the phone's line stands under «Дела» only, not under every ball (D-190); the reports
+  // to check — under «Сообщения» (D-198)
   const cardService = useMemo(
-    () => <ServiceLines draftCount={draftCount} noTeam={noTeam} setup={panel === "tasks"} />,
+    () => <ServiceLines draftCount={draftCount} noTeam={noTeam} setup={panel === "tasks"} reports={panel === "messages"} />,
     [draftCount, noTeam, panel],
   );
 

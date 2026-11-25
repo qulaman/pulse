@@ -9,7 +9,7 @@ import { addMonths, MONTHS_RU, monthMatrix, parseYmd, ymdAt, ymdOf, type Month, 
 import { isWorkday, type ReportPerson, type ReportRules } from "@/lib/people/stats";
 import { pluralRu } from "@/lib/tasks/status-text";
 
-import { hoursText, minutesBetween, pointsText, spanText, timeOf } from "./format";
+import { pointsText, timeOf } from "./format";
 import { awayKindOf, isDueDay, tabelDayState, type AwayKind, type TabelState } from "./tabel";
 import type { DailyReport, PersonDailyReport } from "./types";
 
@@ -124,7 +124,7 @@ export function entryDay(ymd: Ymd): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-/** What a square says under the mouse: «вт, 17 ноября · сдан · 9:19–19:17». */
+/** What a square says under the mouse: «вт, 17 ноября · сдан» — no typed times (D-194, D-198). */
 export function cellTitle(cell: DiaryCell): string {
   const word: Record<DiaryDayState, string> = {
     submitted: "сдан",
@@ -136,8 +136,7 @@ export function cellTitle(cell: DiaryCell): string {
     holiday: "праздник",
     future: "ещё впереди",
   };
-  const times = cell.report?.status === "submitted" ? timesText(cell.report) : "";
-  return [shortDay(cell.day), word[cell.state], times].filter(Boolean).join(" · ");
+  return [shortDay(cell.day), word[cell.state]].join(" · ");
 }
 
 /* ---- the month in one line --------------------------------------------------------------------- */
@@ -188,23 +187,6 @@ export function tallyParts(tally: MonthTally): TallyPart[] | null {
 }
 
 /* ---- an entry ---------------------------------------------------------------------------------- */
-
-/** «9:20–18:02»; a missing end — what is known; nothing — "". */
-export function timesText(report: Pick<DailyReport, "arrived_at" | "left_at">): string {
-  return spanText(report.arrived_at, report.left_at);
-}
-
-/** Hours from arrival to leaving, one decimal; null while they make no length. */
-export function hoursOf(report: Pick<DailyReport, "arrived_at" | "left_at">): number | null {
-  const minutes = minutesBetween(report.arrived_at, report.left_at);
-  return minutes !== null && minutes > 0 ? Math.round((minutes / 60) * 10) / 10 : null;
-}
-
-/** «9:20–18:02 · 8,7 ч по времени сдачи» — the grey line of a handed-in day. */
-export function hoursLine(report: Pick<DailyReport, "arrived_at" | "left_at">): string {
-  const hours = hoursOf(report);
-  return [timesText(report), hours !== null ? `${hoursText(hours)} по времени сдачи` : ""].filter(Boolean).join(" · ");
-}
 
 /** The words of a report, or "" — whitespace is no words. */
 export function wordsOf(report: Pick<DailyReport, "summary">): string {

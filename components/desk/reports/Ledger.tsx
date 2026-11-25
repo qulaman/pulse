@@ -1,36 +1,23 @@
 "use client";
 
+import { Check, Eye } from "lucide-react";
 import Link from "next/link";
-import { motion } from "motion/react";
-import { useLayoutEffect, useRef, useState, type MouseEvent } from "react";
+import { useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 
 import { Face } from "@/components/desk/ui/Face";
+import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
-import { hoursText, rangeText, spanText, taskMeta, tasksCount, timeOf } from "@/lib/daily-report/format";
-import type { DailyReport, DailyReportTask, TeamDayRow } from "@/lib/daily-report/types";
+import { rangeText, taskMeta, tasksCount, timeOf } from "@/lib/daily-report/format";
+import { useSeenOnScreen } from "@/lib/daily-report/review";
+import type { DailyReport, DailyReportTask, FeedReport } from "@/lib/daily-report/types";
 import { aqtobeIsoToYmdHm } from "@/lib/datetime/calendar";
-import { pluralRu } from "@/lib/tasks/status-text";
-
+import { highlightParts, isChecked, isSeen } from "@/lib/desk/reports-feed";
 
 /** «Только что» stays teal this long after the report came. */
 const FRESH_MS = 10 * 60_000;
 /** An edit later than this after the submit is said: «правка 21:40». */
 const EDIT_MS = 60_000;
-
-/** A row of the ledger: a handed-in report and its person. */
-export type LedgerRow = TeamDayRow & { report: DailyReport };
-
-/** Newest handed-in first; the same minute — by name, so the order never flickers. */
-export function ledgerOrder(a: LedgerRow, b: LedgerRow): number {
-  const at = (row: LedgerRow) => row.report.submitted_at ?? row.report.updated_at;
-  return at(b).localeCompare(at(a)) || a.full_name.localeCompare(b.full_name, "ru");
-}
-
-/** The person's words, or nothing: a report handed in with one tap has none. */
-function wordsOf(report: DailyReport): string {
-  return report.summary?.trim() ?? "";
-}
 
 /** «3 задачи: Акт сверки, Отчёт Казахтелеком» — what a report without words did. */
 export function tasksLine(tasks: readonly DailyReportTask[]): string {
@@ -56,19 +43,34 @@ export function isFresh(report: DailyReport, now: Date): boolean {
   return age >= -60_000 && age < FRESH_MS;
 }
 
-/** «1 новый отчёт», «3 новых отчёта», «5 новых отчётов». */
-export function newReportsText(count: number): string {
-  return `${count} ${pluralRu(count, ["новый отчёт", "новых отчёта", "новых отчётов"])}`;
+/** A press on a control inside a row stays the control's; a drag that selected words is reading, not a click. */
+const notForRow = (event: MouseEvent) =>
+  (event.target as HTMLElement).closest("button, a, input, textarea") !== null || Boolean(window.getSelection()?.toString());
+
+/** The words with what the search found marked. */
+function Marked({ text, query }: { text: string; query: string }) {
+  if (!query) return <>{text}</>;
+  return (
+    <>
+      {highlightParts(text, query).map((part, index) =>
+        part.hit ? (
+          <mark key={index} className="rep-feed-hit">
+            {part.text}
+          </mark>
+        ) : (
+          part.text
+        ),
+      )}
+    </>
+  );
 }
 
-/** A double click on a control inside a row stays the control's. */
-const fromControl = (event: MouseEvent) => (event.target as HTMLElement).closest("button, a, input, textarea") !== null;
-
 /**
- * The words in full at reading size, six lines at most until «ещё» opens them in place. Whether
- * they overflow is measured after layout and drawn before paint: the button never jumps in.
+ * The words in full at reading size, six lines at most until «ещё» opens them in place (a search
+ * opens them all: the match may be further down). Whether they overflow is measured after layout
+ * and drawn before paint: the button never jumps in.
  */
-function Words({ text, open, onMore }: { text: string; open: boolean; onMore: () => void }) {
+function Words({ text, query, open, onMore }: { text: string; query: string; open: boolean; onMore: () => void }) {
   const box = useRef<HTMLParagraphElement>(null);
   const [clamped, setClamped] = useState(false);
   useLayoutEffect(() => {
@@ -83,8 +85,8 @@ function Words({ text, open, onMore }: { text: string; open: boolean; onMore: ()
   }, [open, text]);
   return (
     <>
-      <p ref={box} className="rep-day-words" data-open={open ? "" : undefined}>
-        {text}
+      <p ref={box} className="rep-day-words rep-feed-words" data-open={open ? "" : undefined}>
+        <Marked text={text} query={query} />
       </p>
       {clamped && !open ? (
         <button type="button" className="rep-day-more desk-focus" onClick={onMore}>
@@ -95,7 +97,7 @@ function Words({ text, open, onMore }: { text: string; open: boolean; onMore: ()
   );
 }
 
-function TaskLines({ tasks }: { tasks: readonly DailyReportTask[] }) {
+function TaskLines({ tasks, query }: { tasks: readonly DailyReportTask[]; query: string }) {
   if (tasks.length === 0) return null;
   return (
     <ul className="rep-day-tasks" aria-label="Задачи дня">
@@ -103,7 +105,7 @@ function TaskLines({ tasks }: { tasks: readonly DailyReportTask[] }) {
         <li key={task.id} className="rep-day-task">
           <StatusGlyph status={task.status} size={15} />
           <Link href={`/desk/tasks?id=${task.id}`} className="rep-day-task-title desk-focus" title={task.title}>
-            {task.title}
+            <Marked text={task.title} query={query} />
           </Link>
           <span className="rep-day-task-meta" data-late={task.on_time === false ? "" : undefined}>
             {taskMeta(task)}
@@ -114,7 +116,7 @@ function TaskLines({ tasks }: { tasks: readonly DailyReportTask[] }) {
   );
 }
 
-/** When the report came, on the right: «только что», «18:04», «правка 21:40», another day. */
+/** When the report came: «только что», «18:04», another day, «правка 21:40». Never arrival, leaving or hours (D-198). */
 function Stamp({ report, now }: { report: DailyReport; now: Date }) {
   const fresh = isFresh(report, now);
   const late = lateText(report);
@@ -123,170 +125,180 @@ function Stamp({ report, now }: { report: DailyReport; now: Date }) {
     <span className="rep-day-stamp" title={late ? `Сдан ${late} в ${timeOf(report.submitted_at)}` : `Сдан в ${timeOf(report.submitted_at)}`}>
       {fresh ? <span className="rep-day-fresh">только что</span> : null}
       {late ? <span className="rep-day-late">{late}</span> : null}
-      <span className="nums">{timeOf(report.submitted_at)}</span>
+      <span className="nums rep-feed-time">{timeOf(report.submitted_at)}</span>
       {edited ? <span className="rep-day-edited">{edited}</span> : null}
     </span>
   );
 }
 
-function Entry({
-  row,
-  now,
-  open,
-  rise,
-  selected,
-  opened,
-  onMore,
-  onSelect,
-  onOpen,
+/**
+ * «Проверить» — a grey plate with a ring; checked — «Проверено 16:30», green words on a pale plate,
+ * a press takes the mark off (D-198). Who checked it is in the hint when it was somebody else; the
+ * key A is said where it works (the feed's chosen report).
+ */
+export function CheckButton({
+  report,
+  onCheck,
+  checker,
+  size = "md",
+  keys = ["A"],
+  testId = "desk-feed-check",
 }: {
-  row: LedgerRow;
-  now: Date;
-  open: boolean;
-  rise: boolean;
-  selected: boolean;
-  opened: boolean;
-  onMore: () => void;
-  onSelect: (id: string) => void;
-  onOpen: (id: string) => void;
+  report: Pick<DailyReport, "id" | "checked_at">;
+  onCheck: (on: boolean) => void;
+  /** The name of the director who checked it, when not me. */
+  checker?: string | null;
+  size?: "md" | "sm";
+  keys?: string[];
+  testId?: string;
 }) {
-  const report = row.report;
-  const words = wordsOf(report);
-  const span = spanText(report.arrived_at, report.left_at);
-  const hours = hoursText(row.hours);
-  const face = <Face person={{ id: row.user_id, full_name: row.full_name, avatar_url: row.avatar_url }} size={words ? 32 : 24} />;
+  const checked = isChecked(report);
   return (
-    // a new report rises at the top (`data-rise`), the ones under it slide down to make room (D-184)
-    <motion.li
-      layout="position"
-      transition={{ type: "tween", duration: 0.23, ease: [0.2, 0.8, 0.2, 1] }}
-      className="rep-day-entry"
-      data-testid="desk-ledger-entry"
-      data-row-key={row.user_id}
-      data-words={words ? "1" : "0"}
-      data-selected={selected ? "" : undefined}
-      data-open={opened ? "" : undefined}
-      data-rise={rise ? "" : undefined}
-      aria-current={selected ? "true" : undefined}
-      aria-label={row.full_name}
-      onClick={() => onSelect(row.user_id)}
-      onDoubleClick={(event) => {
-        if (!fromControl(event)) onOpen(row.user_id);
-      }}
-    >
-      {words ? (
-        <>
-          <div className="rep-day-who">
-            {face}
-            <div className="min-w-0">
-              <p className="rep-day-name">{row.full_name}</p>
-              {row.position ? <p className="rep-day-position">{row.position}</p> : null}
-              {span ? (
-                <p className="rep-day-span nums">
-                  {span}
-                  {hours ? <span className="rep-day-hours"> · {hours}</span> : null}
-                </p>
-              ) : null}
-            </div>
-          </div>
-          <div className="rep-day-body">
-            <Words text={words} open={open} onMore={onMore} />
-            <TaskLines tasks={report.tasks} />
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="rep-day-who" title={row.position ?? undefined}>
-            {face}
-            <p className="rep-day-name">{row.full_name}</p>
-          </div>
-          <p className="rep-day-compact" title={tasksLine(report.tasks) || undefined}>
-            {span ? <span className="nums rep-day-compact-span">{span}</span> : null}
-            {span && report.tasks.length ? " · " : null}
-            {tasksLine(report.tasks)}
-          </p>
-        </>
-      )}
-      <Stamp report={report} now={now} />
-    </motion.li>
+    <Tooltip label={checked ? `Проверено${checker ? ` · ${checker}` : ""} — снять отметку` : "Отметить проверенным"} keys={keys.length ? keys : undefined}>
+      <button
+        type="button"
+        className="rep-feed-check desk-focus"
+        data-on={checked ? "" : undefined}
+        data-size={size}
+        aria-pressed={checked}
+        data-testid={testId}
+        onClick={(event) => {
+          event.stopPropagation();
+          onCheck(!checked);
+        }}
+      >
+        <Check size={14} strokeWidth={2.4} aria-hidden />
+        {checked ? (
+          <>
+            Проверено <span className="nums rep-feed-check-at">{timeOf(report.checked_at)}</span>
+          </>
+        ) : (
+          "Проверить"
+        )}
+      </button>
+    </Tooltip>
   );
 }
 
-/**
- * «Сводка»'s ledger (D-183): only the handed-in reports, newest first — who and when on the left,
- * the person's words in full at reading size, the day's tasks under them, the time it came on the
- * right. A report without words is one short line of its times and its tasks. What arrives while
- * the director reads waits behind «1 новый отчёт» on top (`held`); shown, it rises into place.
- */
-export function Ledger({
-  rows,
-  held,
-  risen,
-  onShowHeld,
-  empty,
-  now,
-  selectedId,
-  openId,
-  onSelect,
-  onOpen,
-}: {
-  /** Shown entries, in order. */
-  rows: readonly LedgerRow[];
-  /** How many came after the director started reading. */
-  held: number;
-  /** Ids that have just been let in: they rise into place. */
-  risen: ReadonlySet<string>;
-  onShowHeld: () => void;
-  /** What the empty ledger says. */
-  empty: { title: string; hint?: string } | null;
-  now: Date;
-  selectedId: string | null;
-  openId: string | null;
-  onSelect: (id: string) => void;
-  onOpen: (id: string) => void;
-}) {
-  const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set());
+/** «просмотрено 17:41» — quiet: an eye and the time the director first had it whole on screen. */
+export function SeenLine({ report }: { report: Pick<DailyReport, "seen_at"> }) {
+  if (!report.seen_at) return null;
   return (
-    <section className="rep-day-ledger" data-testid="desk-ledger" aria-label="Что сделано">
-      <header className="rep-day-ledger-head">
-        <h2 className="rep-day-ledger-title">Что сделано</h2>
-        {rows.length > 0 ? (
-          <span className="rep-day-ledger-sub">
-            <span className="nums">{rows.length}</span> {pluralRu(rows.length, ["отчёт", "отчёта", "отчётов"])}
-            {rows.length > 1 ? " · сначала новые" : ""}
-          </span>
-        ) : null}
-        {/* the head stays on top while one scrolls: what came meanwhile is said there, nothing moves */}
-        {held > 0 ? (
-          <button type="button" className="rep-day-pill desk-focus" data-testid="desk-new-reports" onClick={onShowHeld}>
-            <span className="rep-day-pill-dot" aria-hidden />
-            {newReportsText(held)}
-          </button>
-        ) : null}
-      </header>
-      {rows.length === 0 && empty ? (
-        <div className="rep-day-ledger-empty">
-          <p className="rep-day-ledger-empty-title">{empty.title}</p>
-          {empty.hint ? <p className="rep-day-ledger-empty-hint">{empty.hint}</p> : null}
+    <span className="rep-feed-seen nums" title={`Просмотрено в ${timeOf(report.seen_at)}`} data-testid="desk-feed-seen">
+      <Eye size={13} strokeWidth={2} aria-hidden />
+      просмотрено {timeOf(report.seen_at)}
+    </span>
+  );
+}
+
+/** «изменён после проверки 19:12» — the person changed the words after the check; the mark came off. */
+export function ChangedLine({ report }: { report: Pick<DailyReport, "changed_after_check_at" | "checked_at"> }) {
+  if (!report.changed_after_check_at || report.checked_at) return null;
+  return (
+    <span className="rep-feed-changed nums" data-testid="desk-feed-changed">
+      изменён после проверки {timeOf(report.changed_after_check_at)}
+    </span>
+  );
+}
+
+export type EntryProps = {
+  report: FeedReport;
+  now: Date;
+  /** The words a search found, marked; "" — none. */
+  query: string;
+  /** The director reads: «новый» and «Проверить» are theirs (D-198). */
+  director: boolean;
+  selected: boolean;
+  /** Its person's diary is open in the panel. */
+  opened: boolean;
+  /** «Не проверены»: once checked, it folds in place into one line instead of leaving. */
+  folding: boolean;
+  checker: string | null;
+  onSelect: (id: string) => void;
+  onOpen: (report: FeedReport) => void;
+  onCheck: (ids: string[], on: boolean) => void;
+};
+
+/**
+ * One report of the feed «Подряд» (D-198): who on the left (a teal dot while nobody has looked at
+ * it yet), the person's words in full at reading size and the day's tasks under them, and on the
+ * right when it came, «просмотрено 17:41», «Проверить» / «Проверено 16:30». A press on the row
+ * opens the person's «Дневник» on that day; the choice stays for the keys (↑ ↓, A). The report
+ * counts as seen once it stayed whole on screen (`useSeenOnScreen`). Under «Не проверены» a
+ * checked report folds in place into «✓ Имя · проверено · Отменить» — the list does not jump.
+ */
+export function LedgerEntry({ report, now, query, director, selected, opened, folding, checker, onSelect, onOpen, onCheck }: EntryProps) {
+  const [open, setOpen] = useState(false);
+  const checked = isChecked(report);
+  // «новый» until a director had it on screen; a checked report has been read whatever the mark says
+  const fresh = director && !isSeen(report) && !checked;
+  const seenRef = useSeenOnScreen(report.id, fresh && report.status === "submitted");
+  const words = report.summary?.trim() ?? "";
+
+  if (folding && checked) {
+    return (
+      <li className="rep-feed-folded" data-testid="desk-feed-folded" data-row-key={report.id} data-checked="">
+        <Check size={14} strokeWidth={2.4} className="rep-feed-folded-tick" aria-hidden />
+        <span className="rep-feed-folded-name">{report.full_name}</span>
+        <span className="rep-feed-folded-word">· проверено</span>
+        <button type="button" className="rep-feed-folded-undo desk-focus" onClick={() => onCheck([report.id], false)} data-testid="desk-feed-uncheck">
+          Отменить
+        </button>
+      </li>
+    );
+  }
+
+  const face = <Face person={{ id: report.user_id, full_name: report.full_name, avatar_url: report.avatar_url }} size={words ? 32 : 24} />;
+  const marks: ReactNode = (
+    <div className="rep-feed-marks">
+      <Stamp report={report} now={now} />
+      {director && !checked ? <SeenLine report={report} /> : null}
+      {director ? <ChangedLine report={report} /> : null}
+      {director ? <CheckButton report={report} checker={checker} onCheck={(on) => onCheck([report.id], on)} /> : null}
+    </div>
+  );
+  return (
+    <li
+      ref={seenRef}
+      className="rep-day-entry rep-feed-entry"
+      data-testid="desk-feed-entry"
+      data-row-key={report.id}
+      data-user={report.user_id}
+      data-words={words ? "1" : "0"}
+      data-new={fresh ? "" : undefined}
+      data-checked={checked ? "" : undefined}
+      data-selected={selected ? "" : undefined}
+      data-open={opened ? "" : undefined}
+      aria-current={selected ? "true" : undefined}
+      aria-label={report.full_name}
+      onClick={(event) => {
+        if (notForRow(event)) return;
+        onSelect(report.id);
+        onOpen(report);
+      }}
+    >
+      <div className="rep-day-who">
+        <span className="rep-feed-face">
+          {fresh ? <span className="rep-feed-dot" aria-label="новый" data-testid="desk-feed-new" /> : null}
+          {face}
+        </span>
+        <div className="min-w-0">
+          <p className="rep-day-name">{report.full_name}</p>
+          {report.gone ? <p className="rep-day-position">больше не в команде</p> : report.position ? <p className="rep-day-position">{report.position}</p> : null}
+        </div>
+      </div>
+      {words ? (
+        <div className="rep-day-body">
+          <Words text={words} query={query} open={open || Boolean(query)} onMore={() => setOpen(true)} />
+          <TaskLines tasks={report.tasks} query={query} />
         </div>
       ) : (
-        <ol className="rep-day-entries">
-          {rows.map((row) => (
-            <Entry
-              key={row.user_id}
-              row={row}
-              now={now}
-              open={opened.has(row.report.id)}
-              rise={risen.has(row.user_id)}
-              selected={selectedId === row.user_id}
-              opened={openId === row.user_id}
-              onMore={() => setOpened((prev) => new Set(prev).add(row.report.id))}
-              onSelect={onSelect}
-              onOpen={onOpen}
-            />
-          ))}
-        </ol>
+        // a one-tap report from «Пульс» has no words: its tasks, one line
+        <p className="rep-day-compact" title={tasksLine(report.tasks) || undefined}>
+          {report.tasks.length ? <Marked text={tasksLine(report.tasks)} query={query} /> : "без слов и задач"}
+        </p>
       )}
-    </section>
+      {marks}
+    </li>
   );
 }

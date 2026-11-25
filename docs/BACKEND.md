@@ -60,7 +60,8 @@
 | `/api/errands` | POST | Д | заявка секретарю | `errands` |
 | `/api/visits` | POST | секретарь | посетитель, сообщение | `announce_visit` |
 | `/api/visits/[id]/answer` | POST | Д | ответ на визит | `answer_visit` |
-| `/api/daily-report` | POST | К | сдать отчёт | `submit_daily_report` |
+| `/api/daily-report` | POST | К | сдать отчёт: слова, `date` — день нажатия; «Пришёл / Ушёл» необязательны (D-198) | `submit_daily_report` |
+| `/api/reports/check` | POST | Д | «Проверено» вкл/выкл, 1–200 отчётов; нажатие без сети ждёт в очереди (D-198) | `check_daily_reports` |
 | `/api/reports/remind` | POST | Д | «Напомнить» о сегодняшнем отчёте; день нажатия не сегодня — 409 `stale_day` | `remind_daily_report` |
 | `/api/files/upload-url` | POST | все | URL загрузки фото | Storage |
 | `/api/files/url` | GET | все | URL файла сообщения | Storage |

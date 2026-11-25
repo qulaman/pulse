@@ -1,11 +1,10 @@
 import { TeamReportsScreen } from "@/components/daily-report/TeamReportsScreen";
 
 /**
- * «Отчёты» (D-152): the team's daily reports — a day, or a period. `?tab=period` opens the
- * period directly; the layout lets only the director in.
+ * «Отчёты» (D-152, D-198): the team's daily reports — all of them in a row, or a period. The view
+ * lives in the address (`?tab=period`, `?who`, `?only=new`, `?day`), read by the screen itself;
+ * the layout lets only the director in.
  */
-export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ tab?: string | string[] }> }) {
-  const { tab } = await searchParams;
-  const key = Array.isArray(tab) ? tab[0] : tab;
-  return <TeamReportsScreen initialTab={key === "period" ? "period" : "day"} />;
+export default function ReportsPage() {
+  return <TeamReportsScreen />;
 }

@@ -1,6 +1,15 @@
 "use client";
 
-import { keepPreviousData, useMutation, useMutationState, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useMutationState,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+  type QueryClient,
+} from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo } from "react";
 
 import { toast } from "@/components/ui/Toast";
@@ -8,12 +17,15 @@ import type { Ymd } from "@/lib/datetime/calendar";
 import { ApiError, postJson } from "@/lib/api/client";
 import { isNetworkError } from "@/lib/net";
 import { outboxSize, subscribeOutbox } from "@/lib/outbox";
-import { useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
+import { useRealtimeListener, useRealtimeQuery, type RealtimeEvent } from "@/lib/realtime/useRealtimeQuery";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import { rpcJson } from "@/lib/supabase/rpc";
+import { useMe } from "@/lib/tasks/queries";
 
 import { readDraft } from "./draft";
 import { askFromOf, ASK_FROM_DEFAULT, reportDue, type ReportDue } from "./due";
+// a cycle (review.ts takes DailyReportFailure from here): both are used inside functions only
+import { patchIfReviewOnly } from "./review";
 import { DAILY_REPORT_ERROR_TEXT, errorCodeOf } from "./format";
 import {
   DAILY_REPORT_RPC,
@@ -38,6 +50,8 @@ export const dailyReportKeys = {
   root: ["daily-report"] as const,
   myDay: () => ["daily-report", "my-day"] as const,
   history: () => ["daily-report", "history"] as const,
+  /** «Прошлые отчёты» a page at a time (D-198 «Показать ещё»), under `history()`. */
+  historyPages: () => ["daily-report", "history", "pages"] as const,
   team: ["daily-report", "team"] as const,
   teamDay: (date: Ymd) => ["daily-report", "team", "day", date] as const,
   teamPeriod: (from: Ymd, to: Ymd) => ["daily-report", "team", "period", from, to] as const,
@@ -48,7 +62,8 @@ export const dailyReportKeys = {
 /** The route that carries the submit (and the outbox's replay of it) to `submit_daily_report`. */
 export const SUBMIT_PATH = "/api/daily-report";
 const SUBMIT_KEY = ["daily-report", "submit"] as const;
-const HISTORY_LIMIT = 30;
+/** Past days a page; a shorter page is the last one. */
+export const HISTORY_PAGE = 30;
 
 const WAITING = "Нет связи. Сдам отчёт, как появится";
 const SUBMIT_FAILED = "Не получилось сдать отчёт. Попробуйте ещё раз";
@@ -74,24 +89,144 @@ async function read<T>(call: Parameters<typeof rpcJson>[0]): Promise<T> {
   return data;
 }
 
-/** The employee's today: the form's prefill, the live tasks of the day, the report if any. */
+type HistoryPages = InfiniteData<DailyReportHistoryItem[], string | null>;
+
+/** The review fields of a report (D-198) — what a director's look or check changes. */
+const MARK_FIELDS = ["seen_at", "checked_at", "checked_by", "changed_after_check_at"] as const;
+
+type ReportRow = Partial<Pick<DailyReport, "id" | "updated_at" | (typeof MARK_FIELDS)[number]>>;
+
+/** Two instants are the same moment — the socket's row and the RPC's jsonb write them differently. */
+function sameInstant(a: string | null | undefined, b: string | null | undefined): boolean {
+  const x = Date.parse(a ?? "");
+  return Number.isFinite(x) && x === Date.parse(b ?? "");
+}
+
+/**
+ * A row of the person's own reports changed. A director's «Просмотрено» / «Проверено» moves only
+ * the marks (`updated_at` stays — D-198): they are written into the cached day and past days as
+ * they come, no read. Anything else — a submit from another phone, the morning's missed row — reads
+ * the day and the past days again.
+ */
+function patchMine(client: QueryClient, payload: RealtimeEvent<ReportRow>): void {
+  const row = payload.eventType === "DELETE" ? null : payload.new;
+  if (!row?.id) return refreshMine(client, false);
+  let known = false;
+  let content = false;
+  const patch = (report: DailyReport): DailyReport => {
+    if (report.id !== row.id) return report;
+    known = true;
+    if (!sameInstant(report.updated_at, row.updated_at)) {
+      content = true;
+      return report;
+    }
+    const next: DailyReport = { ...report };
+    for (const field of MARK_FIELDS) if (field in row) next[field] = row[field] ?? null;
+    return next;
+  };
+  client.setQueryData<MyDailyReportDay>(dailyReportKeys.myDay(), (day) => (day?.report ? { ...day, report: patch(day.report) } : day));
+  client.setQueryData<HistoryPages>(dailyReportKeys.historyPages(), (data) =>
+    data ? { ...data, pages: data.pages.map((page) => page.map(patch)) } : data,
+  );
+  if (!known || content) refreshMine(client, false);
+}
+
+let refreshQueued: { join: boolean } | null = null;
+
+/**
+ * The day and the past days read again. Every mounted reader of the day listens on the same socket,
+ * so one change comes to each of them: gathered into one read. A submit on its way is left alone —
+ * a read would overwrite its provisional report, and it reads both itself when it lands.
+ */
+function refreshMine(client: QueryClient, join: boolean): void {
+  if (refreshQueued) {
+    refreshQueued.join &&= join;
+    return;
+  }
+  refreshQueued = { join };
+  queueMicrotask(() => {
+    const options = { cancelRefetch: !refreshQueued?.join };
+    refreshQueued = null;
+    if (client.isMutating({ mutationKey: SUBMIT_KEY }) > 0) return;
+    void client.invalidateQueries({ queryKey: dailyReportKeys.myDay() }, options);
+    void client.invalidateQueries({ queryKey: dailyReportKeys.history() }, options);
+  });
+}
+
+/**
+ * The person's own reports, live (D-198): a director's «Просмотрено» / «Проверено» reaches the
+ * screen without a reload — the socket on `daily_reports` narrowed to the person (RLS narrows it
+ * again). Waits for who the person is (`/api/me`, cached app-wide).
+ */
+function useMyReportsLive(): void {
+  const me = useMe();
+  const userId = me.data?.userId;
+  const client = useQueryClient();
+  useRealtimeListener<ReportRow>(
+    { table: "daily_reports", filter: userId ? `user_id=eq.${userId}` : undefined },
+    (payload) => patchMine(client, payload),
+    // after a (re)subscribe: whatever the socket missed is in a fresh read
+    () => refreshMine(client, true),
+    "my-daily-reports",
+    Boolean(userId),
+  );
+}
+
+/** The employee's today: the live tasks of the day, the report if any with the director's marks. */
 export function useMyDailyReport() {
+  useMyReportsLive();
   return useQuery({
     queryKey: dailyReportKeys.myDay(),
     queryFn: () => read<MyDailyReportDay>(createBrowserSupabase().rpc(DAILY_REPORT_RPC.my)),
   });
 }
 
-/** «Прошлые отчёты»: submitted and missed days, newest first. */
-export function useMyDailyReportHistory(enabled = true) {
-  return useQuery({
-    queryKey: dailyReportKeys.history(),
+export type MyReportHistory = {
+  /** Loaded past days, newest first; undefined while the first page loads. */
+  items: DailyReportHistoryItem[] | undefined;
+  isError: boolean;
+  /** The last page came full: there may be days before it. */
+  hasMore: boolean;
+  /** «Показать ещё» — the page of days before the oldest loaded one. */
+  loadMore: () => void;
+  loadingMore: boolean;
+  /** The last «Показать ещё» failed: the button says so and tries again. */
+  moreFailed: boolean;
+};
+
+/**
+ * «Прошлые отчёты»: submitted and missed days, newest first, `HISTORY_PAGE` days a page; the next
+ * page — the days strictly before the oldest loaded one (`p_before`, D-198). The first page asks
+ * without `p_before`, as before the D-198 migration.
+ */
+export function useMyDailyReportHistory(enabled = true): MyReportHistory {
+  const query = useInfiniteQuery({
+    queryKey: dailyReportKeys.historyPages(),
     enabled,
-    queryFn: async () => {
-      const call = createBrowserSupabase().rpc(DAILY_REPORT_RPC.history, { p_limit: HISTORY_LIMIT });
-      return (await read<DailyReportHistoryItem[] | null>(call)) ?? [];
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) => {
+      const args = pageParam ? { p_limit: HISTORY_PAGE, p_before: pageParam } : { p_limit: HISTORY_PAGE };
+      return (await read<DailyReportHistoryItem[] | null>(createBrowserSupabase().rpc(DAILY_REPORT_RPC.history, args))) ?? [];
     },
+    getNextPageParam: (last) => (last.length < HISTORY_PAGE ? null : (last.at(-1)?.report_date ?? null)),
   });
+  const { data, fetchNextPage } = query;
+  const items = useMemo(() => {
+    if (!data) return undefined;
+    // a day is listed once, whatever pages a refetch brought it on
+    const seen = new Set<string>();
+    return data.pages.flat().filter((item) => !seen.has(item.report_date) && Boolean(seen.add(item.report_date)));
+  }, [data]);
+  const loadMore = useCallback(() => void fetchNextPage({ cancelRefetch: false }), [fetchNextPage]);
+  return {
+    items,
+    // the first page failed; a failed «Показать ещё» keeps what is loaded (`moreFailed`)
+    isError: query.isError && !data,
+    hasMore: query.hasNextPage,
+    loadMore,
+    loadingMore: query.isFetchingNextPage,
+    moreFailed: query.isFetchNextPageError,
+  };
 }
 
 /**
@@ -113,17 +248,25 @@ async function postSubmit(input: SubmitDailyReportInput): Promise<SubmitDailyRep
   return body;
 }
 
-/** The report as the screen shows it the moment «Сдать» is tapped — the server's answer replaces it. */
+/**
+ * The report as the screen shows it the moment «Сдать» is tapped — the server's answer replaces it.
+ * New words take the director's marks off as the server does (D-198): «просмотрен» goes, a check
+ * comes off and the report says «изменён после проверки».
+ */
 function provisional(day: MyDailyReportDay, input: SubmitDailyReportInput): DailyReport {
   const now = new Date().toISOString();
   const was = day.report?.status === "submitted" ? day.report : null;
   return {
+    seen_at: null,
+    checked_at: null,
+    checked_by: null,
+    changed_after_check_at: was?.checked_at ? now : (was?.changed_after_check_at ?? null),
     id: was?.id ?? `pending-${input.client_request_id}`,
     user_id: was?.user_id ?? day.report?.user_id ?? "",
     report_date: day.date,
     status: "submitted",
-    arrived_at: input.arrived_at,
-    left_at: input.left_at,
+    arrived_at: input.arrived_at ?? null,
+    left_at: input.left_at ?? null,
     summary: input.summary,
     tasks: day.tasks,
     submitted_at: was?.submitted_at ?? now,
@@ -135,10 +278,12 @@ function provisional(day: MyDailyReportDay, input: SubmitDailyReportInput): Dail
   };
 }
 
-function upsertDay(list: DailyReportHistoryItem[] | undefined, report: DailyReport): DailyReportHistoryItem[] | undefined {
-  if (!list) return list;
-  const rest = list.filter((item) => item.report_date !== report.report_date);
-  return [report, ...rest].sort((a, b) => (a.report_date < b.report_date ? 1 : a.report_date > b.report_date ? -1 : 0));
+/** The submitted report into the loaded past days: out of whatever page had its day, into the first one. */
+function upsertDay(data: HistoryPages | undefined, report: DailyReport): HistoryPages | undefined {
+  if (!data || data.pages.length === 0) return data;
+  const pages = data.pages.map((page) => page.filter((item) => item.report_date !== report.report_date));
+  pages[0] = [report, ...pages[0]].sort((a, b) => (a.report_date < b.report_date ? 1 : a.report_date > b.report_date ? -1 : 0));
+  return { ...data, pages };
 }
 
 /**
@@ -165,7 +310,7 @@ export function useSubmitDailyReport() {
       queryClient.setQueryData<MyDailyReportDay>(dailyReportKeys.myDay(), (day) =>
         day && day.date === result.report.report_date ? { ...day, report: result.report } : day,
       );
-      queryClient.setQueryData<DailyReportHistoryItem[]>(dailyReportKeys.history(), (list) => upsertDay(list, result.report));
+      queryClient.setQueryData<HistoryPages>(dailyReportKeys.historyPages(), (data) => upsertDay(data, result.report));
       // and both are read again — the server knows which day it took it for
       void queryClient.invalidateQueries({ queryKey: dailyReportKeys.myDay() });
       void queryClient.invalidateQueries({ queryKey: dailyReportKeys.history() });
@@ -224,15 +369,6 @@ async function readFeedContext(): Promise<FeedContext> {
 }
 
 /**
- * `settings.daily_report.ask_from` — the product's evening: Лента asks for the report from it, the
- * form prefills «Ушёл» from it (`leftSuggestion`). The same read as Лента's, one cache entry.
- */
-export function useAskFrom(): string {
-  const context = useQuery({ queryKey: dailyReportKeys.feed(), staleTime: 60_000, queryFn: readFeedContext });
-  return context.data?.askFrom ?? ASK_FROM_DEFAULT;
-}
-
-/**
  * Where today's report stands for Лента (D-167, `reportDue`): the row in «Дела», the face's call
  * and the greeting's line read this one answer. `now` — the screen's clock. Until the settings
  * come, the evening starts at 17:00; a director or the kiosk get no day (`not_team_member`) and
@@ -250,7 +386,7 @@ export function useReportDue(now: Date): ReportDue {
   // the words typed on /report and not handed in: with them «Сдать» goes in one tap (D-183); read
   // every render (a small localStorage read), so the row follows the draft without waiting a minute
   const draft = day.data ? readDraft(day.data.date) : null;
-  const draftKey = draft ? `${draft.date}|${draft.arrived ?? ""}|${draft.left ?? ""}|${draft.summary ?? ""}` : "";
+  const draftKey = draft ? `${draft.date}|${draft.summary}` : "";
   return useMemo(() => {
     const due = reportDue(day.data, now, askFrom, away, draftKey ? draft : null);
     return waiting && due.show && !due.submitted ? { ...due, submitted: true, asking: false, oneTap: false } : due;
@@ -311,7 +447,10 @@ export function useTeamDailyReportDay(date: Ymd, companyId: string | undefined, 
     queryFn: () => read<TeamDay>(createBrowserSupabase().rpc(DAILY_REPORT_RPC.teamDay, { p_date: date })),
     channel: { table: "daily_reports", filter: companyId ? `company_id=eq.${companyId}` : undefined },
     // a report changes the day it belongs to and every period around it
-    onEvent: (_payload, queryClient) => {
+    onEvent: (payload, queryClient) => {
+      // D-198: a «Просмотрено» / «Проверено» alone is patched in place — reloading every team
+      // query (the feed's pages with it) for each mark seen would be a storm
+      if (patchIfReviewOnly(queryClient, payload)) return;
       void queryClient.invalidateQueries({ queryKey: dailyReportKeys.team });
     },
     enabled: enabled && Boolean(companyId),

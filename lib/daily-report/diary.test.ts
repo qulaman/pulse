@@ -9,8 +9,6 @@ import {
   diaryCalendar,
   entryDay,
   excuseHint,
-  hoursLine,
-  hoursOf,
   missedLine,
   missedMove,
   monthIn,
@@ -21,7 +19,6 @@ import {
   stampOf,
   tallyParts,
   tasksLine,
-  timesText,
   wordsOf,
   type DiaryCell,
 } from "./diary";
@@ -135,7 +132,7 @@ describe("a day of the calendar", () => {
 
   it("says the square in words under the mouse", () => {
     const cell = (patch: Partial<DiaryCell>): DiaryCell => ({ day: "2026-11-17", state: "submitted", today: false, away: null, due: true, report: report(), ...patch });
-    expect(cellTitle(cell({}))).toBe("вт, 17 ноября · сдан · 9:20–18:02");
+    expect(cellTitle(cell({}))).toBe("вт, 17 ноября · сдан");
     expect(cellTitle(cell({ state: "away", report: null }))).toBe("вт, 17 ноября · отпуск или больничный");
     expect(cellTitle(cell({ day: "2026-11-05", state: "holiday", report: null }))).toBe("чт, 5 ноября · праздник");
     expect(entryDay("2026-11-17")).toBe("Вт, 17 ноября");
@@ -171,14 +168,6 @@ describe("the month in one line", () => {
 });
 
 describe("an entry", () => {
-  it("says the times without a gender and the hours as hours by the hand-in", () => {
-    expect(timesText(report())).toBe("9:20–18:02");
-    expect(timesText(report({ left_at: null }))).toBe("9:20");
-    expect(hoursOf(report())).toBe(8.7);
-    expect(hoursLine(report())).toBe("9:20–18:02 · 8,7 ч по времени сдачи");
-    expect(hoursLine(report({ left_at: "2026-11-17T09:00:00+05:00" }))).toBe("9:20–9:00");
-  });
-
   it("reads whitespace as no words and lists the tasks instead", () => {
     expect(wordsOf(report({ summary: "  \n " }))).toBe("");
     expect(tasksLine(report({ tasks: [task("Акт сверки"), task("Отчёт Казахтелеком"), task("Смета")] }))).toBe("3 задачи: Акт сверки, Отчёт Казахтелеком, Смета");

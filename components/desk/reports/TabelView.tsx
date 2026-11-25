@@ -29,8 +29,10 @@ export type TabelViewProps = {
   openId: string | null;
   onSelect: (id: string) => void;
   onOpen: (id: string | null) => void;
-  /** A day's head: open «День» on it. */
+  /** A day's head: the feed «Подряд» at that day. */
   onDay: (day: Ymd) => void;
+  /** A cell: the person's «Дневник» on that day — the words of it (D-198). */
+  onCell: (id: string, day: Ymd) => void;
   today: Ymd;
 };
 
@@ -117,6 +119,7 @@ type RowProps = {
   open: boolean;
   onSelect: (id: string) => void;
   onOpen: (id: string | null) => void;
+  onCell: (id: string, day: Ymd) => void;
 };
 
 /** The day's place in the column: a weekend dimmed, a holiday hatched, a Monday after a rule, today outlined. */
@@ -148,7 +151,7 @@ function Totals({ row, excused, as = "row" }: { row: Pick<TeamPeriodRow, "submit
   );
 }
 
-const Row = memo(function Row({ person, days, mode, excused, selected, open, onSelect, onOpen }: RowProps) {
+const Row = memo(function Row({ person, days, mode, excused, selected, open, onSelect, onOpen, onCell }: RowProps) {
   const id = person.row.user_id;
   return (
     <div
@@ -177,7 +180,20 @@ const Row = memo(function Row({ person, days, mode, excused, selected, open, onS
         </button>
       </span>
       {person.cells.map((cell, index) => (
-        <span key={cell.day} role="cell" className="rep-tabel-cell" data-i={index} data-state={cell.state} data-testid="desk-tabel-cell" {...dayAttrs(days[index], index)}>
+        <span
+          key={cell.day}
+          role="cell"
+          className="rep-tabel-cell"
+          data-i={index}
+          data-state={cell.state}
+          data-testid="desk-tabel-cell"
+          {...dayAttrs(days[index], index)}
+          onClick={(event) => {
+            // a day of the row: its words in the diary, on that day
+            event.stopPropagation();
+            onCell(id, cell.day);
+          }}
+        >
           <span className="rep-tabel-mark">{mode === "marks" ? cellSymbol(cell) : null}</span>
         </span>
       ))}
@@ -407,7 +423,7 @@ function TabelBone() {
  * «День» on it, a name the person's diary, a row is chosen by a click (↑/↓ on the page). A quarter
  * turns into colour only and scrolls sideways under the names. One line over it says the period.
  */
-export function TabelView({ tabel, stale, failed, onRetry, match, show, onShow, selectedId, openId, onSelect, onOpen, onDay }: TabelViewProps) {
+export function TabelView({ tabel, stale, failed, onRetry, match, show, onShow, selectedId, openId, onSelect, onOpen, onDay, onCell }: TabelViewProps) {
   const sheet = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const hasSheet = Boolean(tabel && tabel.people.length > 0);
@@ -563,6 +579,7 @@ export function TabelView({ tabel, stale, failed, onRetry, match, show, onShow, 
                       open={person.row.user_id === openId}
                       onSelect={onSelect}
                       onOpen={onOpen}
+                      onCell={onCell}
                     />
                   </Fragment>
                 ))}

@@ -182,7 +182,8 @@ export function deskRouteFor(pathname: string, search: string, role: Role | unde
     case "/screen":
       return director ? "/desk/screen" : null;
     case "/reports":
-      return director ? "/desk/reports" : null;
+      // the phone's feed filters mean the same on the desk (D-198); `?tab=period` opens the табель there
+      return director ? withQuery("/desk/reports", keep(search, ["tab", "who", "only", "day"])) : null;
     case "/rating":
       // a dispute's push is `/rating#disputes`: the browser carries the hash over the redirect
       return director ? "/desk/settings/points" : null;

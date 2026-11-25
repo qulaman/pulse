@@ -212,6 +212,9 @@ export type Database = {
       daily_reports: {
         Row: {
           arrived_at: string | null
+          changed_after_check_at: string | null
+          checked_at: string | null
+          checked_by: string | null
           client_request_id: string | null
           company_id: string
           created_at: string
@@ -221,6 +224,8 @@ export type Database = {
           id: string
           left_at: string | null
           report_date: string
+          seen_at: string | null
+          seen_by: string | null
           status: string
           submitted_at: string | null
           summary: string | null
@@ -230,6 +235,9 @@ export type Database = {
         }
         Insert: {
           arrived_at?: string | null
+          changed_after_check_at?: string | null
+          checked_at?: string | null
+          checked_by?: string | null
           client_request_id?: string | null
           company_id: string
           created_at?: string
@@ -239,6 +247,8 @@ export type Database = {
           id?: string
           left_at?: string | null
           report_date: string
+          seen_at?: string | null
+          seen_by?: string | null
           status: string
           submitted_at?: string | null
           summary?: string | null
@@ -248,6 +258,9 @@ export type Database = {
         }
         Update: {
           arrived_at?: string | null
+          changed_after_check_at?: string | null
+          checked_at?: string | null
+          checked_by?: string | null
           client_request_id?: string | null
           company_id?: string
           created_at?: string
@@ -257,6 +270,8 @@ export type Database = {
           id?: string
           left_at?: string | null
           report_date?: string
+          seen_at?: string | null
+          seen_by?: string | null
           status?: string
           submitted_at?: string | null
           summary?: string | null
@@ -265,6 +280,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "daily_reports_checked_by_fkey"
+            columns: ["checked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "daily_reports_company_id_fkey"
             columns: ["company_id"]
@@ -275,6 +297,13 @@ export type Database = {
           {
             foreignKeyName: "daily_reports_excused_by_fkey"
             columns: ["excused_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_reports_seen_by_fkey"
+            columns: ["seen_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -2549,6 +2578,10 @@ export type Database = {
         Args: { client_request_id?: string; p_order_id: string }
         Returns: Json
       }
+      check_daily_reports: {
+        Args: { client_request_id?: string; p_ids: string[]; p_on: boolean }
+        Returns: Json
+      }
       claim_deliveries: {
         Args: { p_limit?: number }
         Returns: {
@@ -2806,6 +2839,7 @@ export type Database = {
         }
         Returns: Json
       }
+      mark_daily_reports_seen: { Args: { p_ids: string[] }; Returns: Json }
       mark_thread_read: {
         Args: { seq: number; task_id: string }
         Returns: number
@@ -2850,7 +2884,10 @@ export type Database = {
       }
       morning_brief_on: { Args: { p_settings: Json }; Returns: boolean }
       my_daily_report: { Args: { p_date?: string }; Returns: Json }
-      my_daily_report_history: { Args: { p_limit?: number }; Returns: Json }
+      my_daily_report_history: {
+        Args: { p_before?: string; p_limit?: number }
+        Returns: Json
+      }
       next_delivery_slot: {
         Args: { p_company: string; p_now?: string }
         Returns: string
@@ -3179,9 +3216,10 @@ export type Database = {
       submit_daily_report: {
         Args: {
           client_request_id?: string
-          p_arrived_at: string
-          p_left_at: string
-          p_summary: string
+          p_arrived_at?: string
+          p_day?: string
+          p_left_at?: string
+          p_summary?: string
         }
         Returns: Json
       }
@@ -3198,6 +3236,16 @@ export type Database = {
       team_daily_report_day: { Args: { p_date?: string }; Returns: Json }
       team_daily_report_period: {
         Args: { p_from: string; p_to: string }
+        Returns: Json
+      }
+      team_daily_reports_feed: {
+        Args: {
+          p_before?: string
+          p_days?: number
+          p_query?: string
+          p_unchecked?: boolean
+          p_user?: string
+        }
         Returns: Json
       }
       team_role: {

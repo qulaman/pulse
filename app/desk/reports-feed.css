@@ -1,0 +1,593 @@
+/* «Отчёты → Подряд» of the desk (D-198): reports-feed.
+   The feed of reports day after day (FeedView.tsx) — a sheet with a sticky head per day, the
+   report (Ledger.tsx) with its marks «новый · просмотрено · Проверить / Проверено», the fold of a
+   checked report under «Не проверены», the search with its list of people (FeedSearch.tsx), the
+   diary's marks and «Все отчёты ›» (Diary.tsx). The entry, its words and the roll call reuse
+   reports-day.css (the root carries `.rep-day` for its inks). Teal (`--pen`) only for the choice and
+   «новый»; green — «Проверено»; nothing for «не проверено» (DESIGN §8, D-195). */
+
+html[data-surface="desk"][data-journal] {
+  /* ---- the head and the filters ---- */
+  .desk-page-title.rep-feed-title {
+    align-items: center;
+    row-gap: 10px;
+  }
+  .rep-feed-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    min-height: 36px;
+  }
+  .rep-feed-seg-count {
+    margin-left: 2px;
+    color: var(--ink-2, var(--text-muted));
+    font-size: 12.5px;
+    font-weight: 650;
+  }
+  [aria-selected="true"] .rep-feed-seg-count {
+    color: var(--ink, var(--text));
+  }
+  .rep-feed-chip {
+    display: inline-flex;
+    max-width: 300px;
+    height: 30px;
+    align-items: center;
+    gap: 8px;
+    padding: 0 4px 0 6px;
+    border-radius: 8px;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink, var(--text)) 12%, transparent);
+    color: var(--ink, var(--text));
+    font-size: 13px;
+    font-weight: 550;
+    line-height: 16px;
+    animation: rep-feed-in 200ms var(--ease-snap, ease-out) both;
+  }
+  .rep-feed-chip-x {
+    display: grid;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    place-items: center;
+    border-radius: 6px;
+    color: var(--ink-3, var(--text-muted));
+    transition: background-color 120ms linear, color 120ms linear;
+
+    &:hover {
+      background: var(--hover, var(--surface-2));
+      color: var(--ink, var(--text));
+    }
+  }
+
+  /* the people under the search field, then «Искать „…“ в отчётах» */
+  .rep-feed-suggest {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin: 0;
+    padding: 4px;
+    list-style: none;
+  }
+  .rep-feed-suggest-item {
+    display: flex;
+    min-height: 38px;
+    align-items: center;
+    gap: 10px;
+    padding: 0 10px 0 8px;
+    border-radius: 8px;
+    color: var(--ink-2, var(--text-muted));
+    font-size: 13.5px;
+    line-height: 18px;
+    cursor: default;
+
+    &[data-active] {
+      background: var(--selected, var(--surface-2));
+      color: var(--ink, var(--text));
+    }
+  }
+  .rep-feed-suggest-name {
+    color: var(--ink, var(--text));
+    font-weight: 600;
+  }
+  .rep-feed-suggest-sub {
+    color: var(--ink-3, var(--text-muted));
+  }
+  .rep-feed-suggest-hint {
+    flex-shrink: 0;
+    color: var(--ink-3, var(--text-muted));
+    font-size: 11.5px;
+  }
+
+  /* ---- the sheet of days ---- */
+  .rep-feed-list {
+    position: relative;
+    min-width: 0;
+    padding-bottom: 6px;
+    border-radius: 14px;
+    background: var(--rep-raise);
+    box-shadow: 0 0 0 1px var(--rule-soft, var(--border));
+    container: rep-feed / inline-size;
+  }
+  .rep-feed-day + .rep-feed-day,
+  .rep-feed-morning + .rep-feed-day {
+    margin-top: 6px;
+    border-top: 1px solid var(--rule, var(--border));
+  }
+
+  /* a day's head stays on top while its reports are read */
+  .rep-feed-head {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px 6px 18px;
+    border-bottom: 1px solid var(--rule-soft, var(--border));
+    background: color-mix(in srgb, var(--rep-raise) 88%, transparent);
+    backdrop-filter: blur(14px);
+  }
+  .rep-feed-list > .rep-feed-day:first-child .rep-feed-head,
+  .rep-feed-list > :first-child.rep-feed-morning {
+    border-radius: 14px 14px 0 0;
+  }
+  .rep-feed-head-title {
+    flex-shrink: 0;
+    color: var(--ink, var(--text));
+    font-size: 13.5px;
+    font-weight: 650;
+    line-height: 18px;
+    letter-spacing: 0;
+    white-space: nowrap;
+  }
+  .rep-feed-head-date {
+    margin-left: 4px;
+    color: var(--ink-2, var(--text-muted));
+    font-size: 13px;
+    font-weight: 450;
+  }
+  .rep-feed-head-sub {
+    min-width: 0;
+    flex: 0 1 auto;
+    margin-left: auto;
+    overflow: hidden;
+    color: var(--rep-ink-3);
+    font-size: 12.5px;
+    line-height: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .rep-feed-missed-name {
+    border-radius: 4px;
+    color: var(--ink-2, var(--text-muted));
+
+    &:hover {
+      color: var(--ink, var(--text));
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    &[data-excused] {
+      color: var(--rep-ink-3);
+    }
+  }
+  .rep-feed-missed-excused {
+    color: var(--rep-ink-3);
+  }
+  .rep-feed-all {
+    display: inline-flex;
+    height: 28px;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--ink, var(--text)) 3.5%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink, var(--text)) 11%, transparent);
+    color: var(--ink, var(--text));
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 16px;
+    white-space: nowrap;
+    transition: box-shadow 120ms linear, scale 120ms ease-out;
+
+    svg {
+      color: var(--ink-2, var(--text-muted));
+    }
+    &:hover {
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 45%, transparent);
+    }
+    &:active {
+      scale: 0.96;
+    }
+  }
+  .rep-feed-head-ok {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 5px;
+    color: var(--ok-ink, var(--ok));
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 16px;
+    white-space: nowrap;
+  }
+
+  /* before `ask_from`: today is one quiet line, yesterday right under it */
+  .rep-feed-morning {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 18px;
+    border-bottom: 1px solid var(--rule-soft, var(--border));
+    color: var(--ink-2, var(--text-muted));
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 20px;
+  }
+  .rep-feed-morning-dot {
+    width: 7px;
+    height: 7px;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    box-shadow: inset 0 0 0 1.5px var(--rep-ink-3);
+  }
+  .rep-feed-none {
+    padding: 14px 18px 10px;
+    color: var(--rep-ink-3);
+    font-size: 13px;
+    line-height: 18px;
+  }
+  .rep-feed-end {
+    min-height: 8px;
+  }
+  .rep-feed-end-text {
+    padding: 18px 18px 12px;
+    color: var(--rep-ink-3);
+    font-size: 12.5px;
+    line-height: 16px;
+    text-align: center;
+  }
+
+  /* ---- a report ---- */
+  .rep-feed-entries {
+    padding-top: 4px;
+  }
+  .rep-day-entry.rep-feed-entry {
+    grid-template-columns: 196px minmax(0, 1fr) 150px;
+    margin: 0 6px;
+    padding: 14px 14px 15px;
+    scroll-margin-top: 52px;
+    cursor: pointer;
+
+    &[data-selected]::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 12px;
+      bottom: 12px;
+      width: 3px;
+      border-radius: 3px;
+      background: var(--pen);
+    }
+  }
+  .rep-feed-face {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+  }
+  .rep-feed-dot {
+    position: absolute;
+    left: -11px;
+    top: 12px;
+    width: 7px;
+    height: 7px;
+    border-radius: 9999px;
+    background: var(--pen);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--pen) 16%, transparent);
+  }
+  .rep-feed-entry[data-words="0"] .rep-feed-dot {
+    top: 8px;
+  }
+  .rep-feed-entry[data-new] .rep-day-name {
+    font-weight: 700;
+  }
+  .rep-day-words.rep-feed-words {
+    font-size: 14.5px;
+    line-height: 22px;
+  }
+  .rep-feed-hit {
+    padding: 0 1px;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--warn-ink, var(--warn)) 30%, transparent);
+    color: inherit;
+  }
+
+  .rep-feed-marks {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-self: end;
+    gap: 6px;
+    text-align: right;
+
+    .rep-day-stamp {
+      color: var(--ink-2, var(--text-muted));
+    }
+  }
+  .rep-feed-seen,
+  .rep-feed-changed {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--rep-ink-3);
+    font-size: 12px;
+    line-height: 16px;
+    white-space: nowrap;
+  }
+  .rep-feed-changed {
+    color: var(--ink-2, var(--text-muted));
+    white-space: normal;
+  }
+
+  /* «Проверить» — a grey plate with a ring; «Проверено 16:30» — green words on a pale plate */
+  .rep-feed-check {
+    display: inline-flex;
+    height: 28px;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+    padding: 0 10px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--ink, var(--text)) 3.5%, transparent);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--ink, var(--text)) 11%, transparent),
+      inset 0 1px 0 color-mix(in srgb, var(--ink, var(--text)) 4%, transparent);
+    color: var(--ink, var(--text));
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 16px;
+    white-space: nowrap;
+    transition:
+      background-color 140ms linear,
+      box-shadow 140ms linear,
+      color 140ms linear,
+      scale 120ms ease-out;
+
+    svg {
+      color: var(--ink-2, var(--text-muted));
+      transition: color 140ms linear;
+    }
+    &:hover {
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 45%, transparent);
+    }
+    &:active {
+      scale: 0.95;
+    }
+    &[data-size="sm"] {
+      height: 26px;
+      margin-top: 0;
+    }
+    &[data-on] {
+      height: 24px;
+      padding: 0 8px 0 6px;
+      border-radius: 7px;
+      background: color-mix(in srgb, var(--ok-ink, var(--ok)) 10%, transparent);
+      box-shadow: none;
+      color: var(--ok-ink, var(--ok));
+
+      svg {
+        color: var(--ok-ink, var(--ok));
+      }
+      &:hover {
+        background: color-mix(in srgb, var(--ok-ink, var(--ok)) 16%, transparent);
+      }
+    }
+  }
+  .rep-feed-check-at {
+    color: color-mix(in srgb, var(--ok-ink, var(--ok)) 70%, var(--rep-ink-3));
+    font-weight: 500;
+  }
+  /* the chosen report's button is what A presses: ringed */
+  .rep-feed-entry[data-selected] .rep-feed-check:not([data-on]) {
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--pen) 55%, transparent),
+      0 0 0 3px color-mix(in srgb, var(--pen) 14%, transparent);
+  }
+
+  /* under «Не проверены» a checked report folds in place: «✓ Имя · проверено · Отменить» */
+  .rep-feed-folded {
+    position: relative;
+    display: flex;
+    min-height: 40px;
+    align-items: center;
+    gap: 6px;
+    margin: 0 6px;
+    padding: 0 14px;
+    border-radius: 10px;
+    color: var(--ink-2, var(--text-muted));
+    font-size: 13px;
+    line-height: 18px;
+
+    & + .rep-day-entry::before,
+    .rep-day-entry + &::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 14px;
+      right: 14px;
+      height: 1px;
+      background: var(--rule-soft, var(--border));
+    }
+  }
+  .rep-feed-folded-tick {
+    color: var(--ok-ink, var(--ok));
+  }
+  .rep-feed-folded-name {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--ink, var(--text));
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .rep-feed-folded-undo {
+    padding: 2px 4px;
+    border-radius: 6px;
+    color: var(--rep-pen-deep);
+    font-weight: 600;
+
+    &::before {
+      content: "· ";
+      color: var(--rep-ink-3);
+      font-weight: 400;
+    }
+    &:hover {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+
+  /* the sheet narrows (the panel, a small window): the words keep their room, the gutter gives way */
+  @container rep-feed (max-width: 780px) {
+    .rep-day-entry.rep-feed-entry {
+      grid-template-columns: 164px minmax(0, 1fr) auto;
+      column-gap: 16px;
+    }
+  }
+  @container rep-feed (max-width: 600px) {
+    .rep-day-entry.rep-feed-entry {
+      grid-template-columns: minmax(0, 1fr) auto;
+
+      .rep-day-who {
+        grid-column: 1;
+        grid-row: 1;
+      }
+      .rep-feed-marks {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+      }
+      .rep-day-body,
+      .rep-day-compact {
+        grid-column: 1;
+        grid-row: 2;
+      }
+    }
+    .rep-feed-head-sub {
+      display: none;
+    }
+  }
+
+  .rep-feed-bone-entry {
+    grid-template-columns: 196px minmax(0, 1fr) 120px;
+  }
+
+  /* ---- «Табель»: a day of a row opens the diary on it ---- */
+  .rep-tabel-cell {
+    cursor: pointer;
+  }
+
+  /* ---- «Дневник»: the director's marks and «Все отчёты ›» ---- */
+  .rep-diary-all {
+    margin-left: auto;
+    padding: 0 2px;
+    border-radius: 4px;
+    color: var(--pen-deep, var(--pen, var(--accent)));
+    font-size: 12.5px;
+    font-weight: 600;
+
+    &:hover {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+  .rep-diary-marks {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px 12px;
+    margin-top: 8px;
+
+    .rep-feed-seen,
+    .rep-feed-changed {
+      --rep-ink-3: var(--ink-3, var(--text-muted));
+    }
+  }
+  .rep-feed-dot.rep-diary-dot {
+    position: relative;
+    left: auto;
+    top: -1px;
+    display: inline-block;
+    margin-right: 7px;
+    vertical-align: middle;
+  }
+  .rep-diary-entry[data-new] .rep-diary-date {
+    font-weight: 700;
+  }
+}
+
+/* ---- «Графит» --------------------------------------------------------------------------------- */
+:root[data-surface="desk"][data-journal][data-graphite] {
+  .rep-feed-list {
+    border-radius: 16px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card), var(--lift);
+  }
+  .rep-feed-head {
+    background: color-mix(in srgb, var(--raise) 88%, transparent);
+  }
+  .rep-feed-list > .rep-feed-day:first-child .rep-feed-head,
+  .rep-feed-list > :first-child.rep-feed-morning {
+    border-radius: 16px 16px 0 0;
+  }
+  .rep-day-entry.rep-feed-entry {
+    &[data-selected] {
+      background: var(--selected);
+      box-shadow: none;
+    }
+    &[data-selected]::after {
+      box-shadow: 0 0 10px color-mix(in srgb, var(--pen) 60%, transparent);
+    }
+    &[data-selected]::before,
+    &[data-selected] + .rep-day-entry::before {
+      opacity: 0;
+    }
+  }
+
+  /* motion: data first, the effect over it (principle 1a) — nothing here holds a click */
+  .rep-feed-check[data-on] {
+    animation: rep-feed-stamp 260ms cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+  }
+  .rep-feed-folded {
+    animation: rep-feed-in 220ms var(--ease-snap) both;
+  }
+  .rep-feed-dot {
+    transition:
+      opacity 260ms linear,
+      scale 260ms var(--ease-snap);
+    @starting-style {
+      opacity: 0;
+      scale: 0.4;
+    }
+  }
+  .rep-feed-head-ok {
+    animation: rep-feed-in 220ms var(--ease-snap) both;
+  }
+}
+
+@keyframes rep-feed-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+@keyframes rep-feed-stamp {
+  from {
+    opacity: 0.4;
+    transform: scale(0.9);
+  }
+}

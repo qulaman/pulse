@@ -4,7 +4,7 @@
 
 Зачем он нужен. Схема базы — результат всех миграций по порядку. Функция при каждой правке записывается целиком заново, поэтому одно имя встречается в нескольких файлах, а действует только последнее определение. Указатель говорит, где оно лежит. Перед правкой функции открой файл из столбца «Действует» и копируй тело оттуда, а не из первого найденного поиском.
 
-Миграций — 94, строк — 27374. Функций — 218, их определений — 361; устаревших тел — 11800 строк (43 % текста миграций).
+Миграций — 95, строк — 27997. Функций — 222, их определений — 369; устаревших тел — 12003 строк (43 % текста миграций).
 
 ## Функции
 
@@ -19,6 +19,7 @@
 | `award_points` | `20261103094500_rpc_guards.sql:354` | 3 |
 | `can_see_event` | `20260918150000_calendar_events.sql:89` | 1 |
 | `cancel_shop_order` | `20260917170000_shop_fixes.sql:132` | 2 |
+| `check_daily_reports` | `20261125120000_daily_report_checks.sql:295` | 1 |
 | `claim_deliveries` | `20260924150200_notify_prefs.sql:352` | 2 |
 | `close_time_requests` | `20260926120000_task_lifecycle.sql:201` | 1 |
 | `close_visit` | `20261124180000_tenant_guards_tail.sql:186` | 2 |
@@ -27,10 +28,11 @@
 | `daily_report_checked_on` | `20261028120000_daily_reports.sql:55` | 1 |
 | `daily_report_clock` | `20261028120000_daily_reports.sql:35` | 1 |
 | `daily_report_holiday` | `20261124172000_daily_report_period_speed.sql:21` | 2 |
-| `daily_report_json` | `20261118120000_daily_report_remind_excuse.sql:48` | 3 |
+| `daily_report_json` | `20261125120000_daily_report_checks.sql:72` | 4 |
 | `daily_report_on` | `20261028120000_daily_reports.sql:19` | 1 |
 | `daily_report_refund_early_fines` | `20261118120000_daily_report_remind_excuse.sql:820` | 2 |
-| `daily_report_reminders_due` | `20261028120000_daily_reports.sql:767` | 1 |
+| `daily_report_reminders_due` | `20261125120000_daily_report_checks.sql:567` | 2 |
+| `daily_report_review_json` | `20261125120000_daily_report_checks.sql:100` | 1 |
 | `daily_report_started_on` | `20261028120000_daily_reports.sql:44` | 1 |
 | `daily_report_state` | `20261028120000_daily_reports.sql:167` | 1 |
 | `daily_report_tasks` | `20261028120000_daily_reports.sql:117` | 1 |
@@ -71,6 +73,7 @@
 | `fn_rating` | `20261124100000_on_time_by_handover.sql:12` | 3 |
 | `is_event_participant` | `20260918150000_calendar_events.sql:80` | 1 |
 | `issue_login_code` | `20261104130000_ops_console.sql:1510` | 2 |
+| `mark_daily_reports_seen` | `20261125120000_daily_report_checks.sql:260` | 1 |
 | `mark_thread_read` | `20260917130000_message_deliveries.sql:136` | 2 |
 | `mind_board_branch_cascade` | `20260925150000_mind_board_v2.sql:104` | 1 |
 | `mind_board_branch_follow` | `20261020120000_mind_board_v3.sql:49` | 1 |
@@ -81,7 +84,7 @@
 | `morning_brief_body` | `20261124110000_morning_brief.sql:45` | 1 |
 | `morning_brief_on` | `20261124110000_morning_brief.sql:34` | 1 |
 | `my_daily_report` | `20261103120000_daily_report_soft_start.sql:51` | 2 |
-| `my_daily_report_history` | `20261028120000_daily_reports.sql:379` | 1 |
+| `my_daily_report_history` | `20261125120000_daily_report_checks.sql:536` | 2 |
 | `next_delivery_slot` | `20260911220000_reassign_window_reply_dedupe.sql:10` | 1 |
 | `notes_due_reminders` | `20260923205000_notes_reminders_trash.sql:52` | 1 |
 | `notes_purge_trash` | `20260924090000_mind_boards.sql:442` | 2 |
@@ -175,7 +178,7 @@
 | `send_task_now` | `20260926140000_send_now.sql:81` | 1 |
 | `set_notify_prefs` | `20260924150200_notify_prefs.sql:375` | 1 |
 | `set_shop_order_status` | `20261124180000_tenant_guards_tail.sql:216` | 3 |
-| `submit_daily_report` | `20261103120000_daily_report_soft_start.sql:122` | 2 |
+| `submit_daily_report` | `20261125120000_daily_report_checks.sql:118` | 3 |
 | `subordinates` | `20261124090000_tenant_guards.sql:158` | 2 |
 | `task_of_my_company` | `20261124180000_tenant_guards_tail.sql:18` | 1 |
 | `task_question_answered` | `20261123120000_deadline_fixes.sql:148` | 3 |
@@ -189,6 +192,7 @@
 | `team_channel_alerts_due` | `20260924160000_push_followups.sql:124` | 1 |
 | `team_daily_report_day` | `20261124130000_reports_count_the_team.sql:18` | 3 |
 | `team_daily_report_period` | `20261124172000_daily_report_period_speed.sql:44` | 5 |
+| `team_daily_reports_feed` | `20261125120000_daily_report_checks.sql:361` | 1 |
 | `team_role` | `20260922120100_errands.sql:36` | 1 |
 | `thank_errand` | `20260923210000_errand_thanks.sql:12` | 1 |
 | `transition_errand` | `20260922120100_errands.sql:409` | 1 |
@@ -243,7 +247,7 @@
 | `announcement_acks` | `20260910100000_voice_pipeline.sql:86` | — |
 | `announcements` | `20260910100000_voice_pipeline.sql:77` | — |
 | `companies` | `20260907120000_foundation.sql:26` | `20261014150000` |
-| `daily_reports` | `20261028120000_daily_reports.sql:65` | `20261103120000`, `20261118120000` |
+| `daily_reports` | `20261028120000_daily_reports.sql:65` | `20261103120000`, `20261118120000`, `20261125120000` |
 | `errands` | `20260922120100_errands.sql:258` | `20260923210000`, `20260923235000`, `20260924096000` |
 | `ether_events` | `20261014120000_points_game.sql:489` | — |
 | `event_participants` | `20260918150000_calendar_events.sql:54` | — |
@@ -360,7 +364,7 @@
 |---|---|---|
 | `audit_frozen` | `ops.audit` | `20261104130000_ops_console.sql:111` |
 | `trg_close_time_requests` | `tasks` | `20260926120000_task_lifecycle.sql:218` |
-| `trg_daily_reports_updated_at` | `daily_reports` | `20261028120000_daily_reports.sql:90` |
+| `trg_daily_reports_updated_at` | `daily_reports` | `20261125120000_daily_report_checks.sql:49` |
 | `trg_drop_announcement_pushes` | `announcements` | `20260924150000_push_foundation.sql:168` |
 | `trg_errands_updated_at` | `errands` | `20260922120100_errands.sql:281` |
 | `trg_ether_events_merch` | `orders` | `20261014120000_points_game.sql:570` |

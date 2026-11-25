@@ -1,6 +1,6 @@
-import { dayTitle, isoWeekday, spanText, taskMeta, timeOf } from "@/lib/daily-report/format";
+import { dayTitle, isoWeekday, rangeText, taskMeta, timeOf } from "@/lib/daily-report/format";
 import { cellCode, TABEL_CODES_LEGEND, tabelPeriodWords, type Tabel, type TabelPerson } from "@/lib/daily-report/tabel";
-import type { TeamDay, TeamDayRow } from "@/lib/daily-report/types";
+import type { DailyReport, FeedDay, FeedMissed, FeedReport } from "@/lib/daily-report/types";
 import { aqtobeIsoToYmdHm, parseYmd, WEEKDAYS_SHORT_RU, type Ymd } from "@/lib/datetime/calendar";
 
 /**
@@ -146,7 +146,7 @@ export function tabelSheet(tabel: Tabel, people: readonly TabelPerson[]): Report
   };
 }
 
-/* ---- «Сводка» ---------------------------------------------------------------------------------- */
+/* ---- «Подряд» --------------------------------------------------------------------------------- */
 
 /** «Отчёты 4 ноября 2026.csv». */
 export function dayFileName(date: Ymd): string {
@@ -159,87 +159,90 @@ export function daySheetTitle(date: Ymd): string {
   return `Отчёты · ${dayTitle(date)} ${parseYmd(date)?.year ?? ""}`.trim();
 }
 
-const handedIn = (row: TeamDayRow) => (row.report?.status === "submitted" ? row.report : null);
-const excusedRow = (row: TeamDayRow) => row.state === "missed" && Boolean(row.report?.excused_at);
-
-/** The order of the paper: handed in (newest first, as the ledger reads), waiting, missed, excused, away. */
-function placeOf(row: TeamDayRow): number {
-  if (row.state === "submitted") return 0;
-  if (row.state === "pending") return 1;
-  if (row.state === "missed") return excusedRow(row) ? 3 : 2;
-  return 4;
+/** The days of the feed on screen, oldest and newest; null — none. */
+function feedSpan(days: readonly FeedDay[]): { from: Ymd; to: Ymd } | null {
+  if (days.length === 0) return null;
+  const dates = days.map((day) => day.date).sort();
+  return { from: dates[0], to: dates[dates.length - 1] };
 }
 
-function inDayOrder(rows: readonly TeamDayRow[]): TeamDayRow[] {
-  return rows
-    .filter((row) => row.state !== "off" || handedIn(row))
-    .sort((a, b) => {
-      const place = placeOf(a) - placeOf(b);
-      if (place) return place;
-      const at = handedIn(a)?.submitted_at ?? "";
-      const bt = handedIn(b)?.submitted_at ?? "";
-      if (at !== bt) return at < bt ? 1 : -1;
-      return a.full_name.localeCompare(b.full_name, "ru");
-    });
+/** «Отчёты 3–25 нояб. 2026.csv»; one day — by its date. */
+export function feedFileName(days: readonly FeedDay[]): string {
+  const span = feedSpan(days);
+  if (!span) return "Отчёты.csv";
+  if (span.from === span.to) return dayFileName(span.from);
+  return `Отчёты ${rangeText(span.from, span.to)} ${span.to.slice(0, 4)}.csv`;
 }
 
-/** A person's state in the sheet's words; times without a gender, «не на месте» is the secretary's. */
-function stateWords(row: TeamDayRow, today: boolean): string {
-  if (handedIn(row)) return "сдан";
-  if (row.state === "pending") return "ждём";
-  if (row.state === "missed") return excusedRow(row) ? "уважительная" : "не сдан";
-  if (row.state === "away") {
-    // a closed past day kept no record of which: today's availability speaks only for today
-    if (!today) return "отпуск или больничный";
-    return row.availability === "sick" ? "на больничном" : row.availability === "vacation" ? "в отпуске" : "отпуск или больничный";
-  }
-  return "не рабочий день";
+/** The head of the paper: «Отчёты · 3–25 нояб. 2026»; one day — by its date. */
+export function feedSheetTitle(days: readonly FeedDay[]): string {
+  const span = feedSpan(days);
+  if (!span) return "Отчёты";
+  if (span.from === span.to) return daySheetTitle(span.from);
+  return `Отчёты · ${rangeText(span.from, span.to)} ${span.to.slice(0, 4)}`;
+}
+
+/** «25.11» — a day in a cell. */
+function shortDate(date: Ymd): string {
+  const parts = parseYmd(date);
+  return parts ? `${String(parts.day).padStart(2, "0")}.${String(parts.month).padStart(2, "0")}` : date;
 }
 
 /** «18:04»; a report handed in on another day than its own says the day: «15.11 8:05». */
-function submittedWhen(report: NonNullable<ReturnType<typeof handedIn>>): string | null {
+function submittedWhen(report: Pick<DailyReport, "submitted_at" | "report_date">): string | null {
   const at = aqtobeIsoToYmdHm(report.submitted_at);
   if (!at) return null;
   const time = timeOf(report.submitted_at);
   if (at.ymd === report.report_date) return time;
-  const parts = parseYmd(at.ymd);
-  return parts ? `${String(parts.day).padStart(2, "0")}.${String(parts.month).padStart(2, "0")} ${time}` : time;
+  return `${shortDate(at.ymd)} ${time}`;
+}
+
+/** «Проверено 19:05» — the director's mark on paper; nothing before it. */
+function checkWords(report: FeedReport): string | null {
+  return report.checked_at ? `проверено ${timeOf(report.checked_at)}` : null;
 }
 
 /**
- * «Сводка» for Excel and paper: everybody who owed the day's report or handed one in — the words in
- * full, the tasks by title, the times without a gender; nobody's points. The rows are the shown
- * ones (the search); this puts them in the paper's order and leaves out who owed nothing.
+ * «Подряд» for Excel and paper (D-198): the days on screen, newest first — every report shown (the
+ * words in full, the tasks by title, when it came, whether it is checked), then who of that day
+ * did not hand one in. No times of arrival or leaving and no hours (D-194, D-198), nobody's
+ * points. The reports are the shown ones (one person, words, «Не проверены»).
  */
-export function daySheet(day: TeamDay, rows: readonly TeamDayRow[]): ReportSheet {
+export function feedSheet(days: readonly FeedDay[]): ReportSheet {
   const columns: SheetColumn[] = [
+    { title: "День", tight: true },
     { title: "Сотрудник" },
-    { title: "Должность" },
-    { title: "Состояние" },
-    { title: "Время", tight: true },
+    { title: "Состояние", tight: true },
     { title: "Сдан в", tight: true },
     { title: "Задачи", words: true },
     { title: "Что сделано", words: true },
   ];
-  const shown = inDayOrder(rows);
-  const owed = shown.filter((row) => row.state !== "away" && row.state !== "off").length;
-  const submitted = shown.filter((row) => handedIn(row)).length;
-  const tasks = shown.reduce((sum, row) => sum + (handedIn(row) ? row.tasks.length : 0), 0);
+  const ordered = [...days].sort((a, b) => b.date.localeCompare(a.date));
+  const rows: Cell[][] = [];
+  let reports = 0;
+  let tasks = 0;
+  for (const day of ordered) {
+    for (const report of day.reports) {
+      reports += 1;
+      tasks += report.tasks.length;
+      rows.push([
+        shortDate(day.date),
+        report.full_name,
+        ["сдан", checkWords(report)].filter(Boolean).join(", "),
+        submittedWhen(report),
+        report.tasks.length ? report.tasks.map((task) => `${task.title} — ${taskMeta(task)}`).join("\n") : null,
+        report.summary?.trim() || null,
+      ]);
+    }
+    for (const person of day.missed_people) rows.push(missedRow(day.date, person));
+  }
   return {
     columns,
-    rows: shown.map((row) => {
-      const report = handedIn(row);
-      const words = report?.summary?.trim() || (excusedRow(row) ? `Уважительная причина${row.report?.excused_reason ? `: ${row.report.excused_reason.trim()}` : ""}` : null);
-      return [
-        row.full_name,
-        row.position,
-        stateWords(row, day.today),
-        report ? spanText(report.arrived_at, report.left_at) || null : null,
-        report ? submittedWhen(report) : null,
-        report && row.tasks.length ? row.tasks.map((task) => `${task.title} — ${taskMeta(task)}`).join("\n") : null,
-        words,
-      ];
-    }),
-    total: ["Итого", null, owed > 0 && day.workday ? `сдали ${submitted} из ${owed}` : `сдали ${submitted}`, null, null, tasks ? `задач ${tasks}` : null, null],
+    rows,
+    total: ["Итого", null, `отчётов ${reports}`, null, tasks ? `задач ${tasks}` : null, null],
   };
+}
+
+function missedRow(date: Ymd, person: FeedMissed): Cell[] {
+  return [shortDate(date), person.full_name, person.excused ? "уважительная" : "не сдан", null, null, null];
 }

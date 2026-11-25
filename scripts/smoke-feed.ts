@@ -169,6 +169,9 @@ function day(meId: string, companyId: string, { at = Date.now(), evening = false
 
 // ---- the browser: writes answered locally, reads replaced by the day -------------------------
 
+/** The bodies of `POST /api/daily-report` the screen tried to send (answered here, never sent). */
+const sentReports: { arrived_at?: string | null; left_at?: string | null; date?: string; summary?: string }[] = [];
+
 async function guard(context: BrowserContext, blocked: string[], data: () => ReturnType<typeof day> | null) {
   await context.route("**/*", async (route: Route) => {
     const request = route.request();
@@ -188,8 +191,10 @@ async function guard(context: BrowserContext, blocked: string[], data: () => Ret
       }
       // the report handed in: what `submit_daily_report` would answer
       if (path === "/api/daily-report" && today) {
-        const args = (request.postDataJSON() ?? {}) as { arrived_at?: string; left_at?: string; summary?: string };
-        const now = args.left_at ?? new Date(today.at).toISOString();
+        const args = (request.postDataJSON() ?? {}) as { arrived_at?: string | null; left_at?: string | null; date?: string; summary?: string };
+        sentReports.push(args);
+        // D-198: no «Ушёл» to take the moment from — the server stamps the hand-in itself
+        const now = new Date(today.at).toISOString();
         today.report.report = {
           id: "5e0000r1",
           user_id: today.meId,
@@ -277,7 +282,7 @@ async function evening(context: BrowserContext, me: { userId: string; companyId:
         window.sessionStorage.setItem("smoke-draft", "1");
       }
     },
-    [DRAFT_KEY, JSON.stringify({ date: wall, arrived: null, left: null, summary: "Склад, приёмка цемента" })] as const,
+    [DRAFT_KEY, JSON.stringify({ date: wall, summary: "Склад, приёмка цемента" })] as const,
   );
   await page.goto(`${APP_URL}/feed`, { waitUntil: "networkidle" });
   const face = page.locator('[data-testid="mascot-lever"]').first();
@@ -314,6 +319,26 @@ async function evening(context: BrowserContext, me: { userId: string; companyId:
   record("отчёт сдан одной кнопкой", (await card.innerText()).includes("Сдан в 17:3"));
   const sentWords = String(evening.today?.report.report?.summary ?? "");
   record("одной кнопкой ушли слова из черновика (D-183)", sentWords === "Склад, приёмка цемента", sentWords);
+  const sent = sentReports.at(-1);
+  const noTimes = Boolean(sent) && (sent?.arrived_at ?? null) === null && (sent?.left_at ?? null) === null;
+  record("отчёт ушёл без «Пришёл / Ушёл» (D-198)", noTimes, JSON.stringify(sent ?? null));
+  record("с отчётом ушёл день нажатия (D-198)", sent?.date === wall, String(sent?.date));
+  // the director checks it (D-198): the next read of the day carries the mark — «Сдан · проверен», nothing more
+  if (evening.today?.report.report) {
+    Object.assign(evening.today.report.report, { seen_at: new Date(at + 10 * 60_000).toISOString(), checked_at: new Date(at + 12 * 60_000).toISOString() });
+  }
+  await page.reload({ waitUntil: "networkidle" });
+  await face.waitFor({ timeout: 20_000 });
+  await page.waitForTimeout(1200);
+  const done = page.locator('[data-testid="report-due-done"]').first();
+  // the open section is remembered for a while (D-167); closed — the face opens «Дела»
+  if (!(await done.isVisible().catch(() => false))) {
+    await face.click();
+    await page.waitForTimeout(1300);
+  }
+  const doneText = (await done.innerText().catch(() => "")) ?? "";
+  record("проверенный отчёт в «Делах» — «Сдан · проверен»", doneText.includes("Сдан · проверен"), doneText);
+  await shot("08b-evening-checked");
   record("вечер без ошибок страницы", errors.length === 0, errors.slice(0, 3).join(" | "));
   await page.close();
 }

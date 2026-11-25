@@ -28,6 +28,7 @@ import type { TeamDayRow } from "@/lib/daily-report/types";
 import { todayYmd } from "@/lib/datetime/calendar";
 import { pointsTone } from "@/lib/desk/format";
 import { SWITCH_SWAP } from "@/lib/desk/motion";
+import { personFeedHref } from "@/lib/desk/reports-address";
 import { useCompanySettings } from "@/lib/dictionary-queries";
 import { canChangeAccess, canEditPerson, type Who } from "@/lib/people/access";
 import { usePhones, useSetWorking } from "@/lib/people/card-queries";
@@ -170,7 +171,7 @@ function ReportCell({ person, row }: { person: Person; row: TeamDayRow | undefin
   if (row.state === "away") return <span className="text-muted/40">—</span>;
   if (row.state === "submitted") {
     return (
-      <Link href={`/desk/reports?day=${todayYmd()}&p=${person.id}`} className="hover:underline" title="Открыть отчёт" data-testid="team-report">
+      <Link href={personFeedHref(person.id, todayYmd())} className="hover:underline" title="Открыть отчёт" data-testid="team-report">
         <When className="text-muted">{timeOf(row.report?.submitted_at)}</When>
       </Link>
     );

@@ -5,11 +5,11 @@ import { useMemo, useRef, useState, type CSSProperties } from "react";
 
 import { PersonFace } from "@/components/people/PeoplePicker";
 import { CARD_SPRING } from "@/components/tasks/list/TaskList";
-import { Chip } from "@/components/ui/Chip";
 import { Calendar } from "@/components/ui/datetime/Calendar";
 import { CalendarIcon, PickerPanel, PickerTrigger, useDismiss } from "@/components/ui/datetime/PickerShell";
+import { HapticSwitch } from "@/components/ui/HapticSwitch";
 import { useGlidingState } from "@/components/ui/motion";
-import { markGone, PERIOD_MAX_DAYS, percentText, pointsText, rangeText, shortHm, type PeriodKind } from "@/lib/daily-report/format";
+import { markGone, PERIOD_MAX_DAYS, percentText, rangeText, shortHm, type PeriodKind } from "@/lib/daily-report/format";
 import type { TeamPeriod, TeamPeriodRow } from "@/lib/daily-report/types";
 import { compactYmd, daysBetween, type Ymd, addDays } from "@/lib/datetime/calendar";
 import { shortName } from "@/lib/people/names";
@@ -17,8 +17,9 @@ import { useGoneIds } from "@/lib/people/queries";
 import { TONE_VAR } from "@/lib/tasks/tone";
 
 import { DayStrip } from "./DayStrip";
-import { TeamPeriodBone } from "./Skeletons";
 import { LoadFailed } from "./TeamDayPanel";
+import { FilterChip } from "./TeamFeedPanel";
+import { PeriodRowsBone } from "./TeamSkeletons";
 
 const KINDS: { key: PeriodKind; label: string }[] = [
   { key: "week", label: "Неделя" },
@@ -27,9 +28,9 @@ const KINDS: { key: PeriodKind; label: string }[] = [
 ];
 
 /**
- * «Отчёты → Период» (D-152): a week, a month or any stretch up to 92 days — the team's totals,
- * the line of the days, and the people as a table one taps by the head to sort; a tap on a
- * person opens the rest of their numbers in place.
+ * «Отчёты → Период» (D-152, D-198): a week, a month or any stretch up to 92 days — the team's
+ * totals, the line of the days, and the people as a table one taps by the head to sort; a tap on
+ * a person opens their reports in the feed. No hours, no «пришёл / ушёл» (owner, answer 7; D-194).
  */
 export function TeamPeriodPanel({
   kind,
@@ -42,6 +43,7 @@ export function TeamPeriodPanel({
   failed = false,
   onRetry,
   now,
+  onPerson,
 }: {
   kind: PeriodKind;
   onKind: (kind: PeriodKind) => void;
@@ -53,14 +55,17 @@ export function TeamPeriodPanel({
   failed?: boolean;
   onRetry?: () => void;
   now: Date;
+  /** A person's row leads to their reports in the feed (`?who`, D-198). */
+  onPerson: (userId: string) => void;
 }) {
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
+        {/* the chips of «Подряд»: a pick is light on dark, never the brand colour (D-195) */}
         {KINDS.map((item) => (
-          <Chip key={item.key} tone={kind === item.key ? "accent" : "neutral"} aria-pressed={kind === item.key} onClick={() => onKind(item.key)}>
+          <FilterChip key={item.key} on={kind === item.key} onClick={() => onKind(item.key)} testId={`period-${item.key}`}>
             {item.label}
-          </Chip>
+          </FilterChip>
         ))}
         <span className="nums ml-auto text-[13px] leading-4 text-muted">{rangeText(range.from, range.to)}</span>
       </div>
@@ -73,12 +78,12 @@ export function TeamPeriodPanel({
       {period ? (
         <div className="transition-opacity duration-[150ms]" style={{ opacity: stale ? 0.55 : 1 }} aria-busy={stale || undefined}>
           <PeriodSummary period={period} now={now} />
-          <PeriodPeople rows={period.rows} />
+          <PeriodPeople rows={period.rows} onPerson={onPerson} />
         </div>
       ) : failed ? (
         <LoadFailed onRetry={onRetry} />
       ) : (
-        <TeamPeriodBone />
+        <PeriodRowsBone />
       )}
     </>
   );
@@ -159,13 +164,13 @@ function valueOf(row: TeamPeriodRow, key: SortKey): number {
 const GRID = "grid grid-cols-[minmax(0,1fr)_58px_64px] items-center gap-1";
 
 /**
- * The people of the period as a table that fits a phone: the name and two numbers, the rest
- * a tap away. A tap on a column's head sorts by it — biggest first, again — smallest first,
- * a third time — by name. Whoever left the team stays at the bottom, quiet, said as gone (D-194).
+ * The people of the period as a table that fits a phone: the name, when the report usually comes
+ * and two numbers; a tap on a person opens their reports (D-198). A tap on a column's head sorts
+ * by it — biggest first, again — smallest first, a third time — by name. Whoever left the team
+ * stays at the bottom, quiet, said as gone (D-194).
  */
-function PeriodPeople({ rows }: { rows: readonly TeamPeriodRow[] }) {
+function PeriodPeople({ rows, onPerson }: { rows: readonly TeamPeriodRow[]; onPerson: (userId: string) => void }) {
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "name", desc: false });
-  const [openId, setOpenId] = useState<string | null>(null);
   const goneIds = useGoneIds();
 
   const sorted = useMemo(() => {
@@ -219,48 +224,33 @@ function PeriodPeople({ rows }: { rows: readonly TeamPeriodRow[] }) {
 
       <LayoutGroup>
         <ul className="flex flex-col gap-2">
-          {sorted.map((row) => {
-            const open = openId === row.user_id;
-            return (
-              <motion.li key={row.user_id} layout="position" transition={CARD_SPRING} className="task-card overflow-hidden" style={{ borderRadius: 16 }}>
-                <button
-                  type="button"
-                  aria-expanded={open}
-                  onClick={() => setOpenId(open ? null : row.user_id)}
-                  className={`${GRID} min-h-[56px] w-full px-3.5 py-2 text-left transition-transform duration-[120ms] active:scale-[0.99]`}
-                  data-testid="team-period-person"
-                >
-                  <span className="flex min-w-0 items-center gap-2.5" style={{ opacity: row.gone ? 0.55 : 1 }}>
-                    <PersonFace person={row} size={32} />
-                    <span className="min-w-0">
-                      <span className="block truncate text-[15px] leading-5">{shortName(row.full_name)}</span>
-                      <span className="nums block truncate text-[12px] leading-4 text-muted">
-                        {row.gone ? "не в команде · " : ""}
-                        {row.submitted} из {row.submitted + row.missed}
-                      </span>
-                    </span>
+          {sorted.map((row) => (
+            <motion.li key={row.user_id} layout="position" transition={CARD_SPRING} className="task-card overflow-hidden" style={{ borderRadius: 16 }}>
+              <button
+                type="button"
+                onClick={() => onPerson(row.user_id)}
+                className={`${GRID} relative min-h-[56px] w-full px-3.5 py-2 text-left transition-transform duration-[120ms] active:scale-[0.99]`}
+                data-testid="team-period-person"
+              >
+                <span className="flex min-w-0 items-center gap-2.5" style={{ opacity: row.gone ? 0.55 : 1 }}>
+                  <PersonFace person={row} size={32} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-[15px] leading-5">{shortName(row.full_name)}</span>
+                    <span className="nums block truncate text-[12px] leading-4 text-muted">{personLine(row)}</span>
                   </span>
-                  {/* whoever left is history: their share is said, not lit as a verdict */}
-                  <span className="nums text-right text-[15px] font-semibold leading-5" style={{ color: row.gone ? "var(--text-muted)" : rateColor(row.submit_rate) }}>
-                    {percentText(row.submit_rate)}
-                  </span>
-                  <span className="nums text-right text-[15px] leading-5">
-                    {row.handed_over}
-                    <span className="text-muted">/{row.closed}</span>
-                  </span>
-                </button>
-                {open ? (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1, transition: { duration: 0.2, delay: 0.06 } }}
-                    className="border-t border-border/60 px-3.5 pb-3.5 pt-3"
-                  >
-                    <PersonNumbers row={row} />
-                  </motion.div>
-                ) : null}
-              </motion.li>
-            );
-          })}
+                </span>
+                {/* whoever left is history: their share is said, not lit as a verdict */}
+                <span className="nums text-right text-[15px] font-semibold leading-5" style={{ color: row.gone ? "var(--text-muted)" : rateColor(row.submit_rate) }}>
+                  {percentText(row.submit_rate)}
+                </span>
+                <span className="nums text-right text-[15px] leading-5">
+                  {row.handed_over}
+                  <span className="text-muted">/{row.closed}</span>
+                </span>
+                <HapticSwitch />
+              </button>
+            </motion.li>
+          ))}
         </ul>
       </LayoutGroup>
       <p className="mt-2 px-1 text-[12px] leading-4 text-muted">Задачи — сдано / принято</p>
@@ -275,28 +265,18 @@ function rateColor(rate: number | null): string {
 }
 
 /**
- * A person's period. No «приход», «уход», «часы»: the typed times are what the form prefilled, not
- * attendance (D-194); when the report is usually handed in is a fact the phone recorded. Words
- * without a gender (DESIGN §5): «сдано», not «сдал».
+ * Under a person's name: «5 из 5 · около 18:10» — when the report usually comes («обычно сдаёт около …», D-194). No «приход», «уход», «часы»: the typed
+ * times were what the form prefilled, not attendance (D-194); when the report usually comes is
+ * a fact the phone recorded.
  */
-function PersonNumbers({ row }: { row: TeamPeriodRow }) {
-  const lines: [string, string][] = [
-    ["Отчёты", `${row.submitted} из ${row.workdays} рабочих${row.missed ? ` · не сдано ${row.missed}` : ""}`],
-    ...(row.usual_submitted ? ([["Сдаёт отчёт", `обычно около ${shortHm(row.usual_submitted)}`]] as [string, string][]) : []),
-    ["Задачи", `сдано ${row.handed_over} · принято ${row.closed}`],
-    ["По срокам", row.on_time + row.late ? `в срок ${row.on_time} · после срока ${row.late}` : "задач со сроком не было"],
-    ["Очки за отчёты", pointsText(row.points) || "0"],
-  ];
-  return (
-    <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-[14px] leading-5">
-      {lines.map(([label, value]) => (
-        <div key={label} className="contents">
-          <dt className="text-muted">{label}</dt>
-          <dd className="nums min-w-0 text-right">{value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
+function personLine(row: TeamPeriodRow & { gone: boolean }): string {
+  return [
+    row.gone ? "не в команде" : "",
+    `${row.submitted} из ${row.submitted + row.missed}`,
+    row.usual_submitted ? `около ${shortHm(row.usual_submitted)}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 /**

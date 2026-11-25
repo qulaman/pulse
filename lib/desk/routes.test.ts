@@ -53,6 +53,10 @@ describe("deskRouteFor — the director", () => {
     expect(to("/notes/b/b1")).toBe("/desk/boards/b1");
     expect(to("/screen")).toBe("/desk/screen");
     expect(to("/reports")).toBe("/desk/reports");
+    // the feed's filters and the period tab mean the same on the desk (D-198)
+    expect(to("/reports", "?only=new")).toBe("/desk/reports?only=new");
+    expect(to("/reports", "?who=u1&day=2026-11-20")).toBe("/desk/reports?who=u1&day=2026-11-20");
+    expect(to("/reports", "?tab=period")).toBe("/desk/reports?tab=period");
     expect(to("/rating")).toBe("/desk/settings/points");
     expect(to("/shop")).toBe("/desk/settings/points?view=shop");
     expect(to("/profile")).toBe("/desk/profile");

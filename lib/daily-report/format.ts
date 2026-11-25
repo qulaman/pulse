@@ -1,9 +1,9 @@
 /**
- * The words of the daily report (D-152): times, lengths, the day's state, the lines of a
- * person and of a past day. Pure — the screens draw from these, the tests
+ * The words of the daily report (D-152): times, the day's state, the lines of a person and of a
+ * past day, the director's marks (D-198). Pure — the screens draw from these, the tests
  * pin them. Every clock here is the Aqtobe wall clock (lib/datetime/calendar.ts).
  */
-import { addDays, aqtobeIsoToYmdHm, humanYmd, parseYmd, weekdayOf, ymdHmToAqtobeIso, type Hm, type Ymd } from "@/lib/datetime/calendar";
+import { addDays, aqtobeIsoToYmdHm, humanYmd, parseYmd, weekdayOf, type Hm, type Ymd } from "@/lib/datetime/calendar";
 import { pluralRu } from "@/lib/tasks/status-text";
 
 import type {
@@ -35,47 +35,6 @@ export function shortHm(hm: Hm | null | undefined): string {
 /** The wall-clock time of an instant: «18:04». */
 export function timeOf(iso: string | null | undefined): string {
   return shortHm(aqtobeIsoToYmdHm(iso ?? null)?.hm);
-}
-
-/** The «HH:MM» of an instant, for a time field. */
-export function isoToHm(iso: string | null | undefined): Hm | null {
-  return aqtobeIsoToYmdHm(iso ?? null)?.hm ?? null;
-}
-
-/** A time of the given day as an instant with the offset written out — what the RPC takes. */
-export function isoAt(ymd: Ymd, hm: Hm): string | null {
-  return ymdHmToAqtobeIso(ymd, hm);
-}
-
-/** Minutes from one instant to the next; null when either is missing or unreadable. */
-export function minutesBetween(from: string | null | undefined, to: string | null | undefined): number | null {
-  if (!from || !to) return null;
-  const a = new Date(from).getTime();
-  const b = new Date(to).getTime();
-  if (Number.isNaN(a) || Number.isNaN(b)) return null;
-  return Math.round((b - a) / 60_000);
-}
-
-/** «8 ч 40 мин», «9 ч», «45 мин». */
-export function lengthText(minutes: number): string {
-  const total = Math.max(0, Math.round(minutes));
-  const hours = Math.floor(total / 60);
-  const rest = total % 60;
-  if (hours === 0) return `${rest} мин`;
-  return rest === 0 ? `${hours} ч` : `${hours} ч ${rest} мин`;
-}
-
-/** Arrived to left as a length, or null while «Ушёл» is not after «Пришёл». */
-export function durationText(arrived: string | null | undefined, left: string | null | undefined): string | null {
-  const minutes = minutesBetween(arrived, left);
-  return minutes !== null && minutes > 0 ? lengthText(minutes) : null;
-}
-
-/** Hours with one decimal from the database: «9 ч», «8,5 ч». */
-export function hoursText(hours: number | null | undefined): string {
-  if (hours === null || hours === undefined || !Number.isFinite(hours)) return "";
-  const rounded = Math.round(hours * 10) / 10;
-  return `${String(rounded).replace(".", ",")} ч`;
 }
 
 /** «Вторник, 28 октября» — the eyebrow of a day. */
@@ -137,17 +96,82 @@ export function taskMeta(task: DailyReportTask): string {
 }
 
 /**
- * A past day in «Прошлые отчёты»: «сдан · 8 ч 40 мин · 3 задачи · +1» / «не сдан · −10»; a missed
- * day the director excused (D-183) — «не сдан · уважительная причина», its minus already given back.
+ * The first line of the person's words, for a closed card: the first line that says anything,
+ * spaces folded; "" — no words. The card cuts it to its width.
+ */
+export function firstLine(summary: string | null | undefined): string {
+  if (!summary) return "";
+  const line = summary.split(/\r?\n/).find((part) => part.trim());
+  return line ? line.replace(/\s+/g, " ").trim() : "";
+}
+
+/**
+ * The second line of a closed card in «Прошлые отчёты» (D-198): a handed-in day — the first line of
+ * the person's words («Сверил объёмы по кровле…»), a report without words (an older build) — «сдан ·
+ * 3 задачи» or «сдан»; never a length of the day (D-194) and never «0 задач»; the points stand once,
+ * beside the day. A missed day — «не сдан» (its −10 beside the day) / «не сдан · без штрафа»; excused by the director
+ * (D-183) — «не сдан · уважительная причина: болел», the minus already given back.
  */
 export function historyLine(report: DailyReport): string {
   if (report.status === "missed") {
-    if (report.excused_at) return "не сдан · уважительная причина";
-    // a miss that cost nothing says so: the form promises «пропуск не штрафуется» (D-155 §1)
-    return ["не сдан", report.points < 0 ? pointsText(report.points) : "без штрафа"].join(" · ");
+    if (report.excused_at) {
+      const reason = firstLine(report.excused_reason);
+      return reason ? `не сдан · уважительная причина: ${reason}` : "не сдан · уважительная причина";
+    }
+    // the minus stands once, beside the day; a miss that cost nothing says so — the form promises
+    // «пропуск не штрафуется» (D-155 §1)
+    return report.points < 0 ? "не сдан" : "не сдан · без штрафа";
   }
-  const length = durationText(report.arrived_at, report.left_at);
-  return ["сдан", length, tasksCount(report.tasks.length), pointsText(report.points)].filter(Boolean).join(" · ");
+  const words = firstLine(report.summary);
+  if (words) return words;
+  return ["сдан", report.tasks.length ? tasksCount(report.tasks.length) : ""].filter(Boolean).join(" · ");
+}
+
+/** One thing that happened to a handed-in report (D-198), in the order it happened. */
+export type ReviewFact = { kind: "submitted" | "changed" | "seen" | "checked"; text: string };
+
+/** A director's mark's moment: its time on the report's own day, its date on a later one («26 нояб.»). */
+function markAt(iso: string | null | undefined, reportDate: Ymd): string {
+  const at = aqtobeIsoToYmdHm(iso ?? null);
+  if (!at) return "";
+  if (at.ymd === reportDate) return shortHm(at.hm);
+  const day = parseYmd(at.ymd);
+  return day ? `${day.day} ${SHORT_MONTHS[day.month - 1]}` : "";
+}
+
+/**
+ * What happened to a handed-in report, only what did happen (D-198, the owner's answer 3): «сдан
+ * 17:52 · просмотрен 18:40 · проверен 19:05». Nothing for a mark not set — no «не проверено», no
+ * «ждёт директора». The words changed after a check took it off: «изменён после проверки — директор
+ * увидит снова», and once the director has seen them again only «изменён после проверки». A missed
+ * day has none. Lower case — the screen capitalises the first one it shows.
+ */
+export function reviewFacts(report: DailyReport): ReviewFact[] {
+  if (report.status !== "submitted") return [];
+  const facts: ReviewFact[] = [];
+  const sent = timeOf(report.submitted_at);
+  facts.push({ kind: "submitted", text: sent ? `сдан ${sent}` : "сдан" });
+  if (report.changed_after_check_at && !report.checked_at) {
+    facts.push({ kind: "changed", text: report.seen_at ? "изменён после проверки" : "изменён после проверки — директор увидит снова" });
+  }
+  if (report.seen_at) facts.push({ kind: "seen", text: ["просмотрен", markAt(report.seen_at, report.report_date)].filter(Boolean).join(" ") });
+  if (report.checked_at) facts.push({ kind: "checked", text: ["проверен", markAt(report.checked_at, report.report_date)].filter(Boolean).join(" ") });
+  return facts;
+}
+
+/**
+ * The director's mark on a closed card or a row, in one word (D-198): «проверен» — checked,
+ * «просмотрен» — seen and not checked; null — neither (nothing is said about what did not happen).
+ */
+export function reviewMark(report: Pick<DailyReport, "status" | "seen_at" | "checked_at">): "checked" | "seen" | null {
+  if (report.status !== "submitted") return null;
+  if (report.checked_at) return "checked";
+  return report.seen_at ? "seen" : null;
+}
+
+/** Capitalises the first letter: «Сдан 17:52». */
+export function capitalized(text: string): string {
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
 }
 
 /**
@@ -174,9 +198,14 @@ export function dayState(day: MyDailyReportDay): { tone: DayTone; text: string }
   return { tone: "wait", text: "Не сдан" };
 }
 
-/** The same state in two words for the row in «Дела»: «сдан ✓» / «не сдан» / «выходной» / «праздник». */
+/**
+ * The same state in two words for the row in «Дела»: «сдан в 18:04» / «сдан · проверен» (D-198) /
+ * «не сдан» / «выходной» / «праздник».
+ */
 export function entryState(day: MyDailyReportDay): { tone: "ok" | "wait" | "muted"; text: string } {
-  if (day.report?.status === "submitted") return { tone: "ok", text: `сдан в ${timeOf(day.report.submitted_at)}` };
+  if (day.report?.status === "submitted") {
+    return { tone: "ok", text: day.report.checked_at ? "сдан · проверен" : `сдан в ${timeOf(day.report.submitted_at)}` };
+  }
   if (day.holiday) return { tone: "muted", text: "праздник" };
   if (!day.workday) return { tone: "muted", text: "выходной" };
   return { tone: "wait", text: "не сдан" };
@@ -204,14 +233,12 @@ export const SUMMARY_MAX = 4000;
 
 /**
  * What stops the form from going, in the words the person needs — checked on the phone so the
- * common slips never cost a round trip. The words are asked for always (D-183: the director reads
- * them; a day of tasks alone told him nothing) — one line is enough. The database still takes a
- * day of tasks without words (D-155 §7), so a report queued by an older build is not lost.
+ * common slips never cost a round trip. The report is the person's words, the day's tasks and the
+ * moment it went (D-198: no «Пришёл / Ушёл»). The words are asked for always (D-183: the director
+ * reads them; a day of tasks alone told him nothing) — one line is enough. The database still takes
+ * a day of tasks without words (D-155 §7), so a report queued by an older build is not lost.
  */
-export function formProblem(arrived: string | null, left: string | null, summary: string): string | null {
-  if (!arrived || !left) return "Укажите, когда пришли и ушли";
-  const minutes = minutesBetween(arrived, left);
-  if (minutes === null || minutes <= 0) return "«Ушёл» должно быть позже «Пришёл»";
+export function formProblem(summary: string): string | null {
   if (!summary.trim()) return "Напишите одной строкой, что сделали";
   if (summary.trim().length > SUMMARY_MAX) return `Слишком длинно: до ${SUMMARY_MAX} знаков`;
   return null;
@@ -221,7 +248,9 @@ export function formProblem(arrived: string | null, left: string | null, summary
 export const DAILY_REPORT_ERROR_TEXT: Record<DailyReportError | "forbidden", string> = {
   daily_report_disabled: "Отчёты выключены",
   not_team_member: "Отчёт сдают сотрудники",
-  bad_times: "Проверьте время: «Ушёл» позже «Пришёл», оба — сегодня",
+  // D-198: no times on the form any more — the refusal now means the day is closed (or an old
+  // build sent one time without the other)
+  bad_times: "Этот день уже закрыт — отчёт за него не принимается",
   summary_required: "Напишите, чем занимались",
   summary_too_long: `Слишком длинно: до ${SUMMARY_MAX} знаков`,
   bad_period: `Период — не длиннее ${PERIOD_MAX_DAYS} дней`,
@@ -229,6 +258,7 @@ export const DAILY_REPORT_ERROR_TEXT: Record<DailyReportError | "forbidden", str
   already_excused: "Причина уже записана",
   disputed: "Человек оспорил минус — ответьте на спор",
   reason_required: "Напишите причину",
+  bad_ids: "Не получилось отметить отчёты. Попробуйте ещё раз",
   forbidden: "Нет доступа",
 };
 
@@ -284,13 +314,6 @@ export const STATE_TONE: Record<TeamDayState, "ok" | "warn" | "danger" | "muted"
   off: "muted",
 };
 
-/** «9:05–18:10» — a working day's times, without a gender (D-183). */
-export function spanText(arrived: string | null | undefined, left: string | null | undefined): string {
-  const from = timeOf(arrived);
-  const to = timeOf(left);
-  return from && to ? `${from}–${to}` : from || to;
-}
-
 /** The dot and the bar segment of a person's state — `wait` is a hollow ring (lib/tasks/tone.ts). */
 export const STATE_DOT: Record<TeamDayState, "ok" | "wait" | "danger" | "muted"> = {
   submitted: "ok",
@@ -302,8 +325,8 @@ export const STATE_DOT: Record<TeamDayState, "ok" | "wait" | "danger" | "muted">
 
 /**
  * The line under a person's name on a day: «сдан в 18:12» or what stands instead. Not the typed
- * «Пришёл–Ушёл» and their hours: those are what the form prefilled, not attendance (D-194) — they
- * stay inside the opened report, said as the report's (`reportTimesLine`).
+ * «Пришёл–Ушёл» and their hours: those are what the form prefilled, not attendance (D-194); the report
+ * no longer asks them (D-198).
  */
 export function personDayLine(row: TeamDay["rows"][number]): string {
   const report = row.report;
@@ -333,11 +356,6 @@ export function markGone<R extends { user_id: string; gone?: boolean }>(rows: re
 }
 
 /** «В отчёте: 9:05–18:10» — the times as the person wrote them, inside one report only (D-194). */
-export function reportTimesLine(report: Pick<DailyReport, "arrived_at" | "left_at"> | null | undefined): string {
-  const times = report ? spanText(report.arrived_at, report.left_at) : "";
-  return times ? `В отчёте: ${times}` : "";
-}
-
 /** A share as a percent: «82%»; a dash when nothing was due. */
 export function percentText(rate: number | null | undefined): string {
   if (rate === null || rate === undefined || !Number.isFinite(rate)) return "—";

@@ -46,6 +46,9 @@ export const HISTORY_SOURCES: readonly HistorySource[] = [
   { table: "daily_reports", column: "user_id", label: REPORTS, only: { column: "status", value: "submitted" } },
   // the director who excused a missed day (D-183): his judgement stays on the report
   { table: "daily_reports", column: "excused_by", label: REPORTS },
+  // the director who saw and checked a report (D-198): the marks stay on the report
+  { table: "daily_reports", column: "seen_by", label: REPORTS },
+  { table: "daily_reports", column: "checked_by", label: REPORTS },
   // points and disputes
   { table: "point_transactions", column: "user_id", label: POINTS },
   { table: "point_transactions", column: "actor_id", label: POINTS },

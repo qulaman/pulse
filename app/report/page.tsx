@@ -7,19 +7,14 @@ import type { Pop } from "@/components/daily-report/PointsPop";
 import { ReportSkeleton } from "@/components/daily-report/Skeletons";
 import { LoadFailed } from "@/components/daily-report/TeamDayPanel";
 import { PageHead } from "@/components/ui/PageHead";
-import {
-  useAskFrom,
-  useMyDailyReport,
-  useMyDailyReportHistory,
-  useRefreshAfterReplay,
-  useSubmitDailyReport,
-} from "@/lib/daily-report/queries";
+import { useMyDailyReport, useMyDailyReportHistory, useRefreshAfterReplay, useSubmitDailyReport } from "@/lib/daily-report/queries";
 import { isNetworkError } from "@/lib/net";
 import { useNow } from "@/lib/useNow";
 
 /**
  * «Отчёт за день» (D-152): the data and the submit; the screen itself is `MyReportView`, which
- * takes everything as props.
+ * takes everything as props. The day and the past days are live: a director's «Просмотрено» /
+ * «Проверено» lands without a reload (D-198).
  */
 export default function ReportPage() {
   const day = useMyDailyReport();
@@ -27,7 +22,6 @@ export default function ReportPage() {
   const submit = useSubmitDailyReport();
   useRefreshAfterReplay();
   const now = useNow();
-  const askFrom = useAskFrom();
   const [pop, setPop] = useState<Pop | null>(null);
 
   if (day.isPending) return <ReportSkeleton />;
@@ -50,9 +44,9 @@ export default function ReportPage() {
   return (
     <MyReportView
       day={day.data}
-      history={history.isError ? [] : history.data}
+      history={history.isError ? [] : history.items}
+      more={{ hasMore: history.hasMore, onMore: history.loadMore, loading: history.loadingMore, failed: history.moreFailed }}
       now={now}
-      askFrom={askFrom}
       waiting={waiting}
       pop={pop}
       onSubmit={(input) =>

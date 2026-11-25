@@ -44,6 +44,20 @@ export type DailyReport = {
    */
   excused_at: string | null;
   excused_reason: string | null;
+  /**
+   * D-198 «Просмотрено»: the first time a director had the whole report on screen
+   * (`mark_daily_reports_seen`); null — not yet, or the person changed the words since. Optional:
+   * a cache or a base from before the migration has none — read a missing field as null.
+   */
+  seen_at?: string | null;
+  /** D-198 «Проверено»: when and by which director; null — not checked. Only a submitted report is checked. */
+  checked_at?: string | null;
+  checked_by?: string | null;
+  /**
+   * D-198: the person changed the words after a check — the check came off then, the report waits
+   * for the director again («изменён после проверки 19:12»). The next check clears it.
+   */
+  changed_after_check_at?: string | null;
 };
 
 /** The employee's screen for one day — `my_daily_report(p_date)`. */
@@ -69,10 +83,19 @@ export type MyDailyReportDay = {
   points: { enabled: boolean; reward: number; penalty: number };
 };
 
-/** POST body of the submit (both the RPC args and the outbox payload). */
+/**
+ * POST body of the submit (both the RPC args and the outbox payload). D-198: the report no longer
+ * asks «Пришёл / Ушёл» — a new client sends neither (null); a submit of an old build waiting in an
+ * outbox still carries both and is accepted. Times are never shown (D-194).
+ */
 export type SubmitDailyReportInput = {
-  arrived_at: string;
-  left_at: string;
+  arrived_at?: string | null;
+  left_at?: string | null;
+  /**
+   * D-198: the Asia/Aqtobe day of the tap ("YYYY-MM-DD"). Without times only it tells a report sent
+   * offline before midnight from today's; the base takes yesterday only until the morning tick closes it.
+   */
+  date?: string;
   summary: string;
   client_request_id: string;
 };
@@ -228,7 +251,92 @@ export const DAILY_REPORT_RPC = {
   excuse: "excuse_daily_report",
   /** «Напомнить» — called through POST /api/reports/remind, which also kicks the delivery queue. */
   remind: "remind_daily_report",
+  /** D-198: all reports, days in a row, newest first, with the director's filters. */
+  feed: "team_daily_reports_feed",
+  /** D-198: «Просмотрено» — set once per report by what stayed on a director's screen. */
+  seen: "mark_daily_reports_seen",
+  /** D-198: «Проверено» on / off — called through POST /api/reports/check (outbox, принцип 7). */
+  check: "check_daily_reports",
 } as const;
+
+/** D-198: a report in the director's feed — the report and whose it is. */
+export type FeedReport = DailyReport & {
+  full_name: string;
+  position: string | null;
+  avatar_url: string | null;
+  /** Left the team since: the report stays, out of the day's counts (as `TeamDayRow.gone`). */
+  gone?: boolean;
+};
+
+/** D-198: a past due day without a report, in the feed's day line «без отчёта: …». */
+export type FeedMissed = {
+  user_id: string;
+  full_name: string;
+  avatar_url: string | null;
+  /** The director recorded «Уважительная причина» (D-183). */
+  excused: boolean;
+  /** The missed row (excuse needs it); null — the morning tick has not written it yet. */
+  report_id: string | null;
+};
+
+/**
+ * D-198: one day of the feed. Counts are the «Табель»'s for that day (the team now, due days only —
+ * D-183, D-194) and do not depend on the filters; `reports` and `missed_people` do.
+ */
+export type FeedDay = {
+  date: string;
+  today: boolean;
+  workday: boolean;
+  /** People the report was due from that day. */
+  due: number;
+  /** Of them, handed in. */
+  submitted: number;
+  /** Due, not handed in, not excused (past days; today — 0). */
+  missed: number;
+  excused: number;
+  /** Today only: due and not handed in yet. */
+  pending: number;
+  /** Submitted reports matching the filters, the latest hand-in first. */
+  reports: FeedReport[];
+  /** Past days: who did not hand in, by name. [] under a word or «не проверены» filter. */
+  missed_people: FeedMissed[];
+};
+
+/**
+ * D-198: `team_daily_reports_feed(p_before, p_days, p_user, p_query, p_unchecked)` — the days of
+ * [p_before − p_days, p_before), newest first; a day is listed when it is today or has reports or
+ * missed people under the filters. `next_before` — pass as `p_before` for the page before; null —
+ * nothing earlier (before the module started or the first report).
+ */
+export type ReportsFeedPage = {
+  days: FeedDay[];
+  /** The oldest day this page looked at (inclusive). */
+  from: string;
+  next_before: string | null;
+};
+
+/** D-198: what the director narrowed the feed to — every field lives in the address. */
+export type ReportsFeedFilter = {
+  /** One person (`?who=`): the feed goes through months for them alone. */
+  who: string | null;
+  /** Words to find in the report's words and its tasks' titles (`?q=`); "" — none. */
+  q: string;
+  /** «Не проверены» (`?only=new`): submitted reports without «Проверено». */
+  unchecked: boolean;
+};
+
+/** D-198: the review fields of one report — what seen / check return and the caches are patched with. */
+export type ReviewMark = Pick<DailyReport, "id" | "seen_at" | "checked_at" | "checked_by" | "changed_after_check_at">;
+
+/** D-198: POST /api/reports/check body → `check_daily_reports(p_ids, p_on, client_request_id)`. */
+export type CheckDailyReportsInput = {
+  ids: string[];
+  on: boolean;
+  client_request_id: string;
+};
+
+/** D-198: the marks as stored after the call; reports that were not submitted or not the company's are left out. */
+export type CheckDailyReportsResult = { reports: ReviewMark[]; duplicate?: boolean };
 
 /** One row of `person_daily_reports(p_user_id, p_from, p_to)`: the report and the dispute on its minus. */
 export type PersonDailyReport = DailyReport & {
@@ -263,4 +371,6 @@ export type DailyReportError =
   | "not_missed"
   | "already_excused"
   | "disputed"
-  | "reason_required";
+  | "reason_required"
+  /** D-198: check_daily_reports got no ids or more than 200. */
+  | "bad_ids";

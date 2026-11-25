@@ -18,6 +18,7 @@ import { useCompanySettings } from "@/lib/dictionary-queries";
 import { useSetWorking } from "@/lib/people/card-queries";
 import { isTeamMember, usePeople, useUpdatePerson, type Availability, type Person } from "@/lib/people/queries";
 import { useComposeStore } from "@/lib/store/compose";
+import { personFeedHref } from "@/lib/desk/reports-address";
 import { useMe } from "@/lib/tasks/queries";
 
 import { addressOf } from "./shared";
@@ -85,7 +86,7 @@ export function usePersonMoves(place: MovePlace) {
       edit: () => router.push(`/desk/team/${id}?edit=1`),
       card: () => router.push(`/desk/team/${id}`),
       tasks: () => router.push(`/desk/tasks?who=${id}`),
-      reports: () => router.push(`/desk/reports?tab=tabel&p=${id}`),
+      reports: () => router.push(personFeedHref(id)),
       award: () => setAward({ userId: person.id }),
       vacation: () => availability(person, "vacation"),
       sick: () => availability(person, "sick"),

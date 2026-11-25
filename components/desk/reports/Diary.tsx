@@ -23,7 +23,6 @@ import {
   diaryCalendar,
   entryDay,
   excuseHint,
-  hoursLine,
   missedLine,
   missedMove,
   monthIn,
@@ -36,12 +35,12 @@ import {
   stampOf,
   tallyParts,
   tasksLine,
-  timesText,
   wordsOf,
   type DiaryCell,
 } from "@/lib/daily-report/diary";
 import { taskMeta } from "@/lib/daily-report/format";
 import { dailyReportKeys } from "@/lib/daily-report/queries";
+import { useCheckReports, useSeenOnScreen } from "@/lib/daily-report/review";
 import type { PersonDailyReport } from "@/lib/daily-report/types";
 import { aqtobeIsoToYmdHm, WEEKDAYS_SHORT_RU, weeksInMonth, type Ymd } from "@/lib/datetime/calendar";
 import { useCompanySettings } from "@/lib/dictionary-queries";
@@ -49,21 +48,35 @@ import { usePeople, type Person } from "@/lib/people/queries";
 import { useResolveDispute } from "@/lib/points/game";
 import { useNow } from "@/lib/useNow";
 
-/** What the page mounts it with, in the shell's right-hand panel, for «День» and «Табель» alike. */
+import { ChangedLine, CheckButton, SeenLine } from "./Ledger";
+
+/** What the page mounts it with, in the shell's right-hand panel, for «Подряд» and «Табель» alike. */
 export type DiaryProps = {
   userId: string;
   /** The day to show first: its month, its entry ringed and scrolled to. */
   focus: Ymd;
   today: Ymd;
-  /** A day of the diary's calendar double-clicked or «Открыть день»: the page opens «День» on it. */
+  /** A day of the diary's calendar double-clicked or «Открыть этот день»: the feed «Подряд» at that day. */
   onDay: (day: Ymd) => void;
+  /** The director reads: «новый», «Просмотрено» and «Проверить» on the reports (D-198). */
+  director: boolean;
+  /** «Все отчёты ›» — the feed of this person alone, through the months (D-198). */
+  onAll: () => void;
 };
+
+/**
+ * The form's «Пришёл / Ушёл» are not shown anywhere (D-194, D-198): the diary drops them as the
+ * reports come, so no line of it — the calendar's hint included — can say them or hours.
+ */
+function withoutTimes(rows: readonly PersonDailyReport[]): PersonDailyReport[] {
+  return rows.map((row) => (row.arrived_at || row.left_at ? { ...row, arrived_at: null, left_at: null } : row));
+}
 
 /** The person's reports for the month on screen — the hook's own key, patched after a move. */
 const personKey = (userId: string, from: Ymd, to: Ymd) => ["daily-report", "team", "person", userId, from, to] as const;
 
 /**
- * «Дневник» (D-183): one person's daily reports in the desk's right-hand panel, the same for «День»
+ * «Дневник» (D-183): one person's daily reports in the desk's right-hand panel, the same for «Подряд»
  * and «Табель». The head — the face, the name, where they are, and the moves every desk card has
  * (D-194): «Дать задачу» (the person pinned in the command line), «Изменить», «Карточка», «⋯» —
  * «Начислить очки…» where the game is on, vacation or sick leave from today, back at work. Under it the
@@ -72,9 +85,10 @@ const personKey = (userId: string, from: Ymd, to: Ymd) => ["daily-report", "team
  * the day's tasks, a report without words in one line, a missed day in one red line and its one
  * move: answer the person's dispute of the minus, or write a good reason (the minus comes back).
  * A click on a day of the calendar rings its entry and brings it into view, a double click opens
- * that day in «День». Hours are «по времени сдачи», lunch included: grey, never summed.
+ * that day in the feed «Подряд». No arrival, leaving or hours (D-198); the director's marks on each
+ * handed-in report: «новый», «просмотрено 17:41», «Проверить» / «Проверено 16:30».
  */
-export function Diary({ userId, focus, today, onDay }: DiaryProps) {
+export function Diary({ userId, focus, today, onDay, director, onAll }: DiaryProps) {
   const { pointsEnabled } = useDeskScope();
   const people = usePeople();
   const settings = useCompanySettings();
@@ -99,7 +113,8 @@ export function Diary({ userId, focus, today, onDay }: DiaryProps) {
   const reports = usePersonDailyReports(userId, range.from, range.to, Boolean(rules?.enabled ?? true));
   // the hook holds the month before while ‹ › fetches the next: its days would lie under the new
   // month's squares, so until the month's own answer comes the calendar and the list wait in bones
-  const data = reports.isPlaceholderData ? undefined : reports.data;
+  const raw = reports.isPlaceholderData ? undefined : reports.data;
+  const data = useMemo(() => (raw ? withoutTimes(raw) : undefined), [raw]);
   const entries = useMemo(
     () => [...(data ?? [])].filter((row) => row.report_date >= range.from && row.report_date <= range.to).sort((a, b) => b.report_date.localeCompare(a.report_date)),
     [data, range.from, range.to],
@@ -185,6 +200,9 @@ export function Diary({ userId, focus, today, onDay }: DiaryProps) {
       <section ref={list} className="rep-diary-list" aria-label="Дневник">
         <h3 className="rep-diary-label">
           Дневник <span>сначала новые · щелчок по дню в календаре — к нему</span>
+          <button type="button" className="rep-diary-all desk-focus" onClick={onAll} data-testid="desk-diary-all">
+            Все отчёты ›
+          </button>
         </h3>
         {reports.isError && !data ? (
           <div className="rep-diary-empty">
@@ -204,6 +222,7 @@ export function Diary({ userId, focus, today, onDay }: DiaryProps) {
               report={report}
               ringed={ringed === report.report_date}
               pointsOn={pointsEnabled}
+              director={director}
               now={now}
               listKey={personKey(userId, range.from, range.to)}
               onRing={() => setRinged(report.report_date)}
@@ -302,6 +321,7 @@ function Entry({
   report,
   ringed,
   pointsOn,
+  director,
   now,
   listKey,
   onRing,
@@ -310,6 +330,7 @@ function Entry({
   report: PersonDailyReport;
   ringed: boolean;
   pointsOn: boolean;
+  director: boolean;
   now: Date;
   listKey: readonly unknown[];
   onRing: () => void;
@@ -320,9 +341,16 @@ function Entry({
   const stamp = stampOf(report, now);
   const submitted = report.status === "submitted";
   const state = submitted ? "submitted" : move === "excused" ? "excused" : "missed";
+  // «Просмотрено» by sight and «Проверено» by hand — a handed-in report only, the director's (D-198)
+  const marked = director && submitted;
+  const fresh = marked && !report.seen_at && !report.checked_at;
+  const seenRef = useSeenOnScreen(report.id, fresh);
+  const { check } = useCheckReports();
   return (
     <article
+      ref={seenRef}
       className="rep-diary-entry"
+      data-new={fresh ? "" : undefined}
       data-testid="desk-diary-entry"
       data-day={report.report_date}
       data-state={state}
@@ -336,6 +364,7 @@ function Entry({
       <header className="rep-diary-entry-head">
         <Tooltip label="Открыть этот день" side="top">
           <button type="button" className="rep-diary-date desk-focus" onClick={() => onDay(report.report_date)}>
+            {fresh ? <span className="rep-feed-dot rep-diary-dot" aria-label="новый" /> : null}
             {entryDay(report.report_date)}
           </button>
         </Tooltip>
@@ -357,7 +386,6 @@ function Entry({
       {submitted ? (
         words ? (
           <>
-            <p className="rep-diary-hours nums">{hoursLine(report)}</p>
             <p className="rep-diary-words">{words}</p>
             {report.tasks.length > 0 ? (
               <ul className="rep-diary-tasks">
@@ -376,17 +404,9 @@ function Entry({
             ) : null}
           </>
         ) : (
-          // no words (a one-tap report from Лента): the time and the day's tasks, one line
+          // no words (a one-tap report from «Пульс»): the day's tasks, one line
           <p className="rep-diary-compact nums" title={tasksLine(report) || undefined}>
-            {report.tasks.length > 0 ? (
-              <>
-                <span className="rep-diary-compact-time">{timesText(report)}</span>
-                {timesText(report) ? " · " : ""}
-                {tasksLine(report)}
-              </>
-            ) : (
-              <span className="rep-diary-compact-time">{hoursLine(report)}</span>
-            )}
+            {report.tasks.length > 0 ? tasksLine(report) : <span className="rep-diary-compact-time">без слов и задач</span>}
           </p>
         )
       ) : move === "dispute" && report.dispute ? (
@@ -396,6 +416,13 @@ function Entry({
       ) : (
         <Excuse report={report} pointsOn={pointsOn} />
       )}
+      {marked ? (
+        <div className="rep-diary-marks" data-testid="desk-diary-marks">
+          {report.checked_at ? null : <SeenLine report={report} />}
+          <ChangedLine report={report} />
+          <CheckButton report={report} size="sm" keys={[]} testId="desk-diary-check" onCheck={(on) => check([report.id], on)} />
+        </div>
+      ) : null}
     </article>
   );
 }

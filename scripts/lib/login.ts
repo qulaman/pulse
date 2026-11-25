@@ -76,6 +76,7 @@ const READ_RPC = new Set([
   "my_daily_report_history",
   "team_daily_report_day",
   "team_daily_report_period",
+  "team_daily_reports_feed",
   "tv_board",
   "tv_calendar",
   "tv_focus",

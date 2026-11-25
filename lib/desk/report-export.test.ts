@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import { buildTabel, type TabelMark } from "@/lib/daily-report/tabel";
-import type { DailyReport, TeamDay, TeamDayRow, TeamPeriodRow } from "@/lib/daily-report/types";
+import type { DailyReport, FeedDay, FeedReport, TeamPeriodRow } from "@/lib/daily-report/types";
 import type { ReportPerson, ReportRules } from "@/lib/people/stats";
 
 import {
   csvCell,
   dayFileName,
-  daySheet,
   daySheetTitle,
+  feedFileName,
+  feedSheet,
+  feedSheetTitle,
   printCell,
   tabelFileName,
   tabelSheet,
@@ -34,27 +36,19 @@ const report = (patch: Partial<DailyReport>): DailyReport => ({
   ...patch,
 });
 
-const dayRow = (patch: Partial<TeamDayRow>): TeamDayRow => ({
-  user_id: "u1",
-  full_name: "Айгуль Сапарова",
-  position: "Бухгалтер",
-  avatar_url: null,
-  availability: "active",
-  state: "submitted",
-  report: report({}),
-  tasks: [],
-  activity: { accepted: 0, handed_over: 0, closed: 0, messages: 0 },
-  hours: 8.7,
-  reminded: null,
-  ...patch,
-});
+const feedReport = (patch: Partial<FeedReport>): FeedReport => ({ ...report({}), full_name: "Айгуль Сапарова", position: "Бухгалтер", avatar_url: null, ...patch });
 
-const teamDay = (patch: Partial<TeamDay> = {}): TeamDay => ({
+const feedDay = (patch: Partial<FeedDay>): FeedDay => ({
   date: "2026-11-04",
   today: false,
   workday: true,
-  rows: [],
-  totals: { team: 0, submitted: 0, missed: 0, pending: 0, away: 0, excused: 0, handed_over: 0, closed: 0 },
+  due: 5,
+  submitted: 2,
+  missed: 1,
+  excused: 1,
+  pending: 0,
+  reports: [],
+  missed_people: [],
   ...patch,
 });
 
@@ -239,65 +233,63 @@ describe("tabelSheet", () => {
   });
 });
 
-describe("daySheet", () => {
-  const rows = [
-    dayRow({ user_id: "w", full_name: "Ербол", state: "pending", report: null, hours: null }),
-    dayRow({ user_id: "m", full_name: "Дана", state: "missed", report: report({ status: "missed", arrived_at: null, left_at: null, summary: null, submitted_at: null, points: -10 }), hours: null }),
-    dayRow({
-      user_id: "e",
-      full_name: "Арман",
-      state: "missed",
-      report: report({ status: "missed", arrived_at: null, left_at: null, summary: null, submitted_at: null, points: 0, excused_at: "2026-11-05T04:00:00Z", excused_reason: " болел " }),
-      hours: null,
+describe("feedSheet", () => {
+  const days = [
+    feedDay({
+      date: "2026-11-03",
+      reports: [feedReport({ id: "o", report_date: "2026-11-03", submitted_at: "2026-11-03T12:00:00Z", summary: "Старый" })],
     }),
-    dayRow({ user_id: "v", full_name: "Бекзат", state: "away", availability: "vacation", report: null, hours: null }),
-    dayRow({ user_id: "o", full_name: "Гаухар", state: "off", report: null, hours: null }),
-    dayRow({ user_id: "s1", full_name: "Айгуль" }),
-    dayRow({
-      user_id: "s2",
-      full_name: "Жанна",
-      report: report({ summary: "  ", submitted_at: "2026-11-05T03:05:00Z" }),
-      tasks: [{ id: "t", title: "Акт сверки", status: "done", completed_at: null, closed_at: null, on_time: true }],
+    feedDay({
+      reports: [
+        feedReport({
+          id: "s2",
+          full_name: "Жанна",
+          summary: "  ",
+          submitted_at: "2026-11-05T03:05:00Z",
+          checked_at: "2026-11-05T04:10:00Z",
+          tasks: [{ id: "t", title: "Акт сверки", status: "done", completed_at: null, closed_at: null, on_time: true }],
+        }),
+        feedReport({ id: "s1" }),
+      ],
+      missed_people: [
+        { user_id: "m", full_name: "Дана", avatar_url: null, excused: false, report_id: "rm" },
+        { user_id: "e", full_name: "Арман", avatar_url: null, excused: true, report_id: "re" },
+      ],
     }),
   ];
-  const sheet = daySheet(teamDay(), rows);
+  const sheet = feedSheet(days);
 
-  it("the columns of «Сводка», no points at all", () => {
-    expect(sheet.columns.map((column) => column.title)).toEqual(["Сотрудник", "Должность", "Состояние", "Время", "Сдан в", "Задачи", "Что сделано"]);
-    expect(sheet.rows.flat()).not.toContain(-10);
+  it("the columns of «Подряд»: no arrival, no leaving, no hours, no points", () => {
+    expect(sheet.columns.map((column) => column.title)).toEqual(["День", "Сотрудник", "Состояние", "Сдан в", "Задачи", "Что сделано"]);
     expect(sheet.rows.flat()).not.toContain(1);
+    expect(sheet.rows.flat().join(" ")).not.toMatch(/9:20|18:02|\d,\d ч/);
   });
 
-  it("in the paper's order: handed in newest first, waiting, missed, excused, away; who owed nothing left out", () => {
-    expect(sheet.rows.map((row) => row[0])).toEqual(["Жанна", "Айгуль", "Ербол", "Дана", "Арман", "Бекзат"]);
+  it("newest day first, its reports as on screen, then who did not hand one in", () => {
+    expect(sheet.rows.map((row) => `${row[0]} ${row[1]}`)).toEqual(["04.11 Жанна", "04.11 Айгуль Сапарова", "04.11 Дана", "04.11 Арман", "03.11 Айгуль Сапарова"]);
   });
 
-  it("a handed-in report: the times without a gender, when it came, the words whole", () => {
-    expect(sheet.rows[1]).toEqual(["Айгуль", "Бухгалтер", "сдан", "9:20–18:02", "18:04", null, "Смета\nИ акт сверки"]);
+  it("a report: when it came (another day says it), the director's check, the words whole", () => {
+    expect(sheet.rows[1]).toEqual(["04.11", "Айгуль Сапарова", "сдан", "18:04", null, "Смета\nИ акт сверки"]);
+    expect(sheet.rows[0]).toEqual(["04.11", "Жанна", "сдан, проверено 9:10", "05.11 8:05", "Акт сверки — принята · в срок", null]);
   });
 
-  it("a wordless report: the tasks by title, no empty quote; handed in next morning says the day", () => {
-    expect(sheet.rows[0]).toEqual(["Жанна", "Бухгалтер", "сдан", "9:20–18:02", "05.11 8:05", "Акт сверки — принята · в срок", null]);
+  it("a missed day in plain words; the total counts the reports and their tasks", () => {
+    expect(sheet.rows[2].slice(2)).toEqual(["не сдан", null, null, null]);
+    expect(sheet.rows[3][2]).toBe("уважительная");
+    expect(sheet.total).toEqual(["Итого", null, "отчётов 3", null, "задач 1", null]);
   });
 
-  it("the others in plain words; an excused miss says why", () => {
-    expect(sheet.rows[2].slice(2, 5)).toEqual(["ждём", null, null]);
-    expect(sheet.rows[3][2]).toBe("не сдан");
-    expect(sheet.rows[4][2]).toBe("уважительная");
-    expect(sheet.rows[4][6]).toBe("Уважительная причина: болел");
-    // a past day: today's vacation does not speak for it
-    expect(sheet.rows[5][2]).toBe("отпуск или больничный");
-    expect(daySheet(teamDay({ today: true }), [rows[3]]).rows[0][2]).toBe("в отпуске");
-  });
-
-  it("the total: handed in out of those who owed the report", () => {
-    expect(sheet.total).toEqual(["Итого", null, "сдали 2 из 5", null, null, "задач 1", null]);
-    expect(daySheet(teamDay({ workday: false }), [rows[5]]).total[2]).toBe("сдали 1");
+  it("names the file and the paper by the days on screen", () => {
+    expect(feedFileName(days)).toBe("Отчёты 3–4 нояб. 2026.csv");
+    expect(feedSheetTitle(days)).toBe("Отчёты · 3–4 нояб. 2026");
+    expect(feedFileName([days[1]])).toBe("Отчёты 4 ноября 2026.csv");
+    expect(feedSheetTitle([])).toBe("Отчёты");
   });
 
   it("a multi-line report stays one row of the file", () => {
-    const lines = toCsv(daySheet(teamDay(), [rows[5]])).split("\r\n");
+    const lines = toCsv(feedSheet([feedDay({ reports: [feedReport({})] })])).split("\r\n");
     expect(lines).toHaveLength(4);
-    expect(lines[1]).toBe('Айгуль;Бухгалтер;сдан;9:20–18:02;18:04;;"Смета\nИ акт сверки"');
+    expect(lines[1]).toBe('04.11;Айгуль Сапарова;сдан;18:04;;"Смета\nИ акт сверки"');
   });
 });

@@ -15,7 +15,7 @@ function stubStorage() {
   return data;
 }
 
-const draft = (patch: Partial<Draft> = {}): Draft => ({ date: "2026-10-28", arrived: "08:40", left: null, summary: "Склад, приёмка", ...patch });
+const draft = (patch: Partial<Draft> = {}): Draft => ({ date: "2026-10-28", summary: "Склад, приёмка", ...patch });
 
 let data: Map<string, string>;
 beforeEach(() => {
@@ -49,6 +49,20 @@ describe("the daily report draft (tasks/032)", () => {
   it("nothing readable is no draft", () => {
     data.set(DRAFT_KEY, "{not json");
     expect(readDraft("2026-10-28")).toBeNull();
+    data.set(DRAFT_KEY, "null");
+    expect(readDraft("2026-10-28")).toBeNull();
+  });
+
+  it("a draft of an older build keeps its words; its «Пришёл / Ушёл» are not read (D-198)", () => {
+    data.set(DRAFT_KEY, JSON.stringify({ date: "2026-10-28", arrived: "08:40", left: "17:15", summary: "Объект" }));
+    expect(readDraft("2026-10-28")).toEqual({ date: "2026-10-28", summary: "Объект" });
+    data.set(DRAFT_KEY, JSON.stringify({ date: "2026-10-28", arrived: "08:40" }));
+    expect(readDraft("2026-10-28")).toEqual({ date: "2026-10-28", summary: "" });
+  });
+
+  it("writes the words alone", () => {
+    writeDraft({ ...draft(), arrived: "09:00" } as Draft);
+    expect(JSON.parse(data.get(DRAFT_KEY) ?? "null")).toEqual(draft());
   });
 
   it("a store that refuses (private mode) loses nothing but the draft", () => {

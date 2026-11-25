@@ -42,20 +42,25 @@ function day(patch: Partial<MyDailyReportDay> = {}): MyDailyReportDay {
   };
 }
 
-const submitted = (hm: string): MyDailyReportDay["report"] => ({
+const submitted = (hm: string, checkedHm: string | null = null): MyDailyReportDay["report"] => ({
   id: "r1",
   user_id: "u1",
   report_date: TODAY,
   status: "submitted",
-  arrived_at: `${TODAY}T09:00:00+05:00`,
-  left_at: `${TODAY}T${hm}:00+05:00`,
-  summary: "",
+  // D-198: no «Пришёл / Ушёл»
+  arrived_at: null,
+  left_at: null,
+  summary: "Склад, приёмка цемента",
   tasks: [],
   submitted_at: `${TODAY}T${hm}:00+05:00`,
   updated_at: `${TODAY}T${hm}:00+05:00`,
   points: 1,
   excused_at: null,
   excused_reason: null,
+  seen_at: checkedHm ? `${TODAY}T${checkedHm}:00+05:00` : null,
+  checked_at: checkedHm ? `${TODAY}T${checkedHm}:00+05:00` : null,
+  checked_by: checkedHm ? "d1" : null,
+  changed_after_check_at: null,
 });
 
 const STATES: { id: string; label: string; due: ReturnType<typeof reportDue>; waiting?: boolean }[] = [
@@ -66,6 +71,7 @@ const STATES: { id: string; label: string; due: ReturnType<typeof reportDue>; wa
   { id: "asking-one-1", label: "17:05 · одна задача", due: reportDue(day({ tasks: [task("t1")] }), at("17:05")) },
   { id: "asking-write", label: "17:05 · задач нет — просит, «Написать»", due: reportDue(day({ tasks: [] }), at("17:05")) },
   { id: "submitted", label: "сдан в 17:42", due: reportDue(day({ report: submitted("17:42") }), at("18:10")) },
+  { id: "checked", label: "сдан, директор проверил (D-198)", due: reportDue(day({ report: submitted("17:42", "18:05") }), at("18:10")) },
   { id: "waiting", label: "сдан без сети", due: reportDue(day({ report: submitted("17:42") }), at("18:10")), waiting: true },
 ];
 

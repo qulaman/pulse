@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Draft } from "./draft";
-import { ASK_FROM_DEFAULT, askFromOf, leftSuggestion, NO_REPORT_DUE, oneTapInput, reportDue } from "./due";
+import { ASK_FROM_DEFAULT, askFromOf, NO_REPORT_DUE, oneTapInput, reportDue } from "./due";
 import type { DailyReport, DailyReportTask, MyDailyReportDay } from "./types";
 
 /** An Aqtobe wall-clock moment of 2026-10-28 (a Wednesday), UTC+5. */
@@ -33,7 +33,7 @@ const report = (patch: Partial<DailyReport> = {}): DailyReport => ({
   ...patch,
 });
 
-const WORDS: Draft = { date: "2026-10-28", arrived: null, left: null, summary: "Склад" };
+const WORDS: Draft = { date: "2026-10-28", summary: "Склад" };
 
 const day = (patch: Partial<MyDailyReportDay> = {}): MyDailyReportDay => ({
   date: "2026-10-28",
@@ -103,7 +103,16 @@ describe("reportDue — the report on Лента (D-167)", () => {
 
   it("handed in — quiet, with the time, never asking", () => {
     const due = reportDue(day({ report: report() }), at("18:00"), "17:00");
-    expect(due).toMatchObject({ show: true, submitted: true, submittedAt: "2026-10-28T17:42:00+05:00", asking: false, oneTap: false });
+    expect(due).toMatchObject({ show: true, submitted: true, submittedAt: "2026-10-28T17:42:00+05:00", checked: false, asking: false, oneTap: false });
+  });
+
+  it("checked by the director — said only once it happened (D-198)", () => {
+    expect(reportDue(day({ report: report({ seen_at: "2026-10-28T18:10:00+05:00" }) }), at("18:20")).checked).toBe(false);
+    expect(reportDue(day({ report: report({ checked_at: "2026-10-28T18:15:00+05:00", checked_by: "d" }) }), at("18:20")).checked).toBe(true);
+    // a base from before the migration has no marks at all: not checked
+    expect(reportDue(day({ report: report() }), at("18:20")).checked).toBe(false);
+    expect(reportDue(day(), at("18:20")).checked).toBe(false);
+    expect(NO_REPORT_DUE.checked).toBe(false);
   });
 
   it("one tap only with the person's words in a draft (D-183); without tasks or words — «Написать ›»", () => {
@@ -112,10 +121,9 @@ describe("reportDue — the report on Лента (D-167)", () => {
     expect(reportDue(day({ tasks: [] }), at("17:30"), "17:00", false, WORDS)).toMatchObject({ show: true, asking: true, oneTap: false, tasks: 0 });
   });
 
-  it("no one tap before the suggested arrival: leaving would not be after arriving", () => {
-    expect(reportDue(day(), at("08:30"), "17:00", false, WORDS).oneTap).toBe(false);
-    expect(reportDue(day(), at("09:00"), "17:00", false, WORDS).oneTap).toBe(false);
-    expect(reportDue(day(), at("09:01"), "17:00", false, WORDS).oneTap).toBe(true);
+  it("one tap at any hour of the day: no arrival to be after (D-198)", () => {
+    expect(reportDue(day(), at("08:30"), "17:00", false, WORDS).oneTap).toBe(true);
+    expect(reportDue(day(), at("00:01"), "17:00", false, WORDS).oneTap).toBe(true);
   });
 
   it("away (leave or sick): no row and no asking — but a report handed in anyway stays said", () => {
@@ -130,79 +138,35 @@ describe("reportDue — the report on Лента (D-167)", () => {
 });
 
 describe("oneTapInput — what «Сдать» from Лента sends", () => {
-  it("the suggested arrival, leaving now on the minute, the draft's words, the tap's key", () => {
-    const input = oneTapInput(day(), new Date("2026-10-28T12:42:31Z"), "k-1", WORDS);
-    expect(input).toEqual({
-      arrived_at: "2026-10-28T09:00:00+05:00",
-      left_at: "2026-10-28T17:42:00+05:00",
-      summary: "Склад",
+  it("the draft's words, trimmed, and the tap's key — no «Пришёл / Ушёл» (D-198)", () => {
+    expect(oneTapInput(day(), new Date("2026-10-28T12:42:31Z"), "k-1", { date: "2026-10-28", summary: "  Склад, приёмка цемента \n" })).toEqual({
+      arrived_at: null,
+      left_at: null,
+      // the day of the tap (D-198): a report sent offline before midnight stays that day's
+      date: "2026-10-28",
+      summary: "Склад, приёмка цемента",
       client_request_id: "k-1",
     });
   });
 
   it("no words — no one tap (D-183): the form asks for a line", () => {
     expect(oneTapInput(day(), at("17:42"), "k")).toBeNull();
+    expect(oneTapInput(day(), at("17:42"), "k", null)).toBeNull();
     expect(oneTapInput(day(), at("17:42"), "k", { ...WORDS, summary: "  \n " })).toBeNull();
   });
 
-  it("an arrival suggested from the last report's time of day is kept to the minute", () => {
-    const input = oneTapInput(day({ suggest: { arrived_at: "2026-10-28T04:07:00Z", left_at: "2026-10-28T06:00:00Z" } }), at("18:05"), "k", WORDS);
-    expect(input?.arrived_at).toBe("2026-10-28T09:07:00+05:00");
-    expect(input?.left_at).toBe("2026-10-28T18:05:00+05:00");
-  });
-
-  it("refuses without tasks, on another day, or before the arrival", () => {
-    expect(oneTapInput(day({ tasks: [] }), at("18:00"), "k", WORDS)).toBeNull();
-    expect(oneTapInput(day(), at("00:05", "2026-10-29"), "k", { ...WORDS, date: "2026-10-29" })).toBeNull();
-    expect(oneTapInput(day(), at("08:59"), "k", WORDS)).toBeNull();
-  });
-});
-
-describe("oneTapInput — the draft typed on /report goes in (tasks/032)", () => {
-  const draft = (patch: Partial<Draft> = {}): Draft => ({ date: "2026-10-28", arrived: null, left: null, summary: "", ...patch });
-  const plain = { arrived_at: "2026-10-28T09:00:00+05:00", left_at: "2026-10-28T17:42:00+05:00", summary: "Объект", client_request_id: "k" };
-
-  it("without a draft — nothing goes in one tap (D-183)", () => {
-    expect(oneTapInput(day(), at("17:42"), "k", null)).toBeNull();
-  });
-
-  it("the draft's words, trimmed; the times stay the suggestion and now", () => {
-    expect(oneTapInput(day(), at("17:42"), "k", draft({ summary: "  Склад, приёмка цемента \n" }))).toEqual({
-      ...plain,
-      summary: "Склад, приёмка цемента",
-    });
-  });
-
-  it("the draft's «Пришёл» and «Ушёл» where they are set, each on its own", () => {
-    expect(oneTapInput(day(), at("17:42"), "k", draft({ arrived: "08:40", left: "17:15", summary: "Объект" }))).toEqual({
-      arrived_at: "2026-10-28T08:40:00+05:00",
-      left_at: "2026-10-28T17:15:00+05:00",
-      summary: "Объект",
-      client_request_id: "k",
-    });
-    expect(oneTapInput(day(), at("17:42"), "k", draft({ arrived: "08:40", summary: "Объект" }))).toEqual({ ...plain, arrived_at: "2026-10-28T08:40:00+05:00" });
-    expect(oneTapInput(day(), at("17:42"), "k", draft({ left: "17:15", summary: "Объект" }))).toEqual({ ...plain, left_at: "2026-10-28T17:15:00+05:00" });
-  });
-
   it("a draft of another day is not this day's — as without one", () => {
-    expect(oneTapInput(day(), at("17:42"), "k", draft({ date: "2026-10-27", arrived: "08:40", summary: "Вчерашнее" }))).toBeNull();
+    expect(oneTapInput(day(), at("17:42"), "k", { date: "2026-10-27", summary: "Вчерашнее" })).toBeNull();
   });
 
-  it("times that make no length give way to the suggestion and now; the words still go in", () => {
-    const words = plain;
-    // «Ушёл» before «Пришёл»
-    expect(oneTapInput(day(), at("17:42"), "k", draft({ arrived: "10:00", left: "09:30", summary: "Объект" }))).toEqual(words);
-    // the same minute
-    expect(oneTapInput(day(), at("17:42"), "k", draft({ arrived: "10:00", left: "10:00", summary: "Объект" }))).toEqual(words);
-    // «Пришёл» later than now, «Ушёл» left to now
-    expect(oneTapInput(day(), at("17:42"), "k", draft({ arrived: "18:30", summary: "Объект" }))).toEqual(words);
-    // and when the plain way cannot either, nothing goes
-    expect(oneTapInput(day(), at("08:30"), "k", draft({ arrived: "10:00", left: "09:30", summary: "Объект" }))).toBeNull();
+  it("a draft kept by an older build still carries times: only its words go", () => {
+    const old = { date: "2026-10-28", arrived: "08:40", left: "17:15", summary: "Объект" } as Draft;
+    expect(oneTapInput(day(), at("17:42"), "k", old)).toEqual({ arrived_at: null, left_at: null, date: "2026-10-28", summary: "Объект", client_request_id: "k" });
   });
 
   it("a draft is no way round the rules: no tasks or another day — nothing", () => {
-    expect(oneTapInput(day({ tasks: [] }), at("17:42"), "k", draft({ summary: "Объект" }))).toBeNull();
-    expect(oneTapInput(day(), at("00:05", "2026-10-29"), "k", draft({ summary: "Объект" }))).toBeNull();
+    expect(oneTapInput(day({ tasks: [] }), at("17:42"), "k", WORDS)).toBeNull();
+    expect(oneTapInput(day(), at("00:05", "2026-10-29"), "k", { ...WORDS, date: "2026-10-29" })).toBeNull();
   });
 });
 
@@ -213,22 +177,5 @@ describe("askFromOf", () => {
     expect(askFromOf("9:00")).toBe(ASK_FROM_DEFAULT);
     expect(askFromOf(undefined)).toBe(ASK_FROM_DEFAULT);
     expect(askFromOf(1700)).toBe(ASK_FROM_DEFAULT);
-  });
-});
-
-describe("leftSuggestion (7.6)", () => {
-  it("in the morning «Ушёл» is empty — nobody has left at half past nine", () => {
-    expect(leftSuggestion(day(), at("09:31"))).toBeNull();
-    expect(leftSuggestion(day(), at("16:59"))).toBeNull();
-  });
-
-  it("from the evening (`ask_from`) it is now on the minute", () => {
-    expect(leftSuggestion(day(), at("17:00"))).toBe("17:00");
-    expect(leftSuggestion(day(), at("18:42"))).toBe("18:42");
-    expect(leftSuggestion(day(), at("15:10"), "15:00")).toBe("15:10");
-  });
-
-  it("a day that is not today keeps the database's suggestion", () => {
-    expect(leftSuggestion(day(), at("09:31", "2026-10-29"))).toBe("11:00");
   });
 });

@@ -19,7 +19,6 @@ import {
   tabelTotals,
   type TabelMark,
 } from "./tabel";
-import { spanText } from "./format";
 import type { TeamPeriodRow } from "./types";
 
 // a Thursday; the morning tick has closed Tuesday the 10th
@@ -108,7 +107,6 @@ describe("tabelCell", () => {
   it("carries the times and the hours of a handed-in report, the reason of an excused one", () => {
     const cell = tabelCell("2026-11-02", TODAY, handed("2026-11-02"), RULES, PERSON);
     expect(cell).toMatchObject({ state: "submitted", hours: 8.7, due: true, away: null, reason: null });
-    expect(spanText(cell.arrived_at, cell.left_at)).toBe("9:20–18:02");
     const excused = tabelCell("2026-11-04", TODAY, { ...missed, excused_at: "x", excused_reason: "  болел " }, RULES, PERSON);
     expect(excused).toMatchObject({ state: "excused", reason: "болел", hours: null, arrived_at: null });
   });
@@ -257,9 +255,9 @@ describe("marks and words", () => {
 
   it("the tooltip's words: times without a gender, why nothing was owed", () => {
     const handedCell = tabelCell("2026-11-02", TODAY, handed("2026-11-02"), RULES, PERSON);
-    expect(cellWords(handedCell, day("2026-11-02"), RULES, PERSON)).toBe("сдан · 9:20–18:02");
+    expect(cellWords(handedCell, day("2026-11-02"), RULES, PERSON)).toBe("сдан");
     const weekend = tabelCell("2026-11-07", TODAY, handed("2026-11-07"), RULES, PERSON);
-    expect(cellWords(weekend, day("2026-11-07", { weekend: true }), RULES, PERSON)).toBe("сдан · 9:20–18:02 · в выходной, не в счёт");
+    expect(cellWords(weekend, day("2026-11-07", { weekend: true }), RULES, PERSON)).toBe("сдан · в выходной, не в счёт");
     expect(cellWords(cell({ state: "excused", reason: "болел" }), day("x"), RULES)).toBe("уважительная: болел");
     expect(cellWords(cell({ state: "away" }), day("x"), RULES)).toBe("отпуск или больничный");
     expect(cellWords(cell({ state: "pending" }), day("x"), RULES)).toBe("ещё не сдан");

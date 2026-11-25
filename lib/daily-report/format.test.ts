@@ -4,24 +4,23 @@ import { addDays } from "@/lib/datetime/calendar";
 
 import {
   activityLine,
+  capitalized,
   dayState,
   dayTitle,
-  durationText,
   entryState,
   errorCodeOf,
+  firstLine,
   formProblem,
   historyLine,
-  hoursText,
-  isoAt,
   isoWeekday,
-  lengthText,
   periodOf,
   markGone,
   personDayLine,
   pointsHint,
-  reportTimesLine,
   pointsText,
   rangeText,
+  reviewFacts,
+  reviewMark,
   taskMeta,
   teamTotalsLine,
   timeOf,
@@ -65,23 +64,6 @@ describe("times and lengths", () => {
     expect(timeOf(null)).toBe("");
   });
 
-  it("says a length the way people do", () => {
-    expect(lengthText(520)).toBe("8 ч 40 мин");
-    expect(lengthText(540)).toBe("9 ч");
-    expect(lengthText(45)).toBe("45 мин");
-    expect(durationText("2026-10-28T09:05:00+05:00", "2026-10-28T17:45:00+05:00")).toBe("8 ч 40 мин");
-    expect(durationText("2026-10-28T18:00:00+05:00", "2026-10-28T09:00:00+05:00")).toBeNull();
-  });
-
-  it("writes the database's hours with a comma", () => {
-    expect(hoursText(9)).toBe("9 ч");
-    expect(hoursText(8.5)).toBe("8,5 ч");
-    expect(hoursText(null)).toBe("");
-  });
-
-  it("builds an instant of the day with the offset", () => {
-    expect(isoAt("2026-10-28", "09:05")).toBe("2026-10-28T09:05:00+05:00");
-  });
 });
 
 describe("days", () => {
@@ -120,6 +102,9 @@ describe("the employee's day", () => {
     expect(entryState(day())).toEqual({ tone: "wait", text: "не сдан" });
     expect(entryState(day({ report: report() })).text).toBe("сдан в 18:04");
     expect(entryState(day({ workday: false })).text).toBe("выходной");
+    // D-198: the director's check, once it happened
+    expect(entryState(day({ report: report({ checked_at: "2026-10-28T19:05:00+05:00" }) }))).toEqual({ tone: "ok", text: "сдан · проверен" });
+    expect(entryState(day({ report: report({ seen_at: "2026-10-28T18:40:00+05:00" }) })).text).toBe("сдан в 18:04");
   });
 
   it("names a company holiday where it names a day off (D-155 §7)", () => {
@@ -144,14 +129,29 @@ describe("the employee's day", () => {
     expect(pointsText(-10)).toBe("−10");
     expect(pointsText(0)).toBe("");
     const tasks = [1, 2, 3].map((i) => ({ id: `t${i}`, title: "x", status: "done" as const, completed_at: null, closed_at: null, on_time: true }));
-    expect(historyLine(report({ tasks }))).toBe("сдан · 8 ч 40 мин · 3 задачи · +1");
-    expect(historyLine(report({ status: "missed", points: -10, arrived_at: null, left_at: null }))).toBe("не сдан · −10");
+    // D-198: the first line of the words — no length of the day, the points stand beside the day once
+    expect(historyLine(report({ tasks }))).toBe("Сверка с поставщиком");
+    expect(historyLine(report({ summary: "\n  Сверил объёмы   по кровле\nПрайс — в задаче" }))).toBe("Сверил объёмы по кровле");
+    // a report without words (an older build): the tasks, never «0 задач»
+    expect(historyLine(report({ summary: null, tasks }))).toBe("сдан · 3 задачи");
+    expect(historyLine(report({ summary: "  ", tasks: [] }))).toBe("сдан");
+    // the minus stands beside the day, once
+    expect(historyLine(report({ status: "missed", points: -10, arrived_at: null, left_at: null }))).toBe("не сдан");
     // a minus given back — by «Оспорить» or by the D-155 refund — nets the day to 0
     expect(historyLine(report({ status: "missed", points: 0, arrived_at: null, left_at: null }))).toBe("не сдан · без штрафа");
-    // D-183: the director excused the day — the minus is back, the reason is said
-    expect(historyLine(report({ status: "missed", points: 0, arrived_at: null, left_at: null, excused_at: "2026-10-29T10:00:00+05:00", excused_reason: "болел" }))).toBe(
-      "не сдан · уважительная причина",
-    );
+    // D-183: the director excused the day — the minus is back, the director's reason is said
+    const excused = { status: "missed" as const, points: 0, arrived_at: null, left_at: null, excused_at: "2026-10-29T10:00:00+05:00" };
+    expect(historyLine(report({ ...excused, excused_reason: "болел" }))).toBe("не сдан · уважительная причина: болел");
+    expect(historyLine(report({ ...excused, excused_reason: null }))).toBe("не сдан · уважительная причина");
+  });
+
+  it("takes the first line that says anything", () => {
+    expect(firstLine("Склад\nОфис")).toBe("Склад");
+    expect(firstLine("\r\n \r\nОбъект «Север»  \r\n")).toBe("Объект «Север»");
+    expect(firstLine("   ")).toBe("");
+    expect(firstLine(null)).toBe("");
+    expect(capitalized("сдан 17:52")).toBe("Сдан 17:52");
+    expect(capitalized("")).toBe("");
   });
 
   it("says a task's state and its deadline", () => {
@@ -161,23 +161,69 @@ describe("the employee's day", () => {
     expect(taskMeta({ ...task, on_time: null })).toBe("принята");
   });
 
-  it("stops the form on the common slips", () => {
-    const a = "2026-10-28T09:00:00+05:00";
-    const b = "2026-10-28T18:00:00+05:00";
-    expect(formProblem(a, b, "Сверка")).toBeNull();
-    expect(formProblem(b, a, "Сверка")).toBe("«Ушёл» должно быть позже «Пришёл»");
-    expect(formProblem(a, b, "   ")).toBe("Напишите одной строкой, что сделали");
-    expect(formProblem(a, b, "x".repeat(4001))).toBe("Слишком длинно: до 4000 знаков");
+  it("stops the form on the common slips — words only, no times (D-198)", () => {
+    expect(formProblem("Сверка")).toBeNull();
+    expect(formProblem("x".repeat(4001))).toBe("Слишком длинно: до 4000 знаков");
+    expect(formProblem(` ${"x".repeat(4000)} `)).toBeNull();
   });
 
   it("asks for one line of words always, tasks or not (D-183)", () => {
-    const a = "2026-10-28T09:00:00+05:00";
-    const b = "2026-10-28T18:00:00+05:00";
-    expect(formProblem(a, b, "   ")).toBe("Напишите одной строкой, что сделали");
-    // the times still come first
-    expect(formProblem(b, a, "")).toBe("«Ушёл» должно быть позже «Пришёл»");
+    expect(formProblem("")).toBe("Напишите одной строкой, что сделали");
+    expect(formProblem("  \n ")).toBe("Напишите одной строкой, что сделали");
+  });
+});
+
+describe("the director's marks as the person sees them (D-198)", () => {
+  const at = (hm: string, ymd = "2026-10-28") => `${ymd}T${hm}:00+05:00`;
+  const texts = (r: DailyReport) => reviewFacts(r).map((fact) => fact.text);
+
+  it("only what happened: handed in, seen, checked — in that order, with their times", () => {
+    expect(texts(report())).toEqual(["сдан 18:04"]);
+    expect(texts(report({ seen_at: at("18:40") }))).toEqual(["сдан 18:04", "просмотрен 18:40"]);
+    expect(texts(report({ seen_at: at("18:40"), checked_at: at("19:05"), checked_by: "d" }))).toEqual(["сдан 18:04", "просмотрен 18:40", "проверен 19:05"]);
+    expect(reviewFacts(report({ seen_at: at("18:40"), checked_at: at("19:05") })).map((fact) => fact.kind)).toEqual(["submitted", "seen", "checked"]);
+    // checked straight away: no «просмотрен» invented
+    expect(texts(report({ checked_at: at("19:05") }))).toEqual(["сдан 18:04", "проверен 19:05"]);
   });
 
+  it("a mark on a later day says the day, not a time that reads as the report's own", () => {
+    expect(texts(report({ seen_at: at("09:15", "2026-10-29"), checked_at: at("09:16", "2026-10-29") }))).toEqual([
+      "сдан 18:04",
+      "просмотрен 29 окт.",
+      "проверен 29 окт.",
+    ]);
+  });
+
+  it("changed after a check: the check is off, the director will see it again", () => {
+    expect(texts(report({ changed_after_check_at: at("19:12") }))).toEqual(["сдан 18:04", "изменён после проверки — директор увидит снова"]);
+    // seen again since: the promise is kept, the fact stays
+    expect(texts(report({ changed_after_check_at: at("19:12"), seen_at: at("19:30") }))).toEqual(["сдан 18:04", "изменён после проверки", "просмотрен 19:30"]);
+    // checked again: the change is behind it
+    expect(texts(report({ changed_after_check_at: at("19:12"), seen_at: at("19:30"), checked_at: at("19:31") }))).toEqual([
+      "сдан 18:04",
+      "просмотрен 19:30",
+      "проверен 19:31",
+    ]);
+  });
+
+  it("nothing on a missed day; a base before the migration has no marks", () => {
+    expect(reviewFacts(report({ status: "missed", submitted_at: null }))).toEqual([]);
+    const old = report();
+    delete old.seen_at;
+    delete old.checked_at;
+    expect(texts(old)).toEqual(["сдан 18:04"]);
+    expect(reviewMark(old)).toBeNull();
+  });
+
+  it("one word for a closed card: checked wins over seen, nothing for neither", () => {
+    expect(reviewMark(report())).toBeNull();
+    expect(reviewMark(report({ seen_at: at("18:40") }))).toBe("seen");
+    expect(reviewMark(report({ seen_at: at("18:40"), checked_at: at("19:05") }))).toBe("checked");
+    expect(reviewMark(report({ status: "missed", checked_at: at("19:05") }))).toBeNull();
+  });
+});
+
+describe("the database's refusals", () => {
   it("finds our codes in the database's words", () => {
     expect(errorCodeOf("bad_times")).toBe("bad_times");
     expect(errorCodeOf('P0001: daily_report_disabled')).toBe("daily_report_disabled");
@@ -206,8 +252,6 @@ describe("the director's day", () => {
     // D-183: times without a gender
     // D-194: the moment it was handed in, not the typed times and their hours
     expect(personDayLine(row())).toBe("сдан в 18:04");
-    expect(reportTimesLine(row().report)).toBe("В отчёте: 9:05–18:10");
-    expect(reportTimesLine(null)).toBe("");
     expect(personDayLine(row({ state: "pending", report: null, hours: null }))).toBe("отчёта пока нет");
     expect(personDayLine(row({ state: "off", report: null, hours: null }))).toBe("отчёт не нужен");
     expect(personDayLine(row({ state: "away", availability: "sick", report: null }))).toBe("на больничном");
