@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { userSupabase, withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
-import { inCompanyFolder } from "@/lib/files/folder";
+import { folderOwner } from "@/lib/files/folder";
 import { createServiceSupabase } from "@/lib/supabase/service";
 
 const TTL_SECONDS = 600;
@@ -26,7 +26,7 @@ export const GET = withAuth("any", async ({ req, profile }) => {
   const supabase = await userSupabase(req);
   const { data: message, error } = await supabase
     .from("task_messages")
-    .select("id, type, file_path")
+    .select("id, type, file_path, sender_id")
     .eq("id", messageId)
     .maybeSingle();
   if (error) throw new Error(`file-url lookup failed: ${error.message}`);
@@ -35,8 +35,9 @@ export const GET = withAuth("any", async ({ req, profile }) => {
   const bucket = BUCKET[message.type];
   if (!bucket) return apiError(403, "forbidden", "Нет доступа");
   // the service client signs any path: only the caller's company folder ({company_id}/…) is signed,
-  // whatever path a message row carries (principle 6)
-  if (!inCompanyFolder(message.file_path, profile.companyId)) return apiError(403, "forbidden", "Нет доступа");
+  // whatever path a message row carries (principle 6) — and only the sender's own file in it: the
+  // row is the sender's writing, a message pointing at a colleague's file gets nothing signed
+  if (folderOwner(message.file_path, profile.companyId) !== message.sender_id) return apiError(403, "forbidden", "Нет доступа");
 
   const signed = await createServiceSupabase().storage.from(bucket).createSignedUrl(message.file_path, TTL_SECONDS);
   if (signed.error || !signed.data) {

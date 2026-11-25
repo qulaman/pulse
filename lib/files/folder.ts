@@ -12,7 +12,7 @@
  */
 const SEGMENT = "[A-Za-z0-9_-]+";
 const EXTENSIONS = "webm|m4a|mp4|jpg|jpeg|png|webp";
-const SHAPE = new RegExp(`^(${SEGMENT})/${SEGMENT}/${SEGMENT}\\.(?:${EXTENSIONS})$`);
+const SHAPE = new RegExp(`^(${SEGMENT})/(${SEGMENT})/${SEGMENT}\\.(?:${EXTENSIONS})$`);
 
 export function inCompanyFolder(path: string, companyId: string): boolean {
   const match = SHAPE.exec(path);
@@ -22,4 +22,16 @@ export function inCompanyFolder(path: string, companyId: string): boolean {
 /** The caller's own folder inside the company: `{company_id}/{user_id}/…`, same shape rules. */
 export function inOwnFolder(path: string, companyId: string, userId: string): boolean {
   return inCompanyFolder(path, companyId) && path.split("/")[1] === userId;
+}
+
+/**
+ * Whose folder a path of `companyId` lies in — `{owner_id}` of `{company_id}/{owner_id}/…`, under the
+ * same shape rules — or null for a path of another company or of any other shape. A row that
+ * points at a file is the author's own writing: a route that signs the file for a row's reader
+ * signs it only when this owner is the row's author, so nobody gets a colleague's file signed by
+ * writing its path into a row of their own.
+ */
+export function folderOwner(path: string, companyId: string): string | null {
+  const match = SHAPE.exec(path);
+  return match !== null && match[1] === companyId ? match[2] : null;
 }

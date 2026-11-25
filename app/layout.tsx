@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { unstable_rethrow } from "next/navigation";
 import localFont from "next/font/local";
 
 import { AppUpdate } from "@/components/AppUpdate";
@@ -14,7 +15,8 @@ import { PushSync } from "@/components/push/PushSync";
 import { SecretaryAlarmGate } from "@/components/secretary/SecretaryAlarm";
 import { ErrandReplay } from "@/components/secretary/ErrandReplay";
 import { TapHaptics } from "@/components/TapHaptics";
-import { loadBrand } from "@/lib/brand";
+import { getSessionProfile } from "@/lib/auth";
+import { loadBrand, PRODUCT_BRAND } from "@/lib/brand";
 import { DESK_SHEET_SCRIPT } from "@/lib/desk/device";
 import { QUIET_LOOPS } from "@/lib/design/quiet-loops";
 import { INSTALL_CATCHER } from "@/lib/push/install-catcher";
@@ -123,8 +125,17 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  // the client accent (contrast-checked) overrides the token for the whole instance
-  const brand = await loadBrand();
+  // the accent (contrast-checked) of the viewer's own company overrides the token; nobody signed
+  // in — the product's own (D-134). The session read is the one every layout below makes anyway
+  // (cached per request); a failure of it only means the product's accent — Next's own signals
+  // (a page going dynamic, a redirect) pass through untouched
+  let companyId: string | null = null;
+  try {
+    companyId = (await getSessionProfile()).companyId;
+  } catch (error) {
+    unstable_rethrow(error);
+  }
+  const brand = companyId ? await loadBrand(companyId) : PRODUCT_BRAND;
   return (
     <html
       lang="ru"

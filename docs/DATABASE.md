@@ -164,7 +164,7 @@
 
 `tv` читает свою строку `profiles`, `tv_state`, `tv_events`, остальное — функциями `tv_*`, которые сами маскируют гостя.
 
-**Люди другой компании.** Строка, записанная из браузера, не указывает на человека чужой компании: исполнитель и автор задачи (`tasks_insert`, `tasks_update`), автор встречи (`events_update`), руководитель в карточке (`profiles_guard`). У новой просьбы секретарю `claimed_by` — пусто или человек своей компании. Компанию карточки под токеном пользователя не меняет никто, директор тоже; service role и тики не ограничены.
+**Люди другой компании.** Строка, записанная из браузера, не указывает на человека чужой компании: исполнитель и автор задачи (`tasks_insert`, `tasks_update`), автор встречи (`events_update`), руководитель в карточке (`profiles_guard`). Родительская задача и задача курсора прочтения (`task_reads`) — своей компании (`task_of_my_company`). У новой просьбы секретарю `claimed_by` — пусто или человек своей компании. Компанию карточки под токеном пользователя не меняет никто, директор тоже; service role и тики не ограничены.
 
 **Образец новой таблицы:**
 
@@ -186,7 +186,7 @@ create policy things_select on things for select using (
 
 К ней — pgTAP «компания A не видит компанию B» со второй компанией в самом тесте, строка в выгрузке консоли (§4.11) и, если нужно, публикация Realtime (§10).
 
-**Гранты функций.** Новая функция закрыта для `anon` и `authenticated`: исполнять её могут только владелец и `service_role` (default privileges, `20261124120000_functions_closed_by_default.sql`; в схеме `extensions` функции расширений открыты, как обычно в Postgres). Забытый грант не открывает функцию, а ломает её вызов. Функцию людей миграция открывает `grant execute … to authenticated`; внутренним функциям и тикам гранты не нужны. Явный `revoke … from public, anon` не мешает и остаётся там, где написан. `create or replace` с тем же списком аргументов гранты сохраняет. В `security definer` — `set search_path = public`. Смена имён параметров или типа результата — `drop function`, `create function` и гранты заново. Из функций `security definer` без входа исполнимы только помощники политик (`auth_company_id`, `auth_role`, `auth_session_live`, `subordinates`); это, закрытость новой функции и поимённый список всего, что исполнимо без входа (помощники политик и чистые помощники слов и настроек), сверяет pgTAP 062. Каждая политика `public` называет роль `authenticated`: без входа не читается ни одна строка (D-194). Новая политика обязана назвать роль; это и то, что компания A не видит строк B ни в одной таблице с `company_id`, сверяет pgTAP 065.
+**Гранты функций.** Новая функция закрыта для `anon` и `authenticated`: исполнять её могут только владелец и `service_role` (default privileges, `20261124120000_functions_closed_by_default.sql`; в схеме `extensions` функции расширений открыты, как обычно в Postgres). Забытый грант не открывает функцию, а ломает её вызов. Функцию людей миграция открывает `grant execute … to authenticated`; внутренним функциям и тикам гранты не нужны. Явный `revoke … from public, anon` не мешает и остаётся там, где написан. `create or replace` с тем же списком аргументов гранты сохраняет. В `security definer` — `set search_path = public`. Смена имён параметров или типа результата — `drop function`, `create function` и гранты заново. Из функций `security definer` без входа исполнимы только помощники политик (`auth_company_id`, `auth_role`, `auth_session_live`, `subordinates`); это, закрытость новой функции и поимённый список всего, что исполнимо без входа (помощники политик и чистые помощники слов и настроек), сверяет pgTAP 062. Проверка роли в функции пишется так, чтобы пустая роль не проходила: `coalesce(auth_role(), '') not in (…)` — у отключённого профиля и закрытой сессии роли нет. Каждая политика `public` называет роль `authenticated`: без входа не читается ни одна строка (D-194). Новая политика обязана назвать роль; это и то, что компания A не видит строк B ни в одной таблице с `company_id`, сверяет pgTAP 065.
 
 ## 7. Функции (RPC)
 
@@ -288,7 +288,7 @@ create policy things_select on things for select using (
 
 ### 7.8. Служебные
 
-Клиент их не зовёт: помощники RLS (`auth_session_live`, `subordinates`, `team_role`); чтение настроек (`points_rule`, `daily_report_workday`, `voice_retention_days`, `notify_prefs_of`, `morning_brief_on`); доставка (`next_delivery_slot`, `delivery_category`, `push_when` — слова срока как `lib/ai/time.ts`, `morning_brief_body` — слова утренней сводки); очки (`task_sent_at`, `task_streak_of`); стена (`tv_emit`, `tv_touch`, `tv_task_story`); календарь (`event_release`); заявки (`errand_recipients`); функции триггеров.
+Клиент их не зовёт: помощники RLS (`auth_session_live`, `subordinates`, `team_role`, `task_of_my_company`); чтение настроек (`points_rule`, `daily_report_workday`, `voice_retention_days`, `notify_prefs_of`, `morning_brief_on`); доставка (`next_delivery_slot`, `delivery_category`, `push_when` — слова срока как `lib/ai/time.ts`, `morning_brief_body` — слова утренней сводки); очки (`task_sent_at`, `task_streak_of`); стена (`tv_emit`, `tv_touch`, `tv_task_story`); календарь (`event_release`); заявки (`errand_recipients`); функции триггеров.
 
 ## 8. Триггеры
 
@@ -347,7 +347,7 @@ Service role проходит стражи `tasks` и `profiles` без пров
 
 Чужой файл открывается только подписанной ссылкой, которую выдал сервер после проверки прав (D-18). Клиент грузит прямо в Storage по подписанной ссылке — запись цела до вызовов ИИ (принцип 5).
 
-**Срок голоса (D-155 п.3).** Файл живёт `closed_days` (90) после закрытия всех строк, которые на него ссылаются; запись без дела (только `inbox_items`) — `orphan_days` (30). Задача закрыта в `done` и `revoked` (не в `declined`), заметка — никогда, пока жива; `voice_kept` не трогается. Тик удаляет файлы через Storage API (SQL-ом из `storage.objects` не удаляют) и обнуляет пути `voice_mark_purged`; тексты остаются навсегда.
+**Срок голоса (D-155 п.3).** Файл живёт `closed_days` (90) после закрытия всех строк его компании, которые на него ссылаются; запись без дела (только `inbox_items`) — `orphan_days` (30). Задача закрыта в `done` и `revoked` (не в `declined`), заметка — никогда, пока жива; `voice_kept` не трогается. Тик удаляет файлы через Storage API (SQL-ом из `storage.objects` не удаляют) и обнуляет пути `voice_mark_purged`; тексты остаются навсегда.
 
 ## 10. Realtime
 

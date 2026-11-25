@@ -19,6 +19,13 @@ const BodySchema = z.strictObject({
  * service dropped comes back by itself. The endpoint belongs to the browser: whoever is signed
  * in on it now owns it (a shared phone moves to the new person); the same person re-registering
  * keeps their «присылать сюда» switch. Service role, always scoped to the caller.
+ *
+ * An endpoint is no secret (the director reads his people's devices), so knowing it is not
+ * enough to take it from another person: the browser that holds it also holds its keys, and a
+ * shared phone where somebody else signs in sends the very same ones. Another person's row
+ * moves only to a caller who brings its keys; anyone else gets 409 and that row stays as it is.
+ * The client takes the 409 as any failed subscribe: «Включить» says it did not work, the
+ * background sync stays quiet and tries again on the next start — no loop, nothing stuck.
  */
 export const POST = withAuth<z.infer<typeof BodySchema>>(
   "any",
@@ -31,7 +38,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     const label = deviceLabel(body.user_agent);
     const { data: existing } = await service
       .from("push_subscriptions")
-      .select("id, user_id")
+      .select("id, user_id, p256dh, auth")
       .eq("endpoint", body.endpoint)
       .maybeSingle();
 
@@ -53,7 +60,13 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       return apiOk({ ok: true });
     }
 
-    if (existing) await service.from("push_subscriptions").delete().eq("id", existing.id);
+    if (existing) {
+      // another person's browser — the same browser only when it brings the same keys
+      if (existing.p256dh !== body.keys.p256dh || existing.auth !== body.keys.auth) {
+        return apiError(409, "endpoint_taken", "Это устройство получает уведомления другого человека");
+      }
+      await service.from("push_subscriptions").delete().eq("id", existing.id);
+    }
     const { error } = await service.from("push_subscriptions").insert({
       company_id: profile.companyId,
       user_id: profile.userId,

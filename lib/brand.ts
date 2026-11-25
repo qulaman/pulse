@@ -22,7 +22,13 @@ export type Brand = {
   devTools: boolean;
 };
 
-const FALLBACK: Brand = {
+/**
+ * The product's own brand: what a screen nobody has signed in to shows — `/login`, the landing,
+ * a page not found — and what a broken company row falls back to. A company's own screen before
+ * sign-in is `/c/<slug>` (D-135); the base holds many companies, and none of them is «the» one
+ * (D-134).
+ */
+export const PRODUCT_BRAND: Brand = {
   companyId: null,
   name: "Pulse",
   tagline: null,
@@ -37,33 +43,31 @@ const FALLBACK: Brand = {
 type CompanyRow = { id: string; name: string; settings: unknown };
 
 /**
- * The company row of this instance, read once per server render: the root layout, the
- * header and the employee shell all paint from it (D-126). React's cache lives for one
- * request, so a changed brand shows on the next render.
+ * A company's row, read once per server render: the root layout, the header and the shells all
+ * paint from it (D-126). React's cache lives for one request, so a changed brand shows on the
+ * next render.
  */
-const loadCompanyRow = cache(async (companyId?: string): Promise<CompanyRow | null> => {
-  const supabase = createServiceSupabase();
-  let query = supabase.from("companies").select("id, name, settings").order("created_at").limit(1);
-  if (companyId) query = query.eq("id", companyId);
-  const { data } = await query.maybeSingle();
+const loadCompanyRow = cache(async (companyId: string): Promise<CompanyRow | null> => {
+  const { data } = await createServiceSupabase()
+    .from("companies")
+    .select("id, name, settings")
+    .eq("id", companyId)
+    .maybeSingle();
   return data;
 });
 
 /**
- * The brand of this instance (V-02: one company per deployment, so without an id the
- * first row is the company). Read with the service role: the login screen shows the
- * logo before anyone is signed in. Never throws — a broken row means the default brand.
+ * The brand of the viewer's company — the caller passes the company of the signed-in profile,
+ * never a company of its choosing. Read with the service role: the kiosk role does not read
+ * `companies`. Never throws — a broken row means the product's brand.
  */
-export async function loadBrand(companyId?: string): Promise<Brand> {
+export async function loadBrand(companyId: string): Promise<Brand> {
   try {
-    // one company per deployment: the first row is the one asked for, so the root layout's
-    // read serves the header too; an id that is not it still gets its own read
-    const first = await loadCompanyRow();
-    const data = !companyId || first?.id === companyId ? first : await loadCompanyRow(companyId);
-    return data ? brandOf(data) : FALLBACK;
+    const data = await loadCompanyRow(companyId);
+    return data ? brandOf(data) : PRODUCT_BRAND;
   } catch (error) {
     console.error("brand load failed:", error instanceof Error ? error.message : error);
-    return FALLBACK;
+    return PRODUCT_BRAND;
   }
 }
 
@@ -73,17 +77,17 @@ export async function loadBrand(companyId?: string): Promise<Brand> {
  * passer-by which addresses exist (D-134: the list of clients is nobody's business).
  */
 export async function loadBrandBySlug(slug: string): Promise<Brand> {
-  if (!/^[a-z0-9-]{2,40}$/.test(slug)) return FALLBACK;
+  if (!/^[a-z0-9-]{2,40}$/.test(slug)) return PRODUCT_BRAND;
   try {
     const { data } = await createServiceSupabase()
       .from("companies")
       .select("id, name, settings")
       .eq("slug", slug)
       .maybeSingle();
-    return data ? brandOf(data) : FALLBACK;
+    return data ? brandOf(data) : PRODUCT_BRAND;
   } catch (error) {
     console.error("brand by slug failed:", error instanceof Error ? error.message : error);
-    return FALLBACK;
+    return PRODUCT_BRAND;
   }
 }
 

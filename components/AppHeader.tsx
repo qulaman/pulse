@@ -21,7 +21,7 @@ function initials(fullName: string): string {
  * so this bar shows on the home routes only. Clear, over the page's glow; the height is
  * the one the centred face was measured with (D-60, D-87 §7) — the border stays, transparent.
  */
-export async function AppHeader({ fullName, companyId, pointsFor }: { fullName: string; companyId?: string; pointsFor?: string }) {
+export async function AppHeader({ fullName, companyId, pointsFor }: { fullName: string; companyId: string; pointsFor?: string }) {
   const brand = await loadBrand(companyId);
   const branded = Boolean(brand.logoUrl) || brand.name !== "Pulse";
 

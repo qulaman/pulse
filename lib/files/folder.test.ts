@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { inCompanyFolder, inOwnFolder } from "./folder";
+import { folderOwner, inCompanyFolder, inOwnFolder } from "./folder";
 
 const A = "aaaaaaaa-0000-4000-8000-000000000001";
 const B = "bbbbbbbb-0000-4000-8000-000000000002";
@@ -54,5 +54,39 @@ describe("inOwnFolder", () => {
     expect(inOwnFolder(`${A}/${F}/${F}.m4a`, A, U)).toBe(false);
     expect(inOwnFolder(`${B}/${U}/${F}.m4a`, A, U)).toBe(false);
     expect(inOwnFolder(`${A}/${U}/../${F}.m4a`, A, U)).toBe(false);
+  });
+});
+
+describe("folderOwner", () => {
+  it("names the owner of a well-formed path of the company", () => {
+    expect(folderOwner(`${A}/${U}/${F}.m4a`, A)).toBe(U);
+    expect(folderOwner(`${A}/${U}/${F}.jpg`, A)).toBe(U);
+    expect(folderOwner(`${A}/user/photo.webm`, A)).toBe("user");
+  });
+
+  it("names nobody for another company, a way out or another shape", () => {
+    expect(folderOwner(`${B}/${U}/${F}.m4a`, A)).toBeNull();
+    expect(folderOwner(`${A}x/${U}/${F}.m4a`, A)).toBeNull();
+    expect(folderOwner(`${A}/${U}/../${F}.m4a`, A)).toBeNull();
+    expect(folderOwner(`${A}/../${U}/${F}.m4a`, A)).toBeNull();
+    expect(folderOwner(`${A}/%2e%2e/${F}.m4a`, A)).toBeNull();
+    expect(folderOwner(`${A}//${F}.m4a`, A)).toBeNull();
+    expect(folderOwner(`${A}/${F}.m4a`, A)).toBeNull();
+    expect(folderOwner(`${A}/${U}/x/${F}.m4a`, A)).toBeNull();
+    expect(folderOwner(`${A}/${U}/${F}.svg`, A)).toBeNull();
+    expect(folderOwner("", A)).toBeNull();
+  });
+
+  it("tells an author's file from a colleague's", () => {
+    const path = `${A}/${U}/${F}.webm`;
+    expect(folderOwner(path, A) === U).toBe(true);
+    expect(folderOwner(path, A) === F).toBe(false);
+  });
+
+  it("agrees with inCompanyFolder and inOwnFolder", () => {
+    for (const path of [`${A}/${U}/${F}.m4a`, `${B}/${U}/${F}.m4a`, `${A}/${U}/../${F}.m4a`, `${A}/${U}/${F}.exe`]) {
+      expect(folderOwner(path, A) !== null).toBe(inCompanyFolder(path, A));
+      expect(folderOwner(path, A) === U).toBe(inOwnFolder(path, A, U));
+    }
   });
 });

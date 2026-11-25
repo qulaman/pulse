@@ -1,13 +1,18 @@
 import { LoginForm } from "@/components/auth/LoginForm";
 import { sessionIsClosed } from "@/lib/auth";
-import { loadBrand } from "@/lib/brand";
+import { PRODUCT_BRAND } from "@/lib/brand";
 
 /**
- * Server wrapper: the brand is read before anyone is signed in. Still the first company of
- * the base (V-02 era); D-134 §6 turns it into the product's brand — a company's own screen is
- * `/c/<slug>` (D-135).
+ * Server wrapper. Nobody is signed in here, so the screen carries the product's own brand: the
+ * base holds many companies and none of them is «the» one (D-134). A company's own sign-in
+ * screen is `/c/<slug>` (D-135); after a code, the answer carries the company's brand.
  */
 export default async function LoginPage() {
-  const [brand, closed] = await Promise.all([loadBrand(), sessionIsClosed()]);
-  return <LoginForm brand={{ name: brand.name, logoUrl: brand.logoUrl, tagline: brand.tagline }} closed={closed} />;
+  const closed = await sessionIsClosed();
+  return (
+    <LoginForm
+      brand={{ name: PRODUCT_BRAND.name, logoUrl: PRODUCT_BRAND.logoUrl, tagline: PRODUCT_BRAND.tagline }}
+      closed={closed}
+    />
+  );
 }

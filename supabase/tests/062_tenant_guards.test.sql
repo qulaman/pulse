@@ -1,10 +1,11 @@
 -- The company boundary (20261124090000_tenant_guards.sql, principle 6): a signed-in person of
 -- company A cannot move a card into B, put B's people on A's tasks, meetings or errands, call the
 -- internal helpers, list the brand bucket, or ask about B's people; what A does inside A still
--- works. New functions start closed (20261124120000_functions_closed_by_default.sql). Fixtures
+-- works. New functions start closed (20261124120000_functions_closed_by_default.sql); the small
+-- gaps after them are shut too (20261124180000_tenant_guards_tail.sql). Fixtures
 -- are this file's own (two companies): dev data never leans in.
 begin;
-select plan(36);
+select plan(50);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures: company A — a director, a manager, an employee; company B — a director, an employee
@@ -275,6 +276,102 @@ select is(
       )),
   '', 'anon can call nothing but the listed helpers'
 );
+
+-- ---------------------------------------------------------------------------
+-- 9. The tail (20261124180000_tenant_guards_tail.sql): parent tasks, read cursors, a closed
+--    session, a NULL role, recordings kept across companies
+-- ---------------------------------------------------------------------------
+insert into tasks (id, company_id, author_id, assignee_id, title, status) values
+  ('e5ec0000-0000-0000-0000-0000000000f2', 'e5ec0000-0000-0000-0000-00000000000b',
+   'e5ec0000-0000-0000-0000-000000000011', 'e5ec0000-0000-0000-0000-000000000011', 'pgtap-sec задача B', 'scheduled');
+
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"e5ec0000-0000-0000-0000-000000000001","role":"authenticated"}';
+select throws_ok(
+  $$ insert into tasks (company_id, author_id, assignee_id, title, status, parent_task_id)
+     values ('e5ec0000-0000-0000-0000-00000000000a', 'e5ec0000-0000-0000-0000-000000000001',
+             'e5ec0000-0000-0000-0000-000000000003', 'pgtap-sec под чужой', 'sent', 'e5ec0000-0000-0000-0000-0000000000f2') $$,
+  '42501', null, 'a task cannot hang under a task of another company'
+);
+select lives_ok(
+  $$ insert into tasks (company_id, author_id, assignee_id, title, status, parent_task_id)
+     values ('e5ec0000-0000-0000-0000-00000000000a', 'e5ec0000-0000-0000-0000-000000000001',
+             'e5ec0000-0000-0000-0000-000000000003', 'pgtap-sec под своей', 'sent', 'e5ec0000-0000-0000-0000-0000000000f1') $$,
+  'under one of its own it can'
+);
+select throws_ok(
+  $$ update tasks set parent_task_id = 'e5ec0000-0000-0000-0000-0000000000f2' where id = 'e5ec0000-0000-0000-0000-0000000000f1' $$,
+  '42501', null, 'nor be moved under one by an update'
+);
+select throws_ok(
+  $$ insert into task_reads (task_id, user_id, company_id)
+     values ('e5ec0000-0000-0000-0000-0000000000f2', 'e5ec0000-0000-0000-0000-000000000001', 'e5ec0000-0000-0000-0000-00000000000a') $$,
+  '42501', null, 'a read cursor cannot name a task of another company'
+);
+select lives_ok(
+  $$ insert into task_reads (task_id, user_id, company_id)
+     values ('e5ec0000-0000-0000-0000-0000000000f1', 'e5ec0000-0000-0000-0000-000000000001', 'e5ec0000-0000-0000-0000-00000000000a') $$,
+  'one of its own goes in'
+);
+
+-- a token whose session is gone counts for nothing in revoke_sessions either
+set local request.jwt.claims = '{"sub":"e5ec0000-0000-0000-0000-000000000001","role":"authenticated","session_id":"e5ec0000-0000-0000-0000-0000000000dd"}';
+select throws_ok(
+  $$ select revoke_sessions('e5ec0000-0000-0000-0000-000000000003') $$,
+  'P0001', 'not_found', 'a closed session cannot sign other people out'
+);
+set local request.jwt.claims = '{"sub":"e5ec0000-0000-0000-0000-000000000001","role":"authenticated"}';
+select lives_ok(
+  $$ select revoke_sessions('e5ec0000-0000-0000-0000-000000000003') $$,
+  'a live one still can'
+);
+
+-- a signed-in account without a working profile has no role: the checks refuse it
+set local request.jwt.claims = '{"sub":"e5ec0000-0000-0000-0000-0000000000cc","role":"authenticated"}';
+select throws_ok($$ select tv_overlay() $$, 'P0001', 'forbidden', 'no role, no wall overlay');
+select throws_ok($$ select tv_summary(false) $$, 'P0001', 'forbidden', 'no wall summary');
+select throws_ok(
+  $$ select close_visit('e5ec0000-0000-0000-0000-0000000000ee') $$,
+  'P0001', 'forbidden', 'no closing of a visit'
+);
+reset role;
+
+-- a recording of B that only a note of A names is not kept for A's sake
+insert into storage.objects (bucket_id, name, created_at, updated_at, metadata) values
+  ('voice', 'e5ec0000-0000-0000-0000-00000000000b/e5ec0000-0000-0000-0000-000000000013/e5ec0000-0000-0000-0000-0000000000ab.webm',
+   now() - interval '400 days', now() - interval '400 days', '{"size": 10}');
+insert into notes (company_id, user_id, text, audio_path) values
+  ('e5ec0000-0000-0000-0000-00000000000a', 'e5ec0000-0000-0000-0000-000000000001', 'pgtap-sec чужая запись',
+   'e5ec0000-0000-0000-0000-00000000000b/e5ec0000-0000-0000-0000-000000000013/e5ec0000-0000-0000-0000-0000000000ab.webm');
+select is(
+  (select count(*)::int from voice_purge_due(now(), 100000)
+    where path = 'e5ec0000-0000-0000-0000-00000000000b/e5ec0000-0000-0000-0000-000000000013/e5ec0000-0000-0000-0000-0000000000ab.webm'),
+  1, 'another company''s note does not keep B''s recording past its time'
+);
+insert into notes (company_id, user_id, text, audio_path) values
+  ('e5ec0000-0000-0000-0000-00000000000b', 'e5ec0000-0000-0000-0000-000000000011', 'pgtap-sec своя запись',
+   'e5ec0000-0000-0000-0000-00000000000b/e5ec0000-0000-0000-0000-000000000013/e5ec0000-0000-0000-0000-0000000000ab.webm');
+select is(
+  (select count(*)::int from voice_purge_due(now(), 100000)
+    where path = 'e5ec0000-0000-0000-0000-00000000000b/e5ec0000-0000-0000-0000-000000000013/e5ec0000-0000-0000-0000-0000000000ab.webm'),
+  0, 'B''s own note keeps it, as before'
+);
+
+-- the keys of a device stay on the server side
+insert into push_subscriptions (company_id, user_id, endpoint, p256dh, auth) values
+  ('e5ec0000-0000-0000-0000-00000000000a', 'e5ec0000-0000-0000-0000-000000000003',
+   'https://push.example/pgtap-sec-employee', 'pgtap-p256dh', 'pgtap-auth');
+set local role authenticated;
+set local request.jwt.claims = '{"sub":"e5ec0000-0000-0000-0000-000000000001","role":"authenticated"}';
+select throws_ok(
+  $$ select p256dh, auth from push_subscriptions $$,
+  '42501', null, 'a director cannot read the keys of his people''s devices'
+);
+select is(
+  (select count(*)::int from push_subscriptions where user_id = 'e5ec0000-0000-0000-0000-000000000003'),
+  1, 'he still sees the device itself'
+);
+reset role;
 
 select * from finish();
 rollback;

@@ -1,5 +1,6 @@
 import { withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
+import { svgLooksSafe } from "@/lib/files/svg";
 import { loadCompanySettings } from "@/lib/roster";
 import { parseCompanySettings } from "@/lib/settings";
 import { createServiceSupabase } from "@/lib/supabase/service";
@@ -28,9 +29,16 @@ export const POST = withAuth(["director", "secretary"], async ({ req, profile })
   if (!ext) return apiError(400, "validation_error", "Логотип — PNG, JPEG, WebP или SVG");
   if (file.size > MAX_BYTES) return apiError(400, "validation_error", "Логотип не больше 2 МБ");
 
+  const bytes = await file.arrayBuffer();
+  // the bucket is public: an SVG opened by its URL is a page of our Storage origin, so one that
+  // could run, navigate or load from elsewhere is refused (lib/files/svg.ts)
+  if (ext === "svg" && !svgLooksSafe(new TextDecoder().decode(bytes))) {
+    return apiError(400, "validation_error", "В логотипе SVG есть скрипт или внешние ссылки — сохраните его как PNG");
+  }
+
   const service = createServiceSupabase();
   const path = `${profile.companyId}/logo-${Date.now().toString(36)}.${ext}`;
-  const upload = await service.storage.from("brand").upload(path, await file.arrayBuffer(), {
+  const upload = await service.storage.from("brand").upload(path, bytes, {
     contentType: file.type,
     upsert: true,
     cacheControl: "3600",
