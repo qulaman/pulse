@@ -674,45 +674,66 @@ const DAY_WORD: Record<ReportDayState, string> = {
 function ReportsTile({ source, now, index, className }: { source: Source<ReportStats>; now: Date; index: number; className: string }) {
   return (
     <Tile tileKey="reports" icon={ClipboardCheck} label="Отчёты за день" index={index} className={className}>
-      <Body source={source} what="отчёты" bones={<TileBones picture={72} />}>
+      <Body source={source} what="отчёты" bones={<ReportsBones />}>
         {(stats) => {
           const period = stats.period;
           const due = period ? period.submitted + period.missed : 0;
+          const usual = usualOf(period);
+          // the figures first, the five weeks of days under them across the tile's width: the
+          // picture's place never depends on the words beside it
           return (
-            <div className="@container flex flex-1 flex-col">
-              <div className="flex flex-1 flex-col gap-4 @min-[400px]:flex-row @min-[400px]:items-stretch @min-[400px]:gap-8">
-                <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-                  {due === 0 || !period ? (
-                    <Quiet>За {PERIOD_DAYS} дней сдавать отчёты не требовалось</Quiet>
-                  ) : (
-                    <>
-                      <Figure unit={`из ${due}`}>
-                        <Count value={period.submitted} />
-                      </Figure>
-                      <p className="-mt-1 text-[13px] leading-5 text-muted">отчётов сдано за {PERIOD_DAYS} дней</p>
-                      <PartsBar
-                        parts={[
-                          { key: "submitted", label: "сдано", value: period.submitted, tone: "ok" },
-                          { key: "missed", label: "не сдано", value: period.missed, tone: "danger" },
-                        ]}
-                      />
-                    </>
-                  )}
-                  {/* «Пришёл» and «Ушёл» of a report are the form's own defaults (the company's start,
-                      the moment it was opened): never averaged into «приход», «уход» or hours — only
-                      the moment the report was handed in, and called that (D-194) */}
-                  <ul className="mt-auto flex flex-col gap-y-1 text-[13px] leading-5">
+            <div className="flex flex-1 flex-col gap-4">
+              <div className="flex flex-col gap-2.5">
+                {due === 0 || !period ? (
+                  <Quiet>За {PERIOD_DAYS} дней сдавать отчёты не требовалось</Quiet>
+                ) : (
+                  <>
+                    <Figure unit={`из ${due}`}>
+                      <Count value={period.submitted} />
+                    </Figure>
+                    <p className="-mt-1 text-[13px] leading-5 text-muted">отчётов сдано за {PERIOD_DAYS} дней</p>
+                    <PartsBar
+                      parts={[
+                        { key: "submitted", label: "сдано", value: period.submitted, tone: "ok" },
+                        { key: "missed", label: "не сдано", value: period.missed, tone: "danger" },
+                      ]}
+                    />
+                  </>
+                )}
+                {/* «Пришёл» and «Ушёл» of a report are the form's own defaults (the company's start,
+                    the moment it was opened): never averaged into «приход», «уход» or hours — only
+                    the moment the report was handed in, and called that (D-194) */}
+                {stats.streak > 0 || usual ? (
+                  <ul className="flex flex-col gap-y-1 text-[13px] leading-5">
                     {stats.streak > 0 ? <Fact icon={Flame} label="подряд" value={formatNum(stats.streak)} /> : null}
-                    {usualOf(period) ? <Fact icon={Clock} label="обычно сдаёт отчёт около" value={usualOf(period) as string} first /> : null}
+                    {usual ? <Fact icon={Clock} label="обычно сдаёт отчёт около" value={usual} first /> : null}
                   </ul>
-                </div>
-                <Days calendar={stats.calendar} now={now} />
+                ) : null}
               </div>
+              <Days calendar={stats.calendar} now={now} />
             </div>
           );
         }}
       </Body>
     </Tile>
+  );
+}
+
+/** The reports tile in flight: the figure, its line, the bar, two facts, then the five weeks under them. */
+function ReportsBones() {
+  return (
+    <SkeletonGroup className="flex flex-1 flex-col gap-4">
+      <div className="flex flex-col gap-2.5">
+        <Bone h={32} w={96} />
+        <Bone h={16} w={180} />
+        <Bone h={8} />
+        <Bone h={44} w={220} />
+      </div>
+      <div className="mt-auto flex flex-col gap-1.5">
+        <Bone h={DAYS_HEIGHT} w={DAYS_WIDTH} />
+        <Bone h={16} w={160} />
+      </div>
+    </SkeletonGroup>
   );
 }
 
@@ -745,15 +766,29 @@ function dayLine(cell: ReportCell, now: Date): string {
   return `${name} — ${DAY_WORD[cell.state]}`;
 }
 
-/** Five weeks of days, Monday to Sunday: handed in green, missed red, nothing due quiet, today ringed. */
+/** The calendar's box in px, as app/desk/person-stats.css draws `.ps-days`: 7 columns of 16 with gaps of 4, a 12 px head over five rows. */
+const DAYS_WIDTH = 7 * 16 + 6 * 4;
+const DAYS_HEIGHT = 12 + 5 * 16 + 5 * 4;
+
+/**
+ * Five weeks of days, Monday to Sunday: handed in green, missed red, nothing due quiet, today ringed.
+ * Under the tile's figures, left-aligned; the line under it — the legend, or the day under the pointer
+ * in its place — is one fixed-height row that never sizes the calendar, so the days stay put under the
+ * pointer. The day's line holds over the gaps between days and goes when the pointer leaves the calendar.
+ */
 function Days({ calendar, now }: { calendar: ReportCell[][]; now: Date }) {
   const [hover, setHover] = useState<ReportCell | null>(null);
   const count = (state: ReportDayState) => calendar.flat().filter((cell) => cell.state === state).length;
   return (
-    <figure className="flex shrink-0 flex-col gap-1.5" data-testid="person-stat-days">
-      <div className="ps-days" role="img" aria-label={`Отчёты по дням, пять недель: сдано ${count("submitted")}, не сдано ${count("missed")}`}>
+    <figure className="mt-auto flex min-w-0 flex-col gap-1.5" data-testid="person-stat-days">
+      <div
+        className="ps-days w-max"
+        role="img"
+        aria-label={`Отчёты по дням, пять недель: сдано ${count("submitted")}, не сдано ${count("missed")}`}
+        onPointerLeave={() => setHover(null)}
+      >
         {WEEKDAYS_SHORT_RU.map((day) => (
-          <span key={day} aria-hidden className="ps-days-head">
+          <span key={day} aria-hidden className="ps-days-head" onPointerEnter={() => setHover(null)}>
             {day}
           </span>
         ))}
@@ -766,13 +801,12 @@ function Days({ calendar, now }: { calendar: ReportCell[][]; now: Date }) {
             data-today={cell.today ? "" : undefined}
             style={{ animationDelay: `${120 + i * 12}ms` }}
             onPointerEnter={() => setHover(cell)}
-            onPointerLeave={() => setHover(null)}
           />
         ))}
       </div>
-      <figcaption className="h-4 text-[11px] leading-4 text-muted" aria-live="polite">
+      <figcaption className="h-4 min-w-0 text-[11px] leading-4 text-muted" aria-live="polite">
         {hover ? (
-          <span className="block max-w-[180px] truncate">{dayLine(hover, now)}</span>
+          <span className="block truncate">{dayLine(hover, now)}</span>
         ) : (
           <span className="flex items-center gap-2.5">
             <span className="flex items-center gap-1">
