@@ -4,7 +4,7 @@
 
 Зачем он нужен. Схема базы — результат всех миграций по порядку. Функция при каждой правке записывается целиком заново, поэтому одно имя встречается в нескольких файлах, а действует только последнее определение. Указатель говорит, где оно лежит. Перед правкой функции открой файл из столбца «Действует» и копируй тело оттуда, а не из первого найденного поиском.
 
-Миграций — 88, строк — 24904. Функций — 217, их определений — 343; устаревших тел — 9651 строк (39 % текста миграций).
+Миграций — 93, строк — 26146. Функций — 217, их определений — 350; устаревших тел — 10669 строк (41 % текста миграций).
 
 ## Функции
 
@@ -26,7 +26,7 @@
 | `create_shop_order` | `20260917170000_shop_fixes.sql:49` | 2 |
 | `daily_report_checked_on` | `20261028120000_daily_reports.sql:55` | 1 |
 | `daily_report_clock` | `20261028120000_daily_reports.sql:35` | 1 |
-| `daily_report_holiday` | `20261103120000_daily_report_soft_start.sql:28` | 1 |
+| `daily_report_holiday` | `20261124172000_daily_report_period_speed.sql:21` | 2 |
 | `daily_report_json` | `20261118120000_daily_report_remind_excuse.sql:48` | 3 |
 | `daily_report_on` | `20261028120000_daily_reports.sql:19` | 1 |
 | `daily_report_refund_early_fines` | `20261118120000_daily_report_remind_excuse.sql:820` | 2 |
@@ -34,7 +34,7 @@
 | `daily_report_started_on` | `20261028120000_daily_reports.sql:44` | 1 |
 | `daily_report_state` | `20261028120000_daily_reports.sql:167` | 1 |
 | `daily_report_tasks` | `20261028120000_daily_reports.sql:117` | 1 |
-| `daily_report_workday` | `20261103120000_daily_report_soft_start.sql:38` | 2 |
+| `daily_report_workday` | `20261124172000_daily_report_period_speed.sql:32` | 3 |
 | `daily_reports_due_missed` | `20261103120000_daily_report_soft_start.sql:458` | 2 |
 | `deadline_reminders_due` | `20260926120000_task_lifecycle.sql:885` | 1 |
 | `delete_event` | `20260923200000_calendar_edit_delete.sql:191` | 1 |
@@ -186,8 +186,8 @@
 | `tasks_field_guard` | `20261123120000_deadline_fixes.sql:183` | 4 |
 | `tasks_points` | `20261014120000_points_game.sql:93` | 1 |
 | `team_channel_alerts_due` | `20260924160000_push_followups.sql:124` | 1 |
-| `team_daily_report_day` | `20261118120000_daily_report_remind_excuse.sql:354` | 2 |
-| `team_daily_report_period` | `20261118120000_daily_report_remind_excuse.sql:462` | 3 |
+| `team_daily_report_day` | `20261124130000_reports_count_the_team.sql:18` | 3 |
+| `team_daily_report_period` | `20261124172000_daily_report_period_speed.sql:44` | 5 |
 | `team_role` | `20260922120100_errands.sql:36` | 1 |
 | `thank_errand` | `20260923210000_errand_thanks.sql:12` | 1 |
 | `transition_errand` | `20260922120100_errands.sql:409` | 1 |
@@ -196,7 +196,7 @@
 | `tv_board_cap` | `20261020120000_mind_board_v3.sql:25` | 1 |
 | `tv_board_control` | `20261021100000_board_sketch.sql:136` | 3 |
 | `tv_calendar` | `20260923233000_tv_calendar_month.sql:147` | 2 |
-| `tv_control` | `20261118140000_tv_wall_v5.sql:60` | 8 |
+| `tv_control` | `20261124140000_tv_wall_good_news_round.sql:345` | 9 |
 | `tv_emit` | `20260917190000_tv_events.sql:57` | 1 |
 | `tv_events_announcement` | `20260917190000_tv_events.sql:131` | 1 |
 | `tv_events_order` | `20260917190000_tv_events.sql:144` | 1 |
@@ -214,7 +214,7 @@
 | `tv_rating` | `20261124100000_on_time_by_handover.sql:77` | 5 |
 | `tv_stage` | `20261021150000_board_live_week.sql:38` | 1 |
 | `tv_state_board_point_reset` | `20260925150000_mind_board_v2.sql:137` | 1 |
-| `tv_summary` | `20261118150000_tv_summary_excused.sql:6` | 7 |
+| `tv_summary` | `20261124140000_tv_wall_good_news_round.sql:18` | 8 |
 | `tv_task_story` | `20260925120000_tv_focus_story.sql:30` | 1 |
 | `tv_touch` | `20260923230100_visits.sql:87` | 1 |
 | `tv_week_board` | `20261021150000_board_live_week.sql:60` | 1 |
@@ -277,7 +277,7 @@
 | `tv_events` | `20260917190000_tv_events.sql:16` | — |
 | `tv_pair_attempts` | `20261118140100_tv_pairing.sql:66` | — |
 | `tv_pairings` | `20261118140100_tv_pairing.sql:23` | — |
-| `tv_state` | `20260918100000_tv_state.sql:26` | `20260923230000`, `20260923233000`, `20260924090000`, `20260924095000`, `20260925150000`, `20260925180000`, `20261021150000`, `20261118140000` |
+| `tv_state` | `20260918100000_tv_state.sql:26` | `20260923230000`, `20260923233000`, `20260924090000`, `20260924095000`, `20260925150000`, `20260925180000`, `20261021150000`, `20261118140000`, `20261124140000` |
 | `visits` | `20260923230100_visits.sql:34` | `20260924180000` |
 | `voice_kept` | `20261103121000_voice_retention.sql:46` | — |
 

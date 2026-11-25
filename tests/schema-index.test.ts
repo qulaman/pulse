@@ -28,4 +28,10 @@ describe("supabase/SCHEMA.md (D-162)", () => {
     expect(index.policies.has("tasks.tasks_select")).toBe(true);
     expect(index.enums.has("task_status")).toBe(true);
   });
+
+  it("keeps pointing a policy at its expressions when a later file only changes the role", () => {
+    // `alter policy … to authenticated` without USING / WITH CHECK leaves the conditions where they were
+    const roleOnly = /^\d{14}_rls_policies_to_authenticated\.sql$/;
+    for (const [key, policy] of index.policies) expect(policy.last.file, key).not.toMatch(roleOnly);
+  });
 });

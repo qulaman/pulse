@@ -2836,6 +2836,19 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      morning_brief_body: {
+        Args: {
+          p_due: string
+          p_first: string
+          p_late: number
+          p_meetings: number
+          p_new: number
+          p_rework: number
+          p_today: number
+        }
+        Returns: string
+      }
+      morning_brief_on: { Args: { p_settings: Json }; Returns: boolean }
       my_daily_report: { Args: { p_date?: string }; Returns: Json }
       my_daily_report_history: { Args: { p_limit?: number }; Returns: Json }
       next_delivery_slot: {

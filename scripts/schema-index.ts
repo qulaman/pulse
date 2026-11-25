@@ -133,6 +133,13 @@ export function readSchemaIndex(dir: string = MIGRATIONS_DIR): SchemaIndex {
         if (entry) entry.dropped = true;
         return;
       }
+      // `alter policy … to <role>` with no USING / WITH CHECK keeps the expressions where they were
+      // defined: that file stays the one to read
+      if (verb === "alter" && entry) {
+        const end = sql.indexOf(";", m.index);
+        const statement = sql.slice(m.index, end < 0 ? undefined : end);
+        if (!/\busing\b|\bwith\s+check\b/i.test(statement)) return;
+      }
       if (entry) {
         entry.last = at(m.index);
         entry.changes += 1;
