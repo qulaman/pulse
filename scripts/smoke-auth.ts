@@ -2,9 +2,10 @@
  * Auth smoke: RLS visibility for two roles plus the /api/me contract.
  * Requires a running `pnpm dev` on APP_URL (default http://localhost:3000).
  */
+import { demoPassword } from "./lib/login";
 import { apiSession, APP_URL, finish, record, recordError } from "./lib/smoke";
 
-const PASSWORD = "demo1234";
+const PASSWORD = demoPassword();
 
 async function main() {
   const director = await apiSession("director@demo.local", PASSWORD);

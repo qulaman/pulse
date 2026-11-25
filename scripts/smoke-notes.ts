@@ -16,7 +16,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { chromium, type BrowserContext, type Page } from "playwright";
 
-import { IPHONE_UA, signIn } from "./lib/login";
+import { IPHONE_UA, signIn, DIRECTOR_EMAIL, demoPassword } from "./lib/login";
 import { APP_URL, finish, record, refuseWhenBusy, serviceClient } from "./lib/smoke";
 
 const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui");
@@ -96,7 +96,7 @@ async function main() {
   let page = await openPage(context);
 
   try {
-    await signIn(page, APP_URL, { email: "test@demo.local", password: "1" });
+    await signIn(page, APP_URL, { email: "test@demo.local", password: demoPassword(DIRECTOR_EMAIL) });
     await page.goto(`${APP_URL}/notes`, { waitUntil: "networkidle" });
     await page.getByTestId("notes-lcd").waitFor({ timeout: 20_000 });
     await shot(page, "01-open");

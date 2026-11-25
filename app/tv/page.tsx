@@ -23,8 +23,9 @@ export default async function TvPage({ searchParams }: { searchParams: Promise<{
     throw error;
   }
 
-  // название и логотип берутся на сервере: роль `tv` таблицу companies не читает
-  const brand = await loadBrand();
+  // the name and the logo are read on the server (the `tv` role does not read companies) — of the
+  // kiosk's own company, not of the first one in the shared base (D-134)
+  const brand = await loadBrand(profile.companyId);
   return (
     <TvScreen company={brand.name} guest={guest === "1"} logoUrl={brand.logoUrl} role={profile.role} />
   );

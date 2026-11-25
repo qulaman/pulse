@@ -6,11 +6,12 @@
  * employee cannot sign the director out. Touches nobody else's sessions. Requires the
  * migration 20261014180000 on the base and a running app on APP_URL (default :3000).
  */
+import { demoPassword } from "./lib/login";
 import { apiSession, APP_URL, finish, record, recordError, serviceClient, sessionCookie } from "./lib/smoke";
 
 const DIRECTOR = "10000000-0000-0000-0000-000000000001";
 
-const bearer = async (email: string) => (await apiSession(email, "demo1234")).token;
+const bearer = async (email: string) => (await apiSession(email, demoPassword())).token;
 
 async function call(path: string, auth: { token?: string; cookie?: string }, body?: unknown) {
   const res = await fetch(`${APP_URL}${path}`, {

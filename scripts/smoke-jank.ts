@@ -13,7 +13,7 @@ import { chromium, type Page } from "playwright";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 
-import { PHONE, readOnly, signIn } from "./lib/login";
+import { PHONE, readOnly, signIn, DIRECTOR_EMAIL, demoPassword } from "./lib/login";
 import { APP_URL, finish, record, recordError, skip } from "./lib/smoke";
 
 const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui");
@@ -123,7 +123,7 @@ async function main() {
   await director.addInitScript(COLLECTOR);
   const page = await director.newPage();
   lastPage = page;
-  await signIn(page, APP_URL, { email: "test@demo.local", password: "1" });
+  await signIn(page, APP_URL, { email: "test@demo.local", password: demoPassword(DIRECTOR_EMAIL) });
   const pile = await findPile(page);
   if (!pile) return;
   await page.goto(`${APP_URL}/pulse`, { waitUntil: "networkidle" });
@@ -209,7 +209,7 @@ async function main() {
   await employee.addInitScript(COLLECTOR);
   const epage = await employee.newPage();
   lastPage = epage;
-  await signIn(epage, APP_URL, { email: EMPLOYEE, password: "demo1234" });
+  await signIn(epage, APP_URL, { email: EMPLOYEE, password: demoPassword() });
   await epage.goto(`${APP_URL}/tasks`, { waitUntil: "networkidle" });
   await epage.waitForTimeout(SETTLE_MS);
   await epage.screenshot({ path: join(SHOTS, "j4-tasks.png") });

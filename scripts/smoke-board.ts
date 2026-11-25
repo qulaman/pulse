@@ -14,12 +14,12 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { chromium, type Page } from "playwright";
 
-import { IPHONE_UA, signIn } from "./lib/login";
+import { IPHONE_UA, signIn, DIRECTOR_EMAIL, demoPassword } from "./lib/login";
 import { apiSession, APP_URL, finish, issueTask, record, recordError, refuseWhenBusy } from "./lib/smoke";
 
 const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui", "board");
 const EMPLOYEE = process.env.EMPLOYEE ?? "erlan.b@demo.local";
-const DIRECTOR = { email: "test@demo.local", password: "1" };
+const DIRECTOR = { email: "test@demo.local", password: demoPassword(DIRECTOR_EMAIL) };
 /** What «мгновенно» means here: the employee's call is answered and the tile has changed within this. */
 const LATENCY_LIMIT_MS = Number(process.env.BOARD_LATENCY_MS ?? "1500");
 const WAIT_MS = 10_000;
@@ -46,7 +46,7 @@ async function main() {
   await refuseWhenBusy();
   // the same person as in the browser: only the task author's reply closes a question (trigger 3)
   const director = await apiSession(DIRECTOR.email, DIRECTOR.password);
-  const employee = await apiSession(EMPLOYEE, "demo1234");
+  const employee = await apiSession(EMPLOYEE, demoPassword());
 
   const browser = await chromium.launch({ channel: "chrome", headless: true });
   // a tablet width: the board (tiles in lanes) is what this smoke reads; the phone gets the deck (D-60).

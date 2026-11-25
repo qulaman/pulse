@@ -4,7 +4,7 @@
 
 Зачем он нужен. Схема базы — результат всех миграций по порядку. Функция при каждой правке записывается целиком заново, поэтому одно имя встречается в нескольких файлах, а действует только последнее определение. Указатель говорит, где оно лежит. Перед правкой функции открой файл из столбца «Действует» и копируй тело оттуда, а не из первого найденного поиском.
 
-Миграций — 84, строк — 24079. Функций — 214, их определений — 335; устаревших тел — 9182 строк (38 % текста миграций).
+Миграций — 85, строк — 24240. Функций — 214, их определений — 337; устаревших тел — 9231 строк (38 % текста миграций).
 
 ## Функции
 
@@ -143,7 +143,7 @@
 | `person_daily_reports` | `20261118120000_daily_report_remind_excuse.sql:655` | 1 |
 | `point_transactions_hold_guard` | `20260917160000_shop.sql:80` | 1 |
 | `points_rule` | `20261014120000_points_game.sql:22` | 1 |
-| `profiles_guard` | `20261104120000_person_contact.sql:65` | 4 |
+| `profiles_guard` | `20261124090000_tenant_guards.sql:22` | 5 |
 | `profiles_on_deactivate` | `20261014180000_login_sessions.sql:108` | 1 |
 | `publish_due_scheduled` | `20260924150000_push_foundation.sql:23` | 1 |
 | `purge_closed_tasks` | `20260916120000_delete_tasks.sql:38` | 1 |
@@ -173,7 +173,7 @@
 | `set_notify_prefs` | `20260924150200_notify_prefs.sql:375` | 1 |
 | `set_shop_order_status` | `20260917170000_shop_fixes.sql:225` | 2 |
 | `submit_daily_report` | `20261103120000_daily_report_soft_start.sql:122` | 2 |
-| `subordinates` | `20260907120000_foundation.sql:73` | 1 |
+| `subordinates` | `20261124090000_tenant_guards.sql:158` | 2 |
 | `task_question_answered` | `20261123120000_deadline_fixes.sql:148` | 3 |
 | `task_sent_at` | `20261014120000_points_game.sql:61` | 1 |
 | `task_status_guard` | `20260926140000_send_now.sql:23` | 5 |
@@ -290,13 +290,13 @@
 | `announcements.announcements_select` | `20260926210000_rls_initplan_fk_indexes.sql:34` | 2 |
 | `companies.companies_select` | `20260926210000_rls_initplan_fk_indexes.sql:37` | 3 |
 | `daily_reports.daily_reports_select` | `20261028120000_daily_reports.sql:98` | 1 |
-| `errands.errands_insert` | `20260922120100_errands.sql:306` | 1 |
+| `errands.errands_insert` | `20261124090000_tenant_guards.sql:115` | 2 |
 | `errands.errands_select` | `20260922120100_errands.sql:301` | 1 |
 | `ether_events.ether_events_delete` | `20261014120000_points_game.sql:517` | 1 |
 | `ether_events.ether_events_select` | `20261014120000_points_game.sql:513` | 1 |
 | `event_participants.event_participants_select` | `20260926210000_rls_initplan_fk_indexes.sql:40` | 2 |
 | `events.events_select` | `20260926210000_rls_initplan_fk_indexes.sql:43` | 2 |
-| `events.events_update` | `20260926210000_rls_initplan_fk_indexes.sql:46` | 2 |
+| `events.events_update` | `20261124090000_tenant_guards.sql:106` | 3 |
 | `inbox_items.inbox_items_insert` | `20260926210000_rls_initplan_fk_indexes.sql:50` | 2 |
 | `inbox_items.inbox_items_select` | `20260926210000_rls_initplan_fk_indexes.sql:53` | 2 |
 | `inbox_items.inbox_items_update` | `20260926210000_rls_initplan_fk_indexes.sql:56` | 2 |
@@ -331,7 +331,6 @@
 | `shop_items.shop_items_select` | `20260926210000_rls_initplan_fk_indexes.sql:115` | 2 |
 | `shop_items.shop_items_write` | `20260926210000_rls_initplan_fk_indexes.sql:118` | 2 |
 | `storage.objects.avatars_insert_roster` | `20261104120000_person_contact.sql:130` | 1 |
-| `storage.objects.brand_public_read` | `20260911090000_company_brand.sql:33` | 1 |
 | `storage.objects.photos_insert_own` | `20260910170000_photos_bucket.sql:9` | 1 |
 | `storage.objects.photos_select_own` | `20260910170000_photos_bucket.sql:16` | 1 |
 | `storage.objects.voice_insert_own` | `20260910100000_voice_pipeline.sql:236` | 1 |
@@ -343,9 +342,9 @@
 | `task_reads.task_reads_select` | `20260917120000_messages_fixes.sql:87` | 2 |
 | `task_reads.task_reads_update` | `20260917120000_messages_fixes.sql:95` | 2 |
 | `tasks.tasks_delete` | `20260926210000_rls_initplan_fk_indexes.sql:122` | 2 |
-| `tasks.tasks_insert` | `20260926210000_rls_initplan_fk_indexes.sql:125` | 2 |
+| `tasks.tasks_insert` | `20261124090000_tenant_guards.sql:85` | 3 |
 | `tasks.tasks_select` | `20260926210000_rls_initplan_fk_indexes.sql:128` | 2 |
-| `tasks.tasks_update` | `20260926210000_rls_initplan_fk_indexes.sql:131` | 2 |
+| `tasks.tasks_update` | `20261124090000_tenant_guards.sql:94` | 3 |
 | `tv_events.tv_events_select` | `20260926210000_rls_initplan_fk_indexes.sql:135` | 2 |
 | `tv_state.tv_state_select` | `20260926210000_rls_initplan_fk_indexes.sql:138` | 2 |
 | `visits.visits_select` | `20260923230100_visits.sql:67` | 1 |

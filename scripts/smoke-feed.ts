@@ -21,12 +21,12 @@ import { chromium, type BrowserContext, type Route } from "playwright";
 
 import { DRAFT_KEY } from "../lib/daily-report/draft";
 
-import { IPHONE_UA, signIn } from "./lib/login";
+import { IPHONE_UA, signIn, demoPassword } from "./lib/login";
 import { APP_URL, finish, record } from "./lib/smoke";
 
 const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui", "feed");
 const EMPLOYEE = process.env.EMPLOYEE ?? "erlan.b@demo.local";
-const PASSWORD = process.env.PASSWORD ?? "demo1234";
+const PASSWORD = process.env.PASSWORD ?? demoPassword();
 /** RPCs that only read; every other RPC writes and is answered here. */
 const READ_RPC = new Set(["fn_rating", "push_health", "my_daily_report", "my_daily_report_history"]);
 

@@ -12,6 +12,8 @@ const EXT: Record<string, string> = {
   "image/webp": "webp",
   "image/svg+xml": "svg",
 };
+/** `{company_id}/logo-{base36}.{ext}` — the one shape this route writes. */
+const OWN_LOGO = (companyId: string) => new RegExp(`^${companyId}/logo-[a-z0-9]+\\.(?:png|jpg|webp|svg)$`);
 
 /**
  * Director or secretary (D-104) uploads the company logo (multipart, ≤ 2 MB). The file lands in the public
@@ -47,9 +49,12 @@ export const POST = withAuth(["director", "secretary"], async ({ req, profile })
   const { error } = await service.from("companies").update({ settings: next }).eq("id", profile.companyId);
   if (error) throw new Error(`brand update failed: ${error.message}`);
 
-  // the old file is not needed any more
+  // the old file is not needed any more — but the URL in settings is the company's own writing
+  // (the settings RPC takes any string), so only a logo of this company's folder is removed
   const oldPath = previous?.split("/brand/")[1];
-  if (oldPath && oldPath !== path) await service.storage.from("brand").remove([oldPath]).catch(() => undefined);
+  if (oldPath && oldPath !== path && OWN_LOGO(profile.companyId).test(oldPath)) {
+    await service.storage.from("brand").remove([oldPath]).catch(() => undefined);
+  }
 
   return apiOk({ logo_url: pub.publicUrl });
 });

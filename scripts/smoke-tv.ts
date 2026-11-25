@@ -6,10 +6,11 @@
  *
  *   pnpm smoke:tv     — the dev project, the demo sign-ins of the seed
  */
+import { demoPassword } from "./lib/login";
 import { apiSession, finish, loadEnv, record, refuseWhenBusy, serviceClient } from "./lib/smoke";
 
 loadEnv(["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"]);
-const PASSWORD = "demo1234";
+const PASSWORD = demoPassword();
 const signIn = (email: string) => apiSession(email, PASSWORD);
 
 type Summary = {

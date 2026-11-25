@@ -10,7 +10,8 @@
  * receipt `acted_at`; the task is deleted after. The browser's device is removed at the end.
  * Touches nothing of anybody else: one own device row, one own test row, one own task.
  *   pnpm smoke:push             (against http://localhost:3000, APP_URL to override)
- *   DIRECTOR=test@demo.local PASSWORD=1 PAGE=/profile/notifications (defaults; any role signs
+ *   DIRECTOR=test@demo.local PAGE=/profile/notifications (defaults; PASSWORD overrides the one in
+ *   .env.local, scripts/lib/demo-password.ts; any role signs
  *   in — an employee's «Проверить» lives on PAGE=/profile)
  */
 import { mkdtempSync } from "node:fs";
@@ -19,10 +20,11 @@ import { join } from "node:path";
 import { chromium } from "playwright";
 import webpush from "web-push";
 
-import { signIn } from "./lib/login";
+import { signIn, DIRECTOR_EMAIL, demoPassword } from "./lib/login";
 import { APP_URL, finish, record, serviceClient } from "./lib/smoke";
 
-const ACCOUNT = { email: process.env.DIRECTOR ?? "test@demo.local", password: process.env.PASSWORD ?? "1" };
+const EMAIL = process.env.DIRECTOR ?? DIRECTOR_EMAIL;
+const ACCOUNT = { email: EMAIL, password: process.env.PASSWORD ?? demoPassword(EMAIL) };
 const PAGE = process.env.PAGE ?? "/profile/notifications";
 
 type Shown = { badge: string; lang: string; timestamp: number; actions: string[] } | null;

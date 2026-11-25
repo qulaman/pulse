@@ -14,7 +14,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright";
 
-import { IPHONE_UA, signIn } from "./lib/login";
+import { IPHONE_UA, signIn, DIRECTOR_EMAIL, demoPassword } from "./lib/login";
 import { APP_URL, finish, record, recordError } from "./lib/smoke";
 
 const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui", "pick");
@@ -41,7 +41,7 @@ async function main() {
   page.on("pageerror", (error) => errors.push(error.message));
 
   try {
-    await signIn(page, APP_URL, { email: "test@demo.local", password: "1" });
+    await signIn(page, APP_URL, { email: "test@demo.local", password: demoPassword(DIRECTOR_EMAIL) });
     await page.goto(`${APP_URL}/pulse`, { waitUntil: "networkidle" });
     await page.locator('[data-testid="people-field"]').waitFor({ timeout: 20_000 });
     await page.waitForTimeout(1200);

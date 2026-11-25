@@ -25,6 +25,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { chromium, webkit, type Browser, type BrowserContext, type Page } from "playwright";
 
+import { DIRECTOR_EMAIL, demoPassword } from "./lib/login";
 import { APP_URL, checks, injected, open, record, skip, type Ctx } from "./desk-smoke/shared";
 import { checkCalendar, checkNotes, checkScreen } from "./desk-smoke/planning";
 import { checkErrands, checkReports, checkSecretary, checkTeam } from "./desk-smoke/people";
@@ -35,8 +36,10 @@ import { checkVoice } from "./desk-smoke/voice";
 const OUT = process.env.SMOKE_OUT ?? join(process.cwd(), ".smoke-ui", "desk");
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const DIRECTOR = { email: process.env.DIRECTOR ?? "test@demo.local", password: process.env.DIRECTOR_PASSWORD ?? "1" };
-const SECRETARY = { email: process.env.SECRETARY ?? "marat@demo.local", password: process.env.SECRETARY_PASSWORD ?? "demo1234" };
+const DIRECTOR_LOGIN = process.env.DIRECTOR ?? DIRECTOR_EMAIL;
+const SECRETARY_LOGIN = process.env.SECRETARY ?? "marat@demo.local";
+const DIRECTOR = { email: DIRECTOR_LOGIN, password: process.env.DIRECTOR_PASSWORD ?? demoPassword(DIRECTOR_LOGIN) };
+const SECRETARY = { email: SECRETARY_LOGIN, password: process.env.SECRETARY_PASSWORD ?? demoPassword(SECRETARY_LOGIN) };
 /** `ONLY=tasks,notes` — just these parts (a role checking its own screens); default — everything. */
 const ONLY = new Set((process.env.ONLY ?? "").split(",").map((part) => part.trim()).filter(Boolean));
 const runs = (part: string) => ONLY.size === 0 || ONLY.has(part);

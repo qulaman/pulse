@@ -14,11 +14,12 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright";
 
-import { PHONE, signIn } from "./lib/login";
+import { PHONE, signIn, DIRECTOR_EMAIL, demoPassword } from "./lib/login";
 import { APP_URL, finish, record } from "./lib/smoke";
 
 const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui", "offline");
-const ACCOUNT = { email: process.env.EMAIL ?? "test@demo.local", password: process.env.PASS ?? "1" };
+const EMAIL = process.env.EMAIL ?? DIRECTOR_EMAIL;
+const ACCOUNT = { email: EMAIL, password: process.env.PASS ?? demoPassword(EMAIL) };
 
 mkdirSync(SHOTS, { recursive: true });
 

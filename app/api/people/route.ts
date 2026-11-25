@@ -51,6 +51,19 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     const earlier = await madeBefore(service, profile.companyId, body.client_request_id);
     if (earlier) return apiOk({ id: earlier, aliases: [], namesakes: [] });
 
+    // the insert below runs under the service role: a manager id from the body must be a person
+    // of this company, or the card would point into another one (principle 6)
+    if (body.manager_id) {
+      const { data: manager, error } = await service
+        .from("profiles")
+        .select("id")
+        .eq("id", body.manager_id)
+        .eq("company_id", profile.companyId)
+        .maybeSingle();
+      if (error) throw new Error(`manager lookup failed: ${error.message}`);
+      if (!manager) return apiError(400, "validation_error", "Руководитель не найден");
+    }
+
     const created = await service.auth.admin.createUser({
       email: body.email ?? syntheticEmail(),
       // two random UUIDs: 72 characters, bcrypt's limit — a password no one has

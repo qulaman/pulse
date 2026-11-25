@@ -5,9 +5,10 @@
  */
 import { randomUUID } from "node:crypto";
 
+import { demoPassword } from "./lib/login";
 import { apiSession, APP_URL, finish, record, recordError } from "./lib/smoke";
 
-const PASSWORD = "demo1234";
+const PASSWORD = demoPassword();
 const TRANSCRIPT =
   "Марат, подготовь КП по Казхрому завтра до обеда. Ерлану Б. плюс десять";
 

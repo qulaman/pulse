@@ -6,9 +6,10 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 
+import { demoPassword } from "./lib/login";
 import { apiSession, finish, record, recordError, type ApiSession } from "./lib/smoke";
 
-const PASSWORD = "demo1234";
+const PASSWORD = demoPassword();
 const EVENT_TIMEOUT_MS = 10_000;
 const SILENCE_MS = 3_000;
 const SETTLE_MS = 2_000;

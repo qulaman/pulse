@@ -3,6 +3,7 @@ import { z } from "zod";
 import { withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
 import { logStt } from "@/lib/ai/log";
+import { inOwnFolder } from "@/lib/files/folder";
 import { guardTranscript, isOpus, isSilentOpus } from "@/lib/ai/stt-guard";
 import { getSttProviders, SttError, transcribe } from "@/lib/ai/stt";
 import { HINT_MAX_PEOPLE } from "@/lib/ai/hint-roster";
@@ -41,9 +42,10 @@ const MIME_BY_EXT: Record<string, string> = {
 export const POST = withAuth<z.infer<typeof BodySchema>>(
   ["director"],
   async ({ profile, body }) => {
-    // Path is the ownership proof: the bucket policies are segment-based (DATABASE.md).
-    const prefix = `${profile.companyId}/${profile.userId}/`;
-    if (!body.audio_path.startsWith(prefix)) {
+    // Path is the ownership proof: the bucket policies are segment-based (DATABASE.md). The exact
+    // shape, not a prefix: the download URL must not fold out of the director's folder
+    // (lib/files/folder.ts)
+    if (!inOwnFolder(body.audio_path, profile.companyId, profile.userId)) {
       return apiError(403, "forbidden", "Нет доступа");
     }
 

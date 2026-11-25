@@ -27,7 +27,7 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium, type Browser, type BrowserContext, type Page, type Route } from "playwright";
 
-import { PHONE as IPHONE, readOnly, signIn as enter } from "./lib/login";
+import { PHONE as IPHONE, readOnly, signIn as enter, DIRECTOR_EMAIL, demoPassword } from "./lib/login";
 import { apiSession, APP_URL } from "./lib/smoke";
 
 const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui", "stages");
@@ -52,7 +52,7 @@ const ACCOUNTS: Account[] = [
   {
     role: "director",
     email: "test@demo.local",
-    password: "1",
+    password: demoPassword(DIRECTOR_EMAIL),
     routes: (ids) => [
       "/pulse", "/sent", "/calendar", "/notes", ids.board && `/notes/b/${ids.board}`, "/screen", "/confirm",
       "/settings", "/settings/dictionary", "/profile", "/profile/notifications", "/lab", "/lab/mascot", "/admin",
@@ -63,14 +63,14 @@ const ACCOUNTS: Account[] = [
   {
     role: "employee",
     email: "erlan.b@demo.local",
-    password: "demo1234",
+    password: demoPassword(),
     routes: (ids) =>
       ["/feed", "/tasks", "/calendar", "/rating", "/profile", "/ether", "/shop", ids.task && `/tasks/${ids.task}`].filter(Boolean) as string[],
   },
   {
     role: "secretary",
     email: SECRETARY,
-    password: "demo1234",
+    password: demoPassword(),
     // «Команда» sends the secretary to the roster in «Настройки» (D-104): a redirect, not a screen
     routes: () => ["/feed", "/secretary", "/settings", "/rating", "/profile"],
   },

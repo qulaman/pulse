@@ -45,6 +45,7 @@ Push в `main` — выкатка для всех компаний: Vercel то�
 | `LOGIN_CODE_SECRET` | ключ кодов входа (D-135), схема его не проверяет | сервер | берётся из сервисного ключа |
 | `OPS_HOST`, `OPS_APP_ORIGIN` | свой хост `/ops` (D-157) | сервер | консоль на любом хосте |
 | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD` | Supabase CLI, `smoke:ops` | скрипты | `supabase login` |
+| `SMOKE_DIRECTOR_PASSWORD`, `SMOKE_PASSWORD` | пароли демо-учёток dev для смоуков (`test@demo.local` и остальные), в репозитории их нет | скрипты | смоук останавливается с именем переменной |
 | `PARSER_MODEL`, `PARSER_ESCALATION_MODEL` | модели `eval:parser` | evals | Haiku и Sonnet |
 
 Приложение берёт STT и модели из `settings.stt` и `settings.parser` компании. `NEXT_PUBLIC_SENTRY_DSN` схема и `lib/env.public.ts` ещё принимают, но не читает никто.

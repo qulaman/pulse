@@ -11,19 +11,19 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright";
 
-import { PHONE, signIn } from "./lib/login";
+import { PHONE, signIn, DIRECTOR_EMAIL, demoPassword } from "./lib/login";
 import { apiSession, APP_URL, finish, issueTask, record, recordError, refuseWhenBusy } from "./lib/smoke";
 
 const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui", "cleanup");
 const EMPLOYEE = process.env.EMPLOYEE ?? "erlan.b@demo.local";
-const DIRECTOR = { email: "test@demo.local", password: "1" };
+const DIRECTOR = { email: "test@demo.local", password: demoPassword(DIRECTOR_EMAIL) };
 
 mkdirSync(SHOTS, { recursive: true });
 
 async function main() {
   await refuseWhenBusy();
   const director = await apiSession(DIRECTOR.email, DIRECTOR.password);
-  const employee = await apiSession(EMPLOYEE, "demo1234");
+  const employee = await apiSession(EMPLOYEE, demoPassword());
   const stamp = Date.now().toString(36);
 
   const browser = await chromium.launch({ channel: "chrome", headless: true });

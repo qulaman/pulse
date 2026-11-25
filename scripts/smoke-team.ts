@@ -18,12 +18,12 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { chromium, type Page } from "playwright";
 
-import { IPHONE_UA, signIn } from "./lib/login";
+import { IPHONE_UA, signIn, DIRECTOR_EMAIL, demoPassword } from "./lib/login";
 import { apiSession, APP_URL, finish, issueTask, record, recordError, refuseWhenBusy } from "./lib/smoke";
 
 const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui", "team");
 const EMPLOYEE = process.env.EMPLOYEE ?? "erlan.b@demo.local";
-const DIRECTOR = { email: "test@demo.local", password: "1" };
+const DIRECTOR = { email: "test@demo.local", password: demoPassword(DIRECTOR_EMAIL) };
 
 mkdirSync(SHOTS, { recursive: true });
 
@@ -40,7 +40,7 @@ async function until(page: Page, what: () => Promise<boolean>, ms = 15_000): Pro
 async function main() {
   await refuseWhenBusy();
   const director = await apiSession(DIRECTOR.email, DIRECTOR.password);
-  const employee = await apiSession(EMPLOYEE, "demo1234");
+  const employee = await apiSession(EMPLOYEE, demoPassword());
   const title = `Team smoke ${Date.now().toString(36)}`;
   let taskId: string | null = null;
 

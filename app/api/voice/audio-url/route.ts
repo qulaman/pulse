@@ -1,5 +1,6 @@
 import { userSupabase, withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
+import { inCompanyFolder } from "@/lib/files/folder";
 import { createServiceSupabase } from "@/lib/supabase/service";
 
 const TTL_SECONDS = 600;
@@ -14,8 +15,9 @@ export const GET = withAuth("any", async ({ req, profile }) => {
   const path = new URL(req.url).searchParams.get("path");
   if (!path) return apiError(400, "validation_error", "Неверный запрос");
 
-  // Objects live at {company_id}/{user_id}/{uuid}.{ext} — never cross a company.
-  if (!path.startsWith(`${profile.companyId}/`)) {
+  // Objects live at {company_id}/{user_id}/{uuid}.{ext} — never cross a company, and never a
+  // path the URL could fold out of the bucket (lib/files/folder.ts)
+  if (!inCompanyFolder(path, profile.companyId)) {
     return apiError(403, "forbidden", "Нет доступа");
   }
 

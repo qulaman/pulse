@@ -14,13 +14,13 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { chromium, type Page } from "playwright";
 
-import { IPHONE_UA, signIn } from "./lib/login";
+import { IPHONE_UA, signIn, DIRECTOR_EMAIL, demoPassword } from "./lib/login";
 import { apiSession, APP_URL, finish, issueTask, record, recordError, refuseWhenBusy } from "./lib/smoke";
 import { sameInstant, sheetPresets } from "../lib/tasks/deadline-choices";
 
 const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui", "tasks");
 const EMPLOYEE = process.env.EMPLOYEE ?? "erlan.b@demo.local";
-const DIRECTOR = { email: "test@demo.local", password: "1" };
+const DIRECTOR = { email: "test@demo.local", password: demoPassword(DIRECTOR_EMAIL) };
 
 mkdirSync(SHOTS, { recursive: true });
 
@@ -29,7 +29,7 @@ const card = (page: Page, testId: string, title: string) => page.locator(`[data-
 async function main() {
   await refuseWhenBusy();
   const director = await apiSession(DIRECTOR.email, DIRECTOR.password);
-  const employee = await apiSession(EMPLOYEE, "demo1234");
+  const employee = await apiSession(EMPLOYEE, demoPassword());
   const stamp = Date.now().toString(36);
   const titles = { review: `Tasks smoke ${stamp} приёмка`, question: `Tasks smoke ${stamp} вопрос`, fresh: `Tasks smoke ${stamp} новая` };
   const ids: string[] = [];
@@ -158,7 +158,7 @@ async function main() {
     ids.push(freshId);
     const ectx = await browser.newContext(device);
     const epage = await ectx.newPage();
-    await signIn(epage, APP_URL, { email: EMPLOYEE, password: "demo1234" });
+    await signIn(epage, APP_URL, { email: EMPLOYEE, password: demoPassword() });
     await epage.goto(`${APP_URL}/tasks`, { waitUntil: "networkidle" });
     await epage.locator('[data-testid="status-screen"]').waitFor({ timeout: 20_000 });
     const fresh = card(epage, "my-task", titles.fresh);

@@ -7,13 +7,13 @@
  * attempt limits (one wrong code). Requires the migration 20261014150000 on the base and a
  * running app on APP_URL (default http://localhost:3000).
  */
-import { IPHONE_UA } from "./lib/login";
+import { IPHONE_UA, demoPassword } from "./lib/login";
 import { apiSession, APP_URL, finish, record, recordError, sessionCookie } from "./lib/smoke";
 
 const AIGUL = "10000000-0000-0000-0000-000000000008";
 const DIRECTOR = "10000000-0000-0000-0000-000000000001";
 
-const bearer = async (email: string) => (await apiSession(email, "demo1234")).token;
+const bearer = async (email: string) => (await apiSession(email, demoPassword())).token;
 
 async function issue(token: string | null, cookie: string | null, id: string) {
   const res = await fetch(`${APP_URL}/api/people/${id}/login-code`, {

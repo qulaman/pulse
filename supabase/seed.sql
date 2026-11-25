@@ -88,7 +88,8 @@ insert into profiles (id, company_id, full_name, role, "position", aliases, mana
   ('10000000-0000-0000-0000-000000000009', '11111111-1111-1111-1111-111111111111',
    'ТЕСТ', 'director', 'Тестовый директор', '{"Тест"}', null, 'active');
 
--- The owner's test login: test@demo.local / 1 (dev seed only, never prod).
+-- The owner's test login: test@demo.local (a local seed only, never prod). The smokes take the
+-- dev base's demo passwords from .env.local, not from here (scripts/lib/demo-password.ts).
 update auth.users set encrypted_password = crypt('1', gen_salt('bf'))
  where id = '10000000-0000-0000-0000-000000000009';
 
