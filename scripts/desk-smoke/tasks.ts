@@ -59,6 +59,21 @@ async function checkToday(ctx: Ctx) {
   const boxes = (await Promise.all(["today-team", "today-feed", "home-secretary"].map((id) => page.getByTestId(id).first().boundingBox().catch(() => null)))).filter((box) => box !== null);
   const aligned = boxes.length >= 2 && boxes.every((box) => Math.abs(box.x - boxes[0]!.x) <= 1 && Math.abs(box.width - boxes[0]!.width) <= 1);
   record("сегодня: карточки — одной колонкой одной ширины", aligned, boxes.map((box) => `${Math.round(box.x)}+${Math.round(box.width)}`).join(", "));
+  // like every desk screen: the column starts at the title's left edge and fills the page's width
+  const edge = await page.evaluate(() => {
+    const frame = document.querySelector("#desk-main .desk-page");
+    const title = frame?.querySelector("h1")?.getBoundingClientRect();
+    const column = document.querySelector("[data-testid='today-day']")?.getBoundingClientRect();
+    if (!frame || !title || !column) return null;
+    const style = getComputedStyle(frame);
+    const inner = frame.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    return { title: title.left, left: column.left, width: column.width, inner };
+  });
+  record(
+    "сегодня: колонка — от левого края заголовка во всю ширину страницы",
+    Boolean(edge && Math.abs(edge.left - edge.title) <= 1 && Math.abs(edge.width - edge.inner) <= 1),
+    edge ? `заголовок ${Math.round(edge.title)}, колонка ${Math.round(edge.left)}+${Math.round(edge.width)} из ${Math.round(edge.inner)}` : "нет",
+  );
   const decisions = await page.getByTestId("today-decision").count();
   const entry = await page.getByTestId("desk-inbox-entry").count();
   record("сегодня: «Разобрать по одной» — только когда есть что разбирать", decisions > 0 ? entry === 1 : true, `решений ${decisions}, кнопка ${entry}`);

@@ -21,8 +21,8 @@ const BAND = {
 } as const;
 
 /**
- * «Сегодня» as one column (D-196): every card of the screen one under another, centred, of one
- * width — the moment, the quiet strip, «Сейчас», then the cards in the screen's order (TodayScreen).
+ * «Сегодня» as one column (D-196): every card of the screen one under another across the
+ * page's full width — the moment, the quiet strip, «Сейчас», then the cards in the screen's order (TodayScreen).
  * Data never reorders the cards: a card that grows pushes the ones under it down. The first showing
  * in a tab plays one wave down the column; three minutes without a hand put what rings for ever to
  * sleep (app/desk/today.css).

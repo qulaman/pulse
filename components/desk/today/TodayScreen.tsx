@@ -89,11 +89,11 @@ const DISPUTES_HREF = "/desk/settings/points?view=disputes";
 const ORDERS_HREF = "/desk/settings/points?view=shop";
 
 /**
- * «Сегодня» is one column (D-196): every card one under another, centred, of one width, the same
- * margins on both sides — the work first, then the day around it. The column narrows with the panel
- * open; its cards keep their order whatever the data does.
+ * «Сегодня» is one column (D-196): every card one under another, the page's full width, from the same
+ * left edge as every desk screen — the work first, then the day around it. The column narrows with the
+ * panel open; its cards keep their order whatever the data does.
  */
-const COLUMN = "mx-auto flex w-full min-w-0 max-w-[880px] flex-col gap-[18px]";
+const COLUMN = "flex w-full min-w-0 flex-col gap-5";
 
 /** One block of the frame: its label, the rule of ink, rows of the block's own height. */
 function BlockBone({ rows, height, label = "34%", wide = "64%" }: { rows: number; height: number; label?: string; wide?: string }) {
