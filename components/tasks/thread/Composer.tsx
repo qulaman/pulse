@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { toast } from "@/components/ui/Toast";
 import { PHOTO_MIME, shrinkPhoto, uploadPhotoBlob } from "@/lib/files/photo";
 import { haptic } from "@/lib/haptics";
+import { sound } from "@/lib/sound";
 import { claimMedia, dropMedia, handOverMedia, keepMedia, releaseMedia, type PendingMedia } from "@/lib/media/pending";
 import { showKeptMedia } from "@/lib/media/show";
 import type { TaskActions } from "@/lib/tasks/mutations";
@@ -211,6 +212,7 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
       showHoldHint();
       return;
     }
+    sound("recStop");
 
     const ext = extForMime(audio.mime);
     // the length travels with the message so the player can draw a wave and count the
@@ -241,6 +243,8 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
     setHoldHint(false);
     start.current = { x: event.clientX, y: event.clientY };
     armed.current = true;
+    // before the microphone is asked for: a sound played while it records would be in the message (D-204)
+    sound("recStart");
     const active = createRecorder();
     try {
       await active.start();

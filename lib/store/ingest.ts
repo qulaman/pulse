@@ -5,6 +5,7 @@ import { isNotesOnly, isSendable, strip, toConfirmed } from "@/lib/confirm/entit
 import { askSecretary } from "@/lib/errands/pending";
 import { firstLine, restLines } from "@/lib/notes/list";
 import { softDeleteNotes } from "@/lib/notes/mutations";
+import { sound } from "@/lib/sound";
 import { pluralRu } from "@/lib/tasks/status-text";
 import type { BlockedReason, ParticipantMatch, PostprocessedEntity } from "../ai/postprocess";
 import type {
@@ -379,6 +380,9 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
       // «question» is a finished exchange on Пульс, not a busy pipeline — a new phrase may start
       if (stage !== "idle" && stage !== "error" && stage !== "question" && stage !== "kept") return;
 
+      // «слушаю» plays before the microphone is asked for: the recording has no echo cancelling,
+      // so a sound played while it runs would be in it (D-204)
+      sound("recStart");
       abandon();
       const recorder = createRecorder();
       activeRecorder = recorder;
@@ -430,6 +434,8 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         set({ stage: "error", error: { code: "record_too_short" }, retryFrom: null });
         return;
       }
+      // «принял» — the microphone is closed by now, the sound cannot land in the recording (D-204)
+      sound("recStop");
       await get().ingestAudio(audio);
     },
 
@@ -780,7 +786,10 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         }
         const code: IngestErrorCode = KNOWN_CODES.has(phrase.failure.code) ? (phrase.failure.code as IngestErrorCode) : "unknown";
         const from: RetryFrom = phrase.stage === "heard" ? "parse" : phrase.audioPath ? "transcribe" : "upload";
+        // a failure brought back by the replay round is nobody's tap: it comes back without its sound
+        restoring = true;
         set({ stage: "error", error: { code, message: phrase.failure.message }, retryFrom: retryTargetFor(code, from) });
+        restoring = false;
         void mirror({ failure: null, attempts: 0 });
         return true;
       }
@@ -806,6 +815,8 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
 // keeps a copy (D-130), but a reload in the middle would still cost the director the moment.
 // «question» is a finished exchange (see startVoice), not work in progress; «kept» is on the phone.
 let releaseUpdateHold: (() => void) | null = null;
+/** True only while `restore` puts a kept phrase's old failure back on the screen. */
+let restoring = false;
 useIngestStore.subscribe(({ stage }) => {
   const busy = stage !== "idle" && stage !== "done" && stage !== "question" && stage !== "kept";
   if (busy && !releaseUpdateHold) releaseUpdateHold = holdUpdate();
@@ -813,4 +824,13 @@ useIngestStore.subscribe(({ stage }) => {
     releaseUpdateHold();
     releaseUpdateHold = null;
   }
+});
+
+// The pipeline's two moments are heard wherever it runs — the phone's Пульс, /confirm, the
+// computer (D-204): the batch going out, and anything it could not do with what the person has
+// just said. A kept phrase restored with its old failure is not such a moment (`restoring`).
+useIngestStore.subscribe(({ stage }, was) => {
+  if (stage === was.stage) return;
+  if (stage === "sending") sound("send");
+  else if (stage === "error" && !restoring) sound("refuse");
 });

@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import { create } from "zustand";
 
 import { fromNextFrame, objectMotion } from "@/components/ui/motion";
+import { sound } from "@/lib/sound";
 import { useKeyboardDock } from "@/lib/ui/keyboard";
 
 type ToastAction = { label: string; onClick: () => void };
@@ -38,6 +39,9 @@ type ToastState = {
 let nextId = 1;
 
 const LIFETIME_MS = 3200;
+
+/** The button of every deferred action (D-139): the one toast button that sounds like a step back. */
+const UNDO_LABEL = "Отменить";
 
 /** Ephemeral UI state — Zustand's own territory (docs/FRONTEND.md "State management"). */
 const useToastStore = create<ToastState>((set) => ({
@@ -127,6 +131,8 @@ function ToastItem({ item, node }: { item: Toast; node: (el: HTMLDivElement | nu
           className="shrink-0 font-display text-[14px] font-semibold text-accent"
           onClick={(event) => {
             event.stopPropagation();
+            // taking an action back is heard as a step back, on every screen (D-204)
+            if (item.action?.label === UNDO_LABEL) sound("back");
             item.action?.onClick();
             dismiss(item.id);
           }}

@@ -22,6 +22,7 @@ import { ApiError, postJson } from "@/lib/api/client";
 import { addDays, todayYmd } from "@/lib/datetime/calendar";
 import { isNetworkError } from "@/lib/net";
 import { useRealtimeInvalidate, useRealtimeListener, type RealtimeEvent } from "@/lib/realtime/useRealtimeQuery";
+import { sound } from "@/lib/sound";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import { rpcJson } from "@/lib/supabase/rpc";
 
@@ -530,6 +531,8 @@ export function useCheckReports(): { check: (ids: string[], on: boolean) => void
     (ids: string[], on: boolean) => {
       const unique = [...new Set(ids)].filter((id) => UUID.test(id));
       if (unique.length === 0) return;
+      // the mark is heard at the tap (D-204); taking it off is a plain press
+      if (on) sound("check");
       // one key per tap: every retry and the outbox replay are the same call (принцип 7)
       for (let at = 0; at < unique.length; at += MAX_IDS) {
         mutate({ ids: unique.slice(at, at + MAX_IDS), on, client_request_id: crypto.randomUUID() });

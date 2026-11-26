@@ -32,6 +32,7 @@ const SHELF: { href: string; title: string }[] = [
   { href: "/lab/tech", title: "Технология" },
   { href: "/lab/mascot", title: "Анимации маскота" },
   { href: "/lab/haptics", title: "Вибрация" },
+  { href: "/lab/sounds", title: "Звуки" },
 ];
 
 const MODEL_SHORT: Record<string, string> = {

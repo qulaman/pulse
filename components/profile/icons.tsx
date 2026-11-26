@@ -34,6 +34,14 @@ export const VibrateIcon = () => (
   </svg>
 );
 
+/** A speaker with two waves: «звук». */
+export const SoundIcon = () => (
+  <svg {...stroke}>
+    <path d="M3.5 8v4h2.6l3.4 3V5L6.1 8z" />
+    <path d="M12.6 7.6a3.4 3.4 0 0 1 0 4.8M14.8 5.6a6.2 6.2 0 0 1 0 8.8" />
+  </svg>
+);
+
 export const GearIcon = () => (
   <svg {...stroke}>
     <circle cx="10" cy="10" r="2.4" />

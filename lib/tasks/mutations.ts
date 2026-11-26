@@ -8,6 +8,7 @@ import { GENERIC_ERROR, postJson, type ApiErrorBody } from "@/lib/api/client";
 import { isNetworkError, NetworkError } from "@/lib/net";
 import { shortName } from "@/lib/people/names";
 import { kickPush } from "@/lib/push/client";
+import { sound, type Cue } from "@/lib/sound";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import { voiceApi, VoiceApiError } from "@/lib/voice/api";
 import { markBoardRead } from "./board-queries";
@@ -751,6 +752,18 @@ const UNDO_WORDS: Partial<Record<TaskStatus, string>> = {
   sent: "Снова отправлено",
 };
 
+/**
+ * What a tap on a task sounds like (D-204), by the status it moves to: heard at the tap, on the
+ * phone and on the computer alike, before the «Отменить» window and the server.
+ */
+const STATUS_CUE: Partial<Record<TaskStatus, Cue>> = {
+  accepted: "accept",
+  done: "done",
+  sent: "send",
+  rework: "back",
+  declined: "back",
+};
+
 export function useTaskActions(me: Me | undefined): TaskActions {
   const queryClient = useQueryClient();
   keepOverlays(queryClient);
@@ -776,10 +789,15 @@ export function useTaskActions(me: Me | undefined): TaskActions {
   return {
     transition: (input) => {
       const words = UNDO_WORDS[input.toStatus];
+      const cue = STATUS_CUE[input.toStatus];
+      if (cue) sound(cue);
       transition.mutate({ ...input, requestId: crypto.randomUUID(), undo: words ? named(words, input.taskId) : undefined });
     },
     extend: (input) => extend.mutate({ ...input, requestId: crypto.randomUUID() }),
-    reassign: (input) => reassign.mutate({ ...input, requestId: crypto.randomUUID() }),
+    reassign: (input) => {
+      sound("send");
+      reassign.mutate({ ...input, requestId: crypto.randomUUID() });
+    },
     edit: (input) => edit.mutate({ ...input, requestId: crypto.randomUUID() }),
     requestTime: (input) => requestTime.mutate({ ...input, requestId: crypto.randomUUID() }),
     answerTime: (input) => answerTime.mutate({ ...input, requestId: crypto.randomUUID() }),
@@ -787,12 +805,27 @@ export function useTaskActions(me: Me | undefined): TaskActions {
     // One tap, one call, the report inside it: from a rework the RPC walks rework → accepted
     // itself, in the same transaction (D-130). It used to be two calls, and a tab closed between
     // them left the task «в работе» with the report gone.
-    complete: ({ taskId, report }) => transition.mutate({ taskId, toStatus: "pending_review", requestId: crypto.randomUUID(), report }),
-    revoke: (taskId) => revoke.mutate({ taskId, requestId: crypto.randomUUID(), undo: named("Отозвано", taskId) }),
-    sendNow: (taskId) => sendNow.mutate({ taskId, requestId: crypto.randomUUID() }),
+    complete: ({ taskId, report }) => {
+      sound("handIn");
+      transition.mutate({ taskId, toStatus: "pending_review", requestId: crypto.randomUUID(), report });
+    },
+    revoke: (taskId) => {
+      sound("back");
+      revoke.mutate({ taskId, requestId: crypto.randomUUID(), undo: named("Отозвано", taskId) });
+    },
+    sendNow: (taskId) => {
+      sound("send");
+      sendNow.mutate({ taskId, requestId: crypto.randomUUID() });
+    },
     sendMessage: (input) => sendMessage.mutate({ ...input, id: input.id ?? crypto.randomUUID() }),
-    remove: (taskId) => remove.mutate({ taskId, requestId: crypto.randomUUID(), undo: named("Удалено", taskId) }),
-    reissue: (input) => reissue.mutate({ ...input, requestId: crypto.randomUUID() }),
+    remove: (taskId) => {
+      sound("back");
+      remove.mutate({ taskId, requestId: crypto.randomUUID(), undo: named("Удалено", taskId) });
+    },
+    reissue: (input) => {
+      sound("send");
+      reissue.mutate({ ...input, requestId: crypto.randomUUID() });
+    },
     markRead: (input) => markRead.mutate(input),
     // sending a message is not «busy»: the composer stays live, the row carries its own clock
     busy:

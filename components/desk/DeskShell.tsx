@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, Vie
 
 import { DeskAddress } from "@/components/desk/DeskAddress";
 import { DeskScope } from "@/components/desk/DeskScope";
+import { DeskTapSound } from "@/components/desk/DeskTapSound";
 import { QuickNote } from "@/components/desk/QuickNote";
 import { DeskLinks } from "@/components/desk/ui/DeskLinks";
 import { DeskPanelColumn, DeskPanelProvider, useDeskPanelState } from "@/components/desk/ui/DeskPanel";
@@ -14,7 +15,7 @@ import { SideNav, useDeskBadges, useSettled, type DeskBrand } from "@/components
 import { TopBar } from "@/components/desk/ui/TopBar";
 import { NotesReplay } from "@/components/notes/NotesReplay";
 import { DeskAlarmGate } from "@/components/secretary/SecretaryAlarm";
-import { playChime, playRing, RING_EVERY_MS, unlockAudio, useAudioUnlocked, useDeskSound } from "@/lib/desk/chime";
+import { keepAudioAwake, playChime, playRing, RING_EVERY_MS, unlockAudio, useAudioUnlocked, useDeskSound } from "@/lib/desk/chime";
 import { goPhoneView } from "@/lib/desk/device";
 import { directorSignal, newKeys, secretarySignal, tabTitle, type SignalDot } from "@/lib/desk/signals";
 import { useErrands, useSecretaryActions } from "@/lib/errands/queries";
@@ -348,11 +349,14 @@ function DeskSignals({ role, meId }: { role: DeskRole; meId: string }) {
   // the first click or key wakes the audio — only when this computer is to sound at all
   useEffect(() => {
     if (!sound) return;
+    // a call comes with no touch before it: the audio stays awake on a touch screen too (D-204)
+    const release = keepAudioAwake();
     unlockAudio();
     const wake = () => unlockAudio(true);
     window.addEventListener("pointerdown", wake, true);
     window.addEventListener("keydown", wake, true);
     return () => {
+      release();
       window.removeEventListener("pointerdown", wake, true);
       window.removeEventListener("keydown", wake, true);
     };
@@ -575,6 +579,8 @@ export function DeskShell({ me, role, brand, navFolded = false, children }: { me
           </div>
           {chord ? <ChordHint role={role} left={navWidth + 12} /> : null}
           <DeskSignals role={role} meId={me.userId} />
+          {/* every button of the desk clicks — one listener, no button codes it (D-204) */}
+          <DeskTapSound />
           {/* a meeting of this person rings a quarter of an hour before it (D-180) */}
           <MeetingRing meId={me.userId} />
           {role === "director" ? (

@@ -3,75 +3,26 @@
 import { useSyncExternalStore } from "react";
 
 import { parseSound, SOUND_KEY } from "@/lib/desk/signals";
+import { audioUnlocked, keepAudioAwake, subscribeAudio, unlockAudio, withAudio } from "@/lib/sound";
 
 /**
- * The desk's sound (D-175): a soft chime for a new request and the ring of «Охрана» until it is
- * taken — two WebAudio voices, no file. A browser plays nothing before the person has touched
- * the page: the desk listens for the first click or key and wakes the audio there
- * (DeskShell), and until then a sound is skipped, not queued. «Без звука» is kept per browser.
+ * The desk's calls (D-175): a soft chime for a new request and the ring of «Охрана» until it is
+ * taken — two WebAudio voices, no file, on the app's one audio context (`lib/sound`, D-204). A
+ * browser plays nothing before the person has touched the page: the desk listens for the first
+ * click or key and wakes the audio there (DeskShell), and until then a call is skipped, not
+ * queued. «Без звука» is kept per browser; it is about other people's news — the sounds of the
+ * person's own actions have their own switch (`soundOn`).
  */
 
-type AudioContextCtor = typeof AudioContext;
-
-let context: AudioContext | null = null;
-let unlocked = false;
-const audioListeners = new Set<() => void>();
-
-function ctor(): AudioContextCtor | null {
-  if (typeof window === "undefined") return null;
-  return window.AudioContext ?? (window as unknown as { webkitAudioContext?: AudioContextCtor }).webkitAudioContext ?? null;
-}
-
-/** The page has had a click or a key already (this load): the browser lets it make sound. */
-function activated(): boolean {
-  const nav = typeof navigator === "undefined" ? null : (navigator as Navigator & { userActivation?: { hasBeenActive: boolean } });
-  return Boolean(nav?.userActivation?.hasBeenActive);
-}
-
-/**
- * Wake the audio — from a click or a key (`gesture`), or when the page has had one already.
- * Before that a context would only be born suspended and the browser would scold in the console.
- */
-export function unlockAudio(gesture = false): void {
-  const Ctor = ctor();
-  if (!Ctor || (!gesture && !activated() && !unlocked)) return;
-  try {
-    context ??= new Ctor();
-    void context
-      .resume()
-      .then(() => {
-        if (unlocked) return;
-        unlocked = true;
-        for (const listener of audioListeners) listener();
-      })
-      .catch(() => undefined);
-  } catch {
-    // no audio here: the tab's words and the icon's dot still say it
-  }
-}
-
-function subscribeAudio(listener: () => void): () => void {
-  audioListeners.add(listener);
-  return () => audioListeners.delete(listener);
-}
+export { keepAudioAwake, unlockAudio };
 
 /** Whether the browser lets this page make sound yet. */
 export function useAudioUnlocked(): boolean {
-  return useSyncExternalStore(subscribeAudio, () => unlocked, () => false);
+  return useSyncExternalStore(subscribeAudio, audioUnlocked, () => false);
 }
 
-/**
- * The context, only while it is running: a sound scheduled on a suspended one would wait and come
- * out later in a heap with the others. Born inside a click it runs at once.
- */
-function ready(): AudioContext | null {
-  if (!context) return null;
-  if (context.state !== "running") {
-    void context.resume().catch(() => undefined);
-    return null;
-  }
-  return context;
-}
+/** A call may come out this late when the audio had to wake; later it would be about nothing. */
+const CALL_LATE_MS = 1_500;
 
 function tone(ctx: AudioContext, frequency: number, at: number, length: number, peak: number): void {
   const osc = ctx.createOscillator();
@@ -89,11 +40,11 @@ function tone(ctx: AudioContext, frequency: number, at: number, length: number, 
 /** A new request: two soft notes going up, quieter than the wall's door chime. */
 export function playChime(): void {
   try {
-    const ctx = ready();
-    if (!ctx) return;
-    const at = ctx.currentTime + 0.03;
-    tone(ctx, 880, at, 0.55, 0.11);
-    tone(ctx, 1318.5, at + 0.15, 0.85, 0.09);
+    withAudio((ctx) => {
+      const at = ctx.currentTime + 0.03;
+      tone(ctx, 880, at, 0.55, 0.11);
+      tone(ctx, 1318.5, at + 0.15, 0.85, 0.09);
+    }, CALL_LATE_MS);
   } catch {
     // no sound is no reason to disturb the desk
   }
@@ -102,12 +53,12 @@ export function playChime(): void {
 /** One ring of «Охрана»: two short trills like an old telephone; DeskShell repeats it until taken. */
 export function playRing(): void {
   try {
-    const ctx = ready();
-    if (!ctx) return;
-    const at = ctx.currentTime + 0.03;
-    for (const burst of [0, 0.62]) {
-      for (let i = 0; i < 9; i += 1) tone(ctx, i % 2 ? 1046.5 : 1318.5, at + burst + i * 0.052, 0.07, 0.15);
-    }
+    withAudio((ctx) => {
+      const at = ctx.currentTime + 0.03;
+      for (const burst of [0, 0.62]) {
+        for (let i = 0; i < 9; i += 1) tone(ctx, i % 2 ? 1046.5 : 1318.5, at + burst + i * 0.052, 0.07, 0.15);
+      }
+    }, CALL_LATE_MS);
   } catch {
     // the alarm still covers the screen and fills the tab
   }

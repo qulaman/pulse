@@ -69,6 +69,7 @@ import { countsOf, emptyLanes, hasMessage, hasUnread, HELD_STATUS, isOnBoard, la
 import { alarmOf } from "@/lib/pulse/mood";
 import { useLastVisit } from "@/lib/pulse/queries";
 import { directorMascot } from "@/lib/pulse/scene-face";
+import { sound } from "@/lib/sound";
 import { useComposeStore } from "@/lib/store/compose";
 import { useIngestStore, type IngestError } from "@/lib/store/ingest";
 import { useTaskActions } from "@/lib/tasks/mutations";
@@ -440,6 +441,7 @@ export default function PulsePage() {
     if (!unparsed || !requestId || playedUnparsed.current === requestId) return;
     playedUnparsed.current = requestId;
     playAct("scratch");
+    sound("refuse");
   }, [unparsed, requestId, playAct]);
 
   const onFaceTap = useStableCallback(() => {

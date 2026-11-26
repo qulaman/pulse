@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 
 import { haptic } from "@/lib/haptics";
+import { sound } from "@/lib/sound";
 import { pluralRu } from "@/lib/tasks/status-text";
 
 export type Pop = { key: number; amount: number };
@@ -27,6 +28,7 @@ export function PointsPop({ pop }: { pop: Pop | null }) {
   useEffect(() => {
     if (shownKey === null) return;
     haptic([12, 60, 18]);
+    sound("points");
     const timer = setTimeout(() => setShown(null), SHOW_MS);
     return () => clearTimeout(timer);
   }, [shownKey]);

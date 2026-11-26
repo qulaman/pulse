@@ -14,6 +14,7 @@ import { atLine, dueFromWall, dueSlots, etaLeftMin, etaLine, isAway, isYesNo, sc
 import { shortName } from "@/lib/people/names";
 import { receiptLine } from "@/lib/tasks/receipts";
 import type { SecretaryAction } from "@/lib/settings";
+import { sound } from "@/lib/sound";
 
 /**
  * A button is held for two seconds — and the request goes at once (D-101): a stray touch sends
@@ -376,6 +377,7 @@ function HoldButton({
           sent.current = true;
           setHolding(false);
           haptic(alarm ? [60, 40, 60] : 30);
+          sound("send");
           onSend();
         }, HOLD_SEND_MS);
       }}

@@ -13,6 +13,7 @@ import { askSecretary } from "@/lib/errands/pending";
 import { errandKeys, useSecretaries, useSecretaryActions, type Errand } from "@/lib/errands/queries";
 import { absenceLine, sceneOfAction } from "@/lib/errands/scene";
 import type { SecretaryAction } from "@/lib/settings";
+import { claimClick, sound } from "@/lib/sound";
 import { useNow } from "@/lib/useNow";
 
 /*
@@ -94,18 +95,24 @@ export function useDeskAsk(): DeskAsk {
     usual,
     absence,
     press: (action, anchor) => {
+      // a key of the pult clicks like a key (D-204)
+      sound("key");
       if (isDndAction(action)) setDnd({ action, anchor });
       else send(action, usual(action.code));
     },
     alarm: (action) => {
+      sound("send");
       rememberSend(action.code, null);
       askSecretary(action, null, refresh);
     },
     own: (words) => {
       const text = words.trim();
-      if (text) send(freeAction(text), text);
+      if (!text) return;
+      sound("send");
+      send(freeAction(text), text);
     },
     again: (errand) => {
+      sound("key");
       const action = actions.find((one) => one.code === errand.kind);
       // «не беспокоить» asked again keeps its span: the minutes it was asked for
       const span = errand.until_at ? Math.round((new Date(errand.until_at).getTime() - new Date(errand.created_at).getTime()) / 60_000) : null;
@@ -188,6 +195,8 @@ export function useHold(onSend: () => void, label: string, ms = ALARM_HOLD_MS, d
       onClick: () => {
         if (sent.current) {
           sent.current = false;
+          // the hold has sounded already: letting the key go is not one more press (D-204)
+          claimClick();
           return;
         }
         // a click from the keyboard was taken by the keys above: only the mouse's comes here

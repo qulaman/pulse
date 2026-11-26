@@ -14,6 +14,7 @@ const SHELF: { href: string; title: string; note: string }[] = [
   { href: "/lab/tech", title: "Технология", note: "Путь голосового через систему: узлы, данные, сбои" },
   { href: "/lab/mascot", title: "Анимации маскота", note: "Все состояния, жесты и сцены «Капли» на одной полке" },
   { href: "/lab/haptics", title: "Вибрация", note: "Какой способ тикает на iPhone — проверка на своём телефоне" },
+  { href: "/lab/sounds", title: "Звуки", note: "Послушать каждый момент, выбрать другой голос и громкость на этом устройстве" },
 ];
 
 function Shelf() {

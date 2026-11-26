@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Bell, LogOut, MonitorSmartphone, PanelLeft, Smartphone, Volume2, VolumeX } from "lucide-react";
+import { ArrowRight, Bell, LogOut, MonitorSmartphone, MousePointerClick, PanelLeft, Smartphone, Volume2, VolumeX } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 
@@ -27,6 +27,7 @@ import { ROLE_LABEL } from "@/lib/people/queries";
 import { forgetThisDevice, pushPlatform, type PushState } from "@/lib/push/client";
 import { pushBlocker } from "@/lib/push/words";
 import { homeForRole, type Role } from "@/lib/routes";
+import { setSoundOn, sound as playSound, soundOn, subscribeSound } from "@/lib/sound";
 import { pluralRu } from "@/lib/tasks/status-text";
 import { BUILD, versionLabel } from "@/lib/version";
 import { dropPhrase, listPhrases } from "@/lib/voice/kept";
@@ -202,8 +203,43 @@ function PushSetting({ director }: { director: boolean }) {
           {words ? <StateBadge tone={words.tone}>{words.text}</StateBadge> : <span className="skeleton block h-[26px] w-[96px] rounded-full bg-surface-2" />}
         </div>
         <SoundSetting director={director} />
+        <ActionSoundSetting />
       </div>
     </ProfileCard>
+  );
+}
+
+/**
+ * The sounds of the person's own actions on this computer (D-204): the click of a button, «отправлено»,
+ * «готово». Apart from the calls below — those are other people's news. Turned on, it answers with
+ * a sound itself.
+ */
+function ActionSoundSetting() {
+  const on = useSyncExternalStore(subscribeSound, soundOn, () => true);
+  return (
+    <div className="profile-device" data-testid="desk-profile-action-sound">
+      <span className="profile-device-icon" aria-hidden>
+        <MousePointerClick size={18} strokeWidth={2} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[14px] font-medium leading-5">Звуки действий</p>
+        <p className="text-[12px] leading-4 text-muted">Щелчок кнопок и клавиш пульта, «отправлено», «готово», «Отменить» — в ответ на ваши нажатия</p>
+      </div>
+      <SegmentTabs
+        aria-label="Звуки действий"
+        value={on ? "sound" : "mute"}
+        onChange={(value) => {
+          setSoundOn(value === "sound");
+          if (value !== "sound") return;
+          unlockAudio(true);
+          playSound("check");
+        }}
+        items={[
+          { value: "sound", label: "Со звуком" },
+          { value: "mute", label: "Без звука" },
+        ]}
+      />
+    </div>
   );
 }
 

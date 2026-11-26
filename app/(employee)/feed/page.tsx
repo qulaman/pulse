@@ -56,6 +56,7 @@ import { useRefreshMyDay, useReportDue } from "@/lib/daily-report/queries";
 import { describeErrandsForSecretary } from "@/lib/errands/say";
 import { useEther } from "@/lib/ether/queries";
 import { haptic } from "@/lib/haptics";
+import { sound } from "@/lib/sound";
 import { useNamesKey } from "@/lib/people/names";
 import { useMascotTelegraph } from "@/lib/points/game";
 import { usePointsArrival, usePointsEnabled } from "@/lib/points/queries";
@@ -505,6 +506,7 @@ export default function FeedPage() {
   const onFaceTap = useStableCallback(() => {
     if (acceptByFace && desk.errand) {
       haptic(20);
+      sound("accept");
       secretary.errandActions.mutate({ id: desk.errand.id, to: "accepted" });
       return;
     }

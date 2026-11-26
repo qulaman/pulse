@@ -14,6 +14,7 @@ import { QueryProvider } from "@/components/providers/QueryProvider";
 import { PushSync } from "@/components/push/PushSync";
 import { SecretaryAlarmGate } from "@/components/secretary/SecretaryAlarm";
 import { ErrandReplay } from "@/components/secretary/ErrandReplay";
+import { SoundGate } from "@/components/SoundGate";
 import { TapHaptics } from "@/components/TapHaptics";
 import { getSessionProfile } from "@/lib/auth";
 import { loadBrand, PRODUCT_BRAND } from "@/lib/brand";
@@ -179,6 +180,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </NotOnOps>
           {/* every tap ticks — one listener, no button codes it (D-147) */}
           <TapHaptics />
+          {/* the first touch wakes the audio for the sounds of the person's own actions (D-204) */}
+          <SoundGate />
         </QueryProvider>
       </body>
     </html>

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ReportIcon } from "@/components/daily-report/icons";
 import { PulseMark } from "@/components/brand/PulseMark";
 import { HapticsRow } from "@/components/profile/HapticsRow";
+import { SoundRow } from "@/components/profile/SoundRow";
 import { NotificationsRow } from "@/components/profile/NotificationsRow";
 import { AfterPoints } from "@/components/profile/AfterPoints";
 import { DeskRows } from "@/components/profile/DeskRows";
@@ -61,6 +62,7 @@ export default async function ProfilePage() {
           <SignOutOthersRow userId={profile.userId} />
           <NotificationsRow director={director} />
           <HapticsRow />
+          <SoundRow />
         </RowGroup>
 
         {/* the company's settings moved to the computer with «Настройки» off the bar (D-153) */}

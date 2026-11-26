@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { MIN_RECORDING_MS } from "@/lib/store/ingest";
 import { useUpdateHold } from "@/lib/update/client";
+import { sound } from "@/lib/sound";
 import { createRecorder, isSilent, MicUnavailableError, type RecordedAudio, type Recorder } from "@/lib/voice/recorder";
 
 import { firstLine } from "./list";
@@ -182,6 +183,8 @@ export function useDictation(
 
   async function begin(): Promise<void> {
     if (recorder.current || !live.current.me) return;
+    // before the microphone is asked for: a sound played while it records would be in the note (D-204)
+    sound("recStart");
     const rec = createRecorder();
     recorder.current = rec;
     rec.onLevel((level) => {
@@ -229,6 +232,7 @@ export function useDictation(
       live.current.onReceipt(TOO_SHORT);
       return;
     }
+    sound("recStop");
     // a dead input: kept, but the recogniser would invent a phrase out of its hint (2026-11-17)
     const silent = isSilent(audio);
     const me = live.current.me;
