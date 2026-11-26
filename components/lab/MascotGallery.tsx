@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { ACT_MS, Mascot, type MascotAct, type MascotState } from "@/components/brand/Mascot";
 import { MascotScene, type Scene } from "@/components/brand/MascotScene";
+import { MiniMark, type MiniState } from "@/components/brand/MiniMark";
 import { IdleScene } from "@/components/pulse/IdleScene";
 import { tasksOf } from "@/lib/idle/people";
 
@@ -87,8 +88,8 @@ const STATES: StateEntry[] = [
   {
     state: "happy",
     title: "Доволен",
-    note: "Золото. Точка — улыбка, приподнимается с каждым ударом; вокруг три искры",
-    keys: "bk-g-grin · bk-breath · bk-spark",
+    note: "Золото. Точка сияет: с каждым ударом из неё выходят короткие лучи и медленно идут по кругу; вокруг три искры",
+    keys: "bk-g-sun · bk-g-rays · bk-breath · bk-spark",
   },
   {
     state: "sleeping",
@@ -193,7 +194,7 @@ const ACTS: ActEntry[] = [
   { act: "turn", on: "sleeping", title: "Переворачивается", note: "Ворочается: дуги расходятся и поворачиваются на треть, черта глаза наклоняется" },
   { act: "doze", on: "sleeping", title: "Клюёт носом", note: "Клюёт носом: знак медленно оседает и клонится, рывок вверх — и снова спит" },
   { act: "mumble", on: "sleeping", title: "Бормочет", note: "Бормочет: черта глаза подрагивает, то шире, то уже" },
-  { act: "smile", on: "sleeping", title: "Улыбается во сне", note: "Хороший сон: черта закрытого глаза становится улыбкой и возвращается" },
+  { act: "smile", on: "sleeping", title: "Хороший сон", note: "Хороший сон: черта закрытого глаза собирается в точку, рядом вспыхивает искра, уходят две волны — и снова черта" },
   { act: "kick", on: "sleeping", title: "Бежит во сне", note: "Бежит во сне: два коротких рывка знака в сторону" },
   { act: "scan", on: "calm", title: "Осматривается", note: "Осматривается: кольцо тускнеет, по нему дважды пробегает комета, зрачок идёт за ней" },
   { act: "limber", on: "calm", title: "Разминка", note: "Разминка: кольцо раскрывается на три дуги, долгий вдох, глаз прикрыт — и смыкается" },
@@ -391,6 +392,16 @@ function Caption({ title, note, keys }: { title: string; note: string; keys?: st
     </>
   );
 }
+
+/** The small mark's states (D-209), as the lab shows them. */
+const MINI: { state: MiniState; title: string; note: string; tone?: string }[] = [
+  { state: "still", title: "Стоит", note: "Знак без движения — как значок" },
+  { state: "idle", title: "Пульс", note: "Точка бьётся, от кольца уходит волна: «на связи»" },
+  { state: "busy", title: "Работает", note: "Кольцо раскрыто на три дуги, они шагают по кругу, точка тикает: загрузка, разбор, отправка" },
+  { state: "listening", title: "Слушает", note: "Дуги плывут, точка — три черты голоса: идёт запись" },
+  { state: "done", title: "Готово", note: "Один раз: точка подпрыгивает, уходит волна", tone: "var(--ok)" },
+  { state: "alert", title: "Зовёт", note: "Точка подскакивает, волны чаще: что-то ждёт", tone: "var(--warn)" },
+];
 
 export function MascotGallery() {
   const [size, setSize] = useState(96);
@@ -607,9 +618,10 @@ export function MascotGallery() {
       <section className="mt-6">
         <h2 className="text-[19px] font-semibold leading-6">Экран ожидания</h2>
         <p className="mt-1 text-[13px] leading-4 text-muted">
-          Пока домашний экран в покое, свет маскота вынесен на весь экран: три орбиты с точками, которые идут по ним каждая своим шагом, волны от кольца до края
-          экрана и редкая комета на средней орбите. Когда волна доходит до кружка команды, он чуть вздрагивает. Здесь зона сцены — сама карточка; команда
-          выдуманная, 52 человека: сверху те, у кого есть работа, снизу ряды свободных.
+          Пока домашний экран в покое, свет маскота вынесен на весь экран: три орбиты, по которым идут маленькие копии знака (точка в кольце) и точки, каждая
+          своим шагом; волны от кольца до края экрана и редкая комета на средней орбите. Что волна задевает, то повторяет пульс: вспыхивает, а маленький знак
+          отпускает свою волну; каждая точка медленно уходит в свой цвет и обратно. Когда волна доходит до кружка команды, он чуть вздрагивает. Здесь зона сцены —
+          сама карточка; команда выдуманная, 52 человека: сверху те, у кого есть работа, снизу ряды свободных.
         </p>
         <div className="mt-3 flex flex-col gap-4">
           {[false, true].map((crowd) => (
@@ -620,9 +632,35 @@ export function MascotGallery() {
                   <Mascot state="sleeping" size={96} />
                 </div>
               </Stage>
-              <Caption title={crowd ? "Поле и команда" : "Поле"} note={crowd ? "У директора: кружки команды стоят в поле и вздрагивают от волны" : "У сотрудника: только поле вокруг спящего маскота"} keys="idle-wave · idle-turn · idle-twinkle · idle-comet · crew-ripple" />
+              <Caption title={crowd ? "Поле и команда" : "Поле"} note={crowd ? "У директора: кружки команды стоят в поле и вздрагивают от волны" : "У сотрудника: только поле вокруг спящего маскота"} keys="idle-wave · idle-turn · idle-flare · idle-echo · idle-hue · idle-comet · crew-ripple" />
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="mt-6">
+        <h2 className="text-[19px] font-semibold leading-6">Мини-маскот</h2>
+        <p className="mt-1 text-[13px] leading-4 text-muted">
+          Маленький знак для остальных экранов и компьютера: в строке текста, в кнопке, на вкладке. Один лёгкий рисунок без кода — ставится куда угодно и
+          берёт цвет текста вокруг. Шесть состояний; размеры 14 / 16 / 20 / 24 / 32.
+        </p>
+        <div className="card mt-3 flex flex-col gap-4 p-5" data-testid="mini-gallery">
+          {MINI.map((entry) => (
+            <div key={entry.state} className="flex items-center gap-4">
+              <div className="flex w-[150px] shrink-0 items-center gap-3 text-accent" style={entry.tone ? { color: entry.tone } : undefined}>
+                {[14, 16, 20, 24, 32].map((value) => (
+                  <MiniMark key={`${value}-${runKey}`} state={entry.state} size={value} />
+                ))}
+              </div>
+              <div className="min-w-0">
+                <p className="text-[14px] font-semibold leading-[18px]">{entry.title}</p>
+                <p className="text-[12px] leading-4 text-muted">{entry.note}</p>
+              </div>
+            </div>
+          ))}
+          <p className="border-t border-border pt-3 text-[14px] leading-5">
+            В строке: <MiniMark state="busy" tone="var(--accent)" /> Разбираю фразу… · <MiniMark state="listening" tone="var(--accent)" /> Слушаю · <MiniMark state="idle" tone="var(--accent)" /> на связи
+          </p>
         </div>
       </section>
 

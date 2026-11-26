@@ -3,6 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { MiniMark } from "@/components/brand/MiniMark";
 import { CopyButton } from "@/components/desk/team/fields";
 import { Dialog } from "@/components/desk/ui/Dialog";
 import { ActionDialog } from "@/components/ops/ActionDialog";
@@ -37,7 +38,7 @@ function RunningBody({ progress, onCancel }: { progress: ExportProgress | null; 
   return (
     <div className="flex flex-col gap-4" data-testid="ops-export-run">
       <p className="flex items-center gap-2 text-[14px] leading-5">
-        <span aria-hidden className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-accent" />
+        <MiniMark state="busy" size={16} tone="var(--accent)" />
         {stage}
       </p>
       {progress ? (

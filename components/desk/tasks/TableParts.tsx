@@ -233,7 +233,7 @@ export function TasksEmpty({
 }) {
   const archiveTab = tab === "closed";
   const words = query.trim();
-  if (looking) return <EmptyState title={words ? `Ищу «${words}»…` : "Загружаю закрытые задачи…"} />;
+  if (looking) return <EmptyState busy title={words ? `Ищу «${words}»…` : "Загружаю закрытые задачи…"} />;
   if (archiveLoad?.kind === "failed") return <LoadFailure what="закрытые задачи" offline={archiveLoad.offline} busy={archiveBusy} onRetry={onArchiveRetry} />;
   if (nothingSent) return <EmptyState title="Пока ничего не отправлено" hint="Новая задача — строкой поручения сверху (Ctrl K) или голосом с телефона" />;
   if (filtered) {

@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ArrowUp, Ban, Check, CheckCheck, CircleDot, Clock, Inbox, Paperclip, RotateCcw, Send, Undo2, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState, type ClipboardEvent, type CSSProperties, type DragEvent } from "react";
 
+import { MiniMark } from "@/components/brand/MiniMark";
 import { Face, useAvatars } from "@/components/desk/ui/Face";
 
 import { messageFlags } from "@/components/tasks/TaskThread";
@@ -136,7 +137,7 @@ export function DeskThread({
   const retry = (message: TaskMessage) =>
     actions.sendMessage({ taskId, companyId: me.companyId, text: message.content ?? "", filePath: message.file_path, type: message.type as "text" | "photo" | "voice", id: message.id });
 
-  if (loading && rows.length === 0) return <p className="py-2 text-[13px] leading-5 text-muted">Загружаю переписку…</p>;
+  if (loading && rows.length === 0) return <p className="py-2 text-[13px] leading-5 text-muted"><MiniMark state="busy" tone="var(--accent)" className="mr-2" />Загружаю переписку…</p>;
   if (rows.length === 0 && load.kind === "failed") return <LoadNote state={load} failed="Переписка не загрузилась" onRetry={onRetry} className="py-2" />;
   if (rows.length === 0) return <p className="py-2 text-[13px] leading-5 text-muted">Переписки пока нет — вопрос, отчёт или фото появятся здесь</p>;
 
@@ -398,7 +399,7 @@ function Composer({ taskId, me, actions, placeholder = "Ответить…", on
           className="flex h-7 w-7 items-center justify-center rounded-[2px] text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text disabled:opacity-50"
         >
           {uploading ? (
-            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />
+            <MiniMark state="busy" size={16} />
           ) : (
             <Paperclip size={16} strokeWidth={1.9} aria-hidden />
           )}

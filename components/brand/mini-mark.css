@@ -1,0 +1,147 @@
+/*
+ * The mascot's small self (components/brand/MiniMark.tsx, D-209). Part of app/globals.css by its
+ * @import. `transform` and `opacity` only; a state swaps its parts by opacity, nothing is redrawn.
+ */
+
+.mini-mark {
+  display: inline-flex;
+  flex: none;
+  line-height: 0;
+  vertical-align: -0.18em;
+  transition: color 200ms var(--ease-out);
+}
+.mini-mark svg {
+  display: block;
+  overflow: visible;
+}
+/* every part turns and swells round the middle of the drawing */
+.mini-mark svg * {
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+.mm-ring,
+.mm-wave,
+.mm-arcs circle,
+.mm-bars path {
+  fill: none;
+  stroke: currentColor;
+}
+.mm-dot {
+  fill: currentColor;
+}
+.mm-bars path {
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+.mm-ring,
+.mm-arcs,
+.mm-dot,
+.mm-bars {
+  transition: opacity 160ms var(--ease-out);
+}
+.mm-wave,
+.mm-arcs,
+.mm-bars {
+  opacity: 0;
+}
+
+/* the pulse */
+.mini-mark[data-state="idle"] .mm-dot {
+  animation: mm-beat 3.4s var(--ease-in-out) infinite both;
+}
+.mini-mark[data-state="idle"] .mm-wave {
+  animation: mm-wave 3.4s var(--ease-out) infinite both;
+}
+
+/* working: the arcs step round, the dot ticks */
+.mini-mark[data-state="busy"] .mm-ring,
+.mini-mark[data-state="listening"] .mm-ring {
+  opacity: 0;
+}
+.mini-mark[data-state="busy"] .mm-arcs,
+.mini-mark[data-state="listening"] .mm-arcs {
+  opacity: 1;
+}
+.mini-mark[data-state="busy"] .mm-arcs {
+  animation: mm-step 1.5s var(--ease-in-out) infinite;
+}
+.mini-mark[data-state="busy"] .mm-dot {
+  animation: mm-tick 0.5s var(--ease-in-out) infinite alternate both;
+}
+
+/* listening: the arcs drift, the dot is the voice */
+.mini-mark[data-state="listening"] .mm-arcs {
+  animation: mm-turn 5s linear infinite;
+}
+.mini-mark[data-state="listening"] .mm-dot {
+  opacity: 0;
+}
+.mini-mark[data-state="listening"] .mm-bars {
+  opacity: 1;
+}
+.mini-mark[data-state="listening"] .mm-bars path {
+  animation: mm-bar 0.62s var(--ease-in-out) infinite alternate both;
+}
+.mini-mark[data-state="listening"] .mm-bars path:nth-child(2) {
+  animation-delay: -0.31s;
+}
+.mini-mark[data-state="listening"] .mm-bars path:nth-child(3) {
+  animation-delay: -0.47s;
+}
+
+/* done: once */
+.mini-mark[data-state="done"] .mm-dot {
+  animation: mm-pop 620ms var(--ease-out) both;
+}
+.mini-mark[data-state="done"] .mm-wave {
+  animation: mm-wave 760ms var(--ease-out) both;
+}
+
+/* something waits */
+.mini-mark[data-state="alert"] .mm-dot {
+  animation: mm-hop 1.8s var(--ease-in-out) infinite both;
+}
+.mini-mark[data-state="alert"] .mm-wave {
+  animation: mm-wave 1.8s var(--ease-out) infinite both;
+}
+
+@keyframes mm-beat {
+  0%, 32%, 100% { transform: scale(1); }
+  11% { transform: scale(1.3); }
+  21% { transform: scale(0.94); }
+}
+@keyframes mm-wave {
+  0%, 6% { opacity: 0; transform: scale(1); }
+  14% { opacity: 0.55; }
+  62%, 100% { opacity: 0; transform: scale(1.62); }
+}
+@keyframes mm-step {
+  0% { transform: rotate(0deg); }
+  33.33% { transform: rotate(120deg); }
+  66.66% { transform: rotate(240deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes mm-turn {
+  to { transform: rotate(360deg); }
+}
+@keyframes mm-tick {
+  0% { opacity: 0.55; transform: scale(0.66); }
+  100% { opacity: 1; transform: scale(1.12); }
+}
+@keyframes mm-bar {
+  0% { transform: scaleY(0.4); }
+  100% { transform: scaleY(1); }
+}
+@keyframes mm-pop {
+  0% { transform: scale(0.5); }
+  38% { transform: scale(1.5); }
+  64% { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+@keyframes mm-hop {
+  0%, 46%, 100% { transform: translateY(0) scale(1); }
+  10% { transform: translateY(-2.6px) scale(1.12); }
+  20% { transform: translateY(0) scale(0.94); }
+  30% { transform: translateY(-1.6px) scale(1.06); }
+  40% { transform: translateY(0) scale(1); }
+}

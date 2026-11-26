@@ -275,7 +275,7 @@ export function ShopDesk() {
             onSelect={(order) => setSelectedOrder(order.id)}
             empty={
               orders.isPending ? (
-                <EmptyState title="Загружаю заказы" />
+                <EmptyState busy title="Загружаю заказы" />
               ) : (
                 <EmptyState tone="ok" title="Выдавать нечего" hint="Заказ сотрудника появится здесь сразу — очки за него уже придержаны" />
               )

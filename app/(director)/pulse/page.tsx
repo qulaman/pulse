@@ -38,7 +38,6 @@ import { OrbitBalls, type OrbitBall, type OrbitId } from "@/components/pulse/Orb
 import { AFTER_CARD, recede } from "@/components/pulse/PanelCard";
 import { PickCard, type Picked } from "@/components/pulse/PickCard";
 import { SaidBand } from "@/components/pulse/SaidBand";
-import { SAY_WRITE_SKIRT, SayWrite } from "@/components/pulse/SayWrite";
 import { SecretaryCard } from "@/components/pulse/SecretaryCard";
 import { DESK_FACE, DESK_H, DESK_W, SecretaryDesk } from "@/components/pulse/SecretaryDesk";
 import { useStableActions, useStableCallback } from "@/components/pulse/stable";
@@ -696,11 +695,6 @@ export default function PulsePage() {
     [exchange, unparsed, startManual, closeExchange, fixUnparsed, resetIngest],
   );
 
-  // «Сказать · Написать» under the resting face (owner, 2026-11-25): the same two ways in as the
-  // face's hold and pull, in sight — not while a phrase is in hand, somebody is picked or the
-  // secretary's buttons are out, each of which has its own ways
-  const sayWrite = mode === "idle" && !phraseInHand && !picked && !asking;
-
   return (
     // the three bands of the home stage (HomeStage) — one exception: a phrase of several things lifts
     // the face, the cards band growing by a CSS transition (`crowded`, D-146). PulseSkeleton draws the
@@ -733,8 +727,6 @@ export default function PulsePage() {
               picked={picked?.id ?? null}
               onPick={onPickOrb}
               onLook={onLookAt}
-              // the idlers' floor starts under the buttons
-              skirt={sayWrite ? SAY_WRITE_SKIRT : undefined}
             />
             </div>
             <MascotLever
@@ -863,7 +855,6 @@ export default function PulsePage() {
             </LocalPresence>
           </>
       }
-      underFace={<SayWrite show={sayWrite} />}
       // a thought about Эфир or the calendar opens no thread — there is none behind it
       thought={
         thought && thoughtUp
@@ -902,9 +893,8 @@ export default function PulsePage() {
           style={{ bottom: "calc(var(--tabbar-space) + 2px)" }}
           data-testid="lever-hint"
         >
-          {/* «Сказать · Написать» above are the same ways in, in sight; the line teaches the face's own:
-              the hold and the pull (the faster way), and what its tap brings out — the balls, by their
-              own labels (D-60) */}
+          {/* nothing stands under the face (D-208): the line teaches the face's own ways — the hold,
+              the pull, and what its tap brings out — the balls, by their own labels (D-60) */}
           лицо: удержите — говорите, потяните вниз — текст
           <br />
           нажмите — {balls.map((ball) => ball.label.toLowerCase()).join(", ")}

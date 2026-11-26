@@ -1,5 +1,6 @@
 "use client";
 
+import { MiniMark } from "@/components/brand/MiniMark";
 import { PanelHeader } from "@/components/desk/ui/DeskPanel";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { cancelDeskVoice, finishDeskVoice } from "@/components/desk/voice/control";
@@ -31,6 +32,8 @@ export function InFlight() {
     <section className="flex flex-col gap-4" data-testid="desk-ingest-flight" data-stage={stage}>
       <PanelHeader>
         <h2 className="desk-task-title flex items-baseline gap-2.5 text-[21px] leading-[26px]" aria-live="polite">
+          {/* the mascot's small self beside the words of the stage (D-209): the bars of the voice, then the arcs at work */}
+          <MiniMark state={recording ? "listening" : "busy"} size={20} tone="var(--accent)" className="self-center" />
           {STAGE_LINE[stage] ?? "Разбираю…"}
           {recording ? <Elapsed className="font-mono text-[15px] font-medium leading-5 text-muted" /> : null}
         </h2>
@@ -44,7 +47,6 @@ export function InFlight() {
       {recording ? (
         <>
           <div className="flex items-center gap-3 text-accent">
-            <span aria-hidden className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-current" />
             <LevelBars height={36} bar={5} gap={4} />
             <span className="text-[14px] leading-5 text-muted">{pinned ? "Скажите, что сделать и к какому сроку" : "Скажите, кому, что и к какому сроку"}</span>
           </div>

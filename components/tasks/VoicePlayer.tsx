@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { MiniMark } from "@/components/brand/MiniMark";
+
 /**
  * A voice in a task card, played by us and not by the browser. The native
  * `<audio controls>` widget looks like a different product on every phone and is
@@ -200,7 +202,7 @@ export function VoicePlayer({ load, durationMs, seed, failedText = "Не отк�
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-bg transition-transform duration-[120ms] active:scale-[0.94] disabled:opacity-60"
         >
           {loading ? (
-            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-bg/40 border-t-bg" />
+            <MiniMark state="busy" size={18} />
           ) : playing ? (
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
               <rect x="6" y="4" width="4" height="16" rx="1.4" />

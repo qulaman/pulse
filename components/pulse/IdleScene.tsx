@@ -64,7 +64,6 @@ export const IdleScene = memo(function IdleScene({
   picked = null,
   onPick,
   onLook,
-  skirt,
 }: {
   /**
    * The screen is at rest: no panel open, nothing in flight — except the recording the
@@ -83,8 +82,6 @@ export const IdleScene = memo(function IdleScene({
   onPick?: (pick: Pick | null) => void;
   /** the card of somebody at work opened or closed (D-118): the face looks at him meanwhile */
   onLook?: (pick: Pick | null) => void;
-  /** where the floor of idlers starts under the face — further down while the screen keeps buttons there */
-  skirt?: number;
 }) {
   // a screen nobody has touched for minutes holds still: nobody is watching (D-119)
   const deep = useDeepRest();
@@ -112,7 +109,6 @@ export const IdleScene = memo(function IdleScene({
               // the rows stand still, so they may use the room the play area leaves at the edge
               wide={area.hx + MARGIN - 6}
               reach={area.hy + MARGIN - 6}
-              skirt={skirt}
               waves={quiet && !deep}
               picked={picked}
               onPick={onPick}

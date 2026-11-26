@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { MiniMark } from "@/components/brand/MiniMark";
 import { QrCode } from "@/components/people/QrCode";
 import { canShare, copyText } from "@/components/people/copy";
 import { useLoginCode } from "@/components/people/useLoginCode";
@@ -153,7 +154,7 @@ export function LoginCodePanel({
       )}
 
       <p className="flex items-center gap-2 text-[14px] leading-[18px]" data-testid="code-waiting">
-        <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-accent" aria-hidden />
+        <MiniMark state="idle" size={16} tone="var(--accent)" />
         Ждёт входа…
       </p>
 

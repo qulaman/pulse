@@ -73,8 +73,8 @@ export const STATE_LOOK: Record<MascotState, StateLook> = {
   thinking: { color: "var(--warn)", ring: "apart", spin: "drift", core: "dots", glow: "quiet", halo: "bk-think 1.4s var(--ease-in-out) infinite" },
   // the dot beats with the words, a small wave goes with each
   speaking: { color: "var(--accent)", glow: "talk", blink: true, coreAnim: "bk-talk 0.9s var(--ease-in-out) infinite", ringAnim: CALM },
-  // gold, the eye smiles, sparks
-  happy: { color: "var(--gold)", glyph: "smile", glow: "pulse", extra: "sparks", ringAnim: BREATH, halo: "bk-halo-beat 3.4s var(--ease-in-out) infinite" },
+  // gold, the dot beams: rays go out of it with the beat, sparks
+  happy: { color: "var(--gold)", glyph: "beam", glow: "pulse", extra: "sparks", ringAnim: BREATH, halo: "bk-halo-beat 3.4s var(--ease-in-out) infinite" },
   // the eye is shut, the slowest breath
   sleeping: { color: SLEEP_COLOR, glyph: "shut", glow: "sleep", extra: "zzz", all: "bk-sleep 5.8s var(--ease-in-out) infinite", halo: "bk-sleep-halo 5.8s var(--ease-in-out) infinite" },
   // news from the base: a comet runs the ring, the pupil follows it
@@ -170,7 +170,8 @@ export const ACT_LOOK: Record<MascotAct, ActLook> = {
   turn: { ring: "apart", ringAnim: "bk-a-roll", glyphAnim: "bk-a-g-tilt" },
   doze: { all: "bk-a-nodoff" },
   mumble: { glyphAnim: "bk-a-mumble", coreAnim: "bk-a-mumble" },
-  smile: { glyph: "smile", glyphAnim: "bk-a-g-hold" },
+  // a good dream: the line of the shut eye gathers into a dot, a spark beside it, two waves
+  smile: { glyphAnim: "bk-a-g-dream", extra: "spark", glow: "waves" },
   kick: { all: "bk-a-jerk" },
   wave: { lookAnim: "bk-a-wiggle", glow: "waves" },
   wink: { lidAnim: "bk-a-wink", extra: "spark" },

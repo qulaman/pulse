@@ -128,14 +128,6 @@ const FADE_AWAY = { opacity: 0, transition: { duration: 0.15, ease: "easeOut" } 
 let lastOpen: { panel: OrbitId; at: number } | null = null;
 const LAST_OPEN_MS = 10 * 60_000;
 
-/** The button under the resting face says where a tap on the face leads (D-173). */
-const FACE_GO: Partial<Record<OrbitId, string>> = {
-  tasks: "Открыть дела ›",
-  messages: "Открыть сообщения ›",
-  ether: "Открыть эфир ›",
-  calendar: "Открыть календарь ›",
-};
-const FACE_GO_BALLS = "Дела, сообщения, эфир ›";
 /** The resting face's own name for the screen reader: where its tap leads. */
 const FACE_LABEL: Partial<Record<OrbitId, string>> = {
   tasks: "Маскот: нажмите — открыть дела",
@@ -759,7 +751,10 @@ export default function FeedPage() {
       // board is at rest, gone at the first touch
       face={
             isSecretary ? (
-              // the secretary does not sleep and dream: it sits at work, and its face is the job
+              // the secretary sits at work, and its face is the job; the same field stands behind it
+              // while nothing is asked (D-206) — a request ringing stops the waves
+              <>
+              <IdleScene active={mode === "idle"} quiet={desk.phase === "rest" && !thought} />
               <SecretaryFace
                 scene={desk.scene}
                 phase={desk.phase}
@@ -777,6 +772,7 @@ export default function FeedPage() {
                 onTap={onFaceTap}
                 around={orbit}
               />
+              </>
             ) : (
               <>
                 {/* the dust stays with the resting screen; the dream only with empty hands — a face
@@ -813,26 +809,10 @@ export default function FeedPage() {
       }
       underFace={
         <>
-          {/* right under the resting face: where a tap on it leads, as a button that does the same
-              (D-173) — the person does not have to guess that the face is the way in. After
-              hydration, like the words: what it names comes from the orders and the hour. It fades
-              in — after the face has come down to it, when the face comes back from a card or the
-              balls (D-178) */}
-          {!isSecretary && mode === "idle" && hydrated && !loading && !raising ? (
-            // above the dream that flies round the sleeping head: it passes behind the button
-            <div className={`relative z-10 flex shrink-0 justify-center pt-2 ${cameFrom !== "idle" ? AFTER_CARD : "card-in"}`}>
-              <button
-                type="button"
-                onClick={onFaceTap}
-                className="inline-flex min-h-[44px] items-center rounded-full border border-border bg-surface-2 px-4 font-display text-[15px] font-semibold leading-5 text-text transition-transform duration-[120ms] ease-out active:scale-[0.97]"
-                data-testid="face-go"
-                data-go={reason ?? "balls"}
-              >
-                {(reason && FACE_GO[reason]) || FACE_GO_BALLS}
-              </button>
-            </div>
-          ) : null}
-          {/* under it: «+5 очков», «🔥 3 подряд в срок» (over a card — by the small face, above) */}
+          {/* nothing to press stands under the resting face (D-208): the face is the way in, the
+              words over it say what waits and the line at the bottom of the screen says what a tap
+              brings out. Under the face: «+5 очков», «🔥 3 подряд в срок» (over a card — by the small
+              face, above) */}
           {mode !== "panel" ? pillNode : null}
           <PointsFlight arrival={arrival.key} />
           {/* right under the face: what the secretary is doing, «на месте», and a little lower
@@ -843,7 +823,7 @@ export default function FeedPage() {
             {isSecretary && mode === "idle" && !loading ? (
               <motion.div
                 key="desk-under"
-                className={`flex shrink-0 flex-col items-center${cameFrom !== "idle" ? ` ${AFTER_CARD}` : ""}`}
+                className={`relative z-10 flex shrink-0 flex-col items-center${cameFrom !== "idle" ? ` ${AFTER_CARD}` : ""}`}
                 exit={FADE_AWAY}
                 data-testid="desk-under"
               >
@@ -873,14 +853,16 @@ export default function FeedPage() {
       card={{ open: cardOpen, panel: panel ?? "", label: balls.find((ball) => ball.id === panel)?.label ?? "Панель", receded: false, onClose: closePanel, body: cardBody, initial: !reopened }}
     >
 
-      {/* the secretary's hint; it never lies over the secretary's cards, nor over a card going down
-          (D-178). Everybody else has the button under the face (D-173) */}
-      {isSecretary && mode === "idle" && !(mineErrands.length > 0 || visitRows.some((v) => !v.closed_at)) ? (
+      {/* what a tap on the resting face brings out — the balls, by their own labels (D-208); it
+          never lies over the secretary's cards, nor over a card going down (D-178). After
+          hydration, like the words over the face */}
+      {mode === "idle" && (isSecretary ? !(mineErrands.length > 0 || visitRows.some((v) => !v.closed_at)) : hydrated && !loading && !raising) ? (
         <p
           className={`pointer-events-none fixed inset-x-0 z-20 px-4 text-center text-[12px] leading-4 text-muted${afterCard ? ` ${AFTER_CARD}` : ""}`}
           style={{ bottom: "calc(var(--tabbar-space) + 2px)" }}
+          data-testid="face-hint"
         >
-          нажмите — дела, сообщения, эфир, календарь, заявки
+          нажмите — {balls.map((ball) => ball.label.toLowerCase()).join(", ")}
         </p>
       ) : null}
 

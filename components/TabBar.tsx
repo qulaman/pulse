@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 
+import { MiniMark } from "@/components/brand/MiniMark";
 import { HapticSwitch } from "@/components/ui/HapticSwitch";
 import { warmCalendarMonth } from "@/lib/calendar/queries";
 import { monthOf } from "@/lib/datetime/calendar";
@@ -29,20 +30,10 @@ const stroke = {
 };
 
 const ICONS = {
-  pulse: (
-    <svg width="24" height="24" viewBox="0 0 24 24" {...stroke} aria-hidden>
-      <polyline points="2,12 7,12 10,5 14,19 17,10 19,12 22,12" />
-    </svg>
-  ),
-  // Лента is the face's home: the face itself, not a chat bubble — the bubble is «Сообщения» on
-  // the balls, and the same icon in two places sent people to the wrong one (D-173)
-  feed: (
-    <svg width="24" height="24" viewBox="0 0 24 24" {...stroke} aria-hidden>
-      <circle cx="12" cy="12.5" r="8.5" />
-      <ellipse cx="9.2" cy="11.6" rx="1.5" ry="1.9" fill="currentColor" stroke="none" />
-      <ellipse cx="14.8" cy="11.6" rx="1.5" ry="1.9" fill="currentColor" stroke="none" />
-    </svg>
-  ),
+  // Пульс is the mascot's home, for every role: its small self, alive on every screen (D-209) —
+  // not a chat bubble, the bubble is «Сообщения» on the balls (D-173)
+  pulse: <MiniMark state="idle" size={24} />,
+  feed: <MiniMark state="idle" size={24} />,
   tasks: (
     <svg width="24" height="24" viewBox="0 0 24 24" {...stroke} aria-hidden>
       <polyline points="4,7 6,9 9.5,5.5" />

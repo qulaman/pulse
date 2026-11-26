@@ -2,6 +2,7 @@
 
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
+import { MiniMark } from "@/components/brand/MiniMark";
 import { HapticSwitch } from "@/components/ui/HapticSwitch";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "gold";
@@ -25,7 +26,7 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
   size?: Size;
   block?: boolean;
-  /** Spinner in place of the label; the button stays the same width so nothing jumps. */
+  /** The small mark at work in place of the label (D-209); the button stays the same width so nothing jumps. */
   loading?: boolean;
   icon?: ReactNode;
 };
@@ -59,7 +60,7 @@ export function Button({ variant = "primary", size = "md", block, loading, icon,
           aria-hidden
           className="absolute inset-0 flex items-center justify-center"
         >
-          <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent opacity-80" />
+          <MiniMark state="busy" size={18} />
         </span>
       ) : null}
       <span className={`inline-flex items-center gap-2 ${loading ? "invisible" : ""}`}>

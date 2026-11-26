@@ -3,6 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { MiniMark } from "@/components/brand/MiniMark";
 import { receiptLine, useThreadReceipt } from "@/lib/tasks/receipts";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import { fetchEarlierMessages, isPendingMessage, prependMessages, THREAD_PAGE, type TaskMessage } from "@/lib/tasks/queries";
@@ -202,7 +203,7 @@ export function ThreadView({ taskId, companyId, messages, loading, userId, actio
         {/* a short thread sits on the composer, like every messenger; a long one scrolls */}
         <div className={`flex flex-col gap-2 ${compact ? "mt-auto" : ""}`}>
           {loading && rows.length === 0 ? (
-            <p className="text-[14px] leading-[18px] text-muted">Загружаю переписку…</p>
+            <p className="text-[14px] leading-[18px] text-muted"><MiniMark state="busy" tone="var(--accent)" className="mr-2" />Загружаю переписку…</p>
           ) : rows.length === 0 ? (
             // the day's report has its own place (D-152): the thread does not invite it (D-173)
             <p className="text-[14px] leading-[18px] text-muted">Сообщений пока нет. Вопрос или голосовое — сюда</p>

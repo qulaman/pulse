@@ -86,7 +86,7 @@ export function DisputesList() {
 
   if (items.length === 0) {
     return disputes.isPending ? (
-      <EmptyState title="Загружаю споры" />
+      <EmptyState busy title="Загружаю споры" />
     ) : disputes.isError ? (
       <EmptyState
         title="Споры не загрузить"

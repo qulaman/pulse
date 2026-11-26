@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { MiniMark } from "@/components/brand/MiniMark";
 import { PersonFace } from "@/components/people/PeoplePicker";
 import { HapticSwitch } from "@/components/ui/HapticSwitch";
 import { Sheet } from "@/components/ui/Sheet";
@@ -436,7 +437,7 @@ function PeopleSheet({ open, onClose, onPick }: { open: boolean; onClose: () => 
             </button>
           </li>
         ))}
-        {team.isLoading ? <li className="px-1 py-4 text-[14px] text-muted">Загружаю…</li> : null}
+        {team.isLoading ? <li className="px-1 py-4 text-[14px] text-muted"><MiniMark state="busy" tone="var(--accent)" className="mr-2" />Загружаю…</li> : null}
       </ul>
     </Sheet>
   );

@@ -2,6 +2,7 @@
 /* Parts of this sheet kept in files of their own and loaded with it, before the rest of it: the
    mascot's motion, the screen head, the desk's surface (and the console's, which wears it too). */
 @import "../components/brand/mark/mark.css";
+@import "../components/brand/mini-mark.css";
 @import "../components/pulse/idle-field.css";
 @import "../components/ui/page-head.css";
 @import "./desk/surface.css";

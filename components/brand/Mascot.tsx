@@ -18,7 +18,7 @@ import type { MascotSeason } from "@/lib/mascot/season";
  *   offering     parsed and waiting for the tap: an arrow up, the mark presses itself like a button
  *   thinking     pondering, loading, «не разобрал»: the arcs drift, three dots
  *   speaking     the dot beats with the words, a small wave goes with each (D-49)
- *   happy        gold, the eye smiles, sparks
+ *   happy        gold, the dot beams (rays with the beat), sparks
  *   sleeping     the eye is shut, the slowest breath, z-s drift up — the screen before the first tap
  *   alert        «насторожен»: the pupil sweeps the room and goes up to a small amber light over
  *                the ring — the director's face never gets angry, it watches

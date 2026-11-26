@@ -135,8 +135,7 @@ export function hashOf(id: string, salt: number): number {
  * rows may stand, when that is further: the area is cut short so a flying dream never clips the
  * edge of the screen, and a circle that stands still needs no such room — on a short phone
  * that margin is a whole row of people. `skirt` — how far under the middle of the face the
- * floor starts: the words under the head (`SKIRT`), or further when the screen keeps more there
- * (Пульс's «Сказать · Написать» under the resting face).
+ * floor starts: the words under the head (`SKIRT`), or further when a screen keeps more there.
  */
 export function teamField({
   people,

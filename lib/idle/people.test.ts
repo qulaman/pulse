@@ -63,7 +63,7 @@ describe("teamField", () => {
     }
   });
 
-  it("starts the floor further down when the screen keeps buttons under the face (Пульс: «Сказать · Написать»)", () => {
+  it("starts the floor further down when a screen keeps more under the face", () => {
     const skirt = SKIRT + 34;
     const layout = teamField({ people: team(20), ...AREA, skirt });
     for (const person of team(20).filter((p) => !p.busy)) {

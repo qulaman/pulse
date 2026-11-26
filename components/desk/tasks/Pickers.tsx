@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 
+import { MiniMark } from "@/components/brand/MiniMark";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { humanAqtobe } from "@/lib/ai/time";
 import { addDays, addMonths, aqtobeIsoToYmdHm, monthMatrix, monthOf, monthTitleRu, todayYmd, WEEKDAYS_SHORT_RU, type Month } from "@/lib/datetime/calendar";
@@ -388,7 +389,7 @@ export function PersonPicker({
         />
       </div>
       <ul ref={list} role="listbox" aria-label={title} className="no-bar overflow-y-auto py-1" style={{ height: rows * 40 + 8 }}>
-        {roster.isPending ? <li className="px-3 py-2 text-[13px] leading-4 text-muted">Загружаю людей…</li> : null}
+        {roster.isPending ? <li className="px-3 py-2 text-[13px] leading-4 text-muted"><MiniMark state="busy" tone="var(--accent)" className="mr-2" />Загружаю людей…</li> : null}
         {!roster.isPending && people.length === 0 ? <li className="px-3 py-2 text-[13px] leading-4 text-muted">Никого не нашёл</li> : null}
         {people.map((person) => {
           const current = person.id === currentId;

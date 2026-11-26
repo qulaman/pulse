@@ -33,7 +33,7 @@ export type GlyphId =
   | "thumb"
   | "mic-off"
   | "signal-off"
-  | "smile"
+  | "beam"
   | "shut"
   | "sound"
   | "quiet"
@@ -76,7 +76,15 @@ function Slash() {
   );
 }
 
-const STAR = "M0 -19 L5.3 -6.6 L18.6 -5.6 L8.4 3.1 L11.6 16.2 L0 9.2 L-11.6 16.2 L-8.4 3.1 L-18.6 -5.6 L-5.3 -6.6 Z";
+/** The rays of the beaming dot: eight, long and short in turn, from just off the dot outwards. */
+const RAYS = Array.from({ length: 8 }, (_, n) => {
+  const angle = (n * Math.PI) / 4;
+  const [from, to] = [19.5, n % 2 ? 22.5 : 25.5];
+  const at = (r: number) => `${(Math.sin(angle) * r).toFixed(2)} ${(-Math.cos(angle) * r).toFixed(2)}`;
+  return `M${at(from)} L${at(to)}`;
+});
+
+const STAR ="M0 -19 L5.3 -6.6 L18.6 -5.6 L8.4 3.1 L11.6 16.2 L0 9.2 L-11.6 16.2 L-8.4 3.1 L-18.6 -5.6 L-5.3 -6.6 Z";
 
 function draw(id: GlyphId, count: number, hot: boolean): ReactNode {
   switch (id) {
@@ -275,9 +283,21 @@ function draw(id: GlyphId, count: number, hot: boolean): ReactNode {
           <Slash />
         </>
       );
-    // glad: in a ring an arc is read as a mouth, so the glad one curves up at its ends
-    case "smile":
-      return <path d="M-15 -5 Q0 13 15 -5" {...line} strokeWidth="9" className="bk-g-grin" />;
+    // glad: the dot beams — it stays a dot, short rays go out of it with every beat. Never an arc:
+    // in a ring an arc is read as a mouth or a tick
+    case "beam":
+      return (
+        <>
+          <g className="bk-g-rays-turn">
+            <g className="bk-g-rays">
+              {RAYS.map((ray) => (
+                <path key={ray} d={ray} {...line} strokeWidth="4" />
+              ))}
+            </g>
+          </g>
+          <circle r="12.5" fill="currentColor" className="bk-g-sun" />
+        </>
+      );
     // an eye shut: a level line — not an arc, an arc would smile
     case "shut":
       return <path d="M-14 0 H14" {...line} strokeWidth="8" className="bk-g-doze" />;

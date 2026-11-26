@@ -585,8 +585,14 @@
 .bk-g-doze {
   animation: bk-g-doze 5.8s var(--ease-in-out) infinite both;
 }
-.bk-g-grin {
-  animation: bk-g-grin 3.4s var(--ease-in-out) infinite both;
+.bk-g-sun {
+  animation: bk-g-sun 3.4s var(--ease-in-out) infinite both;
+}
+.bk-g-rays {
+  animation: bk-g-rays 3.4s var(--ease-in-out) infinite both;
+}
+.bk-g-rays-turn {
+  animation: bk-g-rays-turn 26s linear infinite;
 }
 .bk-g-swell {
   animation: bk-g-swell 2.2s var(--ease-in-out) infinite both;
@@ -1101,9 +1107,16 @@
   0%, 100% { transform: scaleX(1); }
   45% { transform: scaleX(0.86); }
 }
-@keyframes bk-g-grin {
-  0%, 30%, 100% { transform: translateY(0) scale(1); }
-  10% { transform: translateY(-2px) scale(1.09); }
+@keyframes bk-g-sun {
+  0%, 30%, 100% { transform: scale(1); }
+  10% { transform: scale(1.14); }
+}
+@keyframes bk-g-rays {
+  0%, 38%, 100% { opacity: 0.55; transform: scale(0.82); }
+  13% { opacity: 1; transform: scale(1.1); }
+}
+@keyframes bk-g-rays-turn {
+  to { transform: rotate(360deg); }
 }
 @keyframes bk-g-hot {
   0%, 100% { transform: scale(0.82); }
@@ -1119,9 +1132,9 @@
   24% { transform: scale(0.96); }
   32%, 100% { transform: scale(1); }
 }
-@keyframes bk-a-g-hold {
-  0%, 100% { transform: scale(1); }
-  20%, 80% { transform: scale(1.08); }
+@keyframes bk-a-g-dream {
+  0%, 100% { transform: translateY(0) scaleX(1); }
+  18%, 72% { transform: translateY(-2px) scale(0.4, 1.6); }
 }
 @keyframes bk-a-g-bob {
   0%, 100% { transform: translateY(0) rotate(0deg); }

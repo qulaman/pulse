@@ -1,7 +1,8 @@
 /*
- * The waiting screen behind the mark (components/pulse/IdleField.tsx, D-206): orbits, motes, waves, a
- * comet. Part of app/globals.css by its @import. `transform` and `opacity` only; the orbits stand
- * still and are painted once, only what rides them is a layer.
+ * The waiting screen behind the mark (components/pulse/IdleField.tsx, D-206): orbits, their riders —
+ * small marks and motes — waves, a comet. Part of app/globals.css by its @import. `transform` and
+ * `opacity` only: a rider changes colour by one ink fading over another, never by animating a
+ * colour. The orbits stand still and are painted once, only what rides them is a layer.
  */
 
 .idle-field {
@@ -53,18 +54,81 @@
   height: 0;
   animation: idle-turn 60s linear infinite;
 }
-.idle-mote {
+/* a rider sits at the arm's end; everything of it is drawn round that point */
+.idle-rider {
   position: absolute;
   left: 0;
   top: 0;
   display: block;
+  width: 0;
+  height: 0;
+  transform: translateX(var(--r));
+}
+.idle-rider i {
+  position: absolute;
+  display: block;
+}
+/* it answers the wave that passes its orbit: a flare, like the beat of the mark */
+.idle-flare {
+  left: 0;
+  top: 0;
   width: var(--d);
   height: var(--d);
   margin: calc(var(--d) / -2) 0 0 calc(var(--d) / -2);
+  opacity: 0.45;
+  transform: scale(0.85);
+  animation: idle-flare 3.2s var(--ease-out) var(--at) infinite both;
+}
+/* no waves (the face is saying something): the riders only twinkle, each on its own clock */
+.idle-field[data-still] .idle-flare {
+  animation: idle-twinkle 5s ease-in-out var(--twinkle) infinite both;
+}
+/* two inks one over the other: the field's own colour and the rider's; the upper one comes and goes */
+.idle-ink {
+  inset: 0;
   border-radius: 50%;
   background: currentColor;
-  transform: translateX(var(--r));
-  animation: idle-twinkle 5s ease-in-out infinite both;
+}
+.idle-ink-to {
+  color: var(--to);
+  opacity: 0;
+  animation: idle-hue 17s ease-in-out infinite alternate both;
+}
+/* a small mark: a dot in a ring, as one drawing */
+.idle-rider[data-kind="mark"] .idle-ink {
+  background: radial-gradient(closest-side, currentColor 30%, transparent 36% 66%, currentColor 72% 94%, transparent 100%);
+}
+/* …and it lets go of a wave of its own when the big one passes */
+.idle-echo {
+  left: 0;
+  top: 0;
+  width: var(--d);
+  height: var(--d);
+  margin: calc(var(--d) / -2) 0 0 calc(var(--d) / -2);
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  opacity: 0;
+  animation: idle-echo 3.2s var(--ease-out) var(--at) infinite both;
+}
+.idle-field[data-still] .idle-echo {
+  animation: none;
+}
+/* a speck goes round one of the marks */
+.idle-moon {
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  animation: idle-turn 7s linear infinite;
+}
+.idle-moon i {
+  left: calc(var(--d) * 0.5 + 5px);
+  top: -1.25px;
+  width: 2.5px;
+  height: 2.5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.7;
 }
 
 /* once in a while a comet runs a stretch of the middle orbit */
@@ -93,8 +157,22 @@
   to { transform: rotate(360deg); }
 }
 @keyframes idle-twinkle {
-  0%, 100% { opacity: 0.28; transform: translateX(var(--r)) scale(0.8); }
-  50% { opacity: 0.72; transform: translateX(var(--r)) scale(1.1); }
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 0.75; transform: scale(1.1); }
+}
+@keyframes idle-flare {
+  0%, 44%, 100% { opacity: 0.45; transform: scale(0.85); }
+  5% { opacity: 1; transform: scale(1.5); }
+  17% { opacity: 0.85; transform: scale(0.96); }
+}
+@keyframes idle-echo {
+  0% { opacity: 0; transform: scale(1); }
+  6% { opacity: 0.6; }
+  36%, 100% { opacity: 0; transform: scale(3.4); }
+}
+@keyframes idle-hue {
+  0%, 30% { opacity: 0; }
+  70%, 100% { opacity: 1; }
 }
 @keyframes idle-comet {
   0%, 78% { opacity: 0; transform: rotate(40deg); }

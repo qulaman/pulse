@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 import { DirectorBusyLine } from "@/components/desk/calendar/DirectorBusyLine";
+import { DeskPulse } from "@/components/desk/ui/DeskPulse";
 import { CommandLine } from "@/components/desk/CommandLine";
 import { useScreenKeys } from "@/components/desk/team/keys";
 import { Menu, type MenuItem } from "@/components/desk/ui/Menu";
@@ -171,6 +172,7 @@ export function TopBar({ fullName, role, folded = false, onToggleNav }: { fullNa
     <header className="desk-head flex h-[72px] shrink-0 items-center gap-4 border-b border-border px-6">
       {role === "director" ? <CommandLine /> : <SecretaryCalls />}
       <div className="ml-auto flex shrink-0 items-center gap-2">
+        <DeskPulse />
         <ThemeButton />
         <KeysButton />
         <MeMenu fullName={fullName} role={role} folded={folded} onToggleNav={onToggleNav} />

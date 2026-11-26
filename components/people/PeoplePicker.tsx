@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
+import { MiniMark } from "@/components/brand/MiniMark";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { haptic } from "@/lib/haptics";
@@ -178,7 +179,7 @@ function PickerBody(props: PeoplePickerProps) {
       ) : null}
 
       <div ref={list} className="no-bar -mx-1 max-h-[52vh] overflow-y-auto px-1" style={held === null ? undefined : { minHeight: held }}>
-        {roster.isLoading ? <p className="px-2 py-3 text-[14px] text-muted">Загружаю людей…</p> : null}
+        {roster.isLoading ? <p className="px-2 py-3 text-[14px] text-muted"><MiniMark state="busy" tone="var(--accent)" className="mr-2" />Загружаю людей…</p> : null}
         {roster.isError ? <p className="px-2 py-3 text-[14px] text-danger">Не смог загрузить список — проверьте связь</p> : null}
 
         {suggested.length > 0 ? (

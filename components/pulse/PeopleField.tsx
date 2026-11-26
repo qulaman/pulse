@@ -58,7 +58,6 @@ export function PeopleField({
   hy,
   wide,
   reach,
-  skirt,
   waves = false,
   picked = null,
   onPick,
@@ -73,8 +72,6 @@ export function PeopleField({
   /** how far out the rows may stand, further than the play area */
   wide?: number;
   reach?: number;
-  /** where the floor of idlers starts under the face (`teamField`) */
-  skirt?: number;
   /** the waves of the field are crossing the screen — the room bobs as each goes past (D-206) */
   waves?: boolean;
   /** the id of the idler picked on this screen; the screen keeps it, this layer draws it */
@@ -138,9 +135,9 @@ export function PeopleField({
   // ---- where everybody stands --------------------------------------------------------------
   const digest = crew.map((c) => `${c.member.id}:${c.member.fullName}:${c.look.busy ? 1 : 0}`).join("|");
   const layout = useMemo(
-    () => teamField({ people: crew.map((c) => ({ id: c.member.id, fullName: c.member.fullName, busy: c.look.busy })), hx, hy, wide, reach, skirt }),
+    () => teamField({ people: crew.map((c) => ({ id: c.member.id, fullName: c.member.fullName, busy: c.look.busy })), hx, hy, wide, reach }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `digest` is the digest of who stands where
-    [digest, hx, hy, wide, reach, skirt],
+    [digest, hx, hy, wide, reach],
   );
 
   // Who has just changed halves. Nobody jumps across the face: they fly, and until they land

@@ -161,7 +161,7 @@ export function LedgerTable({ who, search }: { who: string; search: string }) {
         rowKey={(row) => row.id}
         empty={
           ledger.isPending ? (
-            <EmptyState title="Загружаю историю" />
+            <EmptyState busy title="Загружаю историю" />
           ) : ledger.isError ? (
             <EmptyState
               title="Историю не загрузить"

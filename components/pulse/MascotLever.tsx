@@ -181,8 +181,7 @@ export const MascotLever = memo(function MascotLever({
   // this face is being held with the microphone open — the screen may want to know
   const setHeld = useCallback((value: boolean) => onHold?.(value), [onHold]);
   const [cancelArmed, setCancelArmed] = useState(false);
-  // the finger is on this face with the microphone open: only then does «ведите вверх» mean anything —
-  // a recording started by «Сказать» under the face has its own «Отменить»
+  // the finger is on this face with the microphone open: only then does «ведите вверх» mean anything
   const [holding, setHolding] = useState(false);
   // the voice swells the blob; painted into a CSS variable of the face's wrapper (below)
   const faceRef = useRef<HTMLSpanElement>(null);

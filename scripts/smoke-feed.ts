@@ -8,9 +8,9 @@
  * The day: a new order, a rework, an overdue one, a director's unread word, one in work, one on
  * review; an announcement not yet acknowledged; a meeting in 40 minutes the person is invited to.
  * It runs at 11:00 by the screen's own clock, so the evening report never adds to the counts. With
- * orders waiting Лента opens with «Дела» up; put away, the card stays down at rest, the face speaks and
- * the button under it says where a tap leads; a touch on the card over the face opens «Дела» for good
- * (D-173).
+ * orders waiting Лента opens with «Дела» up; put away, the card stays down at rest, the face speaks,
+ * nothing to press stands under it and a line at the bottom says what a tap brings (D-208); a touch
+ * on the card over the face opens «Дела» for good (D-173).
  *   pnpm smoke:feed            (against http://localhost:3000, APP_URL to override)
  *   EMPLOYEE=erlan.b@demo.local (default) — any demo employee with the demo password
  * Screenshots land in SHOTS_DIR (default ./.smoke-ui/feed).
@@ -433,6 +433,11 @@ async function main() {
     if (!me?.userId || !me.companyId) throw new Error("no session");
     who = { userId: me.userId, companyId: me.companyId };
     today = day(me.userId, me.companyId, { at: morning });
+    // «Подключение» opens by itself on a person's first visit on a phone (D-190) and would take the
+    // place of the screen under test: this phone has shown it already
+    await context.addInitScript((key) => {
+      if (!window.localStorage.getItem(key)) window.localStorage.setItem(key, JSON.stringify({ seen: new Date().toISOString() }));
+    }, `pulse.setup.v1.${me.userId}`);
 
     await page.goto(`${APP_URL}/feed`, { waitUntil: "networkidle" });
     const face = page.locator('[data-testid="mascot-lever"]').first();
@@ -503,29 +508,26 @@ async function main() {
     }
     // the card slides down under the screen's own clock (installed above): give the exit its time
     await card.waitFor({ state: "detached", timeout: 3_000 }).catch(() => {});
-    // the grip puts the card away to rest, not to the balls (D-173): the words and the way back are there
+    // the grip puts the card away to rest, not to the balls (D-173)
     await page.waitForTimeout(1600);
-    const goAfterGrip = await page.locator('[data-testid="face-go"]').innerText().catch(() => "");
-    const putAway = (await card.count()) === 0 && (await mode()) === "idle" && goAfterGrip.includes("Открыть дела");
-    const restState = `${await mode()}, карточек ${await card.count()}, кнопка «${goAfterGrip}»`;
-    record("рывок за ручку убирает карточку — в покой, с «Открыть дела ›»", putAway, restState);
+    const putAway = (await card.count()) === 0 && (await mode()) === "idle";
+    const restState = `${await mode()}, карточек ${await card.count()}`;
+    record("рывок за ручку убирает карточку — в покой", putAway, restState);
     await shot("04-grip-rest");
 
     // at rest (D-173): the card put away stays down, the face says the greeting and the line that
-    // matters most, and a real button under it names where a tap leads
+    // matters most; nothing to press stands under it, a line at the bottom names what a tap brings (D-208)
     await page.waitForTimeout(1000);
     await shot("04b-rest");
     record("убранная карточка сама не поднимается", (await mode()) === "idle" && (await card.count()) === 0, (await mode()) ?? "");
     const restWords = await page.locator('[data-testid="assistant-line"]').allInnerTexts();
     const greetsWithMain = restWords.length >= 1 && restWords.length <= 2 && restWords[0].includes("на доработке");
     record("в покое лицо говорит: приветствие и главное", greetsWithMain, restWords.join(" / "));
-    const go = page.locator('[data-testid="face-go"]');
-    const goBox = await go.boundingBox();
-    const faceBox = await face.boundingBox();
+    const hint = await page.locator('[data-testid="face-hint"]').innerText().catch(() => "");
     record(
-      "под лицом — кнопка «Открыть дела ›» не ниже 44 px",
-      (await go.innerText()).includes("Открыть дела") && Boolean(goBox && goBox.height >= 44 && faceBox && goBox.y >= faceBox.y + faceBox.height - 4 && goBox.y - (faceBox.y + faceBox.height) < 40),
-      goBox && faceBox ? `${Math.round(goBox.height)} px, ${Math.round(goBox.y - (faceBox.y + faceBox.height))} px под лицом` : "нет кнопки",
+      "под лицом кнопок нет, внизу строка «нажмите — дела, …»",
+      (await page.locator('[data-testid="face-go"]').count()) === 0 && hint.includes("нажмите") && hint.includes("дела"),
+      hint || "нет строки",
     );
     // a reload is the same visit: the orders put away do not raise the card again
     await page.reload({ waitUntil: "networkidle" });

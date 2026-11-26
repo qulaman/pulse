@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 
+import { MiniMark } from "@/components/brand/MiniMark";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { useVoiceClaim, voiceClaimed } from "@/components/desk/voice/claim";
@@ -110,7 +111,7 @@ export function RecordingPill({
       data-recording="1"
       className={`desk-focus flex h-8 shrink-0 items-center gap-2 border border-accent px-2.5 text-accent transition-colors duration-[120ms] hover:bg-accent/10 ${className}`}
     >
-      <span aria-hidden className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-current" />
+      <MiniMark state="listening" size={16} />
       {clock}
       {level}
       <span className="text-[13px] font-semibold leading-4">Готово</span>
