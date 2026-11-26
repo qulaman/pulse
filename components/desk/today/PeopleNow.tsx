@@ -135,7 +135,7 @@ export function PeopleNow({
 
   return (
     <section className="desk-crew @container flex flex-col gap-1" data-testid="today-team" data-asleep={asleep ? "" : undefined}>
-      <SectionLabel count={rows.length} action={<BlockLink href="/desk/team">Команда →</BlockLink>}>
+      <SectionLabel count={rows.length} action={<BlockLink href="/desk/team">Команда</BlockLink>}>
         Люди
       </SectionLabel>
       {note}

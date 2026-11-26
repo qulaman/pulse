@@ -945,10 +945,6 @@
     animation: day-fill 380ms var(--day-snap) both;
     animation-delay: calc(260ms + var(--i) * 35ms);
   }
-  .day-all {
-    animation: day-pop 380ms var(--day-pop) both;
-  }
-
   /* the week's race: the leader wears the crown, a new leader breathes one gold ring */
   .day-racer-face {
     position: relative;

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CircleCheck, ClipboardCheck, MonitorUp, TrendingUp, Trophy } from "lucide-react";
+import { Check, ClipboardCheck, MonitorUp, TrendingUp, Trophy } from "lucide-react";
 import { LayoutGroup, motion } from "motion/react";
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
@@ -40,15 +40,7 @@ export function ReportsTile({ day, index }: { day: TeamDay; index: number }) {
   return (
     <Card ink="ok" ok={all} index={index} testId="today-reports">
       <Head icon={ClipboardCheck} title="Отчёты" href="/desk/reports">
-        {all ? (
-          <span className="day-all">
-            <Pill ink="ok" icon={CircleCheck}>
-              все
-            </Pill>
-          </span>
-        ) : missed > 0 ? (
-          <Pill ink="pencil">нет отчёта · {missed}</Pill>
-        ) : null}
+        {missed > 0 ? <Pill ink="pencil">нет отчёта · {missed}</Pill> : null}
       </Head>
       {quiet ? (
         <p className="py-2 text-[13px] leading-5 day-muted">{quiet}</p>

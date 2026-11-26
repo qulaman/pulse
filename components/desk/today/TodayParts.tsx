@@ -198,8 +198,8 @@ export function Decisions({
         action={
           items.length > 0 ? (
             <span className="flex items-center gap-4">
-              <BlockLink href="/desk/inbox">Разобрать по одной →</BlockLink>
-              <BlockLink href="/desk/tasks?tab=yours">Все в задачах →</BlockLink>
+              <BlockLink href="/desk/inbox">Разобрать по одной</BlockLink>
+              <BlockLink href="/desk/tasks?tab=yours">Все в задачах</BlockLink>
             </span>
           ) : null
         }
@@ -359,7 +359,7 @@ export function Attention({
   if (items.length === 0) return null;
   return (
     <section className="@container flex flex-col gap-1" data-testid="today-attention">
-      <SectionLabel count={items.length} action={<BlockLink href="/desk/tasks?tab=working">В задачах →</BlockLink>}>
+      <SectionLabel count={items.length} action={<BlockLink href="/desk/tasks?tab=working">В задачах</BlockLink>}>
         Требует внимания
       </SectionLabel>
       <WorkList>
@@ -431,7 +431,7 @@ export function Overdue({
   if (items.length === 0) return null;
   return (
     <section className="@container flex flex-col gap-1" data-testid="today-overdue">
-      <SectionLabel count={items.length} action={<BlockLink href="/desk/tasks?tab=yours&due=overdue">В задачах →</BlockLink>}>
+      <SectionLabel count={items.length} action={<BlockLink href="/desk/tasks?tab=yours&due=overdue">В задачах</BlockLink>}>
         Просрочено
       </SectionLabel>
       <WorkList>

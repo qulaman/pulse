@@ -205,14 +205,9 @@ export function DayFeed({
         <FeedRows rows={rows} now={now} ether={ether.data} idByName={idByName} taskOf={taskOf} onOpenTask={onOpenTask} />
       ) : null}
       {quiet ? (
-        <p className="flex items-start gap-2.5 py-2 text-[13px] leading-5" data-testid="today-feed-empty">
-          <Mark icon={Sparkles} ink="muted" size={15} />
-          <span>
-            <span className="font-medium">Пока тихо</span>
-            <span className="day-muted block text-[12px] leading-4">
-              {director ? "Начните поручение со слова «всем» — его получит вся команда" : "События дня встанут на линию сверху и в список"}
-            </span>
-          </span>
+        <p className="py-2 text-[13px] leading-5" data-testid="today-feed-empty">
+          <span className="font-medium">Пока тихо</span>
+          {director ? <span className="day-muted block text-[12px] leading-4">Начните поручение со слова «всем» — его получит вся команда</span> : null}
         </p>
       ) : null}
     </Card>
@@ -406,7 +401,7 @@ function FeedRows({
         {more > 0 ? (
           <Unfold key="more">
             <Link href="/desk/ether" prefetch={false} className="day-row day-muted" style={{ gridTemplateColumns: "1fr" }} data-testid="today-feed-more">
-              ещё {more} — вся лента →
+              ещё {more} — вся лента
             </Link>
           </Unfold>
         ) : null}

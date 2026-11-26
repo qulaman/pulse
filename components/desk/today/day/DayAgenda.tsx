@@ -109,7 +109,7 @@ export function DayAgenda({
         {due.length > DUE_SHOWN ? (
           <Unfold key="due-more">
             <Link href="/desk/tasks?due=today" prefetch className="day-row desk-focus day-muted" style={{ gridTemplateColumns: "1fr" }} data-testid="today-due-more">
-              ещё {due.length - DUE_SHOWN} {pluralRu(due.length - DUE_SHOWN, ["срок", "срока", "сроков"])} — в «Задачах» →
+              ещё {due.length - DUE_SHOWN} {pluralRu(due.length - DUE_SHOWN, ["срок", "срока", "сроков"])} — в «Задачах»
             </Link>
           </Unfold>
         ) : null}

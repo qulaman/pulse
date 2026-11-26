@@ -128,8 +128,8 @@ export function DoorCard({
 }
 
 /**
- * The meeting of the moment: on now — a still green dot in the head, «идёт», how much of it has
- * gone as a bar and how much is left; within half an hour — «через N мин» in sky. Who comes, as a
+ * The meeting of the moment: on now — the head says «Идёт встреча» with a still green dot, how much
+ * of it has gone as a bar and how much is left; within half an hour — «через N мин» in sky. Who comes, as a
  * stack of circles. The name leads to the meeting in «Календарь».
  */
 export function MeetingCard({ event, now, index }: { event: CalendarEvent; now: Date; index: number }) {
@@ -143,11 +143,7 @@ export function MeetingCard({ event, now, index }: { event: CalendarEvent; now: 
   return (
     <Card ink={live ? "ok" : "sky"} now index={index} testId="today-meeting">
       <Head icon={CalendarClock} title={live ? "Идёт встреча" : "Скоро встреча"} href={`/desk/calendar?e=${encodeURIComponent(event.id)}`} corner={live ? "state" : null}>
-        {live ? (
-          <Pill ink="ok" testId="today-meeting-live">
-            <LiveDot ink="ok" mode="state" /> идёт
-          </Pill>
-        ) : (
+        {live ? null : (
           <Pill ink="sky" icon={Timer}>
             через {ahead} мин
           </Pill>
