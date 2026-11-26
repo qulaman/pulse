@@ -417,7 +417,7 @@ export default function FeedPage() {
 
   // the small things a face does on its own (D-82): asleep, busy with the stack, waiting for
   // the director, glad on the ring — never over a thought, a panel or the celebration
-  const acts = useMascotActs(mascot, !isSecretary && !loading && !thought && !cheering && mode !== "panel", undefined, carrying);
+  const acts = useMascotActs(mascot, !isSecretary && !loading && !thought && !cheering && mode !== "panel");
   const play = acts.play;
   // one called act after another — an accepted pile nods once per card — but never far behind
   const actsEnd = useRef(0);

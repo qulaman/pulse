@@ -5,9 +5,8 @@
  * a hand shows up as the list of rows it touched, with the old and the new picture on disk.
  *   pnpm smoke:mascot              compare with the baseline (APP_URL, default http://localhost:3000)
  *   UPDATE=1 pnpm smoke:mascot     take the baseline (after a change you meant)
- *   SETS=sec,desk                  only these sets (drop-states, drop-acts, sec, desk, transitions, jobs,
- *                                  job-acts — the jobs of the open balls: taken up, switched, put down, and
- *                                  every act that moves a hand over every job that holds one)
+ *   SETS=sec,desk                  only these sets (drop-states, drop-acts, sec, desk, transitions,
+ *                                  jobs — the jobs of the open balls: taken up, switched, put down)
  * Pictures live in .smoke-ui/mascot/motion/{baseline,current}/<set>/<row>.png.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -17,7 +16,7 @@ import { chromium, type Page } from "playwright";
 import { APP_URL } from "./lib/smoke";
 
 const UPDATE = process.env.UPDATE === "1";
-const SETS = (process.env.SETS ?? "drop-states,drop-acts,sec,desk,transitions,jobs,job-acts").split(",");
+const SETS = (process.env.SETS ?? "drop-states,drop-acts,sec,desk,transitions,jobs").split(",");
 const ROOT = join(process.cwd(), ".smoke-ui", "mascot", "motion");
 /** A pixel counts as changed past this much on any channel; a row, past this many pixels. */
 const CHANNEL = 24;

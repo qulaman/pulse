@@ -129,7 +129,7 @@ const MEASURE = `(() => {
   if (main) walk(main, 0);
   // a stage that shows the error screen, or nothing, is a broken stage, not a steady one
   const broken = !main ? "пустой экран" : /Что-то пошло не так|Вышла новая версия/.test(document.body.innerText) ? "экран ошибки" : null;
-  const mascot = [...document.querySelectorAll("main svg.mascot")].find(shown);
+  const mascot = [...document.querySelectorAll("main .mascot")].find(shown);
   const header = [...document.querySelectorAll("header.border-b")].find(shown);
   return { blocks, mascot: box(mascot), header: box(header), broken };
 })()`;

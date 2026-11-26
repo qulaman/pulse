@@ -1,0 +1,194 @@
+import type { MascotAct, MascotState } from "@/components/brand/Mascot";
+
+import type { GlyphId } from "./glyphs";
+
+/**
+ * What the mark looks like in each state and what each act does to it (D-205) — one table for the
+ * drawing, the storyboards and the tests. The mark is three figures: a dot (the pupil), a ring, light
+ * round the ring. A state is told by what they do; a thing of the product — a card, an envelope, a
+ * cup — is what the dot turns into, never something held beside it. Motion is named here and lives
+ * in `mark.css`: a state's loops carry their own time, an act's one-shots take the act's (`ACT_MS`).
+ */
+
+export const SLEEP_COLOR = "color-mix(in srgb, var(--accent) 72%, var(--surface-2))";
+
+/** Below this size the mark is an avatar: no waves, no acts, no outfit — only what tells the state. */
+export const LITE_PX = 40;
+/** Below this the light keeps closer to the ring: the mark stands in a card beside words. */
+export const FULL_PX = 96;
+
+/** The ring: one piece, three arcs a little apart, opened wide to listen, or dimmed under a comet. */
+export type Ring = "whole" | "apart" | "open" | "dim";
+/** The dot: itself, three bars of the voice, three lines of text being read, three dots taking turns. */
+export type Core = "dot" | "bars" | "lines" | "dots";
+/** The light: waves leaving, coming in, the voice, nothing, and the special cases of a few states. */
+export type Glow = "pulse" | "sleep" | "fast" | "talk" | "press" | "in" | "voice" | "burst" | "party" | "quiet";
+
+export type StateLook = {
+  color: string;
+  ring?: Ring;
+  /** the arcs turn: in thirds with a stop, slowly, or fast */
+  spin?: "step" | "drift" | "fast";
+  core?: Core;
+  /** what the dot has turned into */
+  glyph?: GlyphId;
+  glow?: Glow;
+  /** the colour of the waves when it is not the mark's own (gold for Эфир) */
+  wave?: string;
+  /** where the pupil looks by itself */
+  look?: "wander" | "sweep" | "follow";
+  blink?: boolean;
+  /** a comet runs the ring */
+  comet?: boolean;
+  /** loops: the whole mark, the ring, the dot, the halo — `animation` shorthands */
+  all?: string;
+  ringAnim?: string;
+  coreAnim?: string;
+  halo?: string;
+  /** what stands round the ring */
+  extra?: "zzz" | "sparks" | "light" | "confetti";
+};
+
+const BREATH = "bk-breath 3.4s var(--ease-in-out) infinite";
+const CALM = "bk-calm 4.6s var(--ease-in-out) infinite";
+
+export const STATE_LOOK: Record<MascotState, StateLook> = {
+  // awake, nothing asked: the pulse, a look about, a blink
+  calm: { color: "var(--accent)", glow: "pulse", look: "wander", blink: true, coreAnim: "bk-beat 3.4s var(--ease-in-out) infinite", ringAnim: BREATH, halo: "bk-halo-beat 3.4s var(--ease-in-out) infinite" },
+  // the ring opens, the dot is the voice
+  listening: { color: "var(--accent)", ring: "open", spin: "drift", core: "bars", glow: "voice" },
+  // the recording is put away: a note sinks into the ring
+  saving: { color: "var(--accent)", glyph: "note", glow: "in", ringAnim: "bk-gulp 1.3s var(--ease-in-out) infinite" },
+  // the voice becomes text: three lines written one after another under a running comet
+  transcribing: { color: "var(--warn)", ring: "dim", comet: true, core: "lines", glow: "quiet" },
+  // the text is sorted: the arcs step round, three dots take turns
+  parsing: { color: "var(--warn)", ring: "apart", spin: "step", core: "dots", glow: "quiet", halo: "bk-think 1.05s var(--ease-in-out) infinite" },
+  // the dot is thrown
+  sending: { color: "var(--accent)", glow: "burst", coreAnim: "bk-launch 1.5s linear infinite both", ringAnim: "bk-recoil 1.5s var(--ease-out) infinite", halo: "bk-flash 1.5s var(--ease-out) infinite" },
+  // parsed and waiting for the tap: the mark is a button that presses itself
+  offering: { color: "var(--accent)", glyph: "send", glow: "press", all: "bk-press 1.6s var(--ease-in-out) infinite" },
+  // pondering, loading, «не разобрал»
+  thinking: { color: "var(--warn)", ring: "apart", spin: "drift", core: "dots", glow: "quiet", halo: "bk-think 1.4s var(--ease-in-out) infinite" },
+  // the dot beats with the words, a small wave goes with each
+  speaking: { color: "var(--accent)", glow: "talk", blink: true, coreAnim: "bk-talk 0.9s var(--ease-in-out) infinite", ringAnim: CALM },
+  // gold, the eye smiles, sparks
+  happy: { color: "var(--gold)", glyph: "smile", glow: "pulse", extra: "sparks", ringAnim: BREATH, halo: "bk-halo-beat 3.4s var(--ease-in-out) infinite" },
+  // the eye is shut, the slowest breath
+  sleeping: { color: SLEEP_COLOR, glyph: "shut", glow: "sleep", extra: "zzz", all: "bk-sleep 5.8s var(--ease-in-out) infinite", halo: "bk-sleep-halo 5.8s var(--ease-in-out) infinite" },
+  // news from the base: a comet runs the ring, the pupil follows it
+  processing: { color: "var(--accent)", ring: "dim", comet: true, look: "follow", glow: "in", coreAnim: "bk-sync-dot 1.15s var(--ease-in-out) infinite" },
+  // «обрати внимание»: a card with «!», two hops
+  calling: { color: "var(--warn)", glyph: "card-bang", glow: "fast", all: "bk-call 1.8s var(--ease-in-out) infinite" },
+  // watchful: the pupil sweeps the room, an amber light over the ring
+  alert: { color: "var(--accent)", glow: "quiet", look: "sweep", extra: "light", ringAnim: "bk-taut 2.3s var(--ease-in-out) infinite" },
+  // an unread word of the director: an envelope, a tremble
+  nervous: { color: "var(--warn)", glyph: "envelope", glow: "quiet", ringAnim: "bk-tremble 0.42s linear infinite" },
+  // the deadline burns: a clock racing, the mark shaking
+  panicking: { color: "var(--danger)", ring: "apart", glyph: "clock", glow: "fast", all: "bk-shake 0.3s linear infinite" },
+  // the work of an open ball of Пульс: its thing in the middle of the ring
+  checking: { color: "var(--accent)", glyph: "list", glow: "quiet", ringAnim: CALM },
+  chatting: { color: "var(--accent)", glyph: "bubble", glow: "quiet", ringAnim: CALM },
+  announcing: { color: "var(--accent)", glyph: "megaphone", glow: "fast", ringAnim: "bk-pump 0.65s var(--ease-in-out) infinite" },
+  scheduling: { color: "var(--accent)", glyph: "calendar", glow: "quiet", ringAnim: CALM },
+  serving: { color: "var(--accent)", glyph: "cup", glow: "quiet", all: "bk-bow 3.2s var(--ease-in-out) infinite" },
+  // the batch has flown
+  celebrating: { color: "var(--gold)", ring: "apart", spin: "fast", glyph: "star", glow: "party", extra: "confetti", all: "bk-jump 1.2s var(--ease-in-out) infinite" },
+  // the employee's orders in work: the stack
+  working: { color: "var(--accent)", glyph: "stack", glow: "pulse", ringAnim: BREATH, halo: "bk-halo-beat 3.4s var(--ease-in-out) infinite" },
+  // everything handed in: the hourglass turns
+  awaiting: { color: "var(--accent)", glyph: "hourglass", glow: "quiet", ringAnim: CALM },
+  // Эфир heard: gold waves come in
+  tuned: { color: "var(--accent)", glow: "in", wave: "var(--gold)", coreAnim: "bk-sync-dot 1.15s var(--ease-in-out) infinite" },
+};
+
+export type ActLook = {
+  /** what the dot turns into for the act (the state's own thing steps aside) */
+  glyph?: GlyphId;
+  color?: string;
+  ring?: Ring;
+  /** one-shots, by the name of their keyframes: the whole mark, the ring, the dot, the pupil's look, its lid, the thing */
+  all?: string;
+  ringAnim?: string;
+  coreAnim?: string;
+  lookAnim?: string;
+  lidAnim?: string;
+  glyphAnim?: string;
+  /** light of the act's own: two friendly waves, one strong, one coming in */
+  glow?: "waves" | "burst" | "in";
+  extra?: "tunes" | "bubble" | "moon" | "spark" | "drop" | "dust";
+};
+
+const POP = "bk-a-g-pop";
+const BOB = "bk-a-g-bob";
+
+export const ACT_LOOK: Record<MascotAct, ActLook> = {
+  // ── the director's face answers the board ──
+  tick: { glyph: "check", glyphAnim: POP },
+  receive: { glyph: "card", glyphAnim: "bk-a-g-side", ringAnim: "bk-a-gulp" },
+  hmm: { glyph: "card-x", glyphAnim: "bk-a-g-tilt" },
+  puzzle: { glyph: "question", glyphAnim: BOB },
+  stamp: { glyph: "check", glyphAnim: "bk-a-g-stamp", ringAnim: "bk-a-kick", glow: "burst" },
+  flick: { glyph: "card", glyphAnim: "bk-a-g-flick" },
+  crumple: { glyph: "card", glyphAnim: "bk-a-g-crumple" },
+  push: { glyph: "card-bang", glyphAnim: "bk-a-g-push", glow: "waves" },
+  clock: { glyph: "clock", glyphAnim: BOB },
+  reply: { glyph: "bubble-lines", glyphAnim: POP },
+  // ── a phrase that did not make it ──
+  ear: { glyph: "quiet", ring: "open", glyphAnim: BOB, glow: "in" },
+  scratch: { glyph: "question", ring: "apart", ringAnim: "bk-a-rock", glyphAnim: BOB },
+  pinch: { coreAnim: "bk-a-pinch" },
+  nomic: { glyph: "mic-off", glyphAnim: "bk-a-g-no" },
+  signal: { glyph: "signal-off", glyphAnim: "bk-a-g-no" },
+  // ── what happens to the employee's work ──
+  catch: { glyph: "card", glyphAnim: "bk-a-g-drop", ringAnim: "bk-a-gulp" },
+  insist: { glyph: "card-bang2", glyphAnim: "bk-a-g-no", all: "bk-a-hop2" },
+  nod: { glyph: "check", glyphAnim: POP, all: "bk-a-nod" },
+  raise: { glyph: "question", glyphAnim: BOB },
+  shrug: { glyph: "card-x", ring: "apart", ringAnim: "bk-a-shrug", glyphAnim: "bk-a-g-tilt" },
+  poof: { glyph: "card", glyphAnim: "bk-a-g-poof", extra: "dust" },
+  handover: { glyph: "card", glyphAnim: "bk-a-g-fly", ringAnim: "bk-a-kick", glow: "burst" },
+  medal: { glyph: "medal", color: "var(--gold)", glyphAnim: POP, extra: "spark", glow: "waves" },
+  boomerang: { glyph: "card", glyphAnim: "bk-a-g-boomerang", ringAnim: "bk-a-gulp-late" },
+  relief: { lidAnim: "bk-a-rest", ringAnim: "bk-a-inhale", glow: "waves" },
+  letter: { glyph: "envelope", glyphAnim: "bk-a-g-drop" },
+  read: { glyph: "lines", glyphAnim: POP },
+  listen: { glyph: "sound", glyphAnim: POP },
+  thumb: { glyph: "thumb", glyphAnim: POP },
+  watch: { glyph: "clock", glyphAnim: BOB },
+  wipe: { lidAnim: "bk-a-rest", extra: "drop" },
+  shuffle: { glyph: "stack", glyphAnim: "bk-a-g-shuffle" },
+  coin: { glyph: "coin", color: "var(--gold)", glyphAnim: "bk-a-g-flip", extra: "spark" },
+  // ── the small things of a face at rest ──
+  yawn: { ringAnim: "bk-a-inhale", coreAnim: "bk-a-yawn", glyphAnim: "bk-a-yawn" },
+  snore: { ringAnim: "bk-a-inhale", extra: "bubble" },
+  turn: { ring: "apart", ringAnim: "bk-a-roll", glyphAnim: "bk-a-g-tilt" },
+  doze: { all: "bk-a-nodoff" },
+  mumble: { glyphAnim: "bk-a-mumble", coreAnim: "bk-a-mumble" },
+  smile: { glyph: "smile", glyphAnim: "bk-a-g-hold" },
+  kick: { all: "bk-a-jerk" },
+  wave: { lookAnim: "bk-a-wiggle", glow: "waves" },
+  wink: { lidAnim: "bk-a-wink", extra: "spark" },
+  hop: { all: "bk-a-hop" },
+  spin: { ring: "apart", ringAnim: "bk-a-spin" },
+  whistle: { coreAnim: "bk-a-purse", lookAnim: "bk-a-lookup", extra: "tunes" },
+  heart: { glyph: "heart", glyphAnim: "bk-a-g-beat" },
+  orbit: { lookAnim: "bk-a-follow", extra: "moon" },
+  peek: { lookAnim: "bk-a-peek", ringAnim: "bk-a-lean" },
+  tiptoe: { all: "bk-a-tiptoe", lookAnim: "bk-a-lookup" },
+};
+
+/** The stages of a phrase: the mark is busy with it and plays nothing else. */
+const BUSY: ReadonlySet<MascotState> = new Set(["listening", "saving", "transcribing", "parsing", "sending"]);
+
+/** The work of an open ball of Пульс: the dot is that ball's thing for as long as the card is open. */
+const JOBS: ReadonlySet<MascotState> = new Set(["checking", "chatting", "announcing", "tuned", "scheduling", "serving"]);
+
+/**
+ * Whether an act called on purpose plays on when the face turns to `to` (D-82): it does — the wave
+ * of waking plays over whatever the face wakes into, the employee's «есть!» over the stack it now
+ * carries — unless the face turns to a ball's work or a stage of the phrase. The dot is one: the
+ * new thing is shown at once, not after somebody else's gesture.
+ */
+export function actSurvives(to: MascotState): boolean {
+  return !BUSY.has(to) && !JOBS.has(to);
+}

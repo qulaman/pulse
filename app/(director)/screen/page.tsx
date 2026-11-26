@@ -88,7 +88,7 @@ import { awaitingDirector, unreadMessages, waitedSince } from "@/lib/visits/text
  */
 
 const SCENE_HINT: Record<TvScene, string> = {
-  face: "Сегодня: число дня, Капля и ближайшая встреча",
+  face: "Сегодня: число дня, маскот и ближайшая встреча",
   clock: "Тихие часы: для совещаний",
   team: "Кто чем занят",
   calendar: "Неделя вперёд: что запланировано",

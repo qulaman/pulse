@@ -64,7 +64,7 @@ async function main() {
     const looks = (await page.locator('[data-gaze="on"]').count()) === 1 && (await page.locator('[data-testid="look-line"]').count()) === 1;
     record("маскот смотрит на человека", looks);
     // the face, not the small secretary at the desk (D-85), who is a mascot too
-    record("маскот проснулся", (await page.locator('[data-testid="mascot-lever"] svg.mascot').first().getAttribute("data-state")) !== "sleeping");
+    record("маскот проснулся", (await page.locator('[data-testid="mascot-lever"] .mascot').first().getAttribute("data-state")) !== "sleeping");
     record("кружок выбран", (await page.locator('[data-testid="crew"][data-picked="1"]').getAttribute("data-person")) === person);
 
     await page.locator('[data-testid="pick-text"]').click();

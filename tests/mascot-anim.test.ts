@@ -15,8 +15,9 @@ import { ACT_MS, ACT_TOUCH, Mascot, type MascotAct, type MascotState } from "@/c
 import { SEC_ACT_MS, SecretaryMascot, type SecretaryAct } from "@/components/secretary/SecretaryMascot";
 import { DESK_SCENES, type DeskPhase } from "@/lib/errands/scene";
 
-// the face keyframes live in components/brand/mascot.css, which globals.css @imports
-const CSS = ["app/globals.css", "components/brand/mascot.css", "components/secretary/secretary-mascot.css"].map((file) => readFileSync(join(process.cwd(), file), "utf8")).join("\n");
+// the mascot's keyframes live in components/brand/mark/mark.css, the secretary's in mascot.css and
+// secretary-mascot.css; globals.css @imports them
+const CSS = ["app/globals.css", "components/brand/mark/mark.css", "components/brand/mascot.css", "components/secretary/secretary-mascot.css"].map((file) => readFileSync(join(process.cwd(), file), "utf8")).join("\n");
 const DECLARED = [...CSS.matchAll(/@keyframes\s+([\w-]+)/g)].map((match) => match[1]!);
 
 /** Every state, checked for exhaustiveness by the type. */
@@ -92,7 +93,7 @@ function overruns(base: string, withAct: string, ms: number): string[] {
 }
 
 describe("acts end within their length", () => {
-  it("«Капля» and the employee's face", () => {
+  it("the mascot: the director's and the employee's face", () => {
     const late: string[] = [];
     for (const act of Object.keys(ACT_MS) as MascotAct[]) {
       // `checking` — the director's board acts on «Задачи», with the card on the clipboard (tasks/020)

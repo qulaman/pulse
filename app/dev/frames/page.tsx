@@ -2,7 +2,6 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 
-import { ACT_HANDS } from "@/components/brand/hands";
 import { ACT_MS, Mascot, type MascotAct, type MascotState } from "@/components/brand/Mascot";
 import { SecretaryDesk } from "@/components/pulse/SecretaryDesk";
 import { FINISH_MS, SEC_ACT_MS, SecretaryMascot, type SecretaryAct } from "@/components/secretary/SecretaryMascot";
@@ -16,11 +15,10 @@ import type { MascotSeason } from "@/lib/mascot/season";
  * on its own clock, so a screenshot of a row is the whole motion at a glance — a hand that stays
  * on the desk while the arms go up shows in one picture.
  *
- *   ?set=drop-states | drop-acts | sec | desk | transitions | jobs | job-acts   which rows
+ *   ?set=drop-states | drop-acts | sec | desk | transitions | jobs   which rows
  *                                               (transitions, jobs: the face mounts in one state and
  *                                               turns to the next — the columns are the moments after
- *                                               the turn; job-acts: every act that moves a hand, over
- *                                               every job that holds one)
+ *                                               the turn)
  *   ?only=<row key>[,<row key>…]                just these rows
  *   ?n=8                                        frames per row
  *   ?size=96                                    the face's size; the cells grow with it
@@ -442,23 +440,7 @@ function jobs(size: number): Row[] {
   }));
 }
 
-/** The jobs that hold a hand (components/brand/hands.ts): an act that moves one has to find it free. */
-const HELD_JOBS: MascotState[] = ["checking", "announcing", "scheduling", "serving"];
-
-function jobActs(size: number): Row[] {
-  return HELD_JOBS.flatMap((on) =>
-    (Object.keys(ACT_HANDS) as MascotAct[]).map((act) => ({
-      key: `job-${on}-${act}`,
-      label: `${act} · ${on}`,
-      dur: ACT_MS[act],
-      w: size * 1.7,
-      h: size * 1.7,
-      draw: () => <Mascot state={on} size={size} act={act} />,
-    })),
-  );
-}
-
-const SETS: Record<string, (size: number) => Row[]> = { "drop-states": dropStates, "drop-acts": dropActs, sec: secretary, desk, transitions, jobs, "job-acts": jobActs };
+const SETS: Record<string, (size: number) => Row[]> = { "drop-states": dropStates, "drop-acts": dropActs, sec: secretary, desk, transitions, jobs };
 
 /** The query string after hydration — a string snapshot, so the store stays stable. */
 function useSearch(): string | null {

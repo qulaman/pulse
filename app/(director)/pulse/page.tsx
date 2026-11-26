@@ -117,7 +117,7 @@ const DESK_AT = { x: 80, y: -14 };
 const DRINKS = new Set(["coffee", "tea", "water"]);
 
 /**
- * Пульс — the director's home (D-57, D-60): the face of «Капля» asleep in the middle of
+ * Пульс — the director's home (D-57, D-60): the mascot asleep in the middle of
  * the screen. Hold it to speak, pull it down to type, tap it and it wakes: three balls
  * orbit it — tasks, messages, Эфир — each with its count; a tap on a ball opens its panel
  * (the card deck with the gestures, or the announcements).

@@ -1,64 +1,54 @@
-import { Linger, SHRINK_OUT } from "@/components/brand/Linger";
-import { Carry, MascotFace } from "@/components/brand/MascotFace";
-import { MascotOverlays } from "@/components/brand/MascotOverlays";
-import { Beacon, PropsBehind, PropsBehindBody, PropsOnBody } from "@/components/brand/MascotStateProps";
-import { MIRROR, type BoardAct, type ErrorAct, type WorkAct } from "@/components/brand/MascotWork";
-import { BODY, COLOR, LOOK_EASE, mascotPose, POSE } from "@/lib/mascot/pose";
+import type { CSSProperties, ReactNode } from "react";
+
+import { CONFETTI } from "@/components/brand/confetti";
+import { SeasonWear } from "@/components/brand/MascotSeason";
+import { Bit } from "@/components/brand/mark/glyphs";
+import { GlyphSwap } from "@/components/brand/mark/GlyphSwap";
+import { ACT_LOOK, FULL_PX, LITE_PX, STATE_LOOK } from "@/components/brand/mark/look";
 import type { MascotSeason } from "@/lib/mascot/season";
 
 /**
- * The assistant character «Капля» (D-45, docs/DESIGN.md §3): one soft blob, two eyes.
- * The director's, the employee's and the wall's faces. Each state is its own choreography — a
- * one-shot pose on entry (lean in, wind up), a looping body motion, the eyes as a pair,
- * and a small prop around the blob — so the director reads what the assistant is doing
- * at a glance, without a caption:
- *   calm         breathing, a rare glance
- *   listening    leans in and offers an ear; nods with the voice; sound waves enter the ear
- *   saving       tucks the note away: a card sinks into the head, a satisfied squash
- *   transcribing reads: bars of sound turn into lines of text, the eyes scan left → right
- *   parsing      sorts: cards appear over the head one by one and slide into a stack
- *   sending      winds up and throws the card itself: it shows up in the hand on the wind-up,
- *                leaves at the release and flies up and away; the eyes follow it
- *   offering     holds the parsed cards and asks to be tapped: presses itself down and pops
- *                back like a button, a ring ripples out, the stack lifts with the pop
- *   thinking     generic pondering — a tilt, wandering eyes, three dots
- *   speaking     the mouth moves with the words, small nods (D-49)
- *   happy        golden, squint and blush, a slow breath with sparks
- *   sleeping     eyes shut, the slowest breath, z-s drifting up — the screen before the first tap
- *                (what he dreams of is drawn outside the head: components/pulse/DreamOrbit.tsx)
- *   alert        «насторожен»: straightens up and holds still, the eyes sweep the room, stop at
- *                the edges and go up to a small amber light over the head — the director's face
- *                never gets angry, it watches
- *   calling      «обрати внимание!»: leans in, hops twice like a dog at the door, an «!»
- *                pops over its head — the employee has an order nobody has opened yet
- *   processing   reads the data and reports: plugs into the store, the eyes run glyphs,
- *                then a hop and the tick of the new status (D-65)
- * What the face does while a ball of Пульс is open (D-82) — the ball's own job, done by hand:
- *   checking     «Задачи»: holds a clipboard and ticks it off row by row, the eyes go down the list
- *   chatting     «Сообщения»: a bubble comes in with the typing dots, the face turns and answers
- *   announcing   «Эфир»: a megaphone at the mouth, the body pumps, the words go out in arcs
- *   scheduling   «Календарь»: a tear-off calendar over the shoulder, a page flips and falls
- *   serving      «Секретарь»: a cup on a saucer held with care, steam rising, a small bow
- *   celebrating  the batch has flown: a jump and a burst of confetti
- * The employee's face carries the work the director hands out (D-110, components/brand/MascotWork.tsx):
- *   calling      the «!» is the new order itself — a card with a «!» badge over the head
- *   nervous      the unread word of the director — an envelope bobs by the head
- *   working      orders in work: holds the stack of cards (`carry`), glances down at it
- *   awaiting     everything handed over: an hourglass runs, the eyes go up to the director
- *   tuned        «Эфир» from the listener's side: an ear up, gold arcs come into it
- * An `act` is a one-shot over any of them (D-82): the small things a face does while nothing
- * is asked of it — a yawn, a snore bubble, rolling over, a wave, a wink (see MascotAct) — and,
- * on the employee's face, what has just happened to the work: a card caught, «есть!», a hand
- * up, a shrug, the card thrown up to the director, a medal, the card back to redo (D-110).
- * Two hands, never three: whatever the face holds is held by a hand you can see (a thumb over the
- * edge, a mitten under the saucer, a fist on the grip), and a gesture takes the hand that is free —
- * the employee's stack is in the right hand, so a wave, a shrug or a wiped brow uses the left.
- * Perf contract: a single SVG, animation on transform and opacity only, CSS keyframes
- * (app/globals.css), nothing on filter or box-shadow. Pass `level` (0..1, from the
- * microphone) while listening — the blob swells and nods harder with the voice.
- * The drawing goes in paint order: the props of a state (MascotStateProps.tsx) behind the face,
- * behind the body and on it, the eyes and mouths (MascotFace.tsx), then what is drawn over
- * everything (MascotOverlays.tsx); what the props make of the face — lib/mascot/pose.ts.
+ * The mascot of the product (D-205, docs/DESIGN.md §3): a dot inside a ring, light and waves round
+ * the ring. The director's, the employee's and the wall's face. Three figures and nothing else: the
+ * dot is a pupil — it looks about, blinks, looks where the screen tells it; the ring breathes, opens
+ * into three arcs, turns; the light pulses, takes the voice, throws a wave. A thing of the product
+ * is never held beside the mark: the dot turns into it — a card, an envelope, a cup, a medal — and
+ * back. Each state is its own choreography, read at a glance without a caption:
+ *   calm         the pulse: two beats and two waves, a look about, a blink
+ *   listening    the ring opens into three arcs, the dot is three bars of the voice, a wave trembles round
+ *   saving       the recording is put away: a note sinks into the ring
+ *   transcribing the voice becomes text: three lines written one by one, a comet runs the ring
+ *   parsing      the text is sorted: the arcs step round by thirds, three dots take turns
+ *   sending      the dot is thrown up, the ring kicks back, one strong wave; a new dot grows
+ *   offering     parsed and waiting for the tap: an arrow up, the mark presses itself like a button
+ *   thinking     pondering, loading, «не разобрал»: the arcs drift, three dots
+ *   speaking     the dot beats with the words, a small wave goes with each (D-49)
+ *   happy        gold, the eye smiles, sparks
+ *   sleeping     the eye is shut, the slowest breath, z-s drift up — the screen before the first tap
+ *   alert        «насторожен»: the pupil sweeps the room and goes up to a small amber light over
+ *                the ring — the director's face never gets angry, it watches
+ *   processing   news from the base: a comet runs the dimmed ring, the pupil follows it (D-65)
+ *   calling      «обрати внимание!»: a card with «!», two hops like a dog at the door
+ *   nervous      the director's unread word: an envelope, a tremble
+ *   panicking    the deadline burns: red, a clock racing, the mark shaking
+ * What the dot is while a ball of Пульс is open (D-82) — the ball's own thing:
+ *   checking     «Задачи»: a list ticked off row by row
+ *   chatting     «Сообщения»: a bubble with the typing dots
+ *   announcing   «Эфир»: a megaphone, the words leave it in arcs, waves go out
+ *   tuned        «Эфир» from the listener's side: gold waves come in
+ *   scheduling   «Календарь»: a tear-off calendar, a day falls off
+ *   serving      «Секретарь»: a cup with steam, a small bow
+ *   celebrating  the batch has flown: a star, the arcs fly round, confetti
+ * The employee's face carries the work the director hands out (D-110):
+ *   working      orders in work: a stack of cards (`carry` — how many, a red mark when one is due)
+ *   awaiting     everything handed over: an hourglass turns
+ * An `act` is a one-shot over any of them (D-82): the small things a face does at rest — a yawn,
+ * a hop, a wink, a tune — and what has just happened to the work: a card caught, «есть!», a medal,
+ * the card back to redo. For its length the dot turns into the act's thing, then back into the
+ * state's. What each state and act is made of — components/brand/mark/look.ts.
+ * Perf contract: drawn by the server (one small client part swaps the things), motion on
+ * `transform` and `opacity` only, CSS keyframes (components/brand/mark/mark.css). Pass `level` (0..1,
+ * from the microphone) while listening, or paint `--mascot-level` on an ancestor.
  */
 export type MascotState =
   | "calm"
@@ -87,6 +77,33 @@ export type MascotState =
   | "awaiting"
   | "tuned";
 
+/** What has just happened to the employee's work (D-110). */
+export type WorkAct =
+  | "catch"
+  | "insist"
+  | "nod"
+  | "raise"
+  | "shrug"
+  | "poof"
+  | "handover"
+  | "medal"
+  | "boomerang"
+  | "relief"
+  | "letter"
+  | "read"
+  | "listen"
+  | "thumb"
+  | "watch"
+  | "wipe"
+  | "shuffle"
+  | "coin";
+
+/** The director's face answers the board: a gesture of an aide with a card, not a feeling (tasks/020). */
+export type BoardAct = "tick" | "receive" | "hmm" | "puzzle" | "stamp" | "flick" | "crumple" | "push" | "clock" | "reply";
+
+/** A phrase that did not make it (docs/AI.md §11). */
+export type ErrorAct = "ear" | "scratch" | "pinch" | "nomic" | "signal";
+
 /**
  * The small one-shots of a face at rest (D-82): played over the state, never instead of it,
  * so the barometer still reads — a sleeping face yawns and stays asleep. The waiting screen
@@ -114,7 +131,7 @@ export type MascotAct =
   | BoardAct
   | ErrorAct;
 
-/** How long each act takes: the screen clears it after this, the keyframes are cut to it. */
+/** How long each act takes: the screen clears it after this, the one-shots of the act last exactly this. */
 export const ACT_MS: Record<MascotAct, number> = {
   // the director's face answers the board (tasks/020)
   tick: 1200,
@@ -171,17 +188,79 @@ export const ACT_MS: Record<MascotAct, number> = {
 
 /**
  * The moment an act lands, for a phone that can answer it in the hand (Android; iOS has no
- * vibration API): the card caught, the harder «!!», the medal on the chest, the card back on the
- * crown — [ms into the act, vibration pattern]. The screen that plays the act schedules it.
+ * vibration API): the card caught, the harder «!!», the medal, the card back in the ring —
+ * [ms into the act, vibration pattern]. The screen that plays the act schedules it.
  */
 export const ACT_TOUCH: Partial<Record<MascotAct, [number, number | number[]]>> = {
-  catch: [570, 18],
+  catch: [450, 18],
   insist: [570, [18, 60, 24]],
-  medal: [720, [14, 50, 22]],
-  boomerang: [700, 22],
+  medal: [340, [14, 50, 22]],
+  boomerang: [1360, 22],
 };
 
-export { SLEEP_COLOR } from "@/lib/mascot/pose";
+export { SLEEP_COLOR } from "@/components/brand/mark/look";
+
+/**
+ * The mark is drawn once, in a 240-box, and scaled to the size asked for: one transform, not a new
+ * drawing. The ring's outer width in that drawing, and the share of the screen's box it takes — what
+ * the blob of «Капля» took.
+ */
+const RING = 107;
+const FILL = 0.84;
+
+/** A third of the ring, at the top; the other two are this one turned. Round ends, radius 50. */
+const ARC = "M -43.301 -25 A 50 50 0 0 1 43.301 -25";
+/** A rim light on the ring's upper left, along its outer edge — the side the dot's glint is on. */
+const SHINE = "M -46.49 -21.68 A 51.3 51.3 0 0 1 -19.22 -47.56";
+
+/** A ring that waves: two of them turning against each other read as a trembling wave. */
+const WAVY = (() => {
+  const lobes = 14;
+  const points = 224;
+  let d = "";
+  for (let i = 0; i < points; i++) {
+    const angle = (i / points) * Math.PI * 2;
+    const r = 86 + 2.6 * Math.sin(angle * lobes);
+    d += `${i === 0 ? "M" : "L"}${(Math.cos(angle) * r).toFixed(2)} ${(Math.sin(angle) * r).toFixed(2)}`;
+  }
+  return `${d}Z`;
+})();
+
+/**
+ * The three pills of the dot: where each stands in a row, how tall it is as a silent bar, how long
+ * as a line of text (the last one is short and starts at the same left edge), how much of the
+ * voice it takes and how late — the side bars follow the middle one.
+ */
+const PILLS = [
+  { i: -1, rest: 14, len: 150, lx: "0px", voice: 0.68, lag: "160ms" },
+  { i: 0, rest: 26, len: 150, lx: "0px", voice: 1, lag: "90ms" },
+  { i: 1, rest: 14, len: 86, lx: "-7px", voice: 0.68, lag: "160ms" },
+];
+
+/** The looks of the pupil a state names. */
+const LOOKS = {
+  wander: "bk-wander 13s var(--ease-out) infinite",
+  sweep: "bk-sweep 4.6s var(--ease-in-out) infinite",
+  follow: "bk-follow 1.15s linear infinite",
+};
+const BLINK = "bk-blink 7.3s linear infinite";
+
+/** Sparks of a happy face: where each stands round the ring and when it lights. */
+const SPARKS = [
+  { x: -68, y: -40, delay: "0s" },
+  { x: 70, y: -22, delay: "0.8s" },
+  { x: 48, y: 62, delay: "1.6s" },
+];
+/** The dust of a card taken back. */
+const PUFFS = [
+  { x: -46, y: -30 },
+  { x: 44, y: -34 },
+  { x: -52, y: 22 },
+  { x: 50, y: 26 },
+  { x: 0, y: -54 },
+];
+
+const at = (x: number, y: number) => ({ "--x": `${x}px`, "--y": `${y}px` }) as CSSProperties;
 
 export function Mascot({
   state = "calm",
@@ -198,113 +277,250 @@ export function Mascot({
   /** a one-shot over the state (D-82); the screen clears it after ACT_MS */
   act?: MascotAct | null;
   /**
-   * The employee's orders in work, held as a stack of cards (D-110): how many, and whether one
-   * of them is due within the hour. null or zero — empty hands.
+   * The employee's orders in work (D-110): how many, and whether one of them is due within the
+   * hour — the stack the dot is while they are in work. null or zero — one card.
    */
   carry?: { count: number; hot?: boolean } | null;
   /** a holiday of the company's calendar to dress for (D-119, lib/mascot/useSeason.ts) */
   season?: MascotSeason | null;
   /**
-   * Where the face is looking, as a direction from its middle (−1..1 on each axis): the eyes
-   * go there and hold, the head leans a little the same way (D-84 — the person the director
-   * has just tapped). null — the state's own look.
+   * Where the pupil looks, as a direction from the middle (−1..1 on each axis): it goes there and
+   * holds, the ring leans a little the same way (D-84 — the person the director has just tapped).
+   * null — the state's own look.
    */
   gaze?: { x: number; y: number } | null;
 }) {
-  const pose = mascotPose({ state, size, level, act, carry, season, gaze });
-  const { acting, actBody, beacon, detailed, flip, lean, shadow, voiceTransform } = pose;
-  const side = flip ? MIRROR : undefined;
+  const tier = size < LITE_PX ? "lite" : size < FULL_PX ? "mid" : "full";
+  const look = STATE_LOOK[state];
+  // an avatar plays no acts and wears nothing: it only tells the state
+  const doing = tier === "lite" ? null : act;
+  const part = doing ? ACT_LOOK[doing] : null;
+  const once = (name: string | undefined, easing = "var(--ease-in-out)") => (doing && name ? `${name} ${ACT_MS[doing]}ms ${easing} both` : undefined);
+
+  const glyph = part?.glyph ?? look.glyph ?? null;
+  const ring = part?.ring ?? look.ring ?? "whole";
+  const lookAnim = once(part?.lookAnim) ?? (gaze || !look.look ? undefined : LOOKS[look.look]);
+  const lidAnim = once(part?.lidAnim) ?? (look.blink ? BLINK : undefined);
+  const clamped = Math.min(1, Math.max(0, level));
+
+  const root = { width: size, height: size, color: part?.color ?? look.color } as CSSProperties;
+  const mark = {
+    transform: `scale(${((size * FILL) / RING).toFixed(4)})`,
+    // an ancestor may paint the voice itself (the lever does, 20 times a second): a prop of zero must not hide it
+    ...(clamped > 0 ? { "--mascot-level": clamped.toFixed(3) } : null),
+    ...(gaze ? { "--bk-gx": gaze.x.toFixed(3), "--bk-gy": gaze.y.toFixed(3) } : null),
+    ...(look.wave ? { "--bk-wave": look.wave } : null),
+  } as CSSProperties;
 
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 64 64"
-      aria-hidden
-      className="mascot"
-      data-state={state}
-      data-act={act ?? undefined}
-      style={{ overflow: "visible", display: "block" }}
-    >
-      {/* ground shadow mirrors the larger idle motions; no filters */}
-      <ellipse
-        cx="32"
-        cy="61"
-        rx="16"
-        ry="2.5"
-        fill="var(--bg)"
-        opacity="0.5"
-        style={{ transformOrigin: "32px 61px", animation: shadow }}
-      />
-
-      <PropsBehind state={state} pose={pose} side={side} />
-
-      {/* voice: swell and dip follow the microphone (one transform, no re-layout) */}
-      <g
-        data-face
-        style={{
-          transformOrigin: "32px 60px",
-          transform: voiceTransform,
-          transition: "transform 90ms linear",
-          // the only transform JS rewrites frame by frame; promoted while it does, released after
-          willChange: state === "listening" ? "transform" : "auto",
-        }}
+    <span className="mascot" data-state={state} data-act={doing ?? undefined} aria-hidden style={root}>
+      <span
+        className="bk"
+        data-tier={tier}
+        data-ring={ring}
+        data-core={look.core ?? "dot"}
+        data-glow={look.glow ?? "quiet"}
+        data-spin={look.spin}
+        data-comet={look.comet ? "" : undefined}
+        data-glyph={glyph ?? undefined}
+        data-act-glow={part?.glow}
+        data-gaze={gaze ? "" : undefined}
+        style={mark}
       >
-        {/* the lean towards whoever the face is looking at (D-84) — a transition, not a loop */}
-        <g data-gaze={gaze ? "on" : undefined} style={{ transformOrigin: "32px 60px", transform: lean, transition: LOOK_EASE }}>
-        {/* act: a one-shot over whatever the state is doing — the yawn, the roll, the hop (D-82); an
-            act cut short (the face got busy) goes back to rest from where it was, not in one frame.
-            An act drawn on the other side leans the other way: its motion is mirrored around the
-            middle of the face, and what it carries is mirrored back */}
-        <g transform={side}>
-        <Carry on={detailed} k={actBody} origin="32px 58px" mirrored={flip}>
-        <g style={{ transformOrigin: "32px 58px", animation: actBody }}>
-        <g transform={side}>
-          {/* alert: the light over the head (D-149). It goes where an act takes the head — up on tiptoe,
-              out to peek, over to the ear — but not with the breath, so it hangs in the air instead of
-              sitting on the crown; for an act that draws right under it the light steps aside */}
-          <Linger show={beacon} out={SHRINK_OUT} origin="50% 50%">
-            {beacon ? <Beacon detailed={detailed} /> : null}
-          </Linger>
-          {/* pose: one-shot on entry — it starts from the pose the last state left (the lean to the ear) */}
-          <Carry on={detailed} k={POSE[state]} origin="32px 52px">
-          <g style={{ transformOrigin: "32px 52px", animation: POSE[state] }}>
-            {/* loop: the body's own motion — taken over from wherever the last loop was */}
-            <Carry on={detailed} k={BODY[state]} origin="32px 44px">
-            <g style={{ transformOrigin: "32px 44px", animation: BODY[state] }}>
-              <PropsBehindBody state={state} pose={pose} side={side} />
-              <path
-                d="M32 4 C47 4 59 16 59 31 C59 47 47 60 32 60 C17 60 5 49 5 33 C5 18 17 4 32 4 Z"
-                fill={COLOR[state]}
-                style={{ transition: "fill var(--t-screen) var(--ease-out)" }}
-              />
-              {/* highlight: a lighter lens, colour only */}
-              <ellipse
-                cx="24"
-                cy="18"
-                rx="9"
-                ry="5"
-                fill="#ffffff"
-                opacity="0.14"
-                // 7.3s against the body's 5.8s: the gleam drifts through the breath instead of riding it
-                style={{ transformOrigin: "24px 18px", animation: detailed ? "mascot-glint 7.3s ease-in-out infinite" : "none" }}
-              />
+        <Part className="bk-all" anim={look.all}>
+          <Part className="bk-all-act" anim={once(part?.all)}>
+            <span className="bk-p bk-halos">
+              <span className="bk-p bk-halo" style={look.halo ? { animation: look.halo } : undefined} />
+              <span className="bk-p bk-aura" />
+            </span>
+            <span className="bk-p bk-waves">
+              <span className="bk-p bk-wave bk-wave-1" />
+              <span className="bk-p bk-wave bk-wave-2" />
+              <span className="bk-p bk-inwave" />
+              <span className="bk-p bk-burst" />
+              <span className="bk-p bk-awave" />
+              <span className="bk-p bk-aburst" />
+              <span className="bk-p bk-echo" />
+              <span className="bk-p bk-wavy-wrap">
+                <span className="bk-p bk-wavy bk-wavy-a">
+                  <Wavy />
+                </span>
+                <span className="bk-p bk-wavy bk-wavy-b">
+                  <Wavy />
+                </span>
+              </span>
+            </span>
 
-              <PropsOnBody state={state} pose={pose} side={side} carry={carry} season={season} blushMs={acting ? ACT_MS[acting] : 0} />
+            <span className="bk-p bk-ring">
+              <span className="bk-p bk-ring-gaze">
+                <Part className="bk-ring-act" anim={once(part?.ringAnim)}>
+                  <Part className="bk-ring-live" anim={look.ringAnim}>
+                    <span className="bk-p bk-glow" />
+                    <span className="bk-p bk-iris">
+                      <svg viewBox="-60 -60 120 120" aria-hidden>
+                        <circle r="38.5" fill="none" stroke="currentColor" strokeWidth="1.1" strokeDasharray="1.6 6.463" strokeLinecap="round" />
+                      </svg>
+                    </span>
+                    <span className="bk-p bk-arcs">
+                      <span className="bk-p bk-spin-step">
+                        <span className="bk-p bk-spin-drift">
+                          <span className="bk-p bk-spin-fast">
+                            {[0, 120, 240].map((turn) => (
+                              <span key={turn} className="bk-p" style={{ transform: `rotate(${turn}deg)` }}>
+                                <span className="bk-p bk-arc-split">
+                                  <span className="bk-p bk-arc-level">
+                                    <svg viewBox="-60 -60 120 120" aria-hidden>
+                                      <path d={ARC} fill="none" stroke="currentColor" strokeWidth="7" strokeLinecap="round" />
+                                    </svg>
+                                  </span>
+                                </span>
+                              </span>
+                            ))}
+                          </span>
+                        </span>
+                      </span>
+                    </span>
+                    <span className="bk-p bk-shine">
+                      <svg viewBox="-60 -60 120 120" aria-hidden>
+                        <path d={SHINE} fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                    </span>
+                    <span className="bk-p bk-comet" />
+                  </Part>
+                </Part>
+              </span>
+            </span>
 
-              <MascotFace state={state} act={act} pose={pose} side={side} />
-            </g>
-            </Carry>
-          </g>
-          </Carry>
-        </g>
-        </g>
-        </Carry>
-        </g>
-        </g>
-      </g>
+            {/* the holiday on the ring (D-119), drawn in the 64-box «Капля» had: its crown is the ring's top */}
+            {season && tier !== "lite" ? (
+              <span className="bk-p bk-wear">
+                <svg viewBox="0 0 64 64" width="127" height="127" aria-hidden>
+                  <SeasonWear season={season} />
+                </svg>
+              </span>
+            ) : null}
 
-      <MascotOverlays state={state} pose={pose} side={side} />
+            <span className="bk-p bk-ghost bk-ghost-2" />
+            <span className="bk-p bk-ghost bk-ghost-1" />
+
+            <Part className="bk-core" anim={look.coreAnim}>
+              <Part className="bk-look" anim={lookAnim}>
+                <span className="bk-p bk-gaze">
+                  <span className="bk-p bk-dot">
+                    <Part className="bk-dot-act" anim={once(part?.coreAnim)}>
+                      <Part className="bk-blink" anim={lidAnim}>
+                        {PILLS.map((pill) => (
+                          <span
+                            key={pill.i}
+                            className="bk-p bk-pill"
+                            style={
+                              {
+                                "--i": pill.i,
+                                "--b": pill.rest,
+                                "--len": pill.len,
+                                "--lx": pill.lx,
+                                "--bk-lv": pill.voice === 1 ? "var(--mascot-level, 0)" : `calc(var(--mascot-level, 0) * ${pill.voice})`,
+                                "--bk-lag": pill.lag,
+                              } as CSSProperties
+                            }
+                          >
+                            <span className="bk-p bk-pill-hop">
+                              <i className="bk-p bk-cap bk-cap-a" />
+                              <i className="bk-body" />
+                              <i className="bk-p bk-cap bk-cap-b" />
+                            </span>
+                          </span>
+                        ))}
+                        <span className="bk-p bk-shade">
+                          <i className="bk-glint" />
+                        </span>
+                      </Part>
+                    </Part>
+                  </span>
+                  <GlyphSwap id={glyph} count={carry?.count ?? 1} hot={carry?.hot ?? false} anim={once(part?.glyphAnim)} />
+                </span>
+              </Part>
+            </Part>
+
+            {tier === "lite" ? null : (
+              <>
+                {look.extra === "zzz" ? (
+                  <>
+                    <span className="bk-bit bk-z">
+                      <Bit id="z" />
+                    </span>
+                    <span className="bk-bit bk-z bk-z-2">
+                      <Bit id="z" />
+                    </span>
+                  </>
+                ) : null}
+                {look.extra === "sparks"
+                  ? SPARKS.map((spark) => (
+                      <span key={spark.delay} className="bk-bit bk-spark" style={{ ...at(spark.x, spark.y), animationDelay: spark.delay }}>
+                        <Bit id="spark" />
+                      </span>
+                    ))
+                  : null}
+                {look.extra === "light" ? <span className="bk-light" data-prop="light" /> : null}
+                {look.extra === "confetti"
+                  ? CONFETTI.map((bit, n) => (
+                      <span
+                        key={n}
+                        className="bk-confetto"
+                        style={{ ...at(bit.x * 3.4, bit.y * 3.4 - 26), "--r": `${bit.r}deg`, background: bit.color, borderRadius: bit.round ? "50%" : undefined, animationDelay: `${(n % 5) * 0.07}s` } as CSSProperties}
+                      />
+                    ))
+                  : null}
+
+                {part?.extra === "spark" ? (
+                  <span className="bk-bit" style={{ ...at(44, -50), animation: once("bk-a-spark") }}>
+                    <Bit id="spark" />
+                  </span>
+                ) : null}
+                {part?.extra === "tunes" ? (
+                  <>
+                    <span className="bk-bit" style={{ animation: once("bk-a-tune") }}>
+                      <Bit id="tune" />
+                    </span>
+                    <span className="bk-bit" style={{ animation: once("bk-a-tune2") }}>
+                      <Bit id="tune" />
+                    </span>
+                  </>
+                ) : null}
+                {part?.extra === "drop" ? (
+                  <span className="bk-bit" style={{ animation: once("bk-a-drop") }}>
+                    <Bit id="drop" />
+                  </span>
+                ) : null}
+                {part?.extra === "bubble" ? <span className="bk-bubble" style={{ animation: once("bk-a-bubble") }} /> : null}
+                {part?.extra === "moon" ? (
+                  <span className="bk-p bk-moon-path" style={{ animation: once("bk-a-moon", "linear") }}>
+                    <i className="bk-moon" />
+                  </span>
+                ) : null}
+                {part?.extra === "dust" ? PUFFS.map((puff) => <span key={`${puff.x}${puff.y}`} className="bk-puff" style={{ ...at(puff.x, puff.y), animation: once("bk-a-dust") }} />) : null}
+              </>
+            )}
+          </Part>
+        </Part>
+      </span>
+    </span>
+  );
+}
+
+/** A part of the mark that may carry a motion of its own: a loop of the state, a one-shot of an act. */
+function Part({ className, anim, children }: { className: string; anim?: string; children: ReactNode }) {
+  return (
+    <span className={`bk-p ${className}`} style={anim ? { animation: anim } : undefined}>
+      {children}
+    </span>
+  );
+}
+
+function Wavy() {
+  return (
+    <svg viewBox="-100 -100 200 200" width="200" height="200" aria-hidden>
+      <path d={WAVY} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
     </svg>
   );
 }

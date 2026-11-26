@@ -30,7 +30,7 @@ export function MascotPower() {
     );
 
     const watch = (root: ParentNode) => {
-      for (const face of root.querySelectorAll("svg.mascot")) {
+      for (const face of root.querySelectorAll(".mascot")) {
         if (seen.has(face)) continue;
         seen.add(face);
         view.observe(face);
@@ -42,7 +42,7 @@ export function MascotPower() {
       for (const record of records) {
         for (const node of record.addedNodes) {
           if (!(node instanceof Element)) continue;
-          if (node.matches("svg.mascot") && !seen.has(node)) {
+          if (node.matches(".mascot") && !seen.has(node)) {
             seen.add(node);
             view.observe(node);
           } else {

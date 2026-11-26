@@ -7,8 +7,9 @@ const TULIP = "#e0484a";
 const STEM = "#3fa36b";
 
 /**
- * A holiday on the head (D-119), drawn in the face's 64-box over the crown and riding the body's
- * motion — «Капля» and the secretary alike (the secretary's is over the headset band). New Year:
+ * A holiday on the head (D-119), drawn in a 64-box over the crown and riding the body's motion —
+ * the mascot's ring (its top is the crown, components/brand/Mascot.tsx) and the secretary alike
+ * (the secretary's is over the headset band). New Year:
  * a red hat whose tip flops to the right, a white band, a pompom. Наурыз: a spring tulip tucked in
  * at the left of the crown. Still — nothing here adds a frame of motion to the face.
  */

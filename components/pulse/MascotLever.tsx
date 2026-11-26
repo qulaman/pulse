@@ -393,37 +393,15 @@ export const MascotLever = memo(function MascotLever({
               WebkitTouchCallout: "none",
             }}
           >
-            {/* the voice round the face (D-166): two rings swell with how loud it is, the outer one a
-                beat late — an echo. Transform only, eased by the compositor between the level's writes */}
-            <span
-              aria-hidden
-              className="pointer-events-none absolute inset-0 rounded-full"
-              style={{
-                border: `2px solid color-mix(in srgb, ${cancelArmed ? "var(--danger)" : "var(--accent)"} 55%, transparent)`,
-                opacity: recording ? 1 : 0,
-                transform: "scale(calc(1.03 + var(--mascot-level, 0) * 0.2))",
-                transition: "transform 90ms linear, opacity var(--t-instant) var(--ease-out)",
-              }}
-            />
-            <span
-              aria-hidden
-              className="pointer-events-none absolute inset-0 rounded-full"
-              style={{
-                border: `1.5px solid color-mix(in srgb, ${cancelArmed ? "var(--danger)" : "var(--accent)"} 28%, transparent)`,
-                opacity: recording ? 1 : 0,
-                transform: "scale(calc(1.1 + var(--mascot-level, 0) * 0.36))",
-                transition: "transform 320ms var(--ease-out), opacity var(--t-instant) var(--ease-out)",
-              }}
-            />
-            {/* the only fill round the face: the accent while the microphone is
-                open. The «hold me» ring is gone — it hung on through the stages after the
-                release and read as «still listening» (owner, D-60 fifth refinement) */}
+            {/* the voice is seen on the mark itself (D-205): its dot is the three bars, a wave trembles
+                round it — both read `--mascot-level` from this button. The only thing the lever adds is
+                the red under the face once the finger has gone far enough up to cancel */}
             <span
               aria-hidden
               className="absolute inset-0 rounded-full"
               style={{
-                background: cancelArmed ? "var(--danger)" : "var(--accent)",
-                opacity: recording ? 0.22 : 0,
+                background: "var(--danger)",
+                opacity: recording && cancelArmed ? 0.22 : 0,
                 transition: "opacity var(--t-instant) var(--ease-out)",
               }}
             />

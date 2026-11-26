@@ -289,7 +289,7 @@ async function evening(context: BrowserContext, me: { userId: string; companyId:
   await face.waitFor({ timeout: 20_000 });
   await page.waitForTimeout(1200);
   await shot("06-evening-rest");
-  const faceCalls = (await page.locator('[data-testid="mascot-lever"] svg.mascot').first().getAttribute("data-state")) === "calling";
+  const faceCalls = (await page.locator('[data-testid="mascot-lever"] .mascot').first().getAttribute("data-state")) === "calling";
   record("вечером несданный отчёт — лицо зовёт", faceCalls);
   await face.click();
   await page.waitForTimeout(1300);
@@ -535,7 +535,7 @@ async function main() {
 
     // a touch on the card the face holds up over its head opens «Дела» and leaves it open: no click
     // after the touch lands on the ball that slid under the finger (D-173)
-    const prop = await page.locator('[data-prop="call-card"]').first().boundingBox();
+    const prop = await page.locator('.mascot [data-glyph="card-bang"]').first().boundingBox();
     if (prop) await page.touchscreen.tap(prop.x + prop.width / 2, prop.y + prop.height / 2);
     await page.waitForTimeout(1600);
     await shot("04c-prop-touch");
