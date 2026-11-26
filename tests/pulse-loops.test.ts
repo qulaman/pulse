@@ -21,16 +21,6 @@ describe("folded loops (components/pulse/loops.tsx)", () => {
       [
         "crew-ping",
         "crew-wait",
-        "dream-bank",
-        "dream-beam",
-        "dream-buzz",
-        "dream-grab",
-        "dream-hover",
-        "dream-lights",
-        "dream-puff",
-        "dream-step",
-        "dream-thrust",
-        "dream-wave",
         "orb-breathe",
         "orb-drift",
       ].sort(),
@@ -67,7 +57,5 @@ describe("folded loops (components/pulse/loops.tsx)", () => {
   it("make the iteration as long as its cycles", () => {
     // 40 cycles of the shiver: one cycle of 1.4 s (0.7 s there and back) is a 56 s iteration
     expect(loop("orb-drift", 1_400, "ease-in-out -3000ms infinite")).toBe("orb-drift 56000ms ease-in-out -3000ms infinite");
-    // a bee's wings outlast the 14 s flight in one iteration
-    expect(Number.parseInt(loop("dream-buzz", 90, "linear infinite").split(" ")[1]!, 10)).toBeGreaterThan(16_000);
   });
 });

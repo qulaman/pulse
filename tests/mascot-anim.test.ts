@@ -15,9 +15,8 @@ import { ACT_MS, ACT_TOUCH, Mascot, type MascotAct, type MascotState } from "@/c
 import { SEC_ACT_MS, SecretaryMascot, type SecretaryAct } from "@/components/secretary/SecretaryMascot";
 import { DESK_SCENES, type DeskPhase } from "@/lib/errands/scene";
 
-// the mascot's keyframes live in components/brand/mark/mark.css, the secretary's in mascot.css and
-// secretary-mascot.css; globals.css @imports them
-const CSS = ["app/globals.css", "components/brand/mark/mark.css", "components/brand/mascot.css", "components/secretary/secretary-mascot.css"].map((file) => readFileSync(join(process.cwd(), file), "utf8")).join("\n");
+// the keyframes of the mascot and the secretary live in components/brand/mark/mark.css, which globals.css @imports
+const CSS = ["app/globals.css", "components/brand/mark/mark.css"].map((file) => readFileSync(join(process.cwd(), file), "utf8")).join("\n");
 const DECLARED = [...CSS.matchAll(/@keyframes\s+([\w-]+)/g)].map((match) => match[1]!);
 
 /** Every state, checked for exhaustiveness by the type. */

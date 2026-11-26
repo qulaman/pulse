@@ -48,6 +48,10 @@ const STAGGER_S = 0.04;
 const DIVE: Transition = { duration: 0.2, ease: [0.4, 0, 1, 1] };
 /** Inside the head: at the face's middle, no size, behind the face. */
 const INSIDE = { x: 0, y: 0, scale: 0, opacity: 0 };
+/** The track the balls ride: the size of the mark's own ring while it is in the head, then out to the orbit. */
+const TRACK_IN = { scale: 0.42, opacity: 0 };
+const TRACK_OUT = { scale: 1, opacity: 1, transition: { default: SPRING, opacity: { duration: 0.16 } } };
+const TRACK_GONE = { ...TRACK_IN, transition: DIVE };
 
 const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.9, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 
@@ -179,6 +183,17 @@ const Ring = memo(function Ring({ balls, radius, hidden, onPick }: { balls: Orbi
     // a point at the face's middle turns, each ball turns back round its own middle: the labels stay
     // upright, and framer only moves the balls along their spokes
     <div className="absolute left-0 top-0 h-0 w-0" style={orbit("orbit-spin")} data-testid="orbit" data-mode="ring" data-hidden={hidden ? "1" : "0"}>
+      {/* the mark's ring grown into a track (D-205): it comes out of the face with the balls and
+          they go round on it; back into the head it shrinks with them */}
+      <motion.span
+        aria-hidden
+        data-testid="orbit-track"
+        className="pointer-events-none absolute rounded-full"
+        style={{ left: -radius, top: -radius, width: radius * 2, height: radius * 2, border: "1.5px solid color-mix(in srgb, var(--accent) 24%, transparent)" }}
+        initial={TRACK_IN}
+        animate={hidden ? TRACK_GONE : TRACK_OUT}
+        exit={TRACK_GONE}
+      />
       {balls.map((ball, i) => {
         const angle = -Math.PI / 2 + (i * 2 * Math.PI) / n;
         const delay = i * STAGGER_S;
@@ -336,7 +351,10 @@ const Ball = memo(function Ball({
         {ICON[ball.id]}
         {ball.count > 0 ? <CountBadge count={ball.count} tone={ball.tone} /> : null}
       </motion.span>
-      <span className="whitespace-nowrap text-[12px] leading-4 text-muted">{ball.label}</span>
+      {/* the name stands on the page's own dark, so the track behind it does not cross the letters */}
+      <span className="whitespace-nowrap rounded-[8px] px-1.5 text-[12px] leading-4 text-muted" style={{ background: "color-mix(in srgb, var(--bg) 78%, transparent)" }}>
+        {ball.label}
+      </span>
     </motion.button>
   );
 });

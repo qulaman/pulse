@@ -14,7 +14,7 @@ import { actSurvives } from "@/components/brand/mark/look";
  * awake face, waiting for the director to pick a ball, fidgets the way someone waiting does.
  * The watchful face only looks around harder — D-70: it has no other feelings to show.
  */
-const AWAKE: readonly MascotAct[] = ["wave", "wink", "hop", "spin", "whistle", "heart", "orbit", "yawn"];
+const AWAKE: readonly MascotAct[] = ["wave", "wink", "hop", "spin", "whistle", "heart", "orbit", "yawn", "scan", "limber", "eyeroll", "thump"];
 const POOLS: Partial<Record<MascotState, readonly MascotAct[]>> = {
   sleeping: ["snore", "turn", "doze", "mumble", "smile", "kick", "yawn"],
   calm: AWAKE,
@@ -24,7 +24,7 @@ const POOLS: Partial<Record<MascotState, readonly MascotAct[]>> = {
   // a card gone through, a tune, a wink — somebody busy, not somebody waiting
   working: ["watch", "wipe", "shuffle", "whistle", "wink"],
   // everything is with the director: it looks around, stretches to see, checks the time
-  awaiting: ["peek", "tiptoe", "watch", "whistle"],
+  awaiting: ["peek", "tiptoe", "watch", "whistle", "eyeroll", "scan"],
 };
 
 /** The first act comes a few seconds after the face settles into its state. */

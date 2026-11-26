@@ -1,8 +1,8 @@
 @import "tailwindcss";
 /* Parts of this sheet kept in files of their own and loaded with it, before the rest of it: the
    mascot's motion, the screen head, the desk's surface (and the console's, which wears it too). */
-@import "../components/brand/mascot.css";
 @import "../components/brand/mark/mark.css";
+@import "../components/pulse/idle-field.css";
 @import "../components/ui/page-head.css";
 @import "./desk/surface.css";
 
@@ -305,26 +305,6 @@ h1, h2, h3 {
 }
 h1 { letter-spacing: -0.025em; }
 
-/* ---- the dream of the sleeping face (D-67) ------------------------------------------
-   While a home screen is at rest the assistant dreams: the figures come out of the middle of
-   his head, circle him from above and grow as they go (components/pulse/DreamOrbit.tsx).
-   Two nested animations carry the whole thing, both compositor-only. `dream-swell` scales the
-   carousel from a speck to full size — the orbit lives inside it, so one scale grows the
-   radius and the figures together and they spiral out of the head. `dream-lap` walks one
-   figure around the ellipse and turns it into the direction of travel; the radii arrive as
-   custom properties, so these keyframes serve every screen, and a negative delay is what puts
-   the chaser behind the runner. The ellipse is sampled every 30°: over one lap a chord that
-   short is the arc, and the heading between two samples is off by less than the eye reads. */
-/* out of the head as a speck, clear of it by the first quarter, then slowly on up and gone */
-@keyframes dream-swell {
-  0% { transform: scale(0.08); opacity: 0; animation-timing-function: cubic-bezier(0.3, 0.7, 0.4, 1); }
-  4% { opacity: 1; }
-  /* clear of the head early, then out to the full screen and held there: at full size the
-     bounce lands exactly on the edge, so growing past 1 would send it over */
-  14% { transform: scale(0.62); animation-timing-function: linear; }
-  38%, 92% { transform: scale(1); }
-  100% { transform: scale(1); opacity: 0; }
-}
 /* ---- the team on the waiting screen (D-90, two halves in D-91, circles in D-118) ------------
    Everybody is the same circle: below the face the idlers, grey, standing in their rows and
    shivering; above it the people with work, lit in the colour of the stage, with a ring that

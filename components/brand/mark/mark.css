@@ -10,6 +10,13 @@
  * ~20 times a second; short linear transitions carry it between writes.
  */
 
+/* Scrolled out of view (components/brand/MascotPower.tsx marks it): the mark holds its pose and
+   stops costing frames. Play state only — nothing moves, nothing is re-laid out. */
+.mascot[data-idle],
+.mascot[data-idle] * {
+  animation-play-state: paused !important;
+}
+
 .mascot {
   position: relative;
   display: block;
@@ -261,9 +268,10 @@
   color: color-mix(in srgb, currentColor 46%, transparent);
   animation: bk-turn-back 48s linear infinite;
 }
-/* a rim light on the ring, from the same side as the glint of the dot */
+/* a rim light on the ring, from the same side as the glint of the dot; now and then it runs the ring round */
 .bk-shine {
   transition: opacity 160ms var(--ease-out);
+  animation: bk-shine-run 11s var(--ease-in-out) infinite;
 }
 .bk-iris svg,
 .bk-shine svg,
@@ -405,6 +413,10 @@
 .bk[data-core="bars"] .bk-pill {
   --bk-h: calc(var(--b) + var(--bk-lv) * 150);
   transform: translateX(calc(var(--i) * 22px)) scale(0.4);
+}
+.bk[data-core="bars"] .bk-pill-hop {
+  animation: bk-bars-idle 1.3s var(--ease-in-out) infinite;
+  animation-delay: calc((var(--i) + 1) * 0.18s);
 }
 /* thinking it over: three dots taking turns */
 .bk[data-core="dots"] .bk-pill {
@@ -570,6 +582,28 @@
 .bk-g-hot {
   animation: bk-g-hot 1.1s var(--ease-in-out) infinite both;
 }
+.bk-g-doze {
+  animation: bk-g-doze 5.8s var(--ease-in-out) infinite both;
+}
+.bk-g-grin {
+  animation: bk-g-grin 3.4s var(--ease-in-out) infinite both;
+}
+.bk-g-swell {
+  animation: bk-g-swell 2.2s var(--ease-in-out) infinite both;
+}
+.bk-g-go {
+  animation: bk-g-go 1.3s var(--ease-in-out) infinite both;
+}
+.bk-g-drive {
+  animation: bk-g-drive 0.5s var(--ease-in-out) infinite both;
+}
+.bk-g-print {
+  animation: bk-g-print 2.2s var(--ease-out) infinite both;
+}
+.bk-glyph svg .bk-g-sway {
+  transform-origin: 50% 100%;
+  animation: bk-g-sway 3.2s var(--ease-in-out) infinite both;
+}
 
 /* ───────────── what stands round the ring ───────────── */
 
@@ -670,6 +704,39 @@
   border-radius: 50%;
   background: color-mix(in srgb, currentColor 60%, transparent);
   opacity: 0;
+}
+/* what the ring wears for good: the secretary's headset and bow tie (components/secretary) */
+.bk-wear-own svg {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: block;
+  width: 160px;
+  height: 160px;
+  margin: -80px 0 0 -80px;
+  overflow: visible;
+}
+/* a small sign at the ring's shoulder: «+2» more waiting */
+.bk-badge {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: flex;
+  min-width: 34px;
+  height: 34px;
+  margin: -78px 0 0 36px;
+  padding: 0 8px;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid var(--bg);
+  border-radius: 9999px;
+  background: currentColor;
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1;
+}
+.bk-badge > * {
+  color: var(--bg);
 }
 /* the holiday on the ring (D-119): it rides the mark and adds no motion of its own */
 .bk-wear {
@@ -912,6 +979,28 @@
   70% { opacity: 1; }
   100% { opacity: 0; transform: translate(var(--x), var(--y)) scale(1) rotate(var(--r)); }
 }
+/* at the desk: eyes on the work, a glance up now and then */
+@keyframes bk-desk-look {
+  0%, 38%, 52%, 80%, 100% { transform: translate(6px, 5px); }
+  42%, 48% { transform: translate(-3px, -5px); }
+  86%, 94% { transform: translate(8px, -2px); }
+}
+/* the headset rings: a quick shake, a rest */
+@keyframes bk-ring-ring {
+  0%, 40%, 100% { transform: rotate(0deg); }
+  5%, 15%, 25% { transform: rotate(-5deg); }
+  10%, 20%, 30% { transform: rotate(5deg); }
+}
+/* the gleam leaves its place, runs the ring once and is home */
+@keyframes bk-shine-run {
+  0%, 86% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+/* silent bars: a small breath, one after another */
+@keyframes bk-bars-idle {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(1.22); }
+}
 @keyframes bk-glyph-in {
   0% { opacity: 0; transform: scale(0.42); }
   45% { opacity: 1; }
@@ -985,6 +1074,36 @@
 @keyframes bk-g-flat {
   0%, 100% { transform: scaleY(1); }
   50% { transform: scaleY(1.5); }
+}
+@keyframes bk-g-swell {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(2px); }
+}
+@keyframes bk-g-go {
+  0%, 100% { transform: translateX(-3px); }
+  50% { transform: translateX(4px); }
+}
+@keyframes bk-g-drive {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1.4px); }
+}
+@keyframes bk-g-print {
+  0%, 12% { opacity: 0; transform: translateY(-9px); }
+  24% { opacity: 1; }
+  60%, 88% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(0); }
+}
+@keyframes bk-g-sway {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+@keyframes bk-g-doze {
+  0%, 100% { transform: scaleX(1); }
+  45% { transform: scaleX(0.86); }
+}
+@keyframes bk-g-grin {
+  0%, 30%, 100% { transform: translateY(0) scale(1); }
+  10% { transform: translateY(-2px) scale(1.09); }
 }
 @keyframes bk-g-hot {
   0%, 100% { transform: scale(0.82); }
@@ -1212,6 +1331,35 @@
   70% { transform: translate(-10px, 0); }
   84% { transform: translate(0, -10px); }
 }
+/* after the comet, twice round */
+@keyframes bk-a-scan {
+  0%, 100% { transform: translate(0, 0); }
+  6%, 56% { transform: translate(-2.8px, -7.5px); }
+  12%, 62% { transform: translate(3.3px, -7.3px); }
+  18%, 68% { transform: translate(7.5px, -2.8px); }
+  24%, 74% { transform: translate(7.3px, 3.3px); }
+  30%, 80% { transform: translate(2.8px, 7.5px); }
+  36%, 86% { transform: translate(-3.3px, 7.3px); }
+  42%, 92% { transform: translate(-7.5px, 2.8px); }
+  48%, 96% { transform: translate(-7.3px, -3.3px); }
+}
+/* the eye rolled: once round the rim, up first */
+@keyframes bk-a-eyeroll {
+  0%, 100% { transform: translate(0, 0); }
+  14% { transform: translate(0, -12px); }
+  28% { transform: translate(10px, -6px); }
+  42% { transform: translate(11px, 5px); }
+  56% { transform: translate(0, 11px); }
+  70% { transform: translate(-11px, 5px); }
+  84% { transform: translate(-9px, -7px); }
+}
+/* one strong beat */
+@keyframes bk-a-thump {
+  0%, 46%, 100% { transform: scale(1); }
+  12% { transform: scale(0.82); }
+  24% { transform: scale(1.34); }
+  36% { transform: scale(0.96); }
+}
 /* the lid */
 @keyframes bk-a-wink {
   0%, 100% { transform: scaleY(1); }
@@ -1224,6 +1372,43 @@
   18%, 72% { transform: scaleY(0.1); }
 }
 
+/* the headset set right: one side lifted and let sit */
+@keyframes bk-a-wear-fix {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  25% { transform: rotate(-7deg) translateY(-3px); }
+  50% { transform: rotate(3deg) translateY(1px); }
+  72% { transform: rotate(-2deg) translateY(0); }
+}
+@keyframes bk-a-wear-fix-r {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  25% { transform: rotate(7deg) translateY(-3px); }
+  50% { transform: rotate(-3deg) translateY(1px); }
+  72% { transform: rotate(2deg) translateY(0); }
+}
+/* the secretary at the director's desk: out of the frame and back, a nod, the job handed over */
+@keyframes bk-d-leave {
+  0% { opacity: 1; transform: translateX(0) scale(1); }
+  100% { opacity: 0; transform: translateX(46px) scale(0.6); }
+}
+@keyframes bk-d-arrive {
+  0% { opacity: 0; transform: translateX(46px) scale(0.6); }
+  70% { opacity: 1; transform: translateX(-2px) scale(1.04); }
+  100% { opacity: 1; transform: translateX(0) scale(1); }
+}
+@keyframes bk-d-nod {
+  0%, 100% { transform: translateY(0); }
+  20%, 56% { transform: translateY(4px); }
+  38%, 74% { transform: translateY(-1px); }
+}
+@keyframes bk-d-handoff {
+  0%, 100% { transform: translateX(0) scale(1); }
+  30%, 62% { transform: translateX(-22px) scale(1.12); }
+}
+@keyframes bk-d-turn {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
 /* the whole mark */
 @keyframes bk-a-hop {
   0%, 100% { transform: translateY(0) scale(1, 1); }
@@ -1310,4 +1495,32 @@
   0%, 30% { opacity: 0; transform: translate(0, 0) scale(0.4); }
   40% { opacity: 0.8; }
   78%, 100% { opacity: 0; transform: translate(var(--x), var(--y)) scale(1.5); }
+}
+
+/* ───────────── round the mark, on the screens ───────────── */
+
+/* the stretch of waking on the first tap (components/pulse/MascotLever.tsx) */
+@keyframes mascot-wake {
+  0% { transform: scale(1) rotate(0); }
+  35% { transform: scale(1.1, 0.94) rotate(-2deg); }
+  70% { transform: scale(0.97, 1.05) rotate(1.5deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+/* the active step of the pipeline strip (components/brand/MascotScene.tsx) */
+@keyframes mascot-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.045); }
+}
+/* the secretary's signs: a frame that calls, the red of «охрана», a lamp coming on */
+@keyframes smc-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+@keyframes smc-sos {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+@keyframes smc-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }

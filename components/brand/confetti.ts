@@ -2,7 +2,7 @@
  * celebrating: the confetti, each bit with where it lands and how far it turns on the way.
  * The spread is fixed, not random: a face that celebrates the same way every time is a
  * character, a random one is a particle effect. The assistant throws all ten; the secretary's
- * smaller face, the first eight (components/secretary/secretaryRoom.tsx).
+ * the same ten (components/brand/mark/Mark.tsx).
  */
 export const CONFETTI: ReadonlyArray<{ x: number; y: number; r: number; color: string; round?: boolean }> = [
   { x: -24, y: -10, r: 220, color: "var(--accent)" },

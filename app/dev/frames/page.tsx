@@ -66,6 +66,10 @@ const CARRY: Partial<Record<MascotState, { count: number; hot?: boolean }>> = {
 
 /** Each act on a state it is played over in the product (useMascotActs pools, D-110 events). */
 const ACT_ON: Record<MascotAct, { on: MascotState; carry?: { count: number; hot?: boolean } }> = {
+  scan: { on: "calm" },
+  limber: { on: "calm" },
+  eyeroll: { on: "calm" },
+  thump: { on: "calm" },
   yawn: { on: "sleeping" },
   snore: { on: "sleeping" },
   turn: { on: "sleeping" },

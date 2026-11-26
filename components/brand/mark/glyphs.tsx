@@ -36,7 +36,21 @@ export type GlyphId =
   | "smile"
   | "shut"
   | "sound"
-  | "quiet";
+  | "quiet"
+  // the secretary's errands (lib/errands/scene.ts)
+  | "tea"
+  | "glass"
+  | "dnd"
+  | "shield"
+  | "guest"
+  | "meeting"
+  | "medic"
+  | "go"
+  | "car"
+  | "printer"
+  | "lunch"
+  | "box"
+  | "plant";
 
 const INK = "var(--bk-ink)";
 const cut = { fill: "none", stroke: INK, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
@@ -263,10 +277,10 @@ function draw(id: GlyphId, count: number, hot: boolean): ReactNode {
       );
     // glad: in a ring an arc is read as a mouth, so the glad one curves up at its ends
     case "smile":
-      return <path d="M-15 -5 Q0 13 15 -5" {...line} strokeWidth="9" />;
+      return <path d="M-15 -5 Q0 13 15 -5" {...line} strokeWidth="9" className="bk-g-grin" />;
     // an eye shut: a level line — not an arc, an arc would smile
     case "shut":
-      return <path d="M-14 0 H14" {...line} strokeWidth="8" />;
+      return <path d="M-14 0 H14" {...line} strokeWidth="8" className="bk-g-doze" />;
     case "sound":
       return (
         <>
@@ -278,6 +292,114 @@ function draw(id: GlyphId, count: number, hot: boolean): ReactNode {
     // nothing came through: a level that lies flat
     case "quiet":
       return <path d="M-17 0 H-10 M-3.5 0 H3.5 M10 0 H17" {...line} strokeWidth="6.5" className="bk-g-flat" />;
+    // a cup with the tag of a tea bag over its rim
+    case "tea":
+      return (
+        <>
+          <path d="M-8 -17 q-4 -4 0 -8 M3 -17 q-4 -4 0 -8" {...line} strokeWidth="2.8" className="bk-g-steam" />
+          <path d="M9 -5 h3.5 a6.5 6.5 0 0 1 0 13 h-4" {...line} strokeWidth="4.2" />
+          <path d="M-17 -9 H10 V3 A12 12 0 0 1 -2 15 H-5 A12 12 0 0 1 -17 3 Z" fill="currentColor" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" />
+          <path d="M-9 -9 V-1" {...cut} strokeWidth="1.8" />
+          <rect x="-13" y="-1" width="8" height="8" rx="2" fill={INK} />
+          <path d="M-19 20 H12" {...line} strokeWidth="3.4" />
+        </>
+      );
+    case "glass":
+      return (
+        <>
+          <path d="M-12 -18 H12 L8.5 17 H-8.5 Z" fill="currentColor" stroke="currentColor" strokeWidth="4" strokeLinejoin="round" />
+          <path d="M-9 -6 q4.5 -3.4 9 0 t9 0" {...cut} strokeWidth="2.8" className="bk-g-swell" />
+        </>
+      );
+    // «не беспокоить»
+    case "dnd":
+      return (
+        <>
+          <circle r="20" fill="currentColor" />
+          <rect x="-12" y="-3.8" width="24" height="7.6" rx="3.4" fill={INK} />
+        </>
+      );
+    case "shield":
+      return (
+        <>
+          <path d="M0 -20 L16.5 -13.5 V0 C16.5 10 9.5 17 0 21 C-9.5 17 -16.5 10 -16.5 0 V-13.5 Z" fill="currentColor" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" />
+          <path d="M0 -9 V2" {...cut} strokeWidth="4.2" />
+          <circle cx="0" cy="9.5" r="2.5" fill={INK} />
+        </>
+      );
+    case "guest":
+      return (
+        <>
+          <circle cx="0" cy="-11" r="8.5" fill="currentColor" />
+          <path d="M-17 19 V13 A17 14 0 0 1 17 13 V19 Z" fill="currentColor" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" />
+        </>
+      );
+    case "meeting":
+      return (
+        <>
+          <circle cx="-10" cy="-9" r="6.6" fill="currentColor" />
+          <path d="M-22 17 V13 A12 11 0 0 1 2 13 V17 Z" fill="currentColor" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round" />
+          <circle cx="11" cy="-9" r="6.6" fill="currentColor" stroke={INK} strokeWidth="2.4" />
+          <path d="M-1 17 V13 A12 11 0 0 1 23 13 V17 Z" fill="currentColor" stroke={INK} strokeWidth="2.4" strokeLinejoin="round" />
+        </>
+      );
+    case "medic":
+      return <path d="M-6.5 -18 H6.5 V-6.5 H18 V6.5 H6.5 V18 H-6.5 V6.5 H-18 V-6.5 H-6.5 Z" fill="currentColor" stroke="currentColor" strokeWidth="4" strokeLinejoin="round" />;
+    // on the way to the director
+    case "go":
+      return (
+        <g className="bk-g-go">
+          <path d="M17 0 L1 14.5 V6.5 H-15 V-6.5 H1 V-14.5 Z" fill="currentColor" stroke="currentColor" strokeWidth="5" strokeLinejoin="round" />
+        </g>
+      );
+    case "car":
+      return (
+        <g className="bk-g-drive">
+          <path d="M-20 5 V-1 L-13.5 -3.5 L-8 -12.5 H7 L13.5 -3.5 L20 -1 V5 A3 3 0 0 1 17 8 H-17 A3 3 0 0 1 -20 5 Z" fill="currentColor" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" />
+          <path d="M-5.5 -9 H5 L8 -4 H-8.5 Z" fill={INK} />
+          <circle cx="-10.5" cy="9" r="5.2" fill="currentColor" stroke={INK} strokeWidth="2.2" />
+          <circle cx="10.5" cy="9" r="5.2" fill="currentColor" stroke={INK} strokeWidth="2.2" />
+        </g>
+      );
+    case "printer":
+      return (
+        <>
+          <rect x="-10" y="-19" width="20" height="13" rx="3" fill="currentColor" opacity="0.7" />
+          <rect x="-19" y="-8" width="38" height="19" rx="5.5" fill="currentColor" />
+          <circle cx="12" cy="-2" r="2.2" fill={INK} />
+          {/* the sheet comes out */}
+          <g className="bk-g-print">
+            <rect x="-11" y="4" width="22" height="15" rx="3" fill="currentColor" stroke={INK} strokeWidth="2" />
+            <path d="M-6 10 H6 M-6 14.5 H1" {...cut} strokeWidth="2" />
+          </g>
+        </>
+      );
+    // lunch under a cover
+    case "lunch":
+      return (
+        <>
+          <circle cx="0" cy="-14" r="3.6" fill="currentColor" />
+          <path d="M-18 8 A18 18 0 0 1 18 8 Z" fill="currentColor" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" />
+          <path d="M-22 14.5 H22" {...line} strokeWidth="4.4" />
+          <path d="M-9 -1 q3 -5 8 -6" {...cut} strokeWidth="2.4" />
+        </>
+      );
+    case "box":
+      return (
+        <>
+          <rect x="-18" y="-15" width="36" height="31" rx="6.5" fill="currentColor" />
+          <path d="M-18 -4 H18 M0 -15 V-4" {...cut} strokeWidth="3" />
+          <path d="M-5 5 H5" {...cut} strokeWidth="3" />
+        </>
+      );
+    case "plant":
+      return (
+        <>
+          <path d="M0 6 C-2 -4 -12 -6 -16 -16 C-6 -17 0 -11 0 -3 C0 -11 6 -18 16 -17 C13 -7 3 -4 0 6 Z" fill="currentColor" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" className="bk-g-sway" />
+          <path d="M-11 6 H11 L8 19 H-8 Z" fill="currentColor" stroke="currentColor" strokeWidth="3.4" strokeLinejoin="round" />
+          <path d="M-8 10 H8" {...cut} strokeWidth="2.2" />
+        </>
+      );
   }
 }
 

@@ -36,7 +36,7 @@ export type StateLook = {
   /** the colour of the waves when it is not the mark's own (gold for Эфир) */
   wave?: string;
   /** where the pupil looks by itself */
-  look?: "wander" | "sweep" | "follow";
+  look?: "wander" | "sweep" | "follow" | "desk";
   blink?: boolean;
   /** a comet runs the ring */
   comet?: boolean;
@@ -45,6 +45,8 @@ export type StateLook = {
   ringAnim?: string;
   coreAnim?: string;
   halo?: string;
+  /** a loop of what the ring wears (the secretary's headset ringing) */
+  wearAnim?: string;
   /** what stands round the ring */
   extra?: "zzz" | "sparks" | "light" | "confetti";
 };
@@ -113,8 +115,12 @@ export type ActLook = {
   lookAnim?: string;
   lidAnim?: string;
   glyphAnim?: string;
+  /** what the ring wears: the headset set right */
+  wearAnim?: string;
   /** light of the act's own: two friendly waves, one strong, one coming in */
   glow?: "waves" | "burst" | "in";
+  /** a comet runs the ring for the act */
+  comet?: boolean;
   extra?: "tunes" | "bubble" | "moon" | "spark" | "drop" | "dust";
 };
 
@@ -175,6 +181,14 @@ export const ACT_LOOK: Record<MascotAct, ActLook> = {
   orbit: { lookAnim: "bk-a-follow", extra: "moon" },
   peek: { lookAnim: "bk-a-peek", ringAnim: "bk-a-lean" },
   tiptoe: { all: "bk-a-tiptoe", lookAnim: "bk-a-lookup" },
+  // a comet goes round the ring twice and the pupil goes after it
+  scan: { ring: "dim", comet: true, lookAnim: "bk-a-scan" },
+  // the ring opens into its three arcs, a long breath, and closes
+  limber: { ring: "open", ringAnim: "bk-a-inhale", lidAnim: "bk-a-rest" },
+  // the pupil goes once round the rim
+  eyeroll: { lookAnim: "bk-a-eyeroll" },
+  // one strong beat: the dot thumps, the ring kicks, two waves
+  thump: { coreAnim: "bk-a-thump", ringAnim: "bk-a-kick", glow: "waves" },
 };
 
 /** The stages of a phrase: the mark is busy with it and plays nothing else. */

@@ -2,16 +2,14 @@
 
 import { AnimatePresence } from "motion/react";
 import Link from "next/link";
-import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import { CrewCard } from "@/components/pulse/CrewCard";
 import { CrewCircle, IdleCircle } from "@/components/pulse/CrewCircle";
-import { TOUCHES, type DreamId } from "@/components/pulse/DreamOrbit";
+import { FIELD_WAVE_MS, fieldRadius, fieldWaveDelay } from "@/components/pulse/IdleField";
 import { haptic } from "@/lib/haptics";
-import type { Chase } from "@/lib/idle/flight";
 import { lookOf, wordOf, type CrewTask, type Look } from "@/lib/idle/look";
 import { addressOf, RING_OUT, teamField, type Member, type Pick, type Seat } from "@/lib/idle/people";
-import { brushesOf, keyframesOfBrushes } from "@/lib/idle/wake";
 import { shortName, useNamesKey, initialsOf } from "@/lib/people/names";
 import { useDeepRest } from "@/lib/useDeepRest";
 
@@ -51,7 +49,7 @@ function signOf(tasks: CrewTask[]): string {
  * the side of the face. The assistant in the middle is the machine that turns one into the
  * other, and that is the whole story of the screen.
  *
- * The dream over them brushes the team (D-77). Nobody touching the screen for three minutes
+ * A wave of the field going past bobs the team (D-206). Nobody touching the screen for three minutes
  * stops the rings (the battery of a board left open).
  */
 export function PeopleField({
@@ -61,8 +59,7 @@ export function PeopleField({
   wide,
   reach,
   skirt,
-  dream,
-  chase,
+  waves = false,
   picked = null,
   onPick,
   onLook,
@@ -73,14 +70,13 @@ export function PeopleField({
   /** half the play area, px from the middle of the face */
   hx: number;
   hy: number;
-  /** how far out the rows may stand, further than the dream may fly */
+  /** how far out the rows may stand, further than the play area */
   wide?: number;
   reach?: number;
   /** where the floor of idlers starts under the face (`teamField`) */
   skirt?: number;
-  /** the dream in the air right now, and the line it flies — the room reacts to it (D-77) */
-  dream?: { id: DreamId; key: number } | null;
-  chase?: Chase | null;
+  /** the waves of the field are crossing the screen — the room bobs as each goes past (D-206) */
+  waves?: boolean;
   /** the id of the idler picked on this screen; the screen keeps it, this layer draws it */
   picked?: string | null;
   /** a tap on an idler: that person, or null when the picked one is tapped again */
@@ -284,29 +280,23 @@ export function PeopleField({
     onPick?.(picked === id ? null : pick);
   }, []);
 
-  // ---- what the dream does to the room (D-77) ------------------------------------------------
-  // The flight and the team are measured from the same point — the middle of the face — so who it
-  // goes past, and when, is known the moment the flight is. Every reaction is one animation over
-  // the whole dream; the name carries the number of the dream, because these nodes are not
-  // remounted between dreams and an animation whose name has not changed is never restarted.
-  const base = `wake-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
-  const wake = useMemo(() => {
-    if (!chase || !dream) return null;
-    const css: string[] = [];
+  // ---- what the field does to the room (D-206) ------------------------------------------------
+  // A wave leaves the mark every few seconds and crosses the screen (IdleField). The team and the
+  // wave are measured from the same point — the middle of the face — so when the front reaches each
+  // circle is known from where it sits: one looping animation a circle, late by its distance.
+  const ripple = useMemo(() => {
+    if (!waves) return null;
+    const reach = fieldRadius(hx, hy);
     const byId = new Map<string, string>();
-    for (const { member, look } of crew) {
+    for (const { member } of crew) {
       const seat = layout.seats.get(member.id);
       if (!seat) continue;
-      // the drawn size of the thing, ring included, not the finger target round it
-      const radius = layout.size / 2 + (look.busy ? RING_OUT : 0) + 6;
-      const brushes = brushesOf(chase, TOUCHES[dream.id], seat.x, seat.y, radius);
-      if (!brushes.length) continue;
-      const name = `${base}-${dream.key}-${member.id.replace(/[^a-zA-Z0-9]/g, "")}`;
-      css.push(keyframesOfBrushes(name, brushes, chase.ms, "orb"));
-      byId.set(member.id, `${name} ${chase.ms}ms linear both`);
+      const late = fieldWaveDelay(Math.hypot(seat.x, seat.y), reach);
+      // two waves are in the air, half a period apart: every circle bobs at each
+      if (late !== null) byId.set(member.id, `crew-ripple ${FIELD_WAVE_MS / 2}ms var(--ease-out) ${late}ms infinite both`);
     }
-    return byId.size ? { css: css.join(" "), byId } : null;
-  }, [crew, layout, chase, dream, base]);
+    return byId;
+  }, [crew, layout, waves, hx, hy]);
 
   const box = { w: Math.max(hx, wide ?? hx) * 2, h: Math.max(hy, reach ?? hy) * 2 };
   const busyCount = crew.filter((c) => c.look.busy).length;
@@ -319,7 +309,6 @@ export function PeopleField({
       data-idle={crew.length - busyCount}
       data-asleep={asleep ? "" : undefined}
     >
-      {wake ? <style>{wake.css}</style> : null}
       <LookLine seat={picked ? (layout.seats.get(picked) ?? null) : null} size={layout.size} />
       {crew.map(({ member, tasks, look, sign }) => {
         const seat = layout.seats.get(member.id);
@@ -336,7 +325,7 @@ export function PeopleField({
             y={seat.y}
             size={layout.size}
             hit={layout.spacing - 2}
-            brush={wake?.byId.get(member.id)}
+            brush={ripple?.get(member.id)}
             fresh={landed.has(member.id)}
             picked={picked === member.id}
             dimmed={(picked !== null && picked !== member.id && !look.busy) || (opened !== null && opened !== member.id)}
@@ -445,7 +434,7 @@ const Seated = memo(
           WebkitTapHighlightColor: "transparent",
         }}
       >
-        {/* the shove when the dream goes past (D-77): a layer of its own, the circle owns the rest */}
+        {/* the bob when a wave of the field goes past (D-206): a layer of its own, the circle owns the rest */}
         <span className="crew-anim block" style={{ animation: brush }}>
           <span className="crew-press block">
             <span className="block" style={{ animation: lifted ? "crew-lift 240ms var(--ease-out) forwards" : undefined }}>

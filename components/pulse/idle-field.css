@@ -1,0 +1,110 @@
+/*
+ * The waiting screen behind the mark (components/pulse/IdleField.tsx, D-206): orbits, motes, waves, a
+ * comet. Part of app/globals.css by its @import. `transform` and `opacity` only; the orbits stand
+ * still and are painted once, only what rides them is a layer.
+ */
+
+.idle-field {
+  color: var(--accent);
+}
+.idle-field[data-rest] * {
+  animation-play-state: paused !important;
+}
+.idle-orbits {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  margin: calc(var(--field) / -2) 0 0 calc(var(--field) / -2);
+  overflow: visible;
+}
+
+/* a wave from the ring to the edge of the field: drawn at the edge, it starts at the mark's size */
+.idle-wave {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  width: var(--field);
+  height: var(--field);
+  margin: calc(var(--field) / -2) 0 0 calc(var(--field) / -2);
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    transparent 90%,
+    color-mix(in srgb, currentColor 10%, transparent) 97.2%,
+    color-mix(in srgb, currentColor 46%, transparent) 99.2%,
+    transparent 100%
+  );
+  opacity: 0;
+  animation: idle-wave 6.4s cubic-bezier(0.2, 0.55, 0.4, 1) infinite both;
+}
+.idle-wave-2 {
+  animation-delay: 3.2s;
+}
+
+/* a mote goes round its orbit: the arm turns about the middle, the mote sits at the arm's end */
+.idle-arm {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  width: 0;
+  height: 0;
+  animation: idle-turn 60s linear infinite;
+}
+.idle-mote {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  width: var(--d);
+  height: var(--d);
+  margin: calc(var(--d) / -2) 0 0 calc(var(--d) / -2);
+  border-radius: 50%;
+  background: currentColor;
+  transform: translateX(var(--r));
+  animation: idle-twinkle 5s ease-in-out infinite both;
+}
+
+/* once in a while a comet runs a stretch of the middle orbit */
+.idle-comet {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  width: var(--w);
+  height: var(--w);
+  margin: calc(var(--w) / -2) 0 0 calc(var(--w) / -2);
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0deg 318deg, currentColor 360deg);
+  -webkit-mask: radial-gradient(closest-side, transparent calc(100% - 2.2px), #000 calc(100% - 1.4px));
+  mask: radial-gradient(closest-side, transparent calc(100% - 2.2px), #000 calc(100% - 1.4px));
+  opacity: 0;
+  animation: idle-comet 19s linear infinite both;
+}
+
+@keyframes idle-wave {
+  0% { opacity: 0; transform: scale(0.13); }
+  7% { opacity: 0.7; }
+  82%, 100% { opacity: 0; transform: scale(1); }
+}
+@keyframes idle-turn {
+  to { transform: rotate(360deg); }
+}
+@keyframes idle-twinkle {
+  0%, 100% { opacity: 0.28; transform: translateX(var(--r)) scale(0.8); }
+  50% { opacity: 0.72; transform: translateX(var(--r)) scale(1.1); }
+}
+@keyframes idle-comet {
+  0%, 78% { opacity: 0; transform: rotate(40deg); }
+  81% { opacity: 0.85; }
+  94% { opacity: 0.85; }
+  100% { opacity: 0; transform: rotate(250deg); }
+}
+/* the team feels a wave go past: each circle swells a little when the front reaches it (PeopleField) */
+@keyframes crew-ripple {
+  0%, 16%, 100% { transform: scale(1); }
+  5% { transform: scale(1.075); }
+  11% { transform: scale(0.985); }
+}
