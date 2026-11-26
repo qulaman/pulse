@@ -237,6 +237,8 @@ function TodayView({
   // the tiles (D-164, D-168); a task opened from it goes to the panel and the card stays
   const personId = params.get("p");
   const [focus, setFocus] = useState<string | null>(null);
+  // E or «Изменить…» on a row: the task's panel opens in its form (D-203)
+  const [editFor, setEditFor] = useState<string | null>(null);
   // the panel shows another task or person in place (D-184)
   const openTask = useCallback((id: string) => writeParams({ id }, { type: "desk-pick" }), []);
   const closeTask = useCallback(() => writeParams({ id: null }), []);
@@ -301,6 +303,10 @@ function TodayView({
     openTask,
     closeTask,
     onReply: reply,
+    onEdit: (task) => {
+      setEditFor(task.id);
+      openTask(task.id);
+    },
   });
   const context = useContextMenu();
   const menuOf = (item: DeskItem) => acts.menu(item.task, { onOpenRow: () => openTask(item.task.id) });
@@ -814,6 +820,8 @@ function TodayView({
             next={flow.next}
             focusToken={focus === openId ? 1 : 0}
             onFocused={() => setFocus(null)}
+            editToken={editFor === openId ? 1 : 0}
+            onEditing={() => setEditFor(null)}
             bodyKeys={false}
           />
         </InPanel>

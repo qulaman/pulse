@@ -78,7 +78,10 @@ function HistoryLine({ message }: { message: TaskMessage }) {
       <span aria-hidden className="tasks-ico tasks-event-mark">
         <Mark size={10} strokeWidth={2.6} />
       </span>
-      <span className="min-w-0 truncate">{label}</span>
+      {/* «Текст изменён · было «…»» is read whole: up to three lines, then the rest in the hint (D-203) */}
+      <span className="min-w-0 line-clamp-3 [overflow-wrap:anywhere]" title={label}>
+        {label}
+      </span>
       <span className="nums shrink-0">{humanAqtobe(new Date(message.created_at)).replace(/^сегодня /, "")}</span>
     </p>
   );

@@ -443,6 +443,14 @@
       box-shadow: var(--btn-main-edge), var(--btn-main-glow);
       filter: brightness(1.04);
     }
+    /* nothing to do yet: a quiet well, not the bright button faded — it must not outshine «Отмена» (D-203) */
+    &:disabled {
+      opacity: 1;
+      background: var(--surface-2);
+      box-shadow: inset 0 0 0 1px var(--rule-soft);
+      color: var(--ink-3);
+      filter: none;
+    }
   }
   .btn-secondary {
     background: var(--surface-2);

@@ -1,6 +1,6 @@
 "use client";
 
-import { UserRound } from "lucide-react";
+import { ChevronDown, UserRound } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 
 import { TileFace } from "@/components/desk/team/TeamGrid";
@@ -316,9 +316,6 @@ function Tick({ on }: { on: boolean }) {
 }
 
 export function Chevron() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M7 10l5 5 5-5" />
-    </svg>
-  );
+  // the desk's one chevron (D-203): the select's own size and stroke, turning over while its list is open
+  return <ChevronDown aria-hidden size={14} strokeWidth={2.25} className="desk-chevron" />;
 }

@@ -24,6 +24,7 @@ export function useRowActs({
   openTask,
   closeTask,
   onReply,
+  onEdit,
 }: {
   actions: TaskActions;
   mark: (taskId: string) => void;
@@ -38,6 +39,8 @@ export function useRowActs({
   closeTask: () => void;
   /** «Ответить» (O): the panel with the caret in its answer field */
   onReply: (task: TaskWithPeople) => void;
+  /** «Изменить» (E): the panel of the task in its form (D-203) */
+  onEdit: (task: TaskWithPeople) => void;
 }) {
   const base = taggedActions(
     {
@@ -58,6 +61,7 @@ export function useRowActs({
     now,
     companyId,
     onReply,
+    onEdit,
     onOpen: openTask,
     afterRemove: (id) => {
       if (openId === id) closeTask();

@@ -292,14 +292,14 @@
     display: none;
   }
   .tasks-head {
-    .tasks-head-who .tasks-face-name {
+    .tasks-fields .tasks-face-name {
       font-size: 14px;
       font-weight: 600;
       line-height: 20px;
     }
     [data-testid="desk-field-assignee"] {
       margin-left: -4px;
-      padding: 3px 8px 3px 4px;
+      padding: 2px 8px 2px 3px;
       border-radius: 9999px;
 
       &:hover {
@@ -307,31 +307,103 @@
       }
     }
   }
-  /* the stage: a pill in its ink with its dot */
+  /* the top line (D-203): the stage, «Изменить», the panel's «×» — 32 px, the «×» on its middle */
+  .tasks-topbar {
+    min-height: 32px;
+  }
+  /* the stage: its dot and its word — a label, not a button, so no body (D-203) */
   .tasks-stage {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    height: 24px;
-    padding: 0 10px 0 9px;
-    border-radius: 9999px;
-    background: color-mix(in srgb, currentColor 12%, transparent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 26%, transparent);
+    gap: 7px;
+    height: 20px;
+    padding: 0;
     font-size: 12px;
     font-weight: 600;
-    line-height: 24px;
+    line-height: 20px;
+    letter-spacing: 0.02em;
     white-space: nowrap;
 
     &::before {
       content: "";
-      width: 6px;
-      height: 6px;
+      flex: none;
+      width: 7px;
+      height: 7px;
       border-radius: 9999px;
       background: currentColor;
     }
   }
+  /* «Изменить»: a quiet button with a body, its pencil and its word */
+  .tasks-edit-open {
+    display: inline-flex;
+    height: 32px;
+    align-items: center;
+    gap: 6px;
+    padding: 0 11px 0 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--rule);
+    color: var(--ink-2);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 16px;
+    transition:
+      background-color 120ms linear,
+      color 120ms linear,
+      box-shadow 140ms linear,
+      scale 220ms var(--ease-snap);
+
+    &:hover {
+      background: var(--hover);
+      box-shadow: inset 0 0 0 1px var(--line);
+      color: var(--ink);
+    }
+    &:active {
+      scale: 0.96;
+      transition-duration: 70ms;
+    }
+    &:focus-visible {
+      outline: none;
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--pen) 70%, transparent),
+        0 0 0 3px color-mix(in srgb, var(--pen) 15%, transparent);
+    }
+  }
+  /* the task is in its form: said on the top line where «Изменить» stood */
+  .tasks-edit-badge {
+    display: inline-flex;
+    height: 24px;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px 0 9px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--pen) 12%, transparent);
+    color: var(--pen);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  /* «срочно» beside the deadline: the flame and the word in the desk's «urgent» */
+  .tasks-urgent-mark {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--warn);
+    font-size: 12.5px;
+    font-weight: 600;
+  }
+  /* the one chevron of the desk's fields (D-203): the select's own, turning over while open */
+  .desk-chevron {
+    flex: none;
+    color: var(--ink-3);
+    transition: transform 160ms var(--ease-out);
+  }
+  :is(.tasks-person, .tasks-when)[aria-expanded="true"] .desk-chevron,
+  details[open] > summary .desk-chevron {
+    transform: rotate(180deg);
+  }
   .tasks-title {
-    margin-top: 12px;
+    margin-top: 10px;
     font-size: 22px;
     font-weight: 650;
     line-height: 28px;
@@ -347,14 +419,15 @@
   /* the fields: a property sheet — an icon and a name on the left, the value on the right */
   .tasks-fields {
     grid-template-columns: 104px minmax(0, 1fr);
-    row-gap: 6px;
+    row-gap: 2px;
     margin-top: 14px;
 
     dt {
+      min-height: 28px;
       color: var(--ink-3);
     }
     dd {
-      min-height: 22px;
+      min-height: 28px;
       align-items: center;
     }
     [data-testid="desk-field-deadline"] {
@@ -370,7 +443,7 @@
 
   /* the steps: a stepper, the line between two nodes drawing itself in */
   .tasks-path {
-    margin-top: 18px;
+    margin-top: 16px;
   }
   .tasks-steps {
     column-gap: 0;
@@ -527,9 +600,13 @@
       }
     }
   }
+  .tasks-about {
+    margin-top: 22px;
+  }
   .tasks-body {
-    margin-top: 14px;
+    margin-top: 0;
     color: var(--ink);
+    font-weight: 400;
   }
   .tasks-nudged .tasks-ico {
     color: var(--ink-3);
@@ -566,11 +643,11 @@
     color: var(--ink-2);
   }
 
-  /* the director's buttons under a soft rule */
+  /* the director's buttons: their own bodies are enough — no rule over them (D-203) */
   .tasks-keys {
-    margin-top: 20px;
-    padding-top: 16px;
-    border-top-color: var(--rule-soft);
+    margin-top: 18px;
+    padding-top: 0;
+    border-top: 0;
   }
   /* the reaction: a tray of faces that grow under the hand; the lit one pops */
   [data-testid="reaction-bar"] {
@@ -632,7 +709,7 @@
 
   /* ---- the thread: a timeline ---------------------------------------------------------- */
   .tasks-thread-head {
-    margin-top: 26px;
+    margin-top: 28px;
 
     .tasks-ico {
       color: var(--ink-3);
@@ -842,7 +919,9 @@
     display: none;
   }
   [data-testid="desk-task-more"][data-compact] {
-    padding-inline: 8px;
+    width: 36px;
+    justify-content: center;
+    padding-inline: 0;
 
     .tasks-more-word,
     > .nums {
@@ -1215,16 +1294,40 @@
     padding-left: 72px;
     color: var(--ink-3);
   }
+  /* «Срочно»: a switch with a body — a flame and the word; lit in the desk's «urgent» when on (D-203) */
   .tasks-urgent {
     height: 26px;
-    padding: 0 9px 0 7px;
-    border-radius: 9999px;
+    padding: 0 10px 0 8px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+    color: var(--ink-2);
+    transition:
+      background-color 140ms linear,
+      box-shadow 140ms linear,
+      color 140ms linear;
 
+    svg {
+      color: var(--ink-3);
+      transition: color 140ms linear;
+    }
+    &:hover {
+      box-shadow: inset 0 0 0 1px var(--line);
+      color: var(--ink);
+    }
+    &[data-size="field"] {
+      height: 36px;
+      padding: 0 12px 0 10px;
+      border-radius: 9px;
+    }
     &[data-on] {
       background: color-mix(in srgb, var(--warn) 14%, transparent);
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 36%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 40%, transparent);
+      color: var(--warn);
 
-      > span[aria-hidden] {
+      svg {
+        color: var(--warn);
         animation: tasks-pop 260ms var(--ease-snap) both;
       }
     }
@@ -1240,7 +1343,7 @@
   }
 
   /* the fields: soft wells that light up with the caret */
-  .tasks-confirm .desk-input {
+  :is(.tasks-confirm, .tasks-edit) .desk-input {
     min-height: 36px;
     padding: 0 10px;
     border: 0;
@@ -1271,13 +1374,13 @@
         0 0 0 3px color-mix(in srgb, var(--pen) 15%, transparent);
     }
   }
-  .tasks-confirm textarea.desk-input {
+  :is(.tasks-confirm, .tasks-edit) textarea.desk-input {
     padding: 8px 10px;
   }
   .tasks-confirm [data-testid="desk-entity-what"] {
     font-weight: 500;
   }
-  .tasks-confirm select.field {
+  :is(.tasks-confirm, .tasks-edit) select.field {
     height: 36px;
     padding-left: 10px;
     border: 0;
@@ -1290,6 +1393,49 @@
       border: 0;
       box-shadow: inset 0 0 0 1px var(--line);
     }
+  }
+  /* the task's form in the panel (D-203): the words in a large well, the rows as the panel's
+     properties, the foot with who learns of it and the two buttons */
+  .tasks-edit {
+    margin-top: 10px;
+  }
+  .tasks-edit .tasks-edit-title {
+    padding: 7px 10px;
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 24px;
+    letter-spacing: -0.012em;
+  }
+  .tasks-edit-grid {
+    grid-template-columns: 104px minmax(0, 1fr);
+    row-gap: 10px;
+    margin-top: 14px;
+  }
+  .tasks-edit-label {
+    color: var(--ink-3);
+  }
+  .tasks-edit-problem {
+    margin-top: 5px;
+    color: var(--danger);
+    font-size: 12px;
+    line-height: 16px;
+  }
+  .tasks-edit-foot {
+    margin-top: 18px;
+    padding: 12px 0 4px;
+    border-top: 1px solid var(--rule-soft);
+    color: var(--ink-3);
+
+    [data-armed] {
+      color: var(--warn);
+    }
+  }
+  /* in the panel the foot reaches its edges and stays at its bottom while the fields scroll */
+  [data-testid="desk-task-panel"] .tasks-edit-foot {
+    bottom: -24px;
+    margin: 18px -20px -24px;
+    padding: 12px 20px 20px;
+    background: var(--thread-bg, var(--sheet));
   }
   .tasks-person-face,
   .tasks-when-icon {

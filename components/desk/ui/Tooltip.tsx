@@ -7,14 +7,15 @@ import { Kbd } from "@/components/desk/ui/Kbd";
 
 const DELAY_MS = 450;
 
-type Side = "top" | "bottom" | "right";
+type Side = "top" | "bottom" | "right" | "left";
 
 /**
  * A hover hint on the desk (D-154 wave 3): what a control does and the key that does it, after
  * a short rest of the mouse — «Принять · A». Wraps its child in an inline box (`className` makes
  * it a block — a navigation row); gone on a press, on leave and on scroll. A control reached by
  * the keyboard (Tab, focus-visible) shows its hint at once. `right` — beside a narrow column
- * (the folded navigation). Never the only way to learn something: «?» lists every key.
+ * (the folded navigation); `left` — a control at a panel's top, whose hint must cover neither the
+ * words under it nor fall off the window's top. Never the only way to learn something: «?» lists every key.
  */
 export function Tooltip({
   label,
@@ -45,6 +46,7 @@ export function Tooltip({
     const rect = box.current?.getBoundingClientRect();
     if (!rect) return;
     if (side === "right") setAt({ x: rect.right, y: rect.top + rect.height / 2 });
+    else if (side === "left") setAt({ x: rect.left, y: rect.top + rect.height / 2 });
     else setAt({ x: rect.left + rect.width / 2, y: side === "top" ? rect.top : rect.bottom });
   };
   useEffect(() => {
@@ -62,7 +64,9 @@ export function Tooltip({
   const style =
     side === "right"
       ? { left: (at?.x ?? 0) + 10, top: at?.y ?? 0, transform: "translateY(-50%)" }
-      : { left: at?.x ?? 0, top: side === "top" ? (at?.y ?? 0) - 6 : (at?.y ?? 0) + 6, transform: `translate(-50%, ${side === "top" ? "-100%" : "0"})` };
+      : side === "left"
+        ? { left: (at?.x ?? 0) - 8, top: at?.y ?? 0, transform: "translate(-100%, -50%)" }
+        : { left: at?.x ?? 0, top: side === "top" ? (at?.y ?? 0) - 6 : (at?.y ?? 0) + 6, transform: `translate(-50%, ${side === "top" ? "-100%" : "0"})` };
 
   return (
     <span

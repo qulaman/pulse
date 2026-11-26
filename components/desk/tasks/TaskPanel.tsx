@@ -13,7 +13,8 @@ import type { Me } from "@/lib/tasks/queries";
 import { DeskComposer, DeskThread } from "./DeskThread";
 import { LoadFailure } from "./LoadState";
 import { pressTaskKey } from "./taskKeys";
-import { focusReply, TaskFacts, TaskHead, TaskKeys } from "./TaskParts";
+import { TaskEditForm } from "./TaskEditForm";
+import { focusReply, TaskAbout, TaskHead, TaskKeys, TaskWaits } from "./TaskParts";
 import { useDeskTask, type DeskTask } from "./useDeskTask";
 
 /** The task has left the tab it was opened from (accepted, returned, answered): one press to the next. */
@@ -27,6 +28,8 @@ export type PanelNext = { id: string | null; onGo: () => void };
  */
 export function useTaskKeys(desk: DeskTask, root: RefObject<HTMLElement | null>, onBody: boolean, now: Date) {
   useScreenKeys((event) => {
+    // the panel in its form: its keys are the form's own (D-203)
+    if (desk.editing) return false;
     if (event.shiftKey) return false;
     const box = root.current;
     const target = event.target as HTMLElement | null;
@@ -48,13 +51,16 @@ export function useTaskKeys(desk: DeskTask, root: RefObject<HTMLElement | null>,
 }
 
 /**
- * One task in the right-hand panel (tasks/022 A п.4, D-154 wave 3) — the desk's own, not the
- * phone's card: the head with the fields a click changes (who — «Передать», the deadline — a
- * popover), what waits on it, the director's buttons with their letters and «Ещё», the thread at
- * the desk's density, and the answer field kept at the panel's foot (Enter sends). After a move
- * the panel stays on the task; a task gone from its list says «Готово · следующая →».
- * `focusToken` — the answer field is wanted (O); `bodyKeys` — the task's letters work with the
- * caret nowhere (the table's screen; «Сегодня» keeps them for its own cursor).
+ * One task in the right-hand panel (D-154 wave 3, D-203) — the desk's own, in the order of the
+ * director's eye: the head (the stage, «Изменить», the title, «Кому» and «Срок» that a click
+ * changes, the receipt, the path), what waits on him right above his buttons (a question, a
+ * refusal, the report), the buttons with their letters and «Ещё», what the task is about, the
+ * thread, and the answer field right under it — kept in sight at the panel's foot only once the
+ * thread runs longer than the panel (Enter sends). «Изменить» turns the panel into the task's form
+ * (D-203). After a move the panel stays on the task; a task gone from its list says «Готово ·
+ * следующая →». `focusToken` — the answer field is wanted (O); `editToken` — the form is wanted
+ * (E on a row); `bodyKeys` — the task's letters work with the caret nowhere (the table's screen;
+ * «Сегодня» keeps them for its own cursor).
  */
 export function TaskPanel({
   taskId,
@@ -68,6 +74,8 @@ export function TaskPanel({
   next,
   focusToken,
   onFocused,
+  editToken = 0,
+  onEditing,
   bodyKeys = true,
 }: {
   taskId: string;
@@ -82,6 +90,10 @@ export function TaskPanel({
   focusToken: number;
   /** the reply field has the caret: the screen drops its wish */
   onFocused: () => void;
+  /** non-zero: open in the form (E or «Изменить…» on a row, D-203) */
+  editToken?: number;
+  /** the form is up: the screen drops its wish */
+  onEditing?: () => void;
   bodyKeys?: boolean;
 }) {
   const root = useRef<HTMLDivElement>(null);
@@ -90,7 +102,7 @@ export function TaskPanel({
   useTaskKeys(desk, root, bodyKeys, now);
   useShortcuts("Панель задачи", [
     { keys: ["A", "R", "N", "D", "T"], label: "Принять, доработать, напомнить, срок, передать" },
-    { keys: ["E"], label: "Изменить задачу — текст, срок, человек" },
+    { keys: ["E"], label: "Изменить задачу — текст, срок, человек (Ctrl Enter — сохранить, Esc — выйти)" },
     { keys: ["O"], label: "Курсор в поле ответа" },
     { keys: ["1…4"], label: "Быстрый ответ на вопрос" },
     { keys: ["."], label: "Ещё — все действия" },
@@ -109,6 +121,23 @@ export function TaskPanel({
     focusReply(root.current);
     focused.current();
   }, [focusToken, ready]);
+
+  // E on a row: the panel opens in the form
+  const editing = useRef(onEditing);
+  useLayoutEffect(() => {
+    editing.current = onEditing;
+  });
+  const setEditing = desk.setEditing;
+  useEffect(() => {
+    if (editToken === 0 || !ready) return;
+    setEditing(true);
+    editing.current?.();
+  }, [editToken, ready, setEditing]);
+  // out of the form: the keys go back to the panel itself — not to a button whose hint would cover the words
+  const leaveForm = () => {
+    desk.setEditing(false);
+    requestAnimationFrame(() => root.current?.focus({ preventScroll: true }));
+  };
 
   if (!desk.task) {
     return desk.loading ? (
@@ -134,8 +163,8 @@ export function TaskPanel({
   const said = (desk.messages ?? []).filter((message) => message.type === "text" || message.type === "voice" || message.type === "photo").length;
 
   return (
-    // as tall as the panel at least: the answer field stands at its foot even under a short thread
-    <div ref={root} className="flex min-h-[calc(100dvh-40px)] flex-col" data-testid="desk-task-panel" data-task-id={taskId} data-desk-task={taskId}>
+    // as tall as what it holds: the answer field follows the thread, not the window's foot (D-203)
+    <div ref={root} tabIndex={-1} className="flex flex-col outline-none" data-testid="desk-task-panel" data-task-id={taskId} data-desk-task={taskId} data-editing={desk.editing ? "" : undefined}>
       {next ? (
         <div className="tasks-next mb-3 mr-9 flex items-baseline gap-2 border-b border-border pb-2 text-[13px] leading-5" data-testid="desk-panel-next">
           <CircleCheck aria-hidden size={15} strokeWidth={2.2} className="tasks-ico tasks-next-icon shrink-0 self-center" />
@@ -151,35 +180,46 @@ export function TaskPanel({
         </div>
       ) : null}
 
-      <TaskHead desk={desk} now={now} scope={scope} fly />
-      <TaskFacts desk={desk} now={now} onWords={() => focusReply(root.current)} />
+      {desk.editing ? (
+        <>
+          <TaskHead desk={desk} now={now} scope={scope} fly form />
+          <TaskEditForm desk={desk} onDone={leaveForm} />
+        </>
+      ) : (
+        <>
+          <TaskHead desk={desk} now={now} scope={scope} fly />
+          <TaskWaits desk={desk} now={now} onWords={() => focusReply(root.current)} />
 
-      <div className="tasks-keys mt-4 border-t border-text pt-3">
-        <TaskKeys desk={desk} me={me} now={now} pointsEnabled={pointsEnabled} scope={scope} />
-      </div>
+          <div className="tasks-keys">
+            <TaskKeys desk={desk} me={me} now={now} pointsEnabled={pointsEnabled} scope={scope} />
+          </div>
 
-      <h3 className="tasks-thread-head desk-label mt-5 flex items-center gap-2 uppercase">
-        <MessagesSquare aria-hidden size={14} strokeWidth={2} className="tasks-ico" />
-        Переписка
-        {said > 0 ? <span className="tasks-count nums">{said}</span> : null}
-      </h3>
-      <div className="tasks-thread-box mb-3 mt-1 border-t border-text pt-1" style={{ "--thread-bg": "var(--sheet)" } as CSSProperties}>
-        <DeskThread taskId={task.id} me={me} messages={desk.messages} loading={desk.messagesLoading} load={desk.threadLoad} onRetry={desk.retry} actions={desk.acts.actions} />
-      </div>
+          <TaskAbout desk={desk} />
 
-      {/* the answer field stays in sight while the thread scrolls under it. The panel's scroller keeps
-          a 24 px foot (DeskPanelColumn's pb-6) and a sticky box stops above that padding: the dock
-          reaches over it to the panel's edge, so no word of the thread shows below the field
-          (D-194) — the margin gives the room back, the scroll length stays the same */}
-      <div className="tasks-dock sticky -bottom-6 z-[1] -mx-5 -mb-6 mt-auto bg-surface px-5 pb-7 pt-2">
-        {task.status === "revoked" ? (
-          <p className="pb-2 text-[13px] leading-5 text-muted" data-testid="thread-closed">
-            Задача отозвана — переписка закрыта
-          </p>
-        ) : (
-          <DeskComposer taskId={task.id} me={me} actions={desk.acts.actions} placeholder={desk.signals.question ? "Ответить на вопрос…" : "Написать…"} />
-        )}
-      </div>
+          <h3 className="tasks-thread-head desk-label flex items-center gap-2 uppercase">
+            <MessagesSquare aria-hidden size={14} strokeWidth={2} className="tasks-ico" />
+            Переписка
+            {said > 0 ? <span className="tasks-count nums">{said}</span> : null}
+          </h3>
+          <div className="tasks-thread-box mt-1 pt-1" style={{ "--thread-bg": "var(--sheet)" } as CSSProperties}>
+            <DeskThread taskId={task.id} me={me} messages={desk.messages} loading={desk.messagesLoading} load={desk.threadLoad} onRetry={desk.retry} actions={desk.acts.actions} />
+          </div>
+
+          {/* the answer field follows the thread and stays in sight once the thread scrolls under it. The
+              panel's scroller keeps a 24 px foot (DeskPanelColumn's pb-6) and a sticky box stops above that
+              padding: the dock reaches over it to the panel's edge, so no word of the thread shows below the
+              field (D-194) */}
+          <div className="tasks-dock sticky -bottom-6 z-[1] -mx-5 -mb-6 bg-surface px-5 pb-7 pt-2">
+            {task.status === "revoked" ? (
+              <p className="pb-2 text-[13px] leading-5 text-muted" data-testid="thread-closed">
+                Задача отозвана — переписка закрыта
+              </p>
+            ) : (
+              <DeskComposer taskId={task.id} me={me} actions={desk.acts.actions} placeholder={desk.signals.question ? "Ответить на вопрос…" : "Написать…"} />
+            )}
+          </div>
+        </>
+      )}
 
       {desk.acts.node}
     </div>

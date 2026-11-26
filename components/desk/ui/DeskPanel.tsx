@@ -1,5 +1,6 @@
 "use client";
 
+import { X } from "lucide-react";
 import { createContext, startTransition, useCallback, useContext, useId, useLayoutEffect, useMemo, useRef, useState, ViewTransition, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
@@ -289,15 +290,16 @@ export function DeskPanelColumn({
       className="relative z-10 flex min-h-0 flex-col border-l border-border bg-surface"
     >
       {onResize ? <PanelEdge width={width ?? PANEL_DEFAULT} onResize={onResize} /> : null}
-      <div className="absolute right-3 top-3 z-10">
-        <Tooltip label="Закрыть" keys={["Esc"]} side="bottom">
+      {/* on the middle of the content's first line: 16 px from the top, as the content starts */}
+      <div className="absolute right-3 top-4 z-10">
+        <Tooltip label="Закрыть" keys={["Esc"]} side="left">
           <button
             type="button"
             aria-label="Закрыть панель"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-[10px] text-[18px] leading-none text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
+            className="flex h-8 w-8 items-center justify-center rounded-[8px] text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
           >
-            ×
+            <X aria-hidden size={16} strokeWidth={2} />
           </button>
         </Tooltip>
       </div>

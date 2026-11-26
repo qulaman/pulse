@@ -36,7 +36,8 @@ import { DeskComposer, DeskThread } from "./DeskThread";
 import { FailedScreen, LoadFailure, LoadNote } from "./LoadState";
 import { DraftMark, MoveRow } from "./RowMoves";
 import { pressTaskKey } from "./taskKeys";
-import { DeskReactions, focusReply, MORE_WORD, TaskFacts, TaskHead } from "./TaskParts";
+import { TaskEditForm } from "./TaskEditForm";
+import { DeskReactions, EditTaskButton, focusReply, MORE_WORD, TaskAbout, TaskHead, TaskWaits } from "./TaskParts";
 import { useDeskTask, type DeskTask } from "./useDeskTask";
 
 /**
@@ -539,19 +540,33 @@ function InboxCard({
         data-task-id={task.id}
         data-desk-task={task.id}
       >
-        <p
-          className="tasks-reason mb-2 text-[15px] font-semibold leading-5 [overflow-wrap:anywhere]"
-          style={{ color: tone, "--tone": tone } as CSSProperties}
-          data-testid="desk-inbox-reason"
-        >
-          <Mark aria-hidden size={15} strokeWidth={2.2} className="tasks-ico tasks-reason-icon" />
-          {headline}
-        </p>
-        <TaskHead desk={desk} now={now} large scope={() => card.current} />
-        <TaskFacts desk={desk} now={now} onWords={() => focusReply(thread.current)} />
-        <div className="tasks-keys mt-4 border-t border-text pt-3">
-          <StackKeys desk={desk} me={me} moves={moves} onPress={pressMove} pointsEnabled={pointsEnabled} />
+        {/* the headline and «Изменить» share the card's first line (D-203) */}
+        <div className="flex items-start gap-3">
+          <p
+            className="tasks-reason mb-2 text-[15px] font-semibold leading-5 [overflow-wrap:anywhere]"
+            style={{ color: tone, "--tone": tone } as CSSProperties}
+            data-testid="desk-inbox-reason"
+          >
+            <Mark aria-hidden size={15} strokeWidth={2.2} className="tasks-ico tasks-reason-icon" />
+            {headline}
+          </p>
+          {desk.editing ? null : <EditTaskButton desk={desk} />}
         </div>
+        {desk.editing ? (
+          <>
+            <TaskHead desk={desk} now={now} large form scope={() => card.current} />
+            <TaskEditForm desk={desk} onDone={() => desk.setEditing(false)} />
+          </>
+        ) : (
+          <>
+            <TaskHead desk={desk} now={now} large scope={() => card.current} />
+            <TaskWaits desk={desk} now={now} onWords={() => focusReply(thread.current)} />
+            <div className="tasks-keys">
+              <StackKeys desk={desk} me={me} moves={moves} onPress={pressMove} pointsEnabled={pointsEnabled} />
+            </div>
+            <TaskAbout desk={desk} />
+          </>
+        )}
       </section>
 
       <section ref={thread} className="tasks-inbox-thread flex flex-col gap-1" data-dir={dir} data-testid="desk-inbox-thread">

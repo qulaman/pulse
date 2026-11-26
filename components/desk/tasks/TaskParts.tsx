@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, CalendarClock, Check, CircleCheck, CircleX, Clock, Ellipsis, Hourglass, MessageCircleQuestion, Pencil, Repeat, RotateCcw, Send, TriangleAlert, Undo2, X } from "lucide-react";
+import { Ban, CalendarClock, Check, ChevronDown, CircleCheck, CircleX, Clock, Ellipsis, FileText, Flame, Hourglass, MessageCircleQuestion, Pencil, Repeat, RotateCcw, Send, Undo2, UserRound, X } from "lucide-react";
 import { useState, type CSSProperties, type ReactNode } from "react";
 
 import { Morph } from "@/components/desk/ui/Morph";
@@ -26,7 +26,7 @@ import { heldLine } from "@/lib/tasks/held";
 import { isWorking, passedWord, untilWords } from "@/lib/tasks/lifecycle";
 import { closedAtOf, stepsOf, timeLeft, type Step } from "@/lib/tasks/overview";
 import type { DeliveryRow } from "@/lib/tasks/receipts";
-import type { Me, TaskWithPeople } from "@/lib/tasks/queries";
+import type { Me, TaskMessage, TaskWithPeople } from "@/lib/tasks/queries";
 import { deadlineLabel, TEXT } from "@/lib/tasks/status-text";
 
 import { deliveryLine, handInVerdict, keyOfAction, stageOf, type Line } from "@/lib/desk/tasks";
@@ -85,19 +85,18 @@ function FieldButton({
   testId?: string;
 }) {
   return (
-    <Tooltip label={label} keys={keys} side="bottom">
+    // the box may shrink: a long name ends in «…» instead of running under the next thing (D-203)
+    <Tooltip label={label} keys={keys} side="bottom" className="flex min-w-0">
       <button
         type="button"
         data-act-for={taskId}
         data-act={act}
         data-testid={testId}
         onClick={(event) => onPress(event.currentTarget)}
-        className="-mx-1.5 inline-flex min-w-0 items-center gap-1 rounded-[2px] px-1.5 transition-colors duration-[120ms] hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        className="tasks-field-button -ml-1.5 inline-flex min-w-0 items-center gap-1.5 rounded-[2px] px-1.5 transition-colors duration-[120ms] hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
       >
-        {children}
-        <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden className="shrink-0 text-muted/70">
-          <path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <span className="flex min-w-0 items-center">{children}</span>
+        <ChevronDown aria-hidden size={14} strokeWidth={2.25} className="desk-chevron" />
       </button>
     </Tooltip>
   );
@@ -114,7 +113,7 @@ function Field({ label, icon, children }: { label: string; icon?: ReactNode; chi
         ) : null}
         <span className="truncate">{label}</span>
       </dt>
-      <dd className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-[13px] leading-5">{children}</dd>
+      <dd className="flex min-w-0 flex-wrap items-center gap-x-2 text-[13px] leading-5">{children}</dd>
     </>
   );
 }
@@ -129,7 +128,7 @@ function Receipt({ task, now, onSendNow }: { task: TaskWithPeople; now: Date; on
   const held = delivery.data ? heldLine(delivery.data.held, now) : null;
   if (held) {
     return (
-      <Field label="Доставка" icon={<Send size={13} strokeWidth={2} />}>
+      <Field label="Доставка" icon={<Send size={14} strokeWidth={2} />}>
         <span className="flex items-center gap-1.5 text-muted" data-testid="desk-receipt">
           {held} ·
           <button type="button" className="text-accent underline-offset-2 hover:underline" onClick={onSendNow} data-testid="send-now">
@@ -141,7 +140,7 @@ function Receipt({ task, now, onSendNow }: { task: TaskWithPeople; now: Date; on
   }
   const line = task.status === "sent" ? deliveryLine(task, delivery.data?.receipt, now) : null;
   return line ? (
-    <Field label="Доставка" icon={<Send size={13} strokeWidth={2} />}>
+    <Field label="Доставка" icon={<Send size={14} strokeWidth={2} />}>
       <ToneLine line={line} testId="desk-receipt" />
     </Field>
   ) : null;
@@ -197,15 +196,44 @@ function Path({ desk, now }: { desk: DeskTask; now: Date }) {
   );
 }
 
+/** «Изменить» (E): the task's panel or card turns into its form (D-203); none on a closed task. */
+export function EditTaskButton({ desk, className = "ml-auto" }: { desk: DeskTask; className?: string }) {
+  const task = desk.task as TaskWithPeople;
+  if (!canEdit(task.status)) return null;
+  return (
+    <Tooltip label="Изменить задачу" keys={["E"]} side="left" className={`${className} inline-flex shrink-0`}>
+      <button type="button" onClick={() => desk.acts.press("edit", task)} data-testid="desk-task-edit" className="tasks-edit-open">
+        <Pencil aria-hidden size={14} strokeWidth={2} className="tasks-ico" />
+        Изменить
+      </button>
+    </Tooltip>
+  );
+}
+
 /**
- * The head of a task at the desk (D-154 wave 3): who holds it — a click passes it on — and the
- * stage; the title; the fields a director changes with one click (the deadline: a popover with
- * the quick choices and a month); the receipt (principle 8), the repeat, how much time is left or how
- * the work came in, and the path in four steps. «Изменить» (E) — and a double click on the words —
- * opens the form over the whole open task (D-200). `large` — the stack of «Разобрать», whose headline
- * says the stage and the hand-in; `fly` — the panel, where the title arrives from its row (D-184).
+ * The head of a task at the desk (D-203): a quiet line on top — the stage in words with its dot,
+ * «Изменить» (E) at the other end, the panel's «×» beyond it; the title (a double click edits it);
+ * then the task's properties one per row, each where a click changes it — «Кому» passes it on (T),
+ * «Срок» opens the date (D); the receipt (principle 8), the repeat; and the path in four steps.
+ * `large` — the stack of «Разобрать», whose headline says the stage; `fly` — the panel, where the
+ * title arrives from its row (D-184); `form` — the task is in its form: only the top line stays,
+ * saying so, and the form below holds the rest (D-203).
  */
-export function TaskHead({ desk, now, large = false, scope, fly = false }: { desk: DeskTask; now: Date; large?: boolean; scope?: () => Element | null; fly?: boolean }) {
+export function TaskHead({
+  desk,
+  now,
+  large = false,
+  scope,
+  fly = false,
+  form = false,
+}: {
+  desk: DeskTask;
+  now: Date;
+  large?: boolean;
+  scope?: () => Element | null;
+  fly?: boolean;
+  form?: boolean;
+}) {
   const task = desk.task as TaskWithPeople;
   const stage = stageOf(task, desk.reason, now);
   const closed = task.status === "done" || task.status === "revoked";
@@ -224,103 +252,110 @@ export function TaskHead({ desk, now, large = false, scope, fly = false }: { des
   const stageInk = stage.tone === "danger" ? "var(--danger)" : desk.reason ? TONE_VAR[stage.tone] : "var(--text-muted)";
   // the person's face before the name, as the table has it (D-174)
   const avatars = useAvatars();
-  const who = <FaceName id={task.assignee_id} name={task.assignee?.full_name} avatar={avatars.get(task.assignee_id)} size={26} gone={gone} full />;
+  const who = <FaceName id={task.assignee_id} name={task.assignee?.full_name} avatar={avatars.get(task.assignee_id)} size={22} gone={gone} full />;
   const editable = canEdit(task.status);
   const edit = () => desk.acts.press("edit", task);
-  const titleClass = `desk-task-title tasks-title mt-2 [overflow-wrap:anywhere] ${large ? "text-[28px] leading-8" : "text-[21px] leading-[26px]"}`;
   const title = (
-    <h2 className={titleClass} onDoubleClick={editable ? edit : undefined} data-testid="desk-task-title">
+    <h2
+      className={`desk-task-title tasks-title [overflow-wrap:anywhere] ${large ? "text-[28px] leading-8" : "text-[21px] leading-[26px]"}`}
+      onDoubleClick={editable ? edit : undefined}
+      data-testid="desk-task-title"
+    >
       {task.title}
     </h2>
   );
   return (
     <header className="tasks-head" data-large={large ? "" : undefined}>
-      {/* the panel's «×» stands in the corner: the first line leaves it room */}
-      <div className={`flex items-center gap-3 ${large ? "" : "pr-9"}`}>
-        <div className="tasks-head-who min-w-0 flex-1">
-          {canPass ? (
-            <FieldButton label="Передать другому" keys={["T"]} taskId={task.id} act="reassign handoff" onPress={(target) => desk.acts.press("reassign", task, from(target))} testId="desk-field-assignee">
-              {who}
-            </FieldButton>
-          ) : (
-            who
+      {/* the panel's «×» stands in the corner, on this line's middle: the line leaves it room */}
+      {large && !form ? null : (
+        <div className={`tasks-topbar flex min-h-8 items-center gap-3 ${large ? "" : "pr-11"}`}>
+          {large ? null : (
+            <span className="tasks-stage desk-label min-w-0 truncate uppercase" style={{ color: stageInk }} data-testid="desk-task-stage">
+              {stage.text}
+            </span>
           )}
+          {form ? (
+            <span className="tasks-edit-badge ml-auto shrink-0" data-testid="desk-task-editing">
+              <Pencil aria-hidden size={13} strokeWidth={2} className="tasks-ico" />
+              Правка
+            </span>
+          ) : editable ? (
+            <EditTaskButton desk={desk} />
+          ) : null}
         </div>
-        {editable ? (
-          <Tooltip label="Изменить задачу — текст, срок, человек" keys={["E"]} side="bottom">
-            <button
-              type="button"
-              onClick={edit}
-              data-testid="desk-task-edit"
-              className="tasks-edit-open inline-flex h-7 shrink-0 items-center gap-1.5 rounded-[2px] px-2 text-[13px] font-medium leading-4 text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-            >
-              <Pencil aria-hidden size={14} strokeWidth={2} className="tasks-ico" />
-              Изменить
-            </button>
-          </Tooltip>
-        ) : null}
-        {large ? null : (
-          <span className="tasks-stage desk-label shrink-0 uppercase" style={{ color: stageInk }} data-testid="desk-task-stage">
-            {stage.text}
-          </span>
-        )}
-      </div>
-      {/* `fly` — the panel: the title comes from the task's row and goes back to it (D-184) */}
-      {fly ? (
-        <Morph part="task" id={task.id}>
-          {title}
-        </Morph>
-      ) : (
-        title
       )}
-
-      <dl className="tasks-fields mt-3 grid grid-cols-[76px_minmax(0,1fr)] gap-x-3 gap-y-1" data-testid="desk-task-fields">
-        <Field
-          label={closed ? (task.status === "done" ? "Принята" : "Закрыта") : "Срок"}
-          icon={closed ? task.status === "done" ? <CircleCheck size={13} strokeWidth={2} /> : <CircleX size={13} strokeWidth={2} /> : <CalendarClock size={13} strokeWidth={2} />}
-        >
-          {closed ? (
-            <span className="nums">{humanAqtobe(new Date(closedAtOf(task)), now)}</span>
-          ) : canDate ? (
-            <FieldButton label="Срок" keys={["D"]} taskId={task.id} act="extend retime" onPress={(target) => desk.acts.press("extend", task, from(target))} testId="desk-field-deadline">
-              <When overdue={due.overdue}>{urgentNow ? TEXT.urgent : due.text}</When>
-            </FieldButton>
+      {form ? null : (
+        <>
+          {/* `fly` — the panel: the title comes from the task's row and goes back to it (D-184) */}
+          {fly ? (
+            <Morph part="task" id={task.id}>
+              {title}
+            </Morph>
           ) : (
-            <When overdue={due.overdue}>{due.text}</When>
+            title
           )}
-          {task.priority === "high" && task.deadline && !closed ? <span>· {TEXT.urgent}</span> : null}
-          {!closed && !large && !handedIn && task.status !== "declined" && left.text !== TEXT.noDeadline ? (
-            <span className="text-muted">{left.text}</span>
-          ) : null}
-          {handedIn && verdict && !large ? (
-            <span
-              className={verdict.late ? "text-danger" : "text-muted"}
-              title={task.deadline ? `Срок: ${humanAqtobe(new Date(task.deadline), now)}` : undefined}
-              data-testid="desk-task-handin"
-            >
-              · сдана {verdict.text}
-            </span>
-          ) : null}
-        </Field>
-        {task.status === "scheduled" && task.scheduled_send_at ? (
-          <Field label="Уйдёт" icon={<Clock size={13} strokeWidth={2} />}>
-            <span className="nums">{humanAqtobe(new Date(task.scheduled_send_at), now)}</span>
-          </Field>
-        ) : null}
-        {task.status !== "revoked" && task.status !== "scheduled" ? <Receipt task={task} now={now} onSendNow={() => desk.acts.press("sendNow", task)} /> : null}
-        {desk.rule ? (
-          <Field label="Повтор" icon={<Repeat size={13} strokeWidth={2} />}>
-            <span className="inline-flex min-w-0 items-center gap-1.5" data-testid="desk-task-repeat">
-              <span className="truncate">{ruleLine(desk.rule)}</span>
-              {desk.rule.is_active ? null : <span className="text-muted">· остановлен</span>}
-            </span>
-          </Field>
-        ) : null}
-      </dl>
 
-      <div className="tasks-path mt-3">
-        <Path desk={desk} now={now} />
-      </div>
+          <dl className="tasks-fields grid gap-x-3" data-testid="desk-task-fields">
+            <Field label="Кому" icon={<UserRound size={14} strokeWidth={2} />}>
+              {canPass ? (
+                <FieldButton label="Передать другому" keys={["T"]} taskId={task.id} act="reassign handoff" onPress={(target) => desk.acts.press("reassign", task, from(target))} testId="desk-field-assignee">
+                  {who}
+                </FieldButton>
+              ) : (
+                who
+              )}
+            </Field>
+            <Field
+              label={closed ? (task.status === "done" ? "Принята" : "Закрыта") : "Срок"}
+              icon={closed ? task.status === "done" ? <CircleCheck size={14} strokeWidth={2} /> : <CircleX size={14} strokeWidth={2} /> : <CalendarClock size={14} strokeWidth={2} />}
+            >
+              {closed ? (
+                <span className="nums">{humanAqtobe(new Date(closedAtOf(task)), now)}</span>
+              ) : canDate ? (
+                <FieldButton label="Срок" keys={["D"]} taskId={task.id} act="extend retime" onPress={(target) => desk.acts.press("extend", task, from(target))} testId="desk-field-deadline">
+                  <When overdue={due.overdue}>{urgentNow ? TEXT.urgent : due.text}</When>
+                </FieldButton>
+              ) : (
+                <When overdue={due.overdue}>{due.text}</When>
+              )}
+              {task.priority === "high" && task.deadline && !closed ? (
+                <span className="tasks-urgent-mark" data-testid="desk-task-urgent">
+                  <Flame aria-hidden size={12} strokeWidth={2.2} />
+                  {TEXT.urgent}
+                </span>
+              ) : null}
+              {!closed && !large && !handedIn && task.status !== "declined" && left.text !== TEXT.noDeadline ? <span className="text-muted">{left.text}</span> : null}
+              {handedIn && verdict && !large ? (
+                <span
+                  className={verdict.late ? "text-danger" : "text-muted"}
+                  title={task.deadline ? `Срок: ${humanAqtobe(new Date(task.deadline), now)}` : undefined}
+                  data-testid="desk-task-handin"
+                >
+                  · сдана {verdict.text}
+                </span>
+              ) : null}
+            </Field>
+            {task.status === "scheduled" && task.scheduled_send_at ? (
+              <Field label="Уйдёт" icon={<Clock size={14} strokeWidth={2} />}>
+                <span className="nums">{humanAqtobe(new Date(task.scheduled_send_at), now)}</span>
+              </Field>
+            ) : null}
+            {task.status !== "revoked" && task.status !== "scheduled" ? <Receipt task={task} now={now} onSendNow={() => desk.acts.press("sendNow", task)} /> : null}
+            {desk.rule ? (
+              <Field label="Повтор" icon={<Repeat size={14} strokeWidth={2} />}>
+                <span className="inline-flex min-w-0 items-center gap-1.5" data-testid="desk-task-repeat">
+                  <span className="truncate">{ruleLine(desk.rule)}</span>
+                  {desk.rule.is_active ? null : <span className="text-muted">· остановлен</span>}
+                </span>
+              </Field>
+            ) : null}
+          </dl>
+
+          <div className="tasks-path">
+            <Path desk={desk} now={now} />
+          </div>
+        </>
+      )}
     </header>
   );
 }
@@ -384,22 +419,33 @@ function QuickReplies({ desk, now, onWords }: { desk: DeskTask; now: Date; onWor
   );
 }
 
+/** The newest words of the current handover: a report at or after `completed_at` (D-64 §3). */
+function reportOf(task: TaskWithPeople, messages: readonly TaskMessage[] | undefined): TaskMessage | undefined {
+  if (!task.completed_at) return undefined;
+  const since = new Date(task.completed_at).getTime() - 1000;
+  return [...(messages ?? [])]
+    .reverse()
+    .find((message) => (message.meta as Record<string, unknown> | null)?.report === true && Boolean(message.content?.trim()) && new Date(message.created_at).getTime() >= since);
+}
+
 /**
- * What was said and what waits: the description, the employee's question with the one-click
- * answers, a refusal, a return, a recall, the notes of D-128, the photo of the handed-in work,
- * the original voice and its transcript.
+ * What waits on the director, right above his buttons (D-203): the employee's question with the
+ * one-click answers, a refusal, a request for time, a return, a recall, and of handed-in work the
+ * words and the photo of the report — «Принять» is never pressed blind.
  */
-export function TaskFacts({ desk, now, onWords }: { desk: DeskTask; now: Date; onWords: () => void }) {
+export function TaskWaits({ desk, now, onWords }: { desk: DeskTask; now: Date; onWords: () => void }) {
   const task = desk.task as TaskWithPeople;
   const { question, request, suggestion, declineReason, partial, nudgedAt } = desk.signals;
-  const photo =
-    task.status === "pending_review" || task.status === "done"
-      ? [...(desk.messages ?? [])].reverse().find((message) => message.type === "photo" && message.sender_id === task.assignee_id)
-      : undefined;
+  const handed = task.status === "pending_review" || task.status === "done";
+  const report = handed ? reportOf(task, desk.messages) : undefined;
+  // the photo of this hand-in, not of one before a rework (the report's own window)
+  const since = task.completed_at ? new Date(task.completed_at).getTime() - 1000 : 0;
+  const photo = handed
+    ? [...(desk.messages ?? [])].reverse().find((message) => message.type === "photo" && message.sender_id === task.assignee_id && new Date(message.created_at).getTime() >= since)
+    : undefined;
+  const showReport = task.status === "pending_review" ? Boolean(report || partial) : Boolean(report);
   return (
-    <div data-testid="desk-task-facts">
-      {task.body ? <p className="tasks-body mt-3 max-w-[76ch] whitespace-pre-line text-[14px] leading-5 [overflow-wrap:anywhere]">{task.body}</p> : null}
-
+    <div className="tasks-waits" data-testid="desk-task-facts">
       {question ? (
         <Callout tone="warn" icon={<MessageCircleQuestion size={15} strokeWidth={2} />} testId="desk-question">
           <p className="text-text">«{question}»</p>
@@ -426,9 +472,10 @@ export function TaskFacts({ desk, now, onWords }: { desk: DeskTask; now: Date; o
           <span className="text-text">На доработке — ждём новый отчёт</span>
         </Callout>
       ) : null}
-      {partial && task.status === "pending_review" ? (
-        <Callout tone="warn" icon={<TriangleAlert size={15} strokeWidth={2} />}>
-          <span className="text-text">Сдано не всё — что осталось, в отчёте</span>
+      {showReport ? (
+        <Callout tone={partial && task.status === "pending_review" ? "warn" : "muted"} icon={<FileText size={15} strokeWidth={2} />} testId="desk-task-report">
+          <span className="block whitespace-pre-line text-text [overflow-wrap:anywhere]">{report?.content ? `Отчёт: «${report.content.trim()}»` : "Отчёт без слов"}</span>
+          {partial && task.status === "pending_review" ? <span className="block text-muted">Сдано не всё — что осталось, в отчёте</span> : null}
         </Callout>
       ) : null}
       {task.status === "revoked" ? (
@@ -436,9 +483,10 @@ export function TaskFacts({ desk, now, onWords }: { desk: DeskTask; now: Date; o
           <span className="text-text">{task.passed_to ? passedWord(task.passed?.full_name) : TEXT.revoked}</span>
         </Callout>
       ) : null}
+      {/* the panel's «Напомнить» does not say it was pressed: this line does, so it is not pressed twice */}
       {nudgedAt && isWorking(task.status) ? (
-        <p className="tasks-nudged mt-2 flex items-center gap-1.5 text-[13px] leading-5 text-muted" data-testid="nudged">
-          <Clock aria-hidden size={13} strokeWidth={2} className="tasks-ico" />
+        <p className="tasks-nudged mt-3 flex items-center gap-1.5 text-[13px] leading-5 text-muted" data-testid="nudged">
+          <Clock aria-hidden size={14} strokeWidth={2} className="tasks-ico" />
           Напомнили <span className="nums">{humanAqtobe(new Date(nudgedAt), now)}</span>
         </p>
       ) : null}
@@ -449,23 +497,33 @@ export function TaskFacts({ desk, now, onWords }: { desk: DeskTask; now: Date; o
           <PhotoMessage messageId={photo.id} />
         </div>
       ) : null}
+    </div>
+  );
+}
 
+/**
+ * What the task is about, under the buttons (D-203): the details, the director's own recording
+ * and the words it was heard as — «Ваши слова»: on the desk the director reads his own panel.
+ */
+export function TaskAbout({ desk }: { desk: DeskTask }) {
+  const task = desk.task as TaskWithPeople;
+  const heard = task.source_transcript && task.source_transcript.trim() !== task.title.trim() ? task.source_transcript : null;
+  if (!task.body && !task.source_audio_path && !heard) return null;
+  return (
+    <div className="tasks-about" data-testid="desk-task-about">
+      {task.body ? <p className="tasks-body max-w-[76ch] whitespace-pre-line text-[14px] leading-5 [overflow-wrap:anywhere]">{task.body}</p> : null}
       {task.source_audio_path ? (
         <div className="tasks-audio mt-3 max-w-[360px]">
           <AudioOriginal path={task.source_audio_path} />
         </div>
       ) : null}
-      {task.source_transcript && task.source_transcript.trim() !== task.title.trim() ? (
-        <details className="tasks-transcript group mt-3">
+      {heard ? (
+        <details className="tasks-transcript group mt-2">
           <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[13px] leading-5 text-muted hover:text-text [&::-webkit-details-marker]:hidden">
-            {TEXT.transcriptSpoiler}
-            <span aria-hidden className="transition-transform duration-[120ms] group-open:rotate-180">
-              ▾
-            </span>
+            Ваши слова
+            <ChevronDown aria-hidden size={14} strokeWidth={2.25} className="desk-chevron" />
           </summary>
-          <blockquote className="-ml-3 mt-1 border-l-2 border-border pl-2.5 text-[13px] leading-5 text-muted">
-            «{task.source_transcript}»
-          </blockquote>
+          <blockquote className="-ml-3 mt-1 border-l-2 border-border pl-2.5 text-[13px] leading-5 text-muted">«{heard}»</blockquote>
         </details>
       ) : null}
     </div>
@@ -516,7 +574,7 @@ export const MORE_WORD =
   "ml-auto inline-flex h-9 items-center gap-1.5 rounded-[2px] px-3 text-[14px] font-medium leading-4 text-text transition-colors duration-[120ms] hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
 
 /**
- * The director's buttons of this task — the phone card's own (`cardKeysFor`), each with the letter
+ * The director's buttons of this task — the task screen's own (`screenKeysFor`, D-187, D-203), each with the letter
  * that does it, the closing move filled — and «Ещё» (or «.») with everything the task allows as
  * a menu; the reaction row of D-133 under them on handed-in and accepted work.
  */
@@ -533,7 +591,7 @@ export function TaskKeys({ desk, me, now, pointsEnabled, scope }: { desk: DeskTa
   const wide = keys[0] && first?.kind !== "call" ? wideLabelOf(keys[0], desk.signals.request, desk.signals.suggestion, now) : null;
   return (
     <div data-testid="desk-task-keys">
-      <div className="flex flex-wrap items-center gap-1">
+      <div className="flex flex-wrap items-center gap-2">
         {first?.kind === "call" ? <CallButton tel={first.tel} size="md" testId="task-action-call" /> : null}
         {keys.map((key, index) => {
           const cap = keyOfAction(key, desk.letters);

@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { Flame, X } from "lucide-react";
 import { useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { KIND_ICON, KIND_LABEL } from "@/components/desk/confirm/kinds";
@@ -63,29 +63,25 @@ function TextField({ value, onChange, label, multiline = false, placeholder, tes
 }
 
 /**
- * «Срочно» as what it is — a switch with a box (D-164): ticked, the task is urgent; the word never
- * reads as «срочно, снять». Space or a click turns it; the colour is the desk's «urgent» (warn).
+ * «Срочно» as what it is — a switch with a body (D-164, D-203): a flame and the word, lit in the
+ * desk's «urgent» (warn) when on; never a box or a circle — a circle on the desk is a stage.
+ * Space or a click turns it. `size` — «line» in an entity's head line, «field» beside a 36 px field.
  */
-export function UrgentSwitch({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+export function UrgentSwitch({ on, onChange, size = "line" }: { on: boolean; onChange: (on: boolean) => void; size?: "line" | "field" }) {
   return (
     <Tooltip label={on ? "Срочная — снять отметку" : "Отметить срочной"} side="bottom">
       <button
         type="button"
-        role="checkbox"
+        role="switch"
         aria-checked={on}
         aria-label="Срочно"
         onClick={() => onChange(!on)}
         data-testid="desk-entity-urgent"
         data-on={on ? "" : undefined}
-        className={`tasks-urgent desk-focus flex h-6 items-center gap-1.5 rounded-[2px] px-1.5 text-[13px] leading-none transition-colors duration-[120ms] hover:bg-surface-2 ${on ? "font-semibold text-warn" : "text-muted hover:text-text"}`}
+        data-size={size}
+        className="tasks-urgent desk-focus flex shrink-0 items-center gap-1.5 text-[13px] font-medium leading-none"
       >
-        <span aria-hidden className={`flex h-3.5 w-3.5 items-center justify-center rounded-[2px] border ${on ? "border-warn bg-warn" : "border-current"}`}>
-          {on ? (
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--page, var(--bg))" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M2 5.2 4.1 7.2 8 2.8" />
-            </svg>
-          ) : null}
-        </span>
+        <Flame aria-hidden size={14} strokeWidth={2.2} />
         Срочно
       </button>
     </Tooltip>

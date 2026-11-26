@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { cardKeysFor } from "@/components/tasks/list/DirectorTaskCard";
+import { screenKeysFor } from "@/components/tasks/list/DirectorTaskCard";
 import { latestDeclineReason, latestOpenQuestion } from "@/components/tasks/TaskThread";
 import { loadStateOf, rowKeys, type RowKey } from "@/lib/desk/tasks";
 import type { BoardTask } from "@/lib/pulse/board";
@@ -50,9 +50,10 @@ const NO_ROW = /single JSON object|multiple \(or no\) rows/i;
 /**
  * One task as the desk works on it — in the right-hand panel and on the stack of «Разобрать»
  * (tasks/022 A, D-154 wave 3): the task and its thread live, what waits on it, the director's
- * buttons (the phone card's own, `cardKeysFor`) and letters (`rowKeys`), and the desk's moves
- * (`useDeskActs`: a date or a person in a popover, a word or a «sure?» in a small dialog). The
- * thread on screen is a thread read (D-61), as on the task's phone screen.
+ * buttons (the task screen's own, `screenKeysFor` — the deadline is changed where it is said,
+ * «Отозвать» lives in «Ещё», D-187, D-203) and letters (`rowKeys`), the desk's moves
+ * (`useDeskActs`: a date or a person in a popover, a word or a «sure?» in a small dialog) and
+ * `editing` — the panel in its form (D-203). The thread on screen is a thread read (D-61).
  */
 export function useDeskTask({
   taskId,
@@ -81,8 +82,18 @@ export function useDeskTask({
   const signals = signalsOf(data, row, messages.data);
   const reason: DeskReason | null = data ? reasonFor(data, signals.question, now, Boolean(signals.request)) : null;
   const keys: DeskAction[] = data
-    ? cardKeysFor(data, { question: Boolean(signals.question), request: Boolean(signals.request), suggestion: Boolean(signals.suggestion) }, now)
+    ? screenKeysFor(data, { question: Boolean(signals.question), request: Boolean(signals.request), suggestion: Boolean(signals.suggestion) }, now)
     : [];
+  // the panel in its form (D-203): a task of its own — another task opens as itself
+  const [editingId, setEditingId] = useState<string | null>(null);
+  // another task in the same place: whatever form was up is dropped, it does not come back later
+  const [formOf, setFormOf] = useState(taskId);
+  if (formOf !== taskId) {
+    setFormOf(taskId);
+    setEditingId(null);
+  }
+  const editing = editingId === taskId && Boolean(data);
+  const setEditing = useCallback((on: boolean) => setEditingId(on ? taskId : null), [taskId]);
   const letters: RowKey[] = data ? rowKeys(data, { request: Boolean(signals.request) }) : [];
 
   const acts = useDeskActs({
@@ -93,6 +104,7 @@ export function useDeskTask({
     companyId: me.companyId,
     onReply: () => onReply(),
     onOpen: onOpenTask,
+    onEdit: (task) => setEditingId(task.id),
     afterRemove: afterRemove ? () => afterRemove() : undefined,
   });
 
@@ -135,6 +147,8 @@ export function useDeskTask({
     letters,
     acts,
     rule,
+    editing,
+    setEditing,
   };
 }
 

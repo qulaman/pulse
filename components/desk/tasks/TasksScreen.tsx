@@ -182,6 +182,8 @@ function TasksView({
   const setRange = (value: DayRange | null) => writeParams({ from: value?.from ?? null, to: value?.to ?? null });
   const [purgeAsk, setPurgeAsk] = useState(false);
   const [focus, setFocus] = useState<string | null>(null);
+  // E or «Изменить…» on a row: the task's panel opens in its form (D-203)
+  const [editFor, setEditFor] = useState<string | null>(null);
   const gridBox = useRef<HTMLDivElement>(null);
   const bucket = useWidthBucket(gridBox);
   const drafts = useDraftTasks(me.userId);
@@ -323,6 +325,10 @@ function TasksView({
     openTask,
     closeTask,
     onReply: reply,
+    onEdit: (task) => {
+      setEditFor(task.id);
+      openTask(task.id);
+    },
   });
 
   const choose = (id: string) => {
@@ -737,6 +743,8 @@ function TasksView({
             next={panelNext}
             focusToken={focus === openId ? 1 : 0}
             onFocused={() => setFocus(null)}
+            editToken={editFor === openId ? 1 : 0}
+            onEditing={() => setEditFor(null)}
           />
         </InPanel>
       ) : null}

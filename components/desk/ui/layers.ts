@@ -29,5 +29,6 @@ export function isTopLayer(id: number): boolean {
 export function keysTaken(): boolean {
   if (typeof document === "undefined") return true;
   const body = document.body;
-  return body.hasAttribute("data-dialog-open") || body.hasAttribute("data-sheet-open") || document.querySelector(".desk-pop") !== null;
+  // a task's form in the panel (D-203) keeps the letters off its buttons as a dialog does
+  return body.hasAttribute("data-dialog-open") || body.hasAttribute("data-sheet-open") || body.hasAttribute("data-task-edit") || document.querySelector(".desk-pop") !== null;
 }

@@ -35,7 +35,8 @@ export function MiniButton({
   size?: "sm" | "md";
   testId?: string;
 }) {
-  const height = size === "md" ? `h-9 text-[14px] ${filled || main ? "px-3.5" : "px-2"}` : "h-7 px-2 text-[13px]";
+  // a card's buttons have room around their words: they read as buttons, not one strip (D-203)
+  const height = size === "md" ? `h-9 text-[14px] ${filled || main ? "px-3.5" : "px-3"}` : "h-7 px-2 text-[13px]";
   const look = filled ? "btn-primary border-transparent" : main ? "desk-move" : "border-transparent font-medium text-text hover:bg-surface-2";
   return (
     <button

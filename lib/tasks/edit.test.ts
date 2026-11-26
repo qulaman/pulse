@@ -89,7 +89,14 @@ describe("«Изменить задачу» (D-200)", () => {
     const names = { now: "Ерлан" };
     expect(noticeOf(base, planOf(base, draft), names)).toBe("Пока ничего не изменено");
     expect(noticeOf(base, planOf(base, { ...draft, title: "Новое" }), names)).toBe(
-      "Ерлан получит уведомление «Задача изменена», в переписке останется, что было. Принимать заново не нужно",
+      "Ерлан получит уведомление «Задача изменена». В переписке останется, что было; принимать заново не нужно",
+    );
+    // the truth about the push: none reaches a holder without them, and at night it waits for the morning
+    expect(noticeOf(base, planOf(base, { ...draft, title: "Новое" }), { now: "Ерлан", noPush: true })).toBe(
+      "Ерлан увидит правку, когда откроет приложение: уведомления у него не включены. В переписке останется, что было; принимать заново не нужно",
+    );
+    expect(noticeOf(base, planOf(base, { ...draft, title: "Новое" }), { now: "Ерлан", waitsUntil: "08:00" })).toBe(
+      "Ерлан получит уведомление «Задача изменена» в 08:00, когда начнётся рабочее время. В переписке останется, что было; принимать заново не нужно",
     );
     expect(noticeOf(base, planOf(base, { ...draft, assigneeId: "p-marat", assigneeName: "Марат Ахметов" }), { now: "Ерлан", next: "Марат" })).toBe(
       "Марат получит задачу заново, уже с правкой. Ерлан увидит у себя «Задача передана»",

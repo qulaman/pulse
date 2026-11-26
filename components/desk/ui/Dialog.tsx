@@ -1,5 +1,6 @@
 "use client";
 
+import { X } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
@@ -124,13 +125,14 @@ export function Dialog({
             {title}
           </h2>
         ) : null}
+        {/* on the title's middle: the card's 20 px padding and the 24 px line make it 32 px down */}
         <button
           type="button"
           aria-label="Закрыть"
           onClick={onClose}
-          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-[10px] text-[18px] leading-none text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
+          className="absolute right-3 top-4 flex h-8 w-8 items-center justify-center rounded-[8px] text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
         >
-          ×
+          <X aria-hidden size={16} strokeWidth={2} />
         </button>
         {children}
       </div>
