@@ -33,15 +33,16 @@ import { useNow } from "@/lib/useNow";
 import { Bar, Card, DayList, Head, INK, LiveDot, Person, Unfold } from "./kit";
 
 /*
- * «Заявки» on the right side of «Сегодня» as a keypad (D-196, after HomeSecretary of D-164): every
- * request of the company's catalogue a key of one size in the order of the director's habits; a
- * press is held five seconds with «Отменить» in the toast (the key shows its window running out);
- * when it goes, the key says «Отправлено» and its copy flies into the new row — the row is in the
- * list before the copy leaves (principle 1a). The rows live in place: «отправляю…» → «ждёт, никто
- * не взял» with the push's receipt (principle 8) → «несёт Сауле · ~3 мин» with the way to the
- * promised time; the secretary's question with «Да / Нет». «Охрана» is a bar of its own, sent by a
- * hold of two seconds; while an alarm is up it says so and cannot go again. «Своими словами» is a
- * field with its send inside. The ask itself is the one of «Заявки» (useDeskAsk).
+ * «Заявки» on «Сегодня» as a keypad (D-196, round keys D-199): every request of the company's
+ * catalogue a round key in one row, in the order of the director's habits, the name under it; a
+ * press is held five seconds with «Отменить» in the toast (a ring round the key runs out); when it
+ * goes, the key says «Отправлено» and its copy flies into the new row — the row is in the list
+ * before the copy leaves (principle 1a). The rows live in place: «отправляю…» → «ждёт, никто не
+ * взял» with the push's receipt (principle 8) → «несёт Сауле · ~3 мин» with the way to the promised
+ * time; the secretary's question with «Да / Нет». «Охрана» closes the row — a bigger red key sent by
+ * a hold of two seconds that runs a fuse round it; while an alarm is up it says so and cannot go
+ * again. «Своими словами» is a field with its send inside. The ask itself is the one of «Заявки»
+ * (useDeskAsk).
  */
 
 /** The sign of a request: the scene's icon in its ink (one map with «Заявки», D-174); a request of the company's own keeps its emoji. */
@@ -70,6 +71,8 @@ const LANDING_MS = 4_000;
 /** The code of a request in the director's own words (freeAction). */
 const FREE = "free";
 const SWAP = { duration: 0.16, ease: [0.2, 0.8, 0.2, 1] } as const;
+/** The keys have come up once in this tab (their wave plays on the first showing only, D-196). */
+let padShown = false;
 
 const NO_ACTIONS: SecretaryAction[] = [];
 const NO_ERRANDS: Errand[] = [];
@@ -199,6 +202,11 @@ function Desk({ mine, now }: { mine: readonly Errand[]; now: Date }) {
   const icons = useRef(new Map<string, HTMLElement>());
   const field = useRef<HTMLDivElement>(null);
   const flown = useRef(new Set<string>());
+  // the keys come up one after another once a tab: coming back to «Сегодня» finds them in place
+  const [arrive] = useState(() => !padShown);
+  useEffect(() => {
+    padShown = true;
+  }, []);
 
   // what came into the outbox and what left it since the last render
   const [seen, setSeen] = useState(pending);
@@ -291,8 +299,11 @@ function Desk({ mine, now }: { mine: readonly Errand[]; now: Date }) {
       <div className="flex flex-col gap-1.5 pb-1 pt-1">
         {catalogue.isPending ? (
           <SkeletonGroup className="day-pad">
-            {[0, 1, 2, 3].map((slot) => (
-              <Bone key={slot} h={42} />
+            {[0, 1, 2, 3, 4, 5].map((slot) => (
+              <span key={slot} className="day-key-bone">
+                <i />
+                <Bone w={56} h={12} />
+              </span>
             ))}
           </SkeletonGroup>
         ) : catalogue.data === undefined ? null : actions.length === 0 ? (
@@ -302,9 +313,10 @@ function Desk({ mine, now }: { mine: readonly Errand[]; now: Date }) {
               задать в «Секретаре»
             </Link>
           </Quiet>
-        ) : plain.length > 0 ? (
-          <div className="day-pad" role="group" aria-label="Просьбы секретарю" data-testid="home-secretary-catalogue">
-            {plain.map((action) => {
+        ) : (
+          // one row of round keys, «Охрана» the last of them — red, and sent by a hold
+          <div className="day-pad" data-arrive={arrive ? "" : undefined} role="group" aria-label="Просьбы секретарю" data-testid="home-secretary-catalogue">
+            {plain.map((action, place) => {
               const scene = sceneOfAction(action);
               const dnd = isDndAction(action);
               const state = held.includes(action.code) ? "held" : flash?.code === action.code ? "sent" : dnd && door ? "on" : undefined;
@@ -323,37 +335,39 @@ function Desk({ mine, now }: { mine: readonly Errand[]; now: Date }) {
               return (
                 <button
                   key={action.code}
-                  ref={(node) => {
-                    if (node) keys.current.set(action.code, node);
-                    else keys.current.delete(action.code);
-                  }}
                   type="button"
                   className="day-key desk-focus"
                   data-state={state}
                   onClick={(event) => asks.press(action, event.currentTarget)}
                   title={title}
                   aria-haspopup={dnd ? "menu" : undefined}
+                  style={{ "--i": place } as CSSProperties}
                   data-testid="home-secretary-ask"
                   data-code={action.code}
                 >
-                  <span className="day-key-icon" style={state === "sent" ? undefined : { color: sceneInk(scene) }}>
-                    {state === "sent" ? <Check size={16} strokeWidth={2.5} aria-hidden /> : <Sign scene={scene} icon={action.icon} size={16} />}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="day-key-word">{state === "sent" ? "Отправлено" : action.label}</span>
-                    {note ? <span className="day-key-note">{note}</span> : null}
-                  </span>
-                  {state === "held" ? (
-                    <span aria-hidden className="day-key-window" style={{ "--window": `${GRACE_MS}ms` } as CSSProperties}>
-                      <i />
+                  {/* the round key itself: what flies into the new row */}
+                  <span
+                    ref={(node) => {
+                      if (node) keys.current.set(action.code, node);
+                      else keys.current.delete(action.code);
+                    }}
+                    className="day-key-disc"
+                    style={{ "--tone": state === "sent" ? INK.ok : sceneInk(scene) } as CSSProperties}
+                  >
+                    <span className="day-key-icon">
+                      {state === "sent" ? <Check size={24} strokeWidth={2.5} aria-hidden /> : <Sign scene={scene} icon={action.icon} size={24} />}
                     </span>
-                  ) : null}
+                    {/* the five seconds running out round the key */}
+                    {state === "held" ? <Ring className="day-key-window" style={{ "--window": `${GRACE_MS}ms` } as CSSProperties} /> : null}
+                  </span>
+                  <span className="day-key-word">{state === "sent" ? "Отправлено" : action.label}</span>
+                  {note ? <span className="day-key-note">{note}</span> : null}
                 </button>
               );
             })}
+            {alarm ? <AlarmKey action={alarm} place={plain.length} live={Boolean(alarmErrand || alarmGoing)} hint={alarmHint} onSend={() => asks.alarm(alarm)} /> : null}
           </div>
-        ) : null}
-        {alarm ? <AlarmBar action={alarm} live={Boolean(alarmErrand || alarmGoing)} hint={alarmHint} onSend={() => asks.alarm(alarm)} /> : null}
+        )}
         <AskField boxRef={field} onSend={asks.own} />
       </div>
       <DayList>
@@ -381,31 +395,43 @@ function Desk({ mine, now }: { mine: readonly Errand[]; now: Date }) {
   );
 }
 
+/** A ring round a key, drawn from the top clockwise: the window of a press, the fuse of «Охрана». */
+function Ring({ className, style }: { className: string; style?: CSSProperties }) {
+  return (
+    <svg aria-hidden className={className} style={style} viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="48" pathLength={100} />
+    </svg>
+  );
+}
+
 /**
- * «Охрана» (D-99): a bar of its own, sent by a hold of two seconds that fills it like a fuse; a click
- * or a key alone only says how. While an alarm is up it says so and is off — never a second alarm.
+ * «Охрана» (D-99): the last key of the row, a bigger one, red; sent by a hold of two seconds that
+ * runs a fuse round it; a click or a key alone only says how. While an alarm is up it says so and is
+ * off — never a second alarm.
  */
-function AlarmBar({ action, live, hint, onSend }: { action: SecretaryAction; live: boolean; hint: string; onSend: () => void }) {
+function AlarmKey({ action, place, live, hint, onSend }: { action: SecretaryAction; place: number; live: boolean; hint: string; onSend: () => void }) {
   const { holding, handlers } = useHold(onSend, action.label, ALARM_HOLD_MS, live);
   return (
     <button
       type="button"
-      className="day-alarm desk-focus"
+      className="day-key day-sos desk-focus"
       {...(live ? {} : handlers)}
       disabled={live}
       title={live ? "Охрана уже вызвана — отменить: «Ложная тревога» в её строке" : "Удержите 2 секунды — уйдёт сразу"}
       aria-label={live ? `${action.label}: уже вызвана` : `${action.label}: удержите две секунды, чтобы отправить`}
       data-holding={holding ? "" : undefined}
       data-gone={live ? "" : undefined}
-      style={{ "--hold": `${ALARM_HOLD_MS}ms` } as CSSProperties}
+      style={{ "--hold": `${ALARM_HOLD_MS}ms`, "--i": place } as CSSProperties}
       data-testid="home-secretary-alarm"
     >
-      <span aria-hidden className="day-alarm-fill" />
-      <span className="day-alarm-siren">
-        <Siren size={15} strokeWidth={2.25} aria-hidden />
+      <span className="day-key-disc day-sos-disc">
+        <span className="day-sos-siren">
+          <Siren size={30} strokeWidth={2.25} aria-hidden />
+        </span>
+        <Ring className="day-sos-fuse" />
       </span>
-      <span>{live ? "Охрана вызвана" : holding ? "Держите…" : action.label}</span>
-      <span className="day-alarm-hint">{live ? hint : "удерживайте 2 с"}</span>
+      <span className="day-key-word">{live ? "Охрана вызвана" : holding ? "Держите…" : action.label}</span>
+      <span className="day-key-note">{live ? hint : "удерживайте 2 с"}</span>
     </button>
   );
 }

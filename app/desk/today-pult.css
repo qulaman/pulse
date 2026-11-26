@@ -1,6 +1,10 @@
 /* «Сегодня» → «Заявки» (D-196, components/desk/today/day/DayPult.tsx): what the keypad needs beyond app/desk/today.css. */
 
 :root[data-surface="desk"][data-journal][data-graphite] {
+  /* the round keys take their size from the card's width (today.css, .day-pad) */
+  .day-pult {
+    container-type: inline-size;
+  }
   /* who is at the desk sits in the head: the name of the block keeps its width, the presence gives way */
   .day-pult .day-head-link {
     flex-shrink: 0;
