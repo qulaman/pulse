@@ -487,6 +487,21 @@
 .bk-glyph[data-swap="out"] {
   animation: bk-glyph-out 150ms var(--ease-in) both;
 }
+/* one thing for another goes through the dot: the old one in, the bead for a moment, the new one out of it */
+.bk-glyph[data-swap="in"][data-after] {
+  animation-delay: 110ms;
+}
+.bk-bead {
+  --w: 34px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0;
+  animation: bk-bead 300ms var(--ease-out) both;
+}
+/* in a small mark the thing is drawn larger: there is room in the ring, and a car must not be a blot */
+.bk:not([data-tier="full"]) .bk-glyph svg {
+  transform: scale(1.28);
+}
 
 /* what moves inside a thing; `fill-box` — each piece round its own middle */
 .bk-glyph svg * {
@@ -532,7 +547,18 @@
   animation: bk-g-page 3.4s var(--ease-in) infinite both;
 }
 .bk-g-flip {
-  animation: bk-g-flip 4.2s var(--ease-in-out) infinite both;
+  animation: bk-g-flip 8.4s var(--ease-in-out) infinite both;
+}
+/* each heap melts towards the neck and grows from the floor it lies on, whichever way up the glass is */
+.bk-glyph svg .bk-g-sand-top,
+.bk-glyph svg .bk-g-sand-bot {
+  transform-origin: 50% 100%;
+}
+.bk-g-sand-top {
+  animation: bk-g-sand-top 8.4s linear infinite both;
+}
+.bk-g-sand-bot {
+  animation: bk-g-sand-bot 8.4s linear infinite both;
 }
 .bk-g-sand {
   animation: bk-g-sand 0.7s linear infinite both;
@@ -904,10 +930,12 @@
   50% { transform: scale(0.985); }
 }
 @keyframes bk-tremble {
-  0%, 100% { transform: translate(0, 0); }
-  25% { transform: translate(0.9px, -0.5px); }
-  50% { transform: translate(-0.8px, 0.6px); }
-  75% { transform: translate(0.5px, 0.7px); }
+  0%, 30%, 100% { transform: translate(0, 0); }
+  5% { transform: translate(1.6px, -0.8px); }
+  10% { transform: translate(-1.5px, 0.9px); }
+  15% { transform: translate(1.2px, 1px); }
+  20% { transform: translate(-1px, -0.8px); }
+  25% { transform: translate(0.6px, 0.4px); }
 }
 @keyframes bk-shake {
   0%, 100% { transform: translate(0, 0) rotate(0deg); }
@@ -961,6 +989,68 @@
   87.5% { transform: translate(-7.3px, -3.3px); }
 }
 /* a blink now and then, once twice in a row */
+/* pondering: up and aside, a long hold, a glance the other way */
+@keyframes bk-ponder {
+  0%, 8%, 100% { transform: translate(0, 0); }
+  14%, 44% { transform: translate(-8px, -9px); }
+  50%, 70% { transform: translate(7px, -10px); }
+  76%, 92% { transform: translate(-3px, -8px); }
+}
+/* the unread letter frets: a burst of shivers, a look up, and quiet */
+@keyframes bk-fret {
+  0%, 30%, 100% { transform: translate(0, 0) rotate(0deg); }
+  4% { transform: translate(-3px, 0) rotate(-4deg); }
+  9% { transform: translate(3px, -1px) rotate(4deg); }
+  14% { transform: translate(-3px, 0) rotate(-3deg); }
+  19% { transform: translate(2px, -3px) rotate(3deg); }
+  24% { transform: translate(0, -4px) rotate(0deg); }
+}
+/* panic shakes in bursts, and the ring jolts on a clock of its own — the two never line up twice the same */
+@keyframes bk-panic {
+  0%, 56%, 100% { transform: translate(0, 0) rotate(0deg); }
+  7% { transform: translate(-2.4px, 0.8px) rotate(-1.6deg); }
+  14% { transform: translate(2.2px, -1px) rotate(1.4deg); }
+  21% { transform: translate(-1.8px, -0.8px) rotate(-1deg); }
+  28% { transform: translate(2px, 1px) rotate(1.2deg); }
+  35% { transform: translate(-2px, 0.6px) rotate(-1.4deg); }
+  42% { transform: translate(1.6px, -0.6px) rotate(0.9deg); }
+  49% { transform: translate(-0.8px, 0.3px) rotate(-0.4deg); }
+}
+@keyframes bk-jolt {
+  0%, 60%, 100% { transform: rotate(0deg) scale(1); }
+  20% { transform: rotate(-1.6deg) scale(1.015); }
+  40% { transform: rotate(1.3deg) scale(0.99); }
+}
+/* a second, shorter beat under the words: together with `bk-talk` the rhythm does not repeat for half a minute */
+@keyframes bk-talk-2 {
+  0%, 100% { transform: translateY(0) scale(1); }
+  40% { transform: translateY(-1.2px) scale(1.07, 0.95); }
+  70% { transform: translateY(0.6px) scale(0.97, 1.04); }
+}
+/* the heaps of the hourglass: `top` lies against the top cap, `bot` against the bottom one */
+@keyframes bk-g-sand-top {
+  0% { transform: translateY(0) scaleY(1); }
+  40% { transform: translateY(0) scaleY(0); }
+  50% { transform: translateY(-7.5px) scaleY(0); }
+  90%, 100% { transform: translateY(0) scaleY(1); }
+}
+@keyframes bk-g-sand-bot {
+  0% { transform: translateY(0) scaleY(0); }
+  40%, 50% { transform: translateY(0) scaleY(1); }
+  90% { transform: translateY(-7.5px) scaleY(0); }
+  100% { transform: translateY(0) scaleY(0); }
+}
+/* between one thing and the next the dot shows for a moment: a thing is what the dot turns into */
+@keyframes bk-bead {
+  0% { opacity: 0; transform: scale(0.5); }
+  35%, 60% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.6); }
+}
+/* a wink lifts the ring a little on its side */
+@keyframes bk-a-cock {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  22%, 62% { transform: translate(1px, -1.5px) rotate(-3deg); }
+}
 @keyframes bk-blink {
   0%, 11%, 15%, 54%, 57.6%, 61%, 100% { transform: scaleY(1); animation-timing-function: var(--ease-in); }
   12.2%, 55.2%, 58.8% { transform: scaleY(0.1); animation-timing-function: var(--ease-out); }
@@ -1045,13 +1135,16 @@
   100% { opacity: 0; transform: scale(1.15); }
 }
 @keyframes bk-g-page {
-  0%, 52% { opacity: 0; transform: translate(0, 0) rotate(0deg) scale(1); }
-  56% { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
-  100% { opacity: 1; transform: translate(9px, 26px) rotate(34deg) scale(0); }
+  0%, 46% { opacity: 0; transform: translate(0, 0) rotate(0deg); }
+  50% { opacity: 1; transform: translate(0, 0) rotate(0deg); animation-timing-function: var(--ease-out); }
+  62% { opacity: 1; transform: translate(1px, -3px) rotate(-7deg); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
+  88% { opacity: 1; }
+  100% { opacity: 0; transform: translate(10px, 32px) rotate(28deg); }
 }
 @keyframes bk-g-flip {
-  0%, 62% { transform: rotate(0deg); }
-  74%, 100% { transform: rotate(180deg); }
+  0%, 43% { transform: rotate(0deg); }
+  50%, 93% { transform: rotate(180deg); }
+  100% { transform: rotate(360deg); }
 }
 @keyframes bk-g-sand {
   0% { opacity: 0; transform: translateY(-3px); }
@@ -1060,10 +1153,11 @@
 }
 /* the note goes down into the ring and the next one comes */
 @keyframes bk-g-sink {
-  0% { opacity: 0; transform: translateY(-20px) scale(0.9); }
-  22% { opacity: 1; transform: translateY(-6px) scale(1); }
-  52% { opacity: 1; transform: translateY(0) scale(1); }
-  78%, 100% { opacity: 0; transform: translateY(6px) scale(0.3); }
+  0% { opacity: 0; transform: translateY(-22px) scale(0.9); }
+  14% { opacity: 1; transform: translateY(-9px) scale(1); }
+  48% { opacity: 1; transform: translateY(0) scale(1); }
+  82% { opacity: 1; transform: translateY(4px) scale(0.5); }
+  96%, 100% { opacity: 0; transform: translateY(7px) scale(0.3); }
 }
 @keyframes bk-g-up {
   0%, 48%, 100% { transform: translateY(1px); }
@@ -1132,9 +1226,9 @@
   24% { transform: scale(0.96); }
   32%, 100% { transform: scale(1); }
 }
-@keyframes bk-a-g-dream {
+@keyframes bk-a-g-lift {
   0%, 100% { transform: translateY(0) scaleX(1); }
-  18%, 72% { transform: translateY(-2px) scale(0.4, 1.6); }
+  20%, 74% { transform: translateY(-3px) scaleX(0.88); }
 }
 @keyframes bk-a-g-bob {
   0%, 100% { transform: translateY(0) rotate(0deg); }
@@ -1170,24 +1264,24 @@
 /* up and away, as the dot of a sent phrase goes */
 @keyframes bk-a-g-fly {
   0% { opacity: 1; transform: translateY(0) scale(1); animation-timing-function: var(--ease-out); }
-  18% { opacity: 1; transform: translateY(6px) scale(1.12, 0.86); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
-  52% { opacity: 1; transform: translateY(-104px) scale(0.6, 1.3); }
-  64%, 100% { opacity: 0; transform: translateY(-150px) scale(0.4, 1.4); }
+  27% { opacity: 1; transform: translateY(6px) scale(1.12, 0.86); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
+  80% { opacity: 1; transform: translateY(-104px) scale(0.6, 1.3); }
+  98%, 100% { opacity: 0; transform: translateY(-150px) scale(0.4, 1.4); }
 }
 /* sent back with a finger */
 @keyframes bk-a-g-flick {
-  0%, 22% { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
-  32% { opacity: 1; transform: translate(-7px, 2px) rotate(-10deg) scale(1.04); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
-  64% { opacity: 1; transform: translate(110px, -30px) rotate(160deg) scale(0.7); }
-  74%, 100% { opacity: 0; transform: translate(140px, -40px) rotate(220deg) scale(0.5); }
+  0%, 29% { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+  43% { opacity: 1; transform: translate(-7px, 2px) rotate(-10deg) scale(1.04); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
+  85% { opacity: 1; transform: translate(110px, -30px) rotate(160deg) scale(0.7); }
+  98%, 100% { opacity: 0; transform: translate(140px, -40px) rotate(220deg) scale(0.5); }
 }
 /* crushed into a ball — into the dot it came from */
 @keyframes bk-a-g-crumple {
-  0%, 14% { opacity: 1; transform: scale(1) rotate(0deg); }
-  30% { transform: scale(0.82, 0.9) rotate(-9deg); }
-  46% { transform: scale(0.66, 0.6) rotate(12deg); }
-  62% { transform: scale(0.46, 0.5) rotate(-16deg); }
-  80%, 100% { opacity: 1; transform: scale(0.36) rotate(0deg); }
+  0%, 17% { opacity: 1; transform: scale(1) rotate(0deg); }
+  36% { transform: scale(0.82, 0.9) rotate(-9deg); }
+  56% { transform: scale(0.66, 0.6) rotate(12deg); }
+  75% { transform: scale(0.46, 0.5) rotate(-16deg); }
+  97%, 100% { opacity: 1; transform: scale(0.36) rotate(0deg); }
 }
 /* pushed at the one who must do it */
 @keyframes bk-a-g-push {
@@ -1209,8 +1303,8 @@
 /* taken back: it puffs up and is gone */
 @keyframes bk-a-g-poof {
   0%, 24% { opacity: 1; transform: scale(1); }
-  36% { opacity: 1; transform: scale(0.86); }
-  56%, 100% { opacity: 0; transform: scale(1.7); }
+  38% { opacity: 1; transform: scale(0.86); }
+  62%, 100% { opacity: 0; transform: scale(1.7); }
 }
 /* out and back: «на доработку» */
 @keyframes bk-a-g-boomerang {
@@ -1320,11 +1414,11 @@
   0%, 100% { transform: scale(1); }
   12%, 86% { transform: scale(0.7); }
 }
-@keyframes bk-a-wiggle {
-  0%, 100% { transform: translateX(0); }
-  14%, 42% { transform: translateX(-9px); }
-  28%, 56% { transform: translateX(9px); }
-  70% { transform: translateX(-4px); }
+@keyframes bk-a-greet {
+  0%, 66%, 100% { transform: translate(0, 0) rotate(0deg); }
+  16% { transform: translate(-11px, -5px) rotate(-9deg); }
+  34% { transform: translate(7px, -2px) rotate(5deg); }
+  50% { transform: translate(-3px, 0) rotate(-3deg); }
 }
 @keyframes bk-a-lookup {
   0%, 100% { transform: translate(0, 0); }
@@ -1337,34 +1431,24 @@
 }
 /* after the thing that goes round the ring */
 @keyframes bk-a-follow {
-  0%, 12%, 88%, 100% { transform: translate(0, 0); }
-  16% { transform: translate(0, -10px); }
-  34% { transform: translate(10px, 0); }
-  52% { transform: translate(0, 10px); }
-  70% { transform: translate(-10px, 0); }
-  84% { transform: translate(0, -10px); }
+  0% { transform: rotate(0deg) translateY(0) rotate(0deg); animation-timing-function: var(--ease-out); }
+  12% { transform: rotate(0deg) translateY(-10px) rotate(0deg); animation-timing-function: linear; }
+  86% { transform: rotate(360deg) translateY(-10px) rotate(-360deg); animation-timing-function: var(--ease-in-out); }
+  100% { transform: rotate(360deg) translateY(0) rotate(-360deg); }
 }
 /* after the comet, twice round */
 @keyframes bk-a-scan {
-  0%, 100% { transform: translate(0, 0); }
-  6%, 56% { transform: translate(-2.8px, -7.5px); }
-  12%, 62% { transform: translate(3.3px, -7.3px); }
-  18%, 68% { transform: translate(7.5px, -2.8px); }
-  24%, 74% { transform: translate(7.3px, 3.3px); }
-  30%, 80% { transform: translate(2.8px, 7.5px); }
-  36%, 86% { transform: translate(-3.3px, 7.3px); }
-  42%, 92% { transform: translate(-7.5px, 2.8px); }
-  48%, 96% { transform: translate(-7.3px, -3.3px); }
+  0% { transform: rotate(-20deg) translateY(0) rotate(20deg); animation-timing-function: var(--ease-out); }
+  6% { transform: rotate(-20deg) translateY(-8px) rotate(20deg); animation-timing-function: linear; }
+  94% { transform: rotate(640deg) translateY(-8px) rotate(-640deg); animation-timing-function: var(--ease-in); }
+  100% { transform: rotate(640deg) translateY(0) rotate(-640deg); }
 }
 /* the eye rolled: once round the rim, up first */
 @keyframes bk-a-eyeroll {
-  0%, 100% { transform: translate(0, 0); }
-  14% { transform: translate(0, -12px); }
-  28% { transform: translate(10px, -6px); }
-  42% { transform: translate(11px, 5px); }
-  56% { transform: translate(0, 11px); }
-  70% { transform: translate(-11px, 5px); }
-  84% { transform: translate(-9px, -7px); }
+  0% { transform: rotate(0deg) translateY(0) rotate(0deg); animation-timing-function: var(--ease-out); }
+  12% { transform: rotate(0deg) translateY(-11px) rotate(0deg); animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1); }
+  86% { transform: rotate(360deg) translateY(-11px) rotate(-360deg); animation-timing-function: var(--ease-in-out); }
+  100% { transform: rotate(360deg) translateY(0) rotate(-360deg); }
 }
 /* one strong beat */
 @keyframes bk-a-thump {
@@ -1375,9 +1459,9 @@
 }
 /* the lid */
 @keyframes bk-a-wink {
-  0%, 100% { transform: scaleY(1); }
-  22%, 62% { transform: scaleY(0.1); }
-  78% { transform: scaleY(1.06); }
+  0%, 100% { transform: rotate(0deg) scaleY(1); }
+  22%, 62% { transform: rotate(-12deg) scaleY(0.1); }
+  78% { transform: rotate(0deg) scaleY(1.06); }
 }
 /* eyes shut for a breath: «уф» */
 @keyframes bk-a-rest {
@@ -1470,15 +1554,15 @@
 
 /* what an act puts round the ring */
 @keyframes bk-a-tune {
-  0%, 10% { opacity: 0; transform: translate(34px, -30px) scale(0.5) rotate(-10deg); }
+  0%, 10% { opacity: 0; transform: translate(34px, -30px) scale(0.5) rotate(-10deg); animation-timing-function: cubic-bezier(0.3, 0.7, 0.6, 0.9); }
   22% { opacity: 1; }
-  58% { opacity: 1; transform: translate(56px, -66px) scale(1.1) rotate(10deg); }
+  58% { opacity: 1; transform: translate(56px, -66px) scale(1.1) rotate(10deg); animation-timing-function: linear; }
   76%, 100% { opacity: 0; transform: translate(62px, -86px) scale(1.2) rotate(-6deg); }
 }
 @keyframes bk-a-tune2 {
-  0%, 34% { opacity: 0; transform: translate(40px, -26px) scale(0.5) rotate(8deg); }
+  0%, 34% { opacity: 0; transform: translate(40px, -26px) scale(0.5) rotate(8deg); animation-timing-function: cubic-bezier(0.3, 0.7, 0.6, 0.9); }
   46% { opacity: 1; }
-  78% { opacity: 1; transform: translate(72px, -56px) scale(1.05) rotate(-8deg); }
+  78% { opacity: 1; transform: translate(72px, -56px) scale(1.05) rotate(-8deg); animation-timing-function: linear; }
   96%, 100% { opacity: 0; transform: translate(80px, -74px) scale(1.15) rotate(6deg); }
 }
 @keyframes bk-a-bubble {
@@ -1505,9 +1589,9 @@
   74%, 100% { opacity: 0; transform: translate(84px, 6px) scale(0.7); }
 }
 @keyframes bk-a-dust {
-  0%, 30% { opacity: 0; transform: translate(0, 0) scale(0.4); }
-  40% { opacity: 0.8; }
-  78%, 100% { opacity: 0; transform: translate(var(--x), var(--y)) scale(1.5); }
+  0%, 36% { opacity: 0; transform: translate(0, 0) scale(0.4); }
+  46% { opacity: 0.8; }
+  96%, 100% { opacity: 0; transform: translate(var(--x), var(--y)) scale(1.5); }
 }
 
 /* ───────────── round the mark, on the screens ───────────── */

@@ -1,3 +1,4 @@
+import type { GlyphId } from "@/components/brand/mark/glyphs";
 import { ACT_LOOK, LITE_PX, STATE_LOOK } from "@/components/brand/mark/look";
 import { Mark } from "@/components/brand/mark/Mark";
 import type { MascotSeason } from "@/lib/mascot/season";
@@ -138,8 +139,8 @@ export const ACT_MS: Record<MascotAct, number> = {
   hmm: 1800,
   puzzle: 1600,
   stamp: 1800,
-  flick: 1400,
-  crumple: 1700,
+  flick: 1050,
+  crumple: 1400,
   push: 1600,
   clock: 1800,
   reply: 2000,
@@ -154,8 +155,8 @@ export const ACT_MS: Record<MascotAct, number> = {
   nod: 1200,
   raise: 1800,
   shrug: 1800,
-  poof: 1800,
-  handover: 1300,
+  poof: 1050,
+  handover: 850,
   medal: 2400,
   boomerang: 2200,
   relief: 1800,
@@ -212,6 +213,7 @@ export function Mascot({
   gaze = null,
   carry = null,
   season = null,
+  thing = null,
 }: {
   state?: MascotState;
   size?: number;
@@ -231,6 +233,12 @@ export function Mascot({
    * null — the state's own look.
    */
   gaze?: { x: number; y: number } | null;
+  /**
+   * The dot is this thing for as long as the prop is set, whatever the state's own thing — what a
+   * failed phrase is about stays in the ring while its words are up (a muted microphone, no signal).
+   * An act still plays over it. null — the state's own.
+   */
+  thing?: GlyphId | null;
 }) {
   // an avatar plays no acts: it only tells the state
   const doing = size < LITE_PX ? null : act;
@@ -239,7 +247,7 @@ export function Mascot({
       state={state}
       act={doing}
       size={size}
-      look={STATE_LOOK[state]}
+      look={thing ? { ...STATE_LOOK[state], glyph: thing } : STATE_LOOK[state]}
       part={doing ? ACT_LOOK[doing] : null}
       ms={doing ? ACT_MS[doing] : 0}
       level={level}

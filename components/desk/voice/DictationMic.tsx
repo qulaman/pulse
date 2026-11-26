@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 
+import { MiniMark } from "@/components/brand/MiniMark";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { keysTaken } from "@/components/desk/ui/layers";
 import { markPageRecording } from "@/components/desk/voice/control";
@@ -186,7 +187,8 @@ export function DictationMic({
   if (stage === "saving") {
     return (
       <span role="status" className="inline-flex h-8 shrink-0 items-center gap-2 px-2.5 text-[13px] leading-4 text-muted" data-testid={testId} data-recording="0" data-stage="saving">
-        <MicGlyph size={16} />
+        {/* the mascot's small self at work (D-209), as on every «Сохраняю…» */}
+        <MiniMark state="busy" size={16} tone="var(--accent)" />
         Сохраняю…
       </span>
     );

@@ -3,6 +3,7 @@
 import { LayoutGroup, motion } from "motion/react";
 import { useState } from "react";
 
+import { MiniMark } from "@/components/brand/MiniMark";
 import { CARD_SPRING, CardShell } from "@/components/tasks/list/TaskList";
 import { dayName, historyLine, pointsText, rangeText, reviewFacts, reviewMark } from "@/lib/daily-report/format";
 import { finedMiss, foldHistory, gapLine, type HistoryItem } from "@/lib/daily-report/history";
@@ -79,7 +80,16 @@ function MoreButton({ more }: { more: MoreHistory }) {
         data-testid="report-history-more"
       >
         <span className={more.loading ? "text-muted" : undefined}>
-          {more.loading ? "Загружаю…" : more.failed ? "Не получилось — ещё раз" : "Показать ещё"}
+          {more.loading ? (
+            <>
+              <MiniMark state="busy" tone="var(--accent)" className="mr-2" />
+              Загружаю…
+            </>
+          ) : more.failed ? (
+            "Не получилось — ещё раз"
+          ) : (
+            "Показать ещё"
+          )}
         </span>
       </button>
     </motion.div>

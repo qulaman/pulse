@@ -4,6 +4,7 @@ import { onlineManager, useIsMutating, useQueryClient } from "@tanstack/react-qu
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { MiniMark } from "@/components/brand/MiniMark";
 import { useSendQueue } from "@/components/OfflineBanner";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
@@ -190,9 +191,11 @@ export function AppUpdate() {
       ) : (
         <p
           data-testid="app-update"
-          className="card-in rounded-full border border-border bg-surface px-3 py-1.5 text-[13px] leading-4 text-muted"
+          className="card-in flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[13px] leading-4 text-muted"
           style={{ boxShadow: "var(--shadow-raised)" }}
         >
+          {/* the same small mark as the offline line beside it (D-209): waiting stands, updating works */}
+          <MiniMark state={action === "wait" ? "still" : "busy"} size={14} tone={action === "wait" ? undefined : "var(--accent)"} />
           {action === "wait" ? "Обновлю, как закончите" : "Обновляю…"}
         </p>
       )}

@@ -56,8 +56,8 @@ export function DirectorFab() {
             className="flex items-center gap-3 rounded-full border border-border bg-surface py-2 pl-2 pr-2"
             style={{ boxShadow: "var(--shadow-raised)" }}
           >
-            {/* a «не разобрал» draft: the small face gives the same puzzled tilt as the big one */}
-            <Mascot state="thinking" act={unparsed ? "scratch" : null} size={32} />
+            {/* a «не разобрал» draft: the small face is puzzled — at this size it plays no acts */}
+            <Mascot state="thinking" size={32} />
             <Link href="/confirm" className="text-[14px] font-medium leading-[18px]">
               {unparsed ? "Не разобрал · открыть" : `Черновик: ${count} ${count === 1 ? "сущность" : count < 5 ? "сущности" : "сущностей"} · открыть`}
             </Link>
@@ -75,8 +75,9 @@ export function DirectorFab() {
         <ComposeSheet />
       )}
       {/* on Пульс the face on the screen plays the pipeline itself; the overlay would be a
-          second mascot over the first (D-60, fifth refinement) — errors still need it */}
-      <IngestOverlay progress={pathname !== "/pulse"} />
+          second mascot over the first (D-60, fifth refinement) — and it says a failure in its
+          own words over the face, with the same ways out (2026-11-26) */}
+      <IngestOverlay progress={pathname !== "/pulse"} errors={pathname !== "/pulse"} />
     </>
   );
 }

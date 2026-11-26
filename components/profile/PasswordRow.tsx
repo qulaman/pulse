@@ -75,8 +75,8 @@ export function PasswordRow() {
               {error}
             </p>
           ) : null}
-          <Button block type="submit" disabled={pending || !password || !repeat}>
-            {pending ? "Сохраняю…" : "Сохранить"}
+          <Button block type="submit" disabled={!password || !repeat} loading={pending} busyLabel="Сохраняю…">
+            Сохранить
           </Button>
         </form>
       </Sheet>

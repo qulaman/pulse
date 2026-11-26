@@ -85,6 +85,7 @@ const DESKS: {
   away?: string;
   etaLeft?: number;
   asking?: boolean;
+  listening?: boolean;
 }[] = [
   { caption: "На месте, просьб нет", scene: null, phase: "rest" },
   { caption: "Просьба ждёт", scene: "coffee", phase: "asked", urgency: 1 },
@@ -96,6 +97,7 @@ const DESKS: {
   { caption: "Не беспокоить", scene: "dnd", phase: "doing" },
   { caption: "Готово — галочка", scene: "coffee", phase: "done" },
   { caption: "Смотрит на директора", scene: null, phase: "rest", attending: true },
+  { caption: "Слушает директора", scene: null, phase: "rest", listening: true },
   { caption: "Будет через 4 мин", scene: "tea", phase: "doing", etaLeft: 4 },
   { caption: "Секретарь спрашивает", scene: "coffee", phase: "doing", asking: true },
   { caption: "Тревога", scene: "security", phase: "asked", urgency: 2 },
@@ -173,6 +175,7 @@ export default function SecretarySandboxPage() {
                   away={desk.away ?? null}
                   etaLeft={desk.etaLeft ?? null}
                   asking={desk.asking}
+                  listening={desk.listening}
                   onTap={() => undefined}
                 />
               </div>

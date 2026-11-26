@@ -9,9 +9,20 @@ import { useEffect, useState } from "react";
  */
 export const DEEP_REST_MS = 180_000;
 
+/** Every deep rest on the page, to be woken by news as by a touch. */
+const wakers = new Set<() => void>();
+
 /**
- * true once nobody has touched the screen for `ms`; the next touch anywhere wakes it. Nothing runs
- * per frame: one timer, reset by a passive `pointerdown` listener.
+ * News has come to the screen — a change on the board, a word, the page back from the background:
+ * whatever slept on it wakes as from a touch, and the three minutes start again (2026-11-26).
+ */
+export function wakeDeepRest(): void {
+  for (const wake of wakers) wake();
+}
+
+/**
+ * true once nobody has touched the screen for `ms`; the next touch anywhere wakes it, and so does
+ * news (`wakeDeepRest`). Nothing runs per frame: one timer, reset by a passive `pointerdown` listener.
  */
 export function useDeepRest(ms: number = DEEP_REST_MS): boolean {
   const [deep, setDeep] = useState(false);
@@ -23,9 +34,11 @@ export function useDeepRest(ms: number = DEEP_REST_MS): boolean {
       timer = setTimeout(() => setDeep(true), ms);
     };
     window.addEventListener("pointerdown", poke, { passive: true });
+    wakers.add(poke);
     return () => {
       clearTimeout(timer);
       window.removeEventListener("pointerdown", poke);
+      wakers.delete(poke);
     };
   }, [ms]);
   return deep;

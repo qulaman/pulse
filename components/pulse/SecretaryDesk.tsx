@@ -3,10 +3,13 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import { Blend } from "@/components/brand/Blend";
-import { SECRETARY_TONE, SecretaryMascot } from "@/components/secretary/SecretaryMascot";
+import { SEC_ACT_MS, SECRETARY_TONE, SecretaryMascot } from "@/components/secretary/SecretaryMascot";
 import { untilLine, type DeskPhase, type DeskScene, type Urgency } from "@/lib/errands/scene";
+import { haptic } from "@/lib/haptics";
 import { useMascotSeason } from "@/lib/mascot/useSeason";
+import { subscribeIngestLevel, useIngestStore } from "@/lib/store/ingest";
 import { useDeepRest } from "@/lib/useDeepRest";
+import { elapsedSince } from "@/lib/voice/stages";
 
 /** The secretary stands in this box; the screen places the box, not its parts. */
 export const DESK_W = 56;
@@ -54,9 +57,12 @@ export function SecretaryDesk({
   etaLeft = null,
   asking = false,
   listening = false,
+  acceptKey = 0,
   onTap,
   onHold,
 }: {
+  /** bumped the moment somebody takes a request (useDeskFocus): the mark nods once with a tick */
+  acceptKey?: number;
   /** turned to the big face: the eye goes left, nothing of its own in the ring */
   attending: boolean;
   /** errands in the air right now — a small badge at the ring */
@@ -81,7 +87,10 @@ export function SecretaryDesk({
   etaLeft?: number | null;
   /** the secretary has asked something and waits for the director's answer */
   asking?: boolean;
-  /** the director is saying a request to the secretary right now */
+  /**
+   * the director is saying a request to the secretary right now: it listens as the big mark does —
+   * the ring open, the dot the bars of the voice, the voice's level; the time runs under it
+   */
   listening?: boolean;
   onTap: () => void;
   /** holding the mark: the director says a request to the secretary in his own words (D-99) */
@@ -133,22 +142,69 @@ export function SecretaryDesk({
     return () => clearTimeout(timer);
   }, [nod]);
   const nodding = nod && saw && !move && !attending;
+  // «Принял»: somebody has taken the request — the mark nods once with a tick in its ring, where the
+  // thing asked for has just stopped hopping. The value it was drawn with is not news (adjusted during render)
+  const [acceptSeen, setAcceptSeen] = useState(acceptKey);
+  const [accepting, setAccepting] = useState(false);
+  if (acceptSeen !== acceptKey) {
+    setAcceptSeen(acceptKey);
+    setAccepting(true);
+  }
+  useEffect(() => {
+    if (!accepting) return;
+    const timer = setTimeout(() => setAccepting(false), SEC_ACT_MS.accept);
+    return () => clearTimeout(timer);
+  }, [accepting]);
   // deep rest (nobody has touched the screen for minutes): a mark with nothing to show stops where
   // it is (D-119); anything the director should see (a request, a job, a way out) keeps moving
   const deep = useDeepRest();
   const season = useMascotSeason();
-  const frozen = deep && phase === "rest" && !attending && !move && !nodding;
+  const frozen = deep && phase === "rest" && !attending && !move && !nodding && !listening && !accepting;
   // out of the frame or in; the nod; the small hop of turning round to the big face; or, after
-  // «Готово», the lean over to the big face with the tick and back (D-97)
-  const motion = move
-    ? `${move === "leave" ? "bk-d-leave" : "bk-d-arrive"} ${MOVE_MS}ms ease-in-out both`
-    : nodding
-      ? `bk-d-nod ${NOD_MS}ms ease-in-out both`
-      : attending
-        ? "bk-d-turn 380ms cubic-bezier(0.34, 1.5, 0.64, 1) both"
-        : handing
-          ? "bk-d-handoff 2.2s ease-in-out both"
-          : "none";
+  // «Готово», the lean over to the big face with the tick and back (D-97). A mark listening to the
+  // director stays where it is: its ring tells it
+  const motion = listening
+    ? "none"
+    : move
+      ? `${move === "leave" ? "bk-d-leave" : "bk-d-arrive"} ${MOVE_MS}ms ease-in-out both`
+      : nodding
+        ? `bk-d-nod ${NOD_MS}ms ease-in-out both`
+        : attending
+          ? "bk-d-turn 380ms cubic-bezier(0.34, 1.5, 0.64, 1) both"
+          : handing
+            ? "bk-d-handoff 2.2s ease-in-out both"
+            : "none";
+
+  // The voice reaches the listening mark as it reaches the big one: `--mascot-level` on its own box,
+  // painted straight from the microphone ~20 times a second, never through React state (D-126)
+  const markRef = useRef<HTMLSpanElement>(null);
+  const timerRef = useRef<HTMLSpanElement>(null);
+  const recordingStartedAt = useIngestStore((s) => (listening ? s.recordingStartedAt : null));
+  useEffect(() => {
+    if (!listening) return;
+    const node = markRef.current;
+    let last = 0;
+    const off = subscribeIngestLevel((value) => {
+      const now = performance.now();
+      if (now - last < 50) return;
+      last = now;
+      node?.style.setProperty("--mascot-level", Math.min(1, Math.max(0, value)).toFixed(3));
+    });
+    return () => {
+      off();
+      node?.style.removeProperty("--mascot-level");
+    };
+  }, [listening]);
+  // the time of the dictation under the mark, painted into the node twice a second
+  useEffect(() => {
+    if (!listening) return;
+    const paint = () => {
+      if (timerRef.current) timerRef.current.textContent = elapsedSince(recordingStartedAt);
+    };
+    paint();
+    const id = setInterval(paint, 500);
+    return () => clearInterval(id);
+  }, [listening, recordingStartedAt]);
   return (
     <button
       type="button"
@@ -163,6 +219,8 @@ export function SecretaryDesk({
         holdTimer.current = setTimeout(() => {
           holdTimer.current = null;
           held.current = true;
+          // the same answer in the hand as the big mark's hold: the microphone is opening
+          haptic([15, 30, 15]);
           onHold(true);
         }, 350);
       }}
@@ -197,12 +255,14 @@ export function SecretaryDesk({
 
       {/* the small mark: the secretary's own (D-87, D-207) — what was asked is in its ring */}
       <span
+        ref={markRef}
         hidden={gone}
         className="absolute block"
         style={{ left: DESK_FACE.x - MARK / 2, top: DESK_FACE.y - MARK / 2, width: MARK, height: MARK, "--accent": SECRETARY_TONE } as CSSProperties}
         data-testid="desk-secretary"
         data-move={move ?? undefined}
         data-nod={nodding ? "1" : undefined}
+        data-listening={listening ? "1" : undefined}
       >
         {/* a turn from one of these to another starts from where the last one left the mark */}
         <Blend k={motion} origin="50% 100%" html>
@@ -215,8 +275,12 @@ export function SecretaryDesk({
               scene={move || attending ? null : scene}
               phase={move || attending ? "rest" : phase}
               urgency={urgency}
-              // the way it goes; the big face while it listens, nods or hands the job over; else it looks about
-              look={move ? { x: move === "leave" ? 1 : -1, y: 0 } : attending || listening || nodding || handing ? { x: -1, y: -0.2 } : null}
+              listening={listening}
+              // «Принял»: the nod with a tick, over the thing now at work
+              act={accepting && !listening && !move ? "accept" : null}
+              // the way it goes; the big face while it nods or hands the job over; else it looks about —
+              // listening, its dot is the voice, not a pupil
+              look={listening ? null : move ? { x: move === "leave" ? 1 : -1, y: 0 } : attending || nodding || handing ? { x: -1, y: -0.2 } : null}
             />
           </span>
         </Blend>
@@ -243,8 +307,16 @@ export function SecretaryDesk({
         </span>
       ) : null}
 
-      {/* one line under the mark: what the ring cannot say */}
-      {waiting > 0 ? (
+      {/* one line under the mark: what the ring cannot say — first of all, while the director dictates,
+          that it listens and for how long (the big mark says nothing of a recording that is not its own) */}
+      {listening ? (
+        <span className={`nums ${CAPTION}`} style={{ color: "var(--text)" }} data-testid="desk-listening">
+          Слушаю
+          <span ref={timerRef} className="text-muted">
+            0:00
+          </span>
+        </span>
+      ) : waiting > 0 ? (
         // kept on the phone, it goes by itself once the network is back (D-106)
         <span className={CAPTION} style={{ color: "var(--warn)" }} data-testid="desk-waiting">
           <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: "var(--warn)", animation: "smc-glow 1.2s ease-in-out infinite" }} />

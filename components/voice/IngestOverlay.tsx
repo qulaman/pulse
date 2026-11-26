@@ -7,39 +7,14 @@ import { Mascot } from "@/components/brand/Mascot";
 import { MascotScene, type Scene } from "@/components/brand/MascotScene";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
-import { subscribeIngestLevel, useIngestStore, type IngestErrorCode } from "@/lib/store/ingest";
+import { ERROR_VIEW as ERRORS } from "@/components/voice/phraseErrors";
+import { subscribeIngestLevel, useIngestStore } from "@/lib/store/ingest";
 import { ERROR_ACT, STAGE_LINE, elapsedSince } from "@/lib/voice/stages";
 
 /**
  * Visible progress of the pipeline (D-43) and every failure state of docs/AI.md §11.
  * Nothing here blocks the recording itself — it only reports where the phrase is now.
  */
-
-type ErrorView = {
-  line: string;
-  /** Show the raw transcript: the words are not lost even when the parse is. */
-  showTranscript?: boolean;
-  action?: "retry" | "manual";
-};
-
-const ERRORS: Record<IngestErrorCode, ErrorView> = {
-  record_too_short: { line: "Слишком коротко" },
-  mic_silent: { line: "Микрофон молчит — в записи нет звука. Проверь, включён ли микрофон, и скажи ещё раз" },
-  mic_denied: { line: "Не получил доступ к микрофону. Разреши его в настройках браузера для этого сайта" },
-  mic_unavailable: {
-    line: "Микрофон здесь недоступен: браузер даёт его только по HTTPS или на localhost. Открой приложение по HTTPS-адресу",
-  },
-  empty_transcript: { line: "Не понял, повторить?", action: "retry" },
-  stt_failed: { line: "Не расслышал. Аудио сохранил — повторить?", action: "retry" },
-  parse_failed: { line: "Распознал текст, но не разобрал", showTranscript: true, action: "retry" },
-  parse_refused: { line: "Не берусь разобрать это", showTranscript: true, action: "manual" },
-  parse_empty: { line: "Не нашёл здесь ни задач, ни объявлений", showTranscript: true, action: "manual" },
-  ai_timeout: { line: "Долго думаю. Повторить?", action: "retry" },
-  rate_limited: { line: "Слишком часто. Минуту подожду", action: "retry" },
-  upload_failed: { line: "Не смог сохранить аудио — повторить?", action: "retry" },
-  network: { line: "Нет связи. Попробую ещё раз", action: "retry" },
-  unknown: { line: "Что-то пошло не так — повторить?", action: "retry" },
-};
 
 const SCENE: Record<string, Scene> = {
   recording: "listening",
@@ -49,7 +24,17 @@ const SCENE: Record<string, Scene> = {
   sending: "sending",
 };
 
-export function IngestOverlay({ navigate = true, progress = true }: { navigate?: boolean; /** false on a screen whose own mascot plays the pipeline (the board) */ progress?: boolean } = {}) {
+export function IngestOverlay({
+  navigate = true,
+  progress = true,
+  errors = true,
+}: {
+  navigate?: boolean;
+  /** false on a screen whose own mascot plays the pipeline (the board) */
+  progress?: boolean;
+  /** false on a screen that says a failure over its own face, with the same ways out (Пульс) — «слишком коротко» too */
+  errors?: boolean;
+} = {}) {
   const stage = useIngestStore((state) => state.stage);
   const error = useIngestStore((state) => state.error);
   const transcript = useIngestStore((state) => state.transcript);
@@ -105,14 +90,14 @@ export function IngestOverlay({ navigate = true, progress = true }: { navigate?:
 
   // Too short to be speech: a toast, not a screen (docs/AI.md §11).
   useEffect(() => {
-    if (stage === "error" && error?.code === "record_too_short") {
+    if (errors && stage === "error" && error?.code === "record_too_short") {
       toast("Слишком коротко");
       reset();
     }
-  }, [stage, error, reset]);
+  }, [errors, stage, error, reset]);
 
   const showProgress = progress && stage in STAGE_LINE;
-  const showError = stage === "error" && error !== null && error.code !== "record_too_short";
+  const showError = errors && stage === "error" && error !== null && error.code !== "record_too_short";
   if (!showProgress && !showError) return null;
 
   return (

@@ -94,6 +94,7 @@ function lookOf({
   still,
   cheer,
   mini,
+  listening,
 }: {
   scene: DeskScene | null;
   phase: DeskPhase;
@@ -105,7 +106,13 @@ function lookOf({
   cheer: boolean;
   /** the small secretary beside the director's face: no headset to ring, awake and looking about at rest */
   mini: boolean;
+  /** the director is saying a request into it (D-99) */
+  listening: boolean;
 }): StateLook {
+  // The director dictates to the secretary: it listens exactly as the big mark does (STATE_LOOK.listening)
+  // — the ring opens into its arcs, the dot is the three bars of the voice, the light takes the voice
+  // (`--mascot-level` from an ancestor). Over whatever the ring held: the words are for it now
+  if (listening) return { color: TONE, ring: "open", spin: "drift", core: "bars", glow: "voice" };
   const party = cheer ? ({ extra: "confetti" } as const) : null;
   // the face is talking while the balls are out: no request in it
   if (talking) return { color: TONE, glow: "talk", blink: true, coreAnim: "bk-talk 0.9s var(--ease-in-out) infinite", ringAnim: CALM, ...party };
@@ -194,12 +201,15 @@ export function SecretaryMascot({
   cheer = false,
   still = false,
   season = null,
+  listening = false,
 }: {
   scene: DeskScene | null;
   phase: DeskPhase;
   size?: number;
   talking?: boolean;
   bare?: boolean;
+  /** the director is saying a request into it (D-99): it listens, as the big mark does */
+  listening?: boolean;
   /** the small secretary beside the director's face (D-210): no headset — the bow tie alone; its own request only, no small acts */
   mini?: boolean;
   act?: SecretaryAct | null;
@@ -221,18 +231,19 @@ export function SecretaryMascot({
   room?: boolean;
 }) {
   const rest = !bare && phase === "rest";
-  const asleep = rest && daypart === "night";
-  // an avatar plays no acts; neither does a sleeper
-  const doing = size < LITE_PX || asleep ? null : act;
-  const state = bare ? (talking ? "talking" : "bare") : asleep ? "asleep" : phase;
-  const waiting = !bare && phase === "asked" && queue > 0;
+  // the director's voice wakes it: a sleeper cannot listen
+  const asleep = rest && daypart === "night" && !listening;
+  // an avatar plays no acts; neither does a sleeper, nor a listener — its dot is the voice
+  const doing = size < LITE_PX || asleep || listening ? null : act;
+  const state = listening ? "listening" : bare ? (talking ? "talking" : "bare") : asleep ? "asleep" : phase;
+  const waiting = !bare && !listening && phase === "asked" && queue > 0;
   return (
     <Mark
       kind="secretary"
       state={state}
       act={doing}
       size={size}
-      look={lookOf({ scene, phase, bare, talking, urgency, asleep, still, cheer, mini })}
+      look={lookOf({ scene, phase, bare, talking, urgency, asleep, still, cheer, mini, listening })}
       part={doing ? ACTS[doing] : null}
       ms={doing ? SEC_ACT_MS[doing] : 0}
       gaze={look}

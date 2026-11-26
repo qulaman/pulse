@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 
-import { Mascot } from "@/components/brand/Mascot";
+import { MiniMark } from "@/components/brand/MiniMark";
 import { entitiesSummary } from "@/components/confirm/format";
 import { useDockSpace } from "@/components/ui/dock";
 import { toast } from "@/components/ui/Toast";
@@ -159,7 +159,8 @@ export function KeptPhrases() {
       <div className="flex max-w-full items-center gap-3 rounded-full border border-border bg-surface py-2 pl-2 pr-2" style={{ boxShadow: "var(--shadow-raised)" }}>
         {view.kind === "waiting" ? (
           <>
-            <Mascot state="saving" size={32} />
+            {/* under 40 px the product shows the small mark (D-209) */}
+            <MiniMark state={online ? "busy" : "still"} size={24} tone={online ? "var(--accent)" : "var(--text-muted)"} className="ml-1.5" />
             <p className="pr-2 text-[14px] font-medium leading-[18px]">
               {online
                 ? "Отправляю то, что ждало сети…"
@@ -168,7 +169,7 @@ export function KeptPhrases() {
           </>
         ) : (
           <>
-            <Mascot state={view.phrase.failure ? "thinking" : "offering"} size={32} />
+            <MiniMark state="alert" size={24} tone={view.phrase.failure ? "var(--warn)" : "var(--accent)"} className="ml-1.5" />
             <button type="button" onClick={open} className="flex min-w-0 items-baseline gap-1.5 text-left text-[14px] font-medium leading-[18px]">
               <span className="min-w-0 truncate">
                 {readyLine(view.phrase)}

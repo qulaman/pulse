@@ -20,7 +20,11 @@
   overflow: visible;
 }
 
-/* a wave from the ring to the edge of the field: drawn at the edge, it starts at the mark's size */
+/*
+ * a wave from the ring to the edge of the field: drawn at the edge, it starts at the mark's size.
+ * Its length and delay come from the field's heartbeat (components/pulse/beat.ts), written on the
+ * element; its start is put on the mark's own wave by the Web Animations API
+ */
 .idle-wave {
   position: absolute;
   left: 0;
@@ -38,10 +42,7 @@
     transparent 100%
   );
   opacity: 0;
-  animation: idle-wave 6.4s cubic-bezier(0.2, 0.55, 0.4, 1) infinite both;
-}
-.idle-wave-2 {
-  animation-delay: 3.2s;
+  animation: idle-wave 5.8s cubic-bezier(0.2, 0.55, 0.4, 1) infinite both;
 }
 
 /* a mote goes round its orbit: the arm turns about the middle, the mote sits at the arm's end */
@@ -68,7 +69,8 @@
   position: absolute;
   display: block;
 }
-/* it answers the wave that passes its orbit: a flare, like the beat of the mark */
+/* it answers the wave that passes its orbit: a flare, like the beat of the mark — once a beat
+   (`--beat`, the field's heartbeat), `--at` after the wave leaves the ring */
 .idle-flare {
   left: 0;
   top: 0;
@@ -77,7 +79,7 @@
   margin: calc(var(--d) / -2) 0 0 calc(var(--d) / -2);
   opacity: 0.45;
   transform: scale(0.85);
-  animation: idle-flare 3.2s var(--ease-out) var(--at) infinite both;
+  animation: idle-flare var(--beat, 5.8s) var(--ease-out) var(--at) infinite both;
 }
 /* no waves (the face is saying something): the riders only twinkle, each on its own clock */
 .idle-field[data-still] .idle-flare {
@@ -108,7 +110,7 @@
   border: 1px solid currentColor;
   border-radius: 50%;
   opacity: 0;
-  animation: idle-echo 3.2s var(--ease-out) var(--at) infinite both;
+  animation: idle-echo var(--beat, 5.8s) var(--ease-out) var(--at) infinite both;
 }
 .idle-field[data-still] .idle-echo {
   animation: none;

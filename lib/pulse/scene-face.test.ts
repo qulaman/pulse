@@ -47,6 +47,13 @@ describe("directorMascot", () => {
     expect(directorMascot({ ...director })).toBe("happy");
     expect(directorMascot({ ...director, handoff: true, idle: true })).toBe("calm");
   });
+
+  it("back from a long time away reads the news a moment — not over a card, a failure or the news itself", () => {
+    expect(directorMascot({ ...director, idle: true, comeback: true })).toBe("processing");
+    expect(directorMascot({ ...director, comeback: true, job: "checking" })).toBe("checking");
+    expect(directorMascot({ ...director, comeback: true, oops: true, mood: "alert" })).toBe("alert");
+    expect(directorMascot({ ...director, comeback: true, thought: true, newsAct: true })).toBe("calm");
+  });
 });
 
 const employee = {
@@ -78,5 +85,11 @@ describe("employeeMascot", () => {
     expect(employeeMascot({ ...employee, loading: true })).toBe("thinking");
     expect(employeeMascot({ ...employee, speaking: true })).toBe("speaking");
     expect(employeeMascot({ ...employee })).toBe("happy");
+  });
+
+  it("back from a long time away reads the news a moment, then the news or rest", () => {
+    expect(employeeMascot({ ...employee, idle: true, comeback: true })).toBe("processing");
+    expect(employeeMascot({ ...employee, comeback: true, thought: true, awake: "calling" })).toBe("calling");
+    expect(employeeMascot({ ...employee, comeback: true, job: "checking" })).toBe("checking");
   });
 });

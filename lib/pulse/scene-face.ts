@@ -5,7 +5,8 @@ import type { MascotState } from "@/components/brand/Mascot";
  * the phrase in hand and the celebration after its throw over everything; a request the
  * secretary has just finished (awake, the eye on the secretary — D-210); a failure (its act plays over the job or the mood); «не разобрал»; then the open card's
  * job — a thought or a news act that comes while a card is open does not take the job out of the
- * face's hands (the bubble still shows); then the news itself; then rest or awake.
+ * face's hands (the bubble still shows); then the news itself; the page back after a long time
+ * away, reading what came meanwhile (`comeback`, 2026-11-26); then rest or awake.
  */
 export function directorMascot(scene: {
   /** sending, celebrating, offering or thinking while a phrase is in hand; null otherwise */
@@ -29,6 +30,8 @@ export function directorMascot(scene: {
   rest: MascotState;
   /** the face with the balls out */
   awake: MascotState;
+  /** back from a long time away, the board fetching again: the face reads the news for a moment */
+  comeback?: boolean;
 }): MascotState {
   if (scene.confirm) return scene.confirm;
   if (scene.handoff) return "calm";
@@ -36,13 +39,15 @@ export function directorMascot(scene: {
   if (scene.unparsed) return "thinking";
   if (scene.job) return scene.job;
   if (scene.thought) return scene.newsAct ? (scene.mood ?? "calm") : "processing";
+  if (scene.comeback) return "processing";
   return scene.idle ? scene.rest : scene.awake;
 }
 
 /**
  * Which face the employee's Лента shows (D-110, D-178): the jump with confetti over everything;
  * then the open card's job — news from the director, a thought, does not take it out of the face's
- * hands; then the news (an awake face); then rest or awake.
+ * hands; then the news (an awake face); the page back after a long time away, reading what came
+ * meanwhile (`comeback`, 2026-11-26); then rest or awake.
  */
 export function employeeMascot(scene: {
   cheering: boolean;
@@ -56,10 +61,13 @@ export function employeeMascot(scene: {
   awake: MascotState;
   loading: boolean;
   speaking: boolean;
+  /** back from a long time away, the board fetching again: the face reads the news for a moment */
+  comeback?: boolean;
 }): MascotState {
   if (scene.cheering) return "celebrating";
   if (scene.job) return scene.job;
   if (scene.thought) return scene.awake;
+  if (scene.comeback) return "processing";
   if (scene.idle) return scene.rest;
   return scene.loading ? "thinking" : scene.speaking ? "speaking" : scene.awake;
 }

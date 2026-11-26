@@ -3,6 +3,7 @@
 import { ImageUp, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type DragEvent } from "react";
 
+import { MiniMark } from "@/components/brand/MiniMark";
 import { accentVerdict, normalAccent, useBrandDraft } from "@/components/desk/settings/brand";
 import { SettingRow, SettingsGroup, TextInput, TimeInput } from "@/components/desk/settings/form";
 import { useDraft } from "@/components/settings/draft";
@@ -62,7 +63,10 @@ function LogoWell({ url, letter }: { url: string | null; letter: string }) {
         style={{ background: "var(--spine)", borderColor: over ? "var(--accent)" : "var(--text-muted)" }}
       >
         {upload.isPending ? (
-          <span className="text-[12px] text-white/70">Загружаю…</span>
+          <span className="text-[12px] text-white/70">
+            <MiniMark state="busy" size={14} className="mr-1.5" />
+            Загружаю…
+          </span>
         ) : url ? (
           <StillLogo src={url} className="h-6 max-w-[116px] object-contain" />
         ) : (
@@ -185,7 +189,20 @@ export function CompanyPanel() {
     <div className="flex flex-col gap-6">
       <SettingsGroup id="company" title="Компания" about="Название и логотип видят все: в навигации, на экране входа и на стене. Стиль Pulse остаётся — меняется только акцент.">
         {!edit ? (
-          <SettingRow id="brand-loading" label={brand.failed ? "Не удалось загрузить данные компании" : "Загружаю данные компании…"} hint={brand.failed ? "Проверьте связь и откройте экран ещё раз" : undefined} />
+          <SettingRow
+            id="brand-loading"
+            label={
+              brand.failed ? (
+                "Не удалось загрузить данные компании"
+              ) : (
+                <>
+                  <MiniMark state="busy" tone="var(--accent)" className="mr-2" />
+                  Загружаю данные компании…
+                </>
+              )
+            }
+            hint={brand.failed ? "Проверьте связь и откройте экран ещё раз" : undefined}
+          />
         ) : (
           <>
             <SettingRow id="brand-preview" label="Как это выглядит" hint="Логотип и название в шапке, акцент — на кнопках и ссылках">

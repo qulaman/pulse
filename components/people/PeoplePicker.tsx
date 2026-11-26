@@ -2,7 +2,6 @@
 
 import { useMemo, useRef, useState, type ReactNode } from "react";
 
-import { Mascot } from "@/components/brand/Mascot";
 import { MiniMark } from "@/components/brand/MiniMark";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
@@ -134,7 +133,8 @@ function PickerBody(props: PeoplePickerProps) {
       ) : null}
       {props.hint ? (
         <div className="mb-3 flex items-center gap-3 px-1">
-          <Mascot state="thinking" size={32} />
+          {/* under 40 px the mascot is its small self (D-209): the assistant waits for the answer */}
+          <MiniMark state="alert" size={22} tone="var(--warn)" />
           <p className="text-[13px] leading-4 text-muted">{props.hint}</p>
         </div>
       ) : null}

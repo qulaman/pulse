@@ -26,8 +26,13 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: Variant;
   size?: Size;
   block?: boolean;
-  /** The small mark at work in place of the label (D-209); the button stays the same width so nothing jumps. */
+  /**
+   * The small mark at work in place of the label (D-209); the button stays the same width so nothing
+   * jumps, stays fully lit — at work, not switched off — and takes no clicks.
+   */
   loading?: boolean;
+  /** What a screen reader hears while `loading` — the hidden label is not read: «Отправляю…». */
+  busyLabel?: string;
   icon?: ReactNode;
 };
 
@@ -36,7 +41,7 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
  * Primary carries the accent gradient and a soft glow; secondary is a raised
  * surface with a light top edge; ghost is text; gold is the director's reward.
  */
-export function Button({ variant = "primary", size = "md", block, loading, icon, className = "", children, disabled, ...rest }: Props) {
+export function Button({ variant = "primary", size = "md", block, loading, busyLabel, icon, className = "", children, disabled, ...rest }: Props) {
   return (
     <button
       type="button"
@@ -46,7 +51,9 @@ export function Button({ variant = "primary", size = "md", block, loading, icon,
         "relative inline-flex select-none items-center justify-center gap-2 rounded-[12px] font-display tracking-[-0.01em]",
         // `scale`: Tailwind 4 writes `active:scale-*` into it — without it the press jumped, never sank
         "transition-[transform,scale,background-color,box-shadow,color] duration-[120ms] ease-out",
-        "active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100",
+        // only a button that cannot be pressed fades; one at work stays lit (it is `disabled` too, for the clicks)
+        loading ? "cursor-progress" : "disabled:opacity-40",
+        "active:scale-[0.97] disabled:active:scale-100",
         "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/35",
         VARIANTS[variant],
         SIZES[size],
@@ -63,6 +70,7 @@ export function Button({ variant = "primary", size = "md", block, loading, icon,
           <MiniMark state="busy" size={18} />
         </span>
       ) : null}
+      {loading && busyLabel ? <span className="sr-only">{busyLabel}</span> : null}
       <span className={`inline-flex items-center gap-2 ${loading ? "invisible" : ""}`}>
         {icon ? <span className="-ml-0.5 inline-flex shrink-0">{icon}</span> : null}
         {children}

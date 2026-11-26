@@ -6,12 +6,15 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 
 import { CrewCard } from "@/components/pulse/CrewCard";
 import { CrewCircle, IdleCircle } from "@/components/pulse/CrewCircle";
-import { FIELD_WAVE_MS, fieldRadius, fieldWaveDelay } from "@/components/pulse/IdleField";
+import { alignField, BEATS, restingClock, waveLife, type FieldClock } from "@/components/pulse/beat";
+import { fieldRadius, fieldWaveDelay } from "@/components/pulse/IdleField";
 import { haptic } from "@/lib/haptics";
 import { lookOf, wordOf, type CrewTask, type Look } from "@/lib/idle/look";
 import { addressOf, RING_OUT, teamField, type Member, type Pick, type Seat } from "@/lib/idle/people";
 import { shortName, useNamesKey, initialsOf } from "@/lib/people/names";
 import { useDeepRest } from "@/lib/useDeepRest";
+
+const DEFAULT_CLOCK = restingClock("sleep");
 
 /** The trip up is three acts (D-74) and needs room to read; the way back is a calm float. */
 const LAUNCH_MS = 1_700;
@@ -59,6 +62,7 @@ export function PeopleField({
   wide,
   reach,
   waves = false,
+  clock = DEFAULT_CLOCK,
   picked = null,
   onPick,
   onLook,
@@ -74,6 +78,8 @@ export function PeopleField({
   reach?: number;
   /** the waves of the field are crossing the screen — the room bobs as each goes past (D-206) */
   waves?: boolean;
+  /** the field's heartbeat (IdleScene): the bobs keep the waves' clock */
+  clock?: FieldClock;
   /** the id of the idler picked on this screen; the screen keeps it, this layer draws it */
   picked?: string | null;
   /** a tap on an idler: that person, or null when the picked one is tapped again */
@@ -278,28 +284,37 @@ export function PeopleField({
   }, []);
 
   // ---- what the field does to the room (D-206) ------------------------------------------------
-  // A wave leaves the mark every few seconds and crosses the screen (IdleField). The team and the
-  // wave are measured from the same point — the middle of the face — so when the front reaches each
-  // circle is known from where it sits: one looping animation a circle, late by its distance.
+  // A wave leaves the mark with each of its beats and crosses the screen (IdleField). The team and
+  // the wave are measured from the same point — the middle of the face — so when the front reaches
+  // each circle is known from where it sits: one looping animation a circle, a beat long, late by
+  // its distance. Its start is the field's clock, not the moment the circle appeared or moved: a
+  // circle that has just landed or slid over bobs with the wave in flight (`alignField` below).
+  const beat = clock.beat;
   const ripple = useMemo(() => {
     if (!waves) return null;
     const reach = fieldRadius(hx, hy);
+    const life = waveLife(beat);
     const byId = new Map<string, string>();
     for (const { member } of crew) {
       const seat = layout.seats.get(member.id);
       if (!seat) continue;
-      const late = fieldWaveDelay(Math.hypot(seat.x, seat.y), reach);
-      // two waves are in the air, half a period apart: every circle bobs at each
-      if (late !== null) byId.set(member.id, `crew-ripple ${FIELD_WAVE_MS / 2}ms var(--ease-out) ${late}ms infinite both`);
+      const late = fieldWaveDelay(Math.hypot(seat.x, seat.y), reach, life);
+      // a wave leaves every beat: every circle bobs at each
+      if (late !== null) byId.set(member.id, `crew-ripple ${BEATS[beat].ms}ms var(--ease-out) ${late}ms infinite both`);
     }
     return byId;
-  }, [crew, layout, waves, hx, hy]);
+  }, [crew, layout, waves, hx, hy, beat]);
+  const root = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (root.current && waves) alignField(root.current, clock);
+  });
 
   const box = { w: Math.max(hx, wide ?? hx) * 2, h: Math.max(hy, reach ?? hy) * 2 };
   const busyCount = crew.filter((c) => c.look.busy).length;
   if (!crew.length) return null;
   return (
     <div
+      ref={root}
       className="pointer-events-none absolute inset-0"
       data-testid="people-field"
       data-busy={busyCount}

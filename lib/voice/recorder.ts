@@ -75,12 +75,27 @@ export class MicUnavailableError extends Error {
   }
 }
 
+/**
+ * Thrown by start() when stop() or cancel() came while the browser was still opening the
+ * microphone: the stream it hands over afterwards is released at once, nothing records.
+ */
+export class RecordingDroppedError extends Error {
+  constructor() {
+    super("the recording was stopped before the microphone opened");
+    this.name = "RecordingDroppedError";
+  }
+}
+
 export function createRecorder(): Recorder {
   let stream: MediaStream | null = null;
   let recorder: MediaRecorder | null = null;
   let audioContext: AudioContext | null = null;
   let rafId: number | null = null;
   let startedAt = 0;
+  // getUserMedia is in flight, and whether stop()/cancel() came meanwhile: the stream that arrives
+  // after them has no owner — it must be closed on arrival, or the microphone stays on (2026-11-26)
+  let opening = false;
+  let dropped = false;
   // the loudest sample seen, and how many frames were measured with the audio clock running
   let peak = 0;
   let measured = 0;
@@ -156,30 +171,57 @@ export function createRecorder(): Recorder {
       if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
         throw new MicUnavailableError();
       }
-      stream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS });
-      const mimeType = pickMimeType();
-      recorder = new MediaRecorder(stream, {
-        ...(mimeType ? { mimeType } : {}),
-        audioBitsPerSecond: 48_000, // best-effort: iOS ignores it (docs/FRONTEND.md)
-      });
-      chunks.length = 0;
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) chunks.push(event.data);
-      };
-      recorder.start();
+      dropped = false;
+      opening = true;
+      let got: MediaStream;
+      try {
+        got = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS });
+      } finally {
+        opening = false;
+      }
+      if (dropped) {
+        // released before the microphone answered: nobody wants this stream — no recorder, no meter
+        got.getTracks().forEach((track) => track.stop());
+        throw new RecordingDroppedError();
+      }
+      stream = got;
+      try {
+        const mimeType = pickMimeType();
+        recorder = new MediaRecorder(got, {
+          ...(mimeType ? { mimeType } : {}),
+          audioBitsPerSecond: 48_000, // best-effort: iOS ignores it (docs/FRONTEND.md)
+        });
+        chunks.length = 0;
+        recorder.ondataavailable = (event) => {
+          if (event.data.size > 0) chunks.push(event.data);
+        };
+        recorder.start();
+      } catch (cause) {
+        // the stream is open and the caller will hear only the error: close it here
+        recorder = null;
+        teardown();
+        throw cause;
+      }
       startedAt = Date.now();
       peak = 0;
       measured = 0;
       firstTick = 0;
       lastTick = 0;
       broken = false;
-      meter(stream);
+      try {
+        meter(got);
+      } catch {
+        // no level and no peak: the recording itself goes on, and an unmeasured one is never «silent»
+        broken = true;
+      }
     },
 
     stop() {
       return new Promise<RecordedAudio>((resolve, reject) => {
         const active = recorder;
         if (!active || active.state === "inactive") {
+          // still opening: the stream that comes later is closed on arrival (start() sees `dropped`)
+          if (opening) dropped = true;
           teardown();
           reject(new Error("recorder is not running"));
           return;
@@ -199,6 +241,7 @@ export function createRecorder(): Recorder {
     },
 
     cancel() {
+      if (opening) dropped = true;
       if (recorder && recorder.state !== "inactive") {
         recorder.onstop = null;
         recorder.stop();

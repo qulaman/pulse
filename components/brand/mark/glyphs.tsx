@@ -156,11 +156,16 @@ function draw(id: GlyphId, count: number, hot: boolean): ReactNode {
     }
     case "hourglass":
       return (
-        <g className="bk-g-flip">
-          <path d="M-12.5 -18 H12.5 L2.6 0 L12.5 18 H-12.5 L-2.6 0 Z" fill="currentColor" stroke="currentColor" strokeWidth="5" strokeLinejoin="round" />
-          <path d="M-6 13.5 H6 L0 6 Z" fill={INK} stroke={INK} strokeWidth="1.6" strokeLinejoin="round" />
-          <path d="M0 -6 V2" {...cut} strokeWidth="2" className="bk-g-sand" />
-        </g>
+        <>
+          {/* two turns a loop, so the loop has no seam; the heaps trade places with every turn */}
+          <g className="bk-g-flip">
+            <path d="M-12.5 -18 H12.5 L2.6 0 L12.5 18 H-12.5 L-2.6 0 Z" fill="currentColor" stroke="currentColor" strokeWidth="5" strokeLinejoin="round" />
+            <path d="M-6 -13.5 H6 L0 -6 Z" fill={INK} stroke={INK} strokeWidth="1.6" strokeLinejoin="round" className="bk-g-sand-top" />
+            <path d="M-6 13.5 H6 L0 6 Z" fill={INK} stroke={INK} strokeWidth="1.6" strokeLinejoin="round" className="bk-g-sand-bot" />
+          </g>
+          {/* the trickle does not turn with the glass: it always falls */}
+          <path d="M0 -4 V4" {...cut} strokeWidth="2" className="bk-g-sand" />
+        </>
       );
     case "clock":
       return (
@@ -245,7 +250,8 @@ function draw(id: GlyphId, count: number, hot: boolean): ReactNode {
     case "medal":
       return (
         <>
-          <path d="M-12 -22 L-4 -6 M12 -22 L4 -6" {...line} strokeWidth="6.5" />
+          {/* one ribbon with a notch — two loose strokes read as ears */}
+          <path d="M-14 -23 H-5.5 L0 -13.5 L5.5 -23 H14 L5 -5 H-5 Z" fill="currentColor" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" />
           <circle cx="0" cy="6" r="14.5" fill="currentColor" />
           <path d={STAR} transform="translate(0 6.4) scale(0.42)" fill={INK} stroke={INK} strokeWidth="3" strokeLinejoin="round" />
         </>

@@ -148,7 +148,14 @@ export function DeskThread({
       <LoadNote state={load} failed="Новые сообщения не загрузились" onRetry={onRetry} className="pb-1" />
       {rows.length >= THREAD_PAGE && hasMore ? (
         <button type="button" onClick={() => void showEarlier()} disabled={loadingMore} className="tasks-earlier mb-2 self-start py-1 text-[12px] leading-4 text-muted hover:text-text">
-          {loadingMore ? "Загружаю…" : "Показать раньше"}
+          {loadingMore ? (
+            <>
+              <MiniMark state="busy" tone="var(--accent)" className="mr-1.5" />
+              Загружаю…
+            </>
+          ) : (
+            "Показать раньше"
+          )}
         </button>
       ) : null}
       {rows.map((message, index) => {

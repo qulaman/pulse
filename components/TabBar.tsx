@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 
-import { MiniMark } from "@/components/brand/MiniMark";
+import { TabMark } from "@/components/TabMark";
 import { HapticSwitch } from "@/components/ui/HapticSwitch";
 import { warmCalendarMonth } from "@/lib/calendar/queries";
 import { monthOf } from "@/lib/datetime/calendar";
@@ -19,7 +19,8 @@ import styles from "./TabBar.module.css";
 
 type TabRole = TabBarRole;
 
-type Tab = { href: string; label: string; icon: ReactNode };
+/** `mark` — the icon is the mascot's small self, which says what is going on (TabMark). */
+type Tab = { href: string; label: string; icon: ReactNode; mark?: true };
 
 const stroke = {
   fill: "none",
@@ -30,10 +31,6 @@ const stroke = {
 };
 
 const ICONS = {
-  // Пульс is the mascot's home, for every role: its small self, alive on every screen (D-209) —
-  // not a chat bubble, the bubble is «Сообщения» on the balls (D-173)
-  pulse: <MiniMark state="idle" size={24} />,
-  feed: <MiniMark state="idle" size={24} />,
   tasks: (
     <svg width="24" height="24" viewBox="0 0 24 24" {...stroke} aria-hidden>
       <polyline points="4,7 6,9 9.5,5.5" />
@@ -96,8 +93,15 @@ const LAB_TAB: Tab = { href: "/lab", label: "Лаб", icon: ICONS.lab };
 /** «Календарь» (D-78): one screen for every role, so both bars carry the same tab. */
 const CALENDAR_TAB: Tab = { href: "/calendar", label: "Календарь", icon: ICONS.calendar };
 
+/**
+ * Пульс is the mascot's home, for every role: its icon is the mark's small self (D-209) — not a chat
+ * bubble, the bubble is «Сообщения» on the balls (D-173). It stands still unless something is going
+ * on (TabMark).
+ */
+const PULSE_ICON = { icon: null, mark: true } as const;
+
 const EMPLOYEE_TABS: Tab[] = [
-  { href: "/feed", label: "Пульс", icon: ICONS.feed },
+  { href: "/feed", label: "Пульс", ...PULSE_ICON },
   { href: "/tasks", label: "Дела", icon: ICONS.tasks },
   CALENDAR_TAB,
   { href: "/rating", label: "Рейтинг", icon: ICONS.rating },
@@ -113,7 +117,7 @@ const ADMIN_HOME = "/profile";
 const TABS: Record<TabRole, Tab[]> = {
   // the announcements live inside Пульс and Лента (D-59), the team inside «Профиль»
   director: [
-    { href: "/pulse", label: "Пульс", icon: ICONS.pulse },
+    { href: "/pulse", label: "Пульс", ...PULSE_ICON },
     { href: "/sent", label: "Задачи", icon: ICONS.tasks },
     CALENDAR_TAB,
     { href: "/notes", label: "Заметки", icon: ICONS.notes },
@@ -562,7 +566,8 @@ export function TabBar({ role, lab = false }: { role: TabRole; lab?: boolean }) 
                   }}
                 >
                   <span className={styles.icon}>
-                    {tab.icon}
+                    {/* on Пульс itself the big mark is right there: the small one stands */}
+                    {tab.mark ? <TabMark here={i === route.index && route.own} count={count} voice={role === "director"} /> : tab.icon}
                     {count > 0 ? (
                       <span key={count} className={`nums ${styles.badge} ${badge?.pop ? styles.badgePop : ""}`} aria-hidden>
                         {count > 99 ? "99+" : count}

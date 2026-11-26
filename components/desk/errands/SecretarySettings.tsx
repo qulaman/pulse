@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp, Plus, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 
+import { MiniMark } from "@/components/brand/MiniMark";
 import { useDeskParams } from "@/components/desk/DeskAddress";
 import { GroupLink, landOn, NumberInput, SaveBar, SettingRow, SettingsGroup, TextInput } from "@/components/desk/settings/form";
 import { patchOf, resetOf } from "@/components/desk/settings/sections";
@@ -493,7 +494,14 @@ export function SecretarySettings({ view }: { view: "buttons" | "settings" }) {
         <p className="pult-keypad-note max-w-[880px]" role="alert" data-testid="secretary-settings-failed">
           Настройки не загрузились.{" "}
           <button type="button" className="text-text underline-offset-2 hover:underline" disabled={settings.isFetching} onClick={() => void settings.refetch()}>
-            {settings.isFetching ? "Загружаю…" : "Повторить"}
+            {settings.isFetching ? (
+              <>
+                <MiniMark state="busy" tone="var(--accent)" className="mr-1.5" />
+                Загружаю…
+              </>
+            ) : (
+              "Повторить"
+            )}
           </button>
         </p>
       ) : !ready ? (

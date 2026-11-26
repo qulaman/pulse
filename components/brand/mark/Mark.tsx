@@ -51,6 +51,7 @@ const LOOKS = {
   sweep: "bk-sweep 4.6s var(--ease-in-out) infinite",
   follow: "bk-follow 1.15s linear infinite",
   desk: "bk-desk-look 7s var(--ease-in-out) infinite",
+  ponder: "bk-ponder 5.6s var(--ease-in-out) infinite",
 };
 const BLINK = "bk-blink 7.3s linear infinite";
 
@@ -124,6 +125,9 @@ export function Mark({
   const ring = part?.ring ?? look.ring ?? "whole";
   const lookAnim = once(part?.lookAnim) ?? (gaze || !look.look ? undefined : LOOKS[look.look]);
   const lidAnim = once(part?.lidAnim) ?? (look.blink ? BLINK : undefined);
+  // The dot is hidden while it is a thing: an act of the lid or of the dot alone — a wink, a sigh, a
+  // thump — plays on the thing then, or nobody would see it
+  const thingAnim = once(part?.glyphAnim) ?? (glyph ? (once(part?.lidAnim) ?? once(part?.coreAnim)) : undefined) ?? look.glyphAnim;
   const clamped = Math.min(1, Math.max(0, level));
 
   const root = { width: size, height: size, color: part?.color ?? look.color } as CSSProperties;
@@ -235,7 +239,7 @@ export function Mark({
               <Part className="bk-look" anim={lookAnim}>
                 <span className="bk-p bk-gaze">
                   <span className="bk-p bk-dot">
-                    <Part className="bk-dot-act" anim={once(part?.coreAnim)}>
+                    <Part className="bk-dot-act" anim={once(part?.coreAnim) ?? look.dotAnim}>
                       <Part className="bk-blink" anim={lidAnim}>
                         {PILLS.map((pill) => (
                           <span
@@ -265,7 +269,7 @@ export function Mark({
                       </Part>
                     </Part>
                   </span>
-                  <GlyphSwap id={glyph} count={count} hot={hot} anim={once(part?.glyphAnim)} />
+                  <GlyphSwap id={glyph} count={count} hot={hot} anim={thingAnim} leaves={part?.leaves === true} />
                 </span>
               </Part>
             </Part>

@@ -81,7 +81,8 @@ import { useTaskActions } from "@/lib/tasks/mutations";
 import { sortByUrgency, useMe, useMyTasks, usePulseBoard } from "@/lib/tasks/queries";
 import { pluralRu } from "@/lib/tasks/status-text";
 import { firstNameOf } from "@/lib/text/normalize";
-import { useDeepRest } from "@/lib/useDeepRest";
+import { useComeback } from "@/lib/useComeback";
+import { useDeepRest, wakeDeepRest } from "@/lib/useDeepRest";
 import { useHydrated } from "@/lib/useHydrated";
 import { useNow } from "@/lib/useNow";
 
@@ -128,12 +129,15 @@ const FADE_AWAY = { opacity: 0, transition: { duration: 0.15, ease: "easeOut" } 
 let lastOpen: { panel: OrbitId; at: number } | null = null;
 const LAST_OPEN_MS = 10 * 60_000;
 
-/** The resting face's own name for the screen reader: where its tap leads. */
-const FACE_LABEL: Partial<Record<OrbitId, string>> = {
-  tasks: "Маскот: нажмите — открыть дела",
-  messages: "Маскот: нажмите — сообщение директора",
-  ether: "Маскот: нажмите — новое объявление",
-  calendar: "Маскот: нажмите — ответить на приглашение",
+/**
+ * Where a tap on the resting face leads when something in particular waits — for the screen reader
+ * (`Маскот: нажмите — …`) and for the line at the bottom of the screen (`нажмите — …`, 2026-11-26).
+ */
+const FACE_TAP: Partial<Record<OrbitId, string>> = {
+  tasks: "откроются дела",
+  messages: "откроется сообщение директора",
+  ether: "откроется новое объявление",
+  calendar: "ответить на приглашение",
 };
 const FACE_LABEL_BALLS = "Маскот: нажмите — дела, сообщения, эфир, календарь";
 
@@ -377,6 +381,8 @@ export default function FeedPage() {
   // the medal has landed and the points are on (D-40, D-48): a jump with confetti after it
   const [cheering, setCheering] = useState(false);
   const panelFace: MascotState | null = mode === "panel" && panel ? PANEL_FACE_HEARD[panel] : null;
+  // back after a long time away: the face reads the news a moment while the board fetches (2026-11-26)
+  const comeback = useComeback(board.isFetching);
   // A thought is news from the director: the face is awake for it and plays what happened (D-110)
   // instead of the director's «reads the data» (D-65) — but not over an open card: the face keeps the
   // card's job in its hands and the thought says the news (D-178). The medal's jump is over all.
@@ -389,6 +395,8 @@ export default function FeedPage() {
     awake: employeeFace(load.rest, true),
     loading,
     speaking: speech.speaking,
+    // the secretary's face is its own: it reads no news this way
+    comeback: comeback && !isSecretary,
   });
   // the stack is in the hands whenever the hands are not busy with a ball's job
   const carrying = !isSecretary && !panelFace && !cheering && load.carry > 0;
@@ -409,8 +417,21 @@ export default function FeedPage() {
 
   // the small things a face does on its own (D-82): asleep, busy with the stack, waiting for
   // the director, glad on the ring — never over a thought, a panel or the celebration
-  const acts = useMascotActs(mascot, !isSecretary && !loading && !thought && !cheering && mode !== "panel");
+  const acts = useMascotActs(mascot, !isSecretary && !loading && !thought && !cheering && mode !== "panel" && !comeback);
   const play = acts.play;
+  // a thought gone and the face back to sleep: it dozes off with a yawn, as it does when tapped to rest
+  const hadThought = useRef(false);
+  useEffect(() => {
+    const had = hadThought.current;
+    hadThought.current = thought !== null;
+    if (had && thought === null && !isSecretary && mascot === "sleeping") play("yawn");
+  }, [thought, mascot, isSecretary, play]);
+  // News wakes whatever has gone still on the screen (lib/useDeepRest.ts), as a touch does: a word
+  // from the director, a request to the secretary — said as a thought or shown by the desk
+  const newsId = speech.line && !speech.line.opening ? speech.line.id : null;
+  useEffect(() => {
+    if (newsId) wakeDeepRest();
+  }, [newsId]);
   // one called act after another — an accepted pile nods once per card — but never far behind
   const actsEnd = useRef(0);
   const actTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -447,6 +468,8 @@ export default function FeedPage() {
   useEffect(() => {
     if (!happened.event || playedEvent.current === happened.key) return;
     playedEvent.current = happened.key;
+    // something happened to the work: news, as a touch is, for whatever has gone still on the screen
+    wakeDeepRest();
     // an order taken, handed in or closed changes what today's report holds (D-167)
     refreshMyDay();
     playInTurn(EVENT_ACT[happened.event]);
@@ -754,7 +777,7 @@ export default function FeedPage() {
               // the secretary sits at work, and its face is the job; the same field stands behind it
               // while nothing is asked (D-206) — a request ringing stops the waves
               <>
-              <IdleScene active={mode === "idle"} quiet={desk.phase === "rest" && !thought} />
+              <IdleScene active={mode === "idle"} quiet={desk.phase === "rest" && !thought} beat={secretary.daypart === "night" ? "sleep" : "awake"} />
               <SecretaryFace
                 scene={desk.scene}
                 phase={desk.phase}
@@ -777,7 +800,7 @@ export default function FeedPage() {
               <>
                 {/* the dust stays with the resting screen; the dream only with empty hands — a face
                     holding its work, waiting on the director or worried is not dreaming (D-110) */}
-                <IdleScene active={mode === "idle"} quiet={!thought && restFace === "sleeping"} />
+                <IdleScene active={mode === "idle"} quiet={!thought && restFace === "sleeping"} beat={restFace === "sleeping" ? "sleep" : "awake"} />
                 <MascotLever
                   state={mascot}
                   act={acts.act}
@@ -786,7 +809,7 @@ export default function FeedPage() {
                   size={faceSize}
                   wakeKey={wakeKey}
                   voice={false}
-                  label={mode !== "idle" ? undefined : ((reason && FACE_LABEL[reason]) ?? FACE_LABEL_BALLS)}
+                  label={mode !== "idle" ? undefined : reason && FACE_TAP[reason] ? `Маскот: нажмите — ${FACE_TAP[reason]}` : FACE_LABEL_BALLS}
                   // the balls live in the head and travel with the face (D-178); over a card, «+N» and
                   // the run of «в срок» stand by the small face, at once (principle 1a)
                   around={aroundFace}
@@ -862,7 +885,9 @@ export default function FeedPage() {
           style={{ bottom: "calc(var(--tabbar-space) + 2px)" }}
           data-testid="face-hint"
         >
-          нажмите — {balls.map((ball) => ball.label.toLowerCase()).join(", ")}
+          {/* where the tap leads right now: what waits for the person, as the face's own name says it;
+              the balls only when nothing in particular waits (2026-11-26) */}
+          нажмите — {!isSecretary && reason && FACE_TAP[reason] ? FACE_TAP[reason] : balls.map((ball) => ball.label.toLowerCase()).join(", ")}
         </p>
       ) : null}
 

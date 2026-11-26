@@ -525,8 +525,8 @@ async function main() {
     record("в покое лицо говорит: приветствие и главное", greetsWithMain, restWords.join(" / "));
     const hint = await page.locator('[data-testid="face-hint"]').innerText().catch(() => "");
     record(
-      "под лицом кнопок нет, внизу строка «нажмите — дела, …»",
-      (await page.locator('[data-testid="face-go"]').count()) === 0 && hint.includes("нажмите") && hint.includes("дела"),
+      "под лицом кнопок нет, внизу строка «нажмите — …»",
+      (await page.locator('[data-testid="face-go"]').count()) === 0 && hint.includes("нажмите"),
       hint || "нет строки",
     );
     // a reload is the same visit: the orders put away do not raise the card again

@@ -36,8 +36,9 @@ export function SendBar({ sendable, total, sending, onSend, onReset, onFixFirst 
       <div className="mx-auto max-w-lg">
         {/* the main button always does something: send, point at the first «кому?», or close */}
         {sendable > 0 || sending ? (
-          <Button block disabled={sending} onClick={() => onSend(false)}>
-            {sending ? "Отправляю…" : `Отправить ${sendable} из ${total}`}
+          // at work, the button stays lit with the small mark in it; the label keeps its width
+          <Button block loading={sending} busyLabel="Отправляю…" onClick={() => onSend(false)}>
+            {`Отправить ${sendable} из ${total}`}
           </Button>
         ) : total > 0 && onFixFirst ? (
           <Button block onClick={onFixFirst}>

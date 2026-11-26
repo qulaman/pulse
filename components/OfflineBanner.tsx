@@ -3,6 +3,7 @@
 import { notifyManager, useMutationState, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
+import { MiniMark, type MiniState } from "@/components/brand/MiniMark";
 import { useOnline } from "@/lib/useOnline";
 
 import { humanAqtobe } from "@/lib/ai/time";
@@ -64,30 +65,59 @@ export function useSendQueue(): { isOnline: boolean; paused: number; shown: bool
   return { isOnline, paused, shown: !isOnline || paused > 0 };
 }
 
+/** How long «Отправил» stays once the queue has emptied: the mark's one beat, then the line goes. */
+const SENT_MS = 1_400;
+
+/**
+ * The queue was being sent and has just emptied: true for a moment, so the line can say so with one
+ * beat of the mark before it goes. Coming back online with nothing waiting is not such a moment.
+ */
+function useJustSent(draining: boolean, isOnline: boolean): boolean {
+  const [was, setWas] = useState(draining);
+  const [sent, setSent] = useState(false);
+  if (was !== draining) {
+    setWas(draining);
+    setSent(was && !draining && isOnline);
+  }
+  useEffect(() => {
+    if (!sent) return;
+    const timer = setTimeout(() => setSent(false), SENT_MS);
+    return () => clearTimeout(timer);
+  }, [sent]);
+  return sent;
+}
+
 /**
  * A thin line at the top while the phone has no network: the assistant's own words
  * (docs/DESIGN.md §4 «Оффлайн»), no red, no exclamation. Layout stays put — the line
- * overlays the header instead of pushing it.
+ * overlays the header instead of pushing it. The mascot's small self says the same in one look
+ * (D-209): it stands while there is no network, is at work while the queue goes out, and beats once
+ * when the last of it has gone — «Отправил», and the line leaves.
  */
 export function OfflineBanner() {
   const { isOnline, paused, shown } = useSendQueue();
   const fetchedAt = useLatestFetch();
-  if (!shown) return null;
+  const sent = useJustSent(isOnline && paused > 0, isOnline);
+  if (!shown && !sent) return null;
   const queue = paused > 0 ? ` (${paused} в очереди)` : "";
   // nothing to send: say how old the screen is — without network it is the phone's copy (D-127)
   const at = !isOnline && paused === 0 ? fetchedAt : null;
-  const text = isOnline
-    ? `Отправляю${queue}`
-    : at
-      ? `Нет связи · данные на ${humanAqtobe(new Date(at)).replace(/^сегодня /, "")}`
-      : `Нет связи. Отправлю, как появится${queue}`;
+  const text = !shown
+    ? "Отправил"
+    : isOnline
+      ? `Отправляю${queue}`
+      : at
+        ? `Нет связи · данные на ${humanAqtobe(new Date(at)).replace(/^сегодня /, "")}`
+        : `Нет связи. Отправлю, как появится${queue}`;
+  const [mark, tone]: [MiniState, string | undefined] = !shown ? ["done", "var(--ok)"] : isOnline ? ["busy", "var(--accent)"] : ["still", undefined];
   return (
     <div
       role="status"
       className="pointer-events-none fixed inset-x-0 z-40 flex justify-center px-4"
       style={{ top: "calc(6px + env(safe-area-inset-top))" }}
     >
-      <p className="card-in rounded-full border border-border bg-surface px-3 py-1.5 text-[13px] leading-4 text-muted" style={{ boxShadow: "var(--shadow-raised)" }}>
+      <p className="card-in flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[13px] leading-4 text-muted" style={{ boxShadow: "var(--shadow-raised)" }}>
+        <MiniMark state={mark} size={14} tone={tone} />
         {text}
       </p>
     </div>

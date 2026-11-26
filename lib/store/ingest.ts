@@ -226,9 +226,21 @@ const initialState: IngestState = {
   suspicious: false,
 };
 
-/** The live recorder is a handle, not state: it never renders. */
-let activeRecorder: Recorder | null = null;
+/**
+ * The live recording is a handle, not state: it never renders. `opening` is the browser's answer to
+ * the microphone request; `open` turns true once it has come. Stop and cancel take the handle at once
+ * (a second stop finds none) and settle with the opening: a recording released before the microphone
+ * opened is dropped by the recorder itself, its stream closed on arrival — no path leaves a live
+ * microphone behind (2026-11-26).
+ */
+type Take = { recorder: Recorder; opening: Promise<void>; open: boolean };
+let take: Take | null = null;
 const levelListeners = new Set<(level: number) => void>();
+
+/** What the browser's refusal to open the microphone means for the director. */
+function micFailure(cause: unknown): IngestErrorCode {
+  return cause instanceof MicUnavailableError ? "mic_unavailable" : "mic_denied";
+}
 
 /** Microphone loudness, 0..1, straight to the caller — no re-render per frame. */
 export function subscribeIngestLevel(cb: (level: number) => void): () => void {
@@ -384,8 +396,9 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
       // so a sound played while it runs would be in it (D-204)
       sound("recStart");
       abandon();
+      // a recording still opening from before (a quick cancel and a new hold) is dropped for good
+      take?.recorder.cancel();
       const recorder = createRecorder();
-      activeRecorder = recorder;
       recorder.onLevel(emitLevel);
       set({
         ...initialState,
@@ -398,27 +411,36 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         recordingStartedAt: Date.now(),
       });
 
+      const mine: Take = { recorder, opening: recorder.start(), open: false };
+      take = mine;
       try {
-        await recorder.start();
+        await mine.opening;
+        mine.open = true;
       } catch (cause) {
-        activeRecorder = null;
-        set({
-          stage: "error",
-          error: { code: cause instanceof MicUnavailableError ? "mic_unavailable" : "mic_denied" },
-          retryFrom: null,
-          recordingStartedAt: null,
-        });
+        // stop or cancel took the recording over while the microphone was opening: they say what happened
+        if (take !== mine) return;
+        take = null;
+        set({ stage: "error", error: { code: micFailure(cause) }, retryFrom: null, recordingStartedAt: null });
       }
     },
 
     async stopVoice() {
-      const recorder = activeRecorder;
-      if (get().stage !== "recording" || !recorder) return;
-      activeRecorder = null;
+      const mine = take;
+      if (get().stage !== "recording" || !mine) return;
+      take = null;
+
+      if (!mine.open) {
+        // Released before the browser opened the microphone (slow to answer, or its permission prompt
+        // still up): nothing was recorded, and nothing will be — the recorder closes the stream the
+        // moment it comes. Not waited for: the prompt may stay up for as long as the person likes.
+        mine.recorder.cancel();
+        set({ stage: "error", error: { code: "record_too_short" }, retryFrom: null, recordingStartedAt: null });
+        return;
+      }
 
       let audio: RecordedAudio;
       try {
-        audio = await recorder.stop();
+        audio = await mine.recorder.stop();
       } catch {
         set({
           stage: "error",
@@ -440,8 +462,9 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
     },
 
     cancelVoice() {
-      activeRecorder?.cancel();
-      activeRecorder = null;
+      // an opening microphone is dropped too: its stream is closed the moment the browser hands it over
+      take?.recorder.cancel();
+      take = null;
       forget();
       set({ ...initialState });
     },
@@ -781,7 +804,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
           // the batch the server refused: the cards come back to be fixed and thrown again
           set({ stage: "confirm" });
           void mirror({ stage: "parsed", confirm: null, failure: null });
-          toast(phrase.failure.message ?? "Не отправилось — проверь и отправь ещё раз");
+          toast(phrase.failure.message ?? "Не отправилось — проверьте и отправьте ещё раз");
           return true;
         }
         const code: IngestErrorCode = KNOWN_CODES.has(phrase.failure.code) ? (phrase.failure.code as IngestErrorCode) : "unknown";
@@ -802,8 +825,8 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
     },
 
     reset() {
-      activeRecorder?.cancel();
-      activeRecorder = null;
+      take?.recorder.cancel();
+      take = null;
       forget();
       set({ ...initialState });
     },

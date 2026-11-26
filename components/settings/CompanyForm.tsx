@@ -179,8 +179,8 @@ export function CompanyForm({ onDirtyChange }: { onDirtyChange?: (dirty: boolean
             onChange={(e) => void upload(e.target.files?.[0] ?? null)}
           />
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" disabled={uploading} onClick={() => fileInput.current?.click()}>
-              {uploading ? "Загружаю…" : company.brand.logo_url ? "Заменить" : "Загрузить"}
+            <Button variant="secondary" loading={uploading} busyLabel="Загружаю…" onClick={() => fileInput.current?.click()}>
+              {company.brand.logo_url ? "Заменить" : "Загрузить"}
             </Button>
             {company.brand.logo_url ? (
               <Button variant="ghost" onClick={() => void removeLogo()}>

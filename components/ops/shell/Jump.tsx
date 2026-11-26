@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
+import { MiniMark } from "@/components/brand/MiniMark";
 import { Dialog } from "@/components/desk/ui/Dialog";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { taskIdIn } from "@/components/ops/company/words";
@@ -115,7 +116,14 @@ function JumpDialog({ onClose }: { onClose: () => void }) {
             ))}
           </ul>
         ) : (
-          <p className="px-1 py-2 text-[13px] leading-5 text-muted">{companies.isPending ? "Загружаю список компаний" : "Ничего не нашлось"}</p>
+          <p className="px-1 py-2 text-[13px] leading-5 text-muted">{companies.isPending ? (
+            <>
+              <MiniMark state="busy" tone="var(--accent)" className="mr-2" />
+              Загружаю список компаний
+            </>
+          ) : (
+            "Ничего не нашлось"
+          )}</p>
         )}
       </div>
     </Dialog>

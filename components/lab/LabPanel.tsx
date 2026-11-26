@@ -239,8 +239,8 @@ function ModelsCard({ settings }: { settings: LabSettings }) {
             </select>
           </Field>
         ) : null}
-        <Button block disabled={!dirty || save.isPending} onClick={() => save.mutate({ stt: draft.stt, parser: draft.parser })}>
-          {save.isPending ? "Сохраняю…" : "Применить"}
+        <Button block disabled={!dirty} loading={save.isPending} busyLabel="Сохраняю…" onClick={() => save.mutate({ stt: draft.stt, parser: draft.parser })}>
+          Применить
         </Button>
       </div>
     </section>

@@ -36,14 +36,16 @@ export type StateLook = {
   /** the colour of the waves when it is not the mark's own (gold for Эфир) */
   wave?: string;
   /** where the pupil looks by itself */
-  look?: "wander" | "sweep" | "follow" | "desk";
+  look?: "wander" | "sweep" | "follow" | "desk" | "ponder";
   blink?: boolean;
   /** a comet runs the ring */
   comet?: boolean;
-  /** loops: the whole mark, the ring, the dot, the halo — `animation` shorthands */
+  /** loops: the whole mark, the ring, the dot (and a second one under it), the thing, the halo — `animation` shorthands */
   all?: string;
   ringAnim?: string;
   coreAnim?: string;
+  dotAnim?: string;
+  glyphAnim?: string;
   halo?: string;
   /** a loop of what the ring wears (the secretary's headset ringing) */
   wearAnim?: string;
@@ -69,10 +71,11 @@ export const STATE_LOOK: Record<MascotState, StateLook> = {
   sending: { color: "var(--accent)", glow: "burst", coreAnim: "bk-launch 1.5s linear infinite both", ringAnim: "bk-recoil 1.5s var(--ease-out) infinite", halo: "bk-flash 1.5s var(--ease-out) infinite" },
   // parsed and waiting for the tap: the mark is a button that presses itself
   offering: { color: "var(--accent)", glyph: "send", glow: "press", all: "bk-press 1.6s var(--ease-in-out) infinite" },
-  // pondering, loading, «не разобрал»
-  thinking: { color: "var(--warn)", ring: "apart", spin: "drift", core: "dots", glow: "quiet", halo: "bk-think 1.4s var(--ease-in-out) infinite" },
+  // pondering, loading, «не разобрал»: one pupil that looks up and aside and thinks — the three dots
+  // are the sign of «разбираю» alone, so «не получилось» never looks like «ещё работаю»
+  thinking: { color: "var(--warn)", ring: "apart", spin: "drift", glow: "quiet", look: "ponder", blink: true, halo: "bk-think 1.4s var(--ease-in-out) infinite" },
   // the dot beats with the words, a small wave goes with each
-  speaking: { color: "var(--accent)", glow: "talk", blink: true, coreAnim: "bk-talk 0.9s var(--ease-in-out) infinite", ringAnim: CALM },
+  speaking: { color: "var(--accent)", glow: "talk", blink: true, coreAnim: "bk-talk 0.9s var(--ease-in-out) infinite", dotAnim: "bk-talk-2 0.62s var(--ease-in-out) infinite", ringAnim: CALM },
   // gold, the dot beams: rays go out of it with the beat, sparks
   happy: { color: "var(--gold)", glyph: "beam", glow: "pulse", extra: "sparks", ringAnim: BREATH, halo: "bk-halo-beat 3.4s var(--ease-in-out) infinite" },
   // the eye is shut, the slowest breath
@@ -83,10 +86,10 @@ export const STATE_LOOK: Record<MascotState, StateLook> = {
   calling: { color: "var(--warn)", glyph: "card-bang", glow: "fast", all: "bk-call 1.8s var(--ease-in-out) infinite" },
   // watchful: the pupil sweeps the room, an amber light over the ring
   alert: { color: "var(--accent)", glow: "quiet", look: "sweep", extra: "light", ringAnim: "bk-taut 2.3s var(--ease-in-out) infinite" },
-  // an unread word of the director: an envelope, a tremble
-  nervous: { color: "var(--warn)", glyph: "envelope", glow: "quiet", ringAnim: "bk-tremble 0.42s linear infinite" },
-  // the deadline burns: a clock racing, the mark shaking
-  panicking: { color: "var(--danger)", ring: "apart", glyph: "clock", glow: "fast", all: "bk-shake 0.3s linear infinite" },
+  // an unread word of the director: the envelope frets — a burst of shivers, a look up, and quiet
+  nervous: { color: "var(--warn)", glyph: "envelope", glow: "quiet", ringAnim: "bk-tremble 2.3s linear infinite", glyphAnim: "bk-fret 2.3s var(--ease-in-out) infinite" },
+  // the deadline burns: a clock racing, the mark shaking in bursts, the ring jolting on its own clock
+  panicking: { color: "var(--danger)", ring: "apart", glyph: "clock", glow: "fast", all: "bk-panic 0.9s linear infinite", ringAnim: "bk-jolt 0.37s linear infinite" },
   // the work of an open ball of Пульс: its thing in the middle of the ring
   checking: { color: "var(--accent)", glyph: "list", glow: "quiet", ringAnim: CALM },
   chatting: { color: "var(--accent)", glyph: "bubble", glow: "quiet", ringAnim: CALM },
@@ -121,6 +124,8 @@ export type ActLook = {
   glow?: "waves" | "burst" | "in";
   /** a comet runs the ring for the act */
   comet?: boolean;
+  /** the thing flies off or is crushed: the act ends as it goes, nothing of it comes back to go out again */
+  leaves?: boolean;
   extra?: "tunes" | "bubble" | "moon" | "spark" | "drop" | "dust";
 };
 
@@ -134,8 +139,8 @@ export const ACT_LOOK: Record<MascotAct, ActLook> = {
   hmm: { glyph: "card-x", glyphAnim: "bk-a-g-tilt" },
   puzzle: { glyph: "question", glyphAnim: BOB },
   stamp: { glyph: "check", glyphAnim: "bk-a-g-stamp", ringAnim: "bk-a-kick", glow: "burst" },
-  flick: { glyph: "card", glyphAnim: "bk-a-g-flick" },
-  crumple: { glyph: "card", glyphAnim: "bk-a-g-crumple" },
+  flick: { glyph: "card", glyphAnim: "bk-a-g-flick", leaves: true },
+  crumple: { glyph: "card", glyphAnim: "bk-a-g-crumple", leaves: true },
   push: { glyph: "card-bang", glyphAnim: "bk-a-g-push", glow: "waves" },
   clock: { glyph: "clock", glyphAnim: BOB },
   reply: { glyph: "bubble-lines", glyphAnim: POP },
@@ -151,8 +156,8 @@ export const ACT_LOOK: Record<MascotAct, ActLook> = {
   nod: { glyph: "check", glyphAnim: POP, all: "bk-a-nod" },
   raise: { glyph: "question", glyphAnim: BOB },
   shrug: { glyph: "card-x", ring: "apart", ringAnim: "bk-a-shrug", glyphAnim: "bk-a-g-tilt" },
-  poof: { glyph: "card", glyphAnim: "bk-a-g-poof", extra: "dust" },
-  handover: { glyph: "card", glyphAnim: "bk-a-g-fly", ringAnim: "bk-a-kick", glow: "burst" },
+  poof: { glyph: "card", glyphAnim: "bk-a-g-poof", extra: "dust", leaves: true },
+  handover: { glyph: "card", glyphAnim: "bk-a-g-fly", ringAnim: "bk-a-kick", glow: "burst", leaves: true },
   medal: { glyph: "medal", color: "var(--gold)", glyphAnim: POP, extra: "spark", glow: "waves" },
   boomerang: { glyph: "card", glyphAnim: "bk-a-g-boomerang", ringAnim: "bk-a-gulp-late" },
   relief: { lidAnim: "bk-a-rest", ringAnim: "bk-a-inhale", glow: "waves" },
@@ -170,11 +175,13 @@ export const ACT_LOOK: Record<MascotAct, ActLook> = {
   turn: { ring: "apart", ringAnim: "bk-a-roll", glyphAnim: "bk-a-g-tilt" },
   doze: { all: "bk-a-nodoff" },
   mumble: { glyphAnim: "bk-a-mumble", coreAnim: "bk-a-mumble" },
-  // a good dream: the line of the shut eye gathers into a dot, a spark beside it, two waves
-  smile: { glyphAnim: "bk-a-g-dream", extra: "spark", glow: "waves" },
+  // a good dream: the sleeper warms to gold for a moment, the line of the shut eye lifts, a spark, two waves
+  smile: { color: "var(--gold)", glyphAnim: "bk-a-g-lift", extra: "spark", glow: "waves" },
   kick: { all: "bk-a-jerk" },
-  wave: { lookAnim: "bk-a-wiggle", glow: "waves" },
-  wink: { lidAnim: "bk-a-wink", extra: "spark" },
+  // hello: the whole mark tips like a head — a swing of the pupil from side to side is «нет»
+  wave: { all: "bk-a-greet", lookAnim: "bk-a-lookup", glow: "waves" },
+  // the lid shuts aslant and the ring lifts on that side — a blink shuts level
+  wink: { lidAnim: "bk-a-wink", ringAnim: "bk-a-cock", extra: "spark" },
   hop: { all: "bk-a-hop" },
   spin: { ring: "apart", ringAnim: "bk-a-spin" },
   whistle: { coreAnim: "bk-a-purse", lookAnim: "bk-a-lookup", extra: "tunes" },

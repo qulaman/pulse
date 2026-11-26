@@ -3,6 +3,7 @@
 import { memo, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { motion, useIsPresent } from "motion/react";
 
+import { useFieldClock, type Beat } from "@/components/pulse/beat";
 import { IdleField } from "@/components/pulse/IdleField";
 import { LocalPresence } from "@/components/pulse/LocalPresence";
 import { PeopleField } from "@/components/pulse/PeopleField";
@@ -51,8 +52,9 @@ function useArea(anchor: RefObject<HTMLDivElement | null>): { hx: number; hy: nu
  * takes a tap; the moment the screen stops resting the whole scene dissolves in 180 ms.
  *
  * The scene owns the geometry: it measures the play area once and hands it to the field and to the
- * team, which are both laid out from the middle of the face. Nothing runs per frame: the field is
- * plain CSS.
+ * team, which are both laid out from the middle of the face. It owns the heartbeat too: the field's
+ * waves leave with the mark's own, and the team bobs on the same clock (components/pulse/beat.ts).
+ * Nothing runs per frame: the field is plain CSS, the clock is read once a beat.
  *
  * Memoised (D-178): a tap on the face or a ball renders the board again, and the scene — the
  * whole team on the director's screen — only when what it is given changes.
@@ -60,6 +62,7 @@ function useArea(anchor: RefObject<HTMLDivElement | null>): { hx: number; hy: nu
 export const IdleScene = memo(function IdleScene({
   active,
   quiet = true,
+  beat = "sleep",
   team,
   picked = null,
   onPick,
@@ -76,6 +79,12 @@ export const IdleScene = memo(function IdleScene({
    * orbits and the team stay.
    */
   quiet?: boolean;
+  /**
+   * The mark's heartbeat, which the waves keep: "sleep" — the face asleep (`sleeping`, a wave every
+   * 5.8 s); "awake" — the face beating (`calm`, `happy`, `working`: a wave every 3.4 s). The waves leave
+   * the ring together with the mark's own; a change lets the waves in flight finish.
+   */
+  beat?: Beat;
   team?: { members: Member[]; allHref?: (id: string) => string; onTaskMore?: (taskId: string) => void };
   /** the idler picked on this screen (D-84) — the screen keeps it, the field draws it */
   picked?: string | null;
@@ -87,6 +96,8 @@ export const IdleScene = memo(function IdleScene({
   const deep = useDeepRest();
   const anchor = useRef<HTMLDivElement>(null);
   const area = useArea(anchor);
+  // the field's and the team's one clock: the mark's own wave, read off the face beside them
+  const clock = useFieldClock(anchor, beat, active, deep);
 
   return (
     <>
@@ -97,7 +108,7 @@ export const IdleScene = memo(function IdleScene({
       <LocalPresence>
         {active && area ? (
           <Fade key="field">
-            <IdleField hx={area.hx} hy={area.hy} rest={deep} still={!quiet} />
+            <IdleField hx={area.hx} hy={area.hy} rest={deep} still={!quiet} clock={clock} />
           </Fade>
         ) : null}
         {active && area && team ? (
@@ -110,6 +121,7 @@ export const IdleScene = memo(function IdleScene({
               wide={area.hx + MARGIN - 6}
               reach={area.hy + MARGIN - 6}
               waves={quiet && !deep}
+              clock={clock}
               picked={picked}
               onPick={onPick}
               onLook={onLook}

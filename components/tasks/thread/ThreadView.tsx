@@ -196,7 +196,14 @@ export function ThreadView({ taskId, companyId, messages, loading, userId, actio
             disabled={loadingMore}
             className="mx-auto mb-2 block min-h-[36px] rounded-full border border-border px-4 text-[13px] leading-4 text-muted"
           >
-            {loadingMore ? "Загружаю…" : "Показать раньше"}
+            {loadingMore ? (
+              <>
+                <MiniMark state="busy" tone="var(--accent)" className="mr-1.5" />
+                Загружаю…
+              </>
+            ) : (
+              "Показать раньше"
+            )}
           </button>
         ) : null}
 

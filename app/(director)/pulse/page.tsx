@@ -50,6 +50,7 @@ import { useDirectorControls } from "@/components/tasks/list/useDirectorControls
 import { MessageAsk } from "@/components/visits/MessageAsk";
 import { VisitAsk } from "@/components/visits/VisitAsk";
 import { useKeptPill } from "@/components/voice/KeptPhrases";
+import { ERROR_THING, ERROR_VIEW, PhraseErrorButtons } from "@/components/voice/phraseErrors";
 import { nextEvent, startsSoon, todayCount } from "@/lib/calendar/agenda";
 import { useCalendar, type CalendarEvent } from "@/lib/calendar/queries";
 import { nextEventLine } from "@/lib/calendar/say";
@@ -74,6 +75,8 @@ import { useIngestStore, type IngestError } from "@/lib/store/ingest";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { useMe, usePulseBoard } from "@/lib/tasks/queries";
 import { firstNameOf } from "@/lib/text/normalize";
+import { useComeback } from "@/lib/useComeback";
+import { wakeDeepRest } from "@/lib/useDeepRest";
 import { useHydrated } from "@/lib/useHydrated";
 import { useNow } from "@/lib/useNow";
 import { ERROR_ACT } from "@/lib/voice/stages";
@@ -105,6 +108,10 @@ const AT_REST: Scene = { mode: "idle", panel: null, view: "idle", cameFrom: "idl
 
 /** The cards band against the words' band while a phrase of several things waits (D-146). */
 const CROWDED_GROW = 8;
+
+/** A hold too short to say anything: the mark pinches and says this under itself, then rests (2026-11-26). */
+const TOO_SHORT_NOTE = "Держите, пока говорите";
+const TOO_SHORT_NOTE_MS = 2_200;
 
 /**
  * The secretary on the waiting screen (D-85, D-210): a small mark right of the face, a little
@@ -148,10 +155,18 @@ export default function PulsePage() {
   // state /confirm draws as «Не разобрал». On Пульс it used to be silent (no cards, so nothing
   // «in hand») and the face just fell asleep while the words sat in a draft
   const unparsed = stage === "confirm" && entities.length === 0 && heard.trim() !== "";
+  // A phrase that did not make it is said over the face, as «не разобрал» is (2026-11-26): what was
+  // heard, what went wrong, the ways out — the overlay's dimmed card is not drawn on Пульс.
+  // «Слишком коротко» is not one of them: a pinch and a word under the face, and the face is free
+  const failed = stage === "error" && ingestError !== null && ingestError.code !== "record_too_short" ? ingestError : null;
   const resetIngest = useIngestStore((state) => state.reset);
+  const retryIngest = useIngestStore((state) => state.retry);
   const startManual = useIngestStore((state) => state.startManual);
   const startVoice = useIngestStore((state) => state.startVoice);
   const stopVoice = useIngestStore((state) => state.stopVoice);
+  // the word under the face after a hold too short
+  const [note, setNote] = useState<string | null>(null);
+  const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ---- somebody picked on the waiting screen (D-84) -----------------------------------------
   // The face turns to them and the ways to give them a task come out over its head; holding
@@ -228,6 +243,8 @@ export default function PulsePage() {
   const { hasSecretary, errandRows, deskStage, visitRows, visitorsWaiting, messagesWaiting, meetingNow, meetingEndsAt } = desk;
   // the director is saying a request into the desk (D-99)
   const toSecretary = useIngestStore((state) => state.toSecretary);
+  // ...right now: the small secretary listens; the face stays calm and looks at it (2026-11-26)
+  const dictating = stage === "recording" && toSecretary;
   // Эфир is news too: an announcement going out and every «ознакомился» coming back;
   // so are the calendar — an answer, a move, the reminder the tick has just written —
   // and the errands: «Айгуль · кофе принят»
@@ -236,7 +253,7 @@ export default function PulsePage() {
   const eventSoon = startsSoon(nextMeeting, now);
   const [openEvent, setOpenEvent] = useState<CalendarEvent | null>(null);
   const closeEvent = useCallback(() => setOpenEvent(null), []);
-  const showHint = useLeverHint();
+  const hint = useLeverHint();
   // the pill of a phrase the phone keeps stands where the hint would (D-130)
   const keptPill = useKeptPill((state) => state.shown);
 
@@ -276,6 +293,13 @@ export default function PulsePage() {
     ],
     [taskCount, counts.overdue, counts.declined, counts.review, messageTasks.length, ether.data, events, now, eventSoon, pointsEnabled, disputes],
   );
+  // The hint's lines (2026-11-26): the hold and the pull on the first, what a tap brings out on the
+  // second — each way only until it has been done (useLeverHint)
+  const hintWays = useMemo(() => {
+    const gestures = [hint.hold ? "удержите — говорите" : null, hint.pull ? "потяните вниз — текст" : null].filter(Boolean).join(", ");
+    const tap = hint.tap ? `нажмите — ${balls.map((ball) => ball.label.toLowerCase()).join(", ")}` : "";
+    return [gestures, tap].filter((line) => line !== "");
+  }, [hint, balls]);
   // the deck behind each ball: tasks without the message lane, or every task with a message (whatever its lane)
   const taskLanes = useMemo<Lanes>(() => ({ ...lanes, question: [] }), [lanes]);
   // the thought talks about the newest word on the board — a tap on it opens that thread
@@ -368,6 +392,8 @@ export default function PulsePage() {
   // when a panel is open; a change without one is still «reads the data» (D-65), but not over an
   // open card: the face keeps the card's job in its hands and the thought says the news (D-178)
   const newsAct = thought ? thoughtAct(thought.kind) : null;
+  // back after a long time away: the face reads the news a moment while the board fetches (2026-11-26)
+  const comeback = useComeback(board.isFetching);
   // The order of the faces is `directorMascot`: the phrase in hand and its celebration; a request the
   // secretary has just finished (the face looks at it; the thought says the news); a phrase that did not
   // make it (tasks/020, phase B) — the face stays awake while the error is up and while its act
@@ -384,15 +410,27 @@ export default function PulsePage() {
     newsAct: newsAct !== null,
     mood,
     idle: mode === "idle",
-    // asked, the secretary gets the face's eye and nothing else: what is asked for shows in the secretary's own ring (D-210)
-    rest: asking || attending || reading ? "calm" : restFace,
+    // asked, the secretary gets the face's eye and nothing else: what is asked for shows in the secretary's own ring (D-210);
+    // so does a request said into it — the secretary listens, the face is calm and watches it
+    rest: asking || attending || reading || dictating ? "calm" : restFace,
     awake,
+    comeback,
   });
   // where the face looks: the middle of the picked circle, the person whose card is open, or the small face at the desk
-  const gaze = attending && picked ? lookAt(picked.x, picked.y) : reading && looking ? lookAt(looking.x, looking.y) : asking || handoff ? lookAt(DESK_AT.x + DESK_FACE.x, DESK_AT.y + DESK_FACE.y) : null;
+  const gaze =
+    attending && picked
+      ? lookAt(picked.x, picked.y)
+      : reading && looking
+        ? lookAt(looking.x, looking.y)
+        : asking || handoff || dictating
+          ? lookAt(DESK_AT.x + DESK_FACE.x, DESK_AT.y + DESK_FACE.y)
+          : null;
   // the small things a face at rest does on its own — asleep, waiting on the ring, or
   // watchful (D-82); never while anything is in flight or said, nor under a thought
-  const acts = useMascotActs(mascot, stage === "idle" && !phraseInHand && !cheering && !exchange && mode !== "panel" && !attending && !reading && !asking && !handoff && !thought);
+  const acts = useMascotActs(
+    mascot,
+    stage === "idle" && !phraseInHand && !cheering && !exchange && mode !== "panel" && !attending && !reading && !asking && !handoff && !thought && !comeback,
+  );
   // each thought plays its act once: a re-render for another reason must not replay it
   const playAct = acts.play;
   const playedThought = useRef<string | null>(null);
@@ -404,7 +442,8 @@ export default function PulsePage() {
   // each failure plays its act once — the error object is new with every failure
   const playedError = useRef<IngestError | null>(null);
   useEffect(() => {
-    if (stage !== "error" || !ingestError || playedError.current === ingestError) return;
+    // «слишком коротко» is answered as it happens (below) and never stays on the screen
+    if (stage !== "error" || !ingestError || ingestError.code === "record_too_short" || playedError.current === ingestError) return;
     playedError.current = ingestError;
     const act = ERROR_ACT[ingestError.code];
     playAct(act);
@@ -413,6 +452,28 @@ export default function PulsePage() {
     if (oopsTimer.current) clearTimeout(oopsTimer.current);
     oopsTimer.current = setTimeout(() => setOops(null), ACT_MS[act]);
   }, [stage, ingestError, playAct]);
+  // Too short to say anything (2026-11-26): no toast and no card — the pinch, a word under the face,
+  // and the face is free for the next hold at once (a pick stays for it). The word goes as soon as
+  // the next phrase starts.
+  useEffect(
+    () =>
+      useIngestStore.subscribe((current, previous) => {
+        if (current.stage !== previous.stage && current.stage !== "idle" && current.stage !== "error") setNote(null);
+        if (current.stage !== "error" || current.error?.code !== "record_too_short" || current.error === previous.error) return;
+        playAct("pinch");
+        setOops("pinch");
+        if (oopsTimer.current) clearTimeout(oopsTimer.current);
+        oopsTimer.current = setTimeout(() => setOops(null), ACT_MS.pinch);
+        setNote(TOO_SHORT_NOTE);
+        if (noteTimer.current) clearTimeout(noteTimer.current);
+        noteTimer.current = setTimeout(() => setNote(null), TOO_SHORT_NOTE_MS);
+        // after this round of the store's listeners: a reset inside it would reach the rest of them out of order
+        queueMicrotask(() => {
+          if (useIngestStore.getState().error?.code === "record_too_short") useIngestStore.getState().reset();
+        });
+      }),
+    [playAct],
+  );
   // no network: the phrase stays on the phone and goes by itself (D-130) — the same phone held
   // up for signal as a failed upload, but the face is not sorry, it has kept the words
   useEffect(
@@ -429,9 +490,22 @@ export default function PulsePage() {
   useEffect(
     () => () => {
       if (oopsTimer.current) clearTimeout(oopsTimer.current);
+      if (noteTimer.current) clearTimeout(noteTimer.current);
     },
     [],
   );
+  // a thought gone and the face back to sleep: it dozes off with a yawn, as it does when tapped to rest
+  const hadThought = useRef(false);
+  useEffect(() => {
+    const had = hadThought.current;
+    hadThought.current = thought !== null;
+    if (had && thought === null && mascot === "sleeping") playAct("yawn");
+  }, [thought, mascot, playAct]);
+  // News on the board wakes whatever has gone still on the screen (lib/useDeepRest.ts), as a touch does
+  const newsId = speech.line && !speech.line.opening ? speech.line.id : null;
+  useEffect(() => {
+    if (newsId) wakeDeepRest();
+  }, [newsId]);
   // «не разобрал» plays the moment the parse comes back empty — the hand to the crown — once per
   // phrase: corrected words are a new request, and a second miss scratches again
   const playedUnparsed = useRef<string | null>(null);
@@ -449,10 +523,12 @@ export default function PulsePage() {
       return;
     }
     // somebody is picked: the face is their microphone — a tap starts, a tap stops (D-84);
-    // holding it works as always and never gets here
+    // holding it works as always and never gets here — but a hold let go at once is a tap, and its
+    // recording was dropped a moment ago: the store's stage, not this render's, says which it is
     if (picked && !phraseInHand) {
-      if (stage === "recording") void stopVoice();
-      else if (stage === "idle" || stage === "error" || stage === "question") void startVoice(picked.address, { id: picked.id, name: picked.name });
+      const now = useIngestStore.getState().stage;
+      if (now === "recording") void stopVoice();
+      else if (now === "idle" || now === "error" || now === "question") void startVoice(picked.address, { id: picked.id, name: picked.name });
       return;
     }
     // a phrase is in hand: the face is the throw, nothing else (D-36 — never by itself)
@@ -552,19 +628,24 @@ export default function PulsePage() {
 
   // what the words band says: «не разобрал» — what was heard, in the director's bubble, and the
   // assistant's answer under it
-  const assistantSaid = exchange?.said ?? (unparsed ? heard : null);
+  // A failure says what was heard, if anything — the words are never lost with the phrase — and the
+  // server's own words for it when it gave some, the overlay's otherwise
+  const failedHeard = failed && heard.trim() ? heard : null;
+  const assistantSaid = exchange?.said ?? (unparsed ? heard : failedHeard);
   const assistantLines: AssistantLine[] = phraseInHand
     ? confirmLines
     : unparsed
       ? [{ id: `unparsed:${requestId ?? ""}`, text: "Не разобрал: не нашёл здесь ни задачи, ни объявления.", tone: "warn" }]
-      : loading && mode !== "idle" && lines.length === 0
-        ? [{ id: "loading", text: "Смотрю, что нового…" }]
-        : lines;
-  const saying = Boolean(assistantSaid) || assistantLines.length > 0 || exchange !== null || unparsed;
+      : failed
+        ? [{ id: `failed:${requestId ?? ""}:${failed.code}`, text: failed.message ?? ERROR_VIEW[failed.code].line, tone: "warn" }]
+        : loading && mode !== "idle" && lines.length === 0
+          ? [{ id: "loading", text: "Смотрю, что нового…" }]
+          : lines;
+  const saying = Boolean(assistantSaid) || assistantLines.length > 0 || exchange !== null || unparsed || failed !== null;
   // a thought over the face: a person's card says the same news and stands where the thought would,
   // so the thought waits (D-118); a phrase in hand owns the face — a thought over it hid «Понял так: …» (D-146).
-  // So do an answer and «Не разобрал…»: their buttons are in the words, which step aside under a thought (D-178)
-  const thoughtUp = thought !== null && !reading && !phraseInHand && !exchange && !unparsed;
+  // So do an answer, «Не разобрал…» and a failure: their buttons are in the words, which step aside under a thought (D-178)
+  const thoughtUp = thought !== null && !reading && !phraseInHand && !exchange && !unparsed && !failed;
 
   const noTeam = Boolean(peopleRows) && team.length === 0;
   const serviceLines = useMemo(() => <ServiceLines draftCount={draftCount} noTeam={noTeam} />, [draftCount, noTeam]);
@@ -683,15 +764,19 @@ export default function PulsePage() {
     if (thoughtTask) openThread(thoughtTask);
   }, [thoughtTask, openThread]);
   const fixUnparsed = useStableCallback(() => useComposeStore.getState().request(heard));
-  // the ways out of an answer or of «не разобрал», under the words
+  const retryFailed = useStableCallback(() => void retryIngest());
+  const failedCode = failed?.code ?? null;
+  // the ways out of an answer, of «не разобрал» or of a phrase that did not make it, under the words
   const buttons = useMemo(
     () =>
       exchange ? (
         <ExchangeButtons exchange={exchange} onManual={startManual} onClose={closeExchange} />
       ) : unparsed ? (
         <UnparsedButtons onFix={fixUnparsed} onManual={startManual} onClose={resetIngest} />
+      ) : failedCode ? (
+        <PhraseErrorButtons code={failedCode} onRetry={retryFailed} onManual={startManual} onWrite={fixUnparsed} onClose={resetIngest} />
       ) : null,
-    [exchange, unparsed, startManual, closeExchange, fixUnparsed, resetIngest],
+    [exchange, unparsed, failedCode, startManual, closeExchange, fixUnparsed, resetIngest, retryFailed],
   );
 
   return (
@@ -722,6 +807,8 @@ export default function PulsePage() {
               active={mode === "idle" && (stage === "idle" || stage === "recording")}
               // a face that is looking at somebody is not dreaming
               quiet={!thought && stage === "idle" && !attending && !reading && !asking}
+              // the field's waves leave with the mark's own: a sleeper's breath or a waking beat
+              beat={mascot === "sleeping" ? "sleep" : "awake"}
               team={teamScene}
               picked={picked?.id ?? null}
               onPick={onPickOrb}
@@ -751,6 +838,10 @@ export default function PulsePage() {
               gaze={faceGaze}
               onHold={setHeld}
               around={orbit}
+              play={playAct}
+              // what the failure is about stays in the ring while its words are up (2026-11-26)
+              thing={failedCode ? ERROR_THING[failedCode] : null}
+              note={note}
             />
             {/* the ways to give the picked person a task, right over the face that is looking at them */}
             <LocalPresence>
@@ -787,7 +878,8 @@ export default function PulsePage() {
                     waiting={desk.waitingErrands}
                     etaLeft={deskStage.phase === "doing" ? etaLeftMin(deskStage.errand, now) : null}
                     asking={errandRows.some((e) => isActive(e) && e.question && !e.answer)}
-                    listening={stage === "recording" && toSecretary}
+                    listening={dictating}
+                    acceptKey={deskStage.acceptKey}
                     onHold={(down) => {
                       // hold the desk — say it to the secretary in your own words (D-99)
                       if (down) {
@@ -886,17 +978,21 @@ export default function PulsePage() {
     >
       {/* the bottom: the gesture hint — never under the face */}
       {/* the hint is for an idle face: while the phrase is in flight the face says what it does */}
-      {showHint && mode === "idle" && stage === "idle" && !picked && !asking && !visitorsWaiting && !messagesWaiting && !keptPill ? (
+      {hintWays.length > 0 && mode === "idle" && stage === "idle" && !picked && !asking && !visitorsWaiting && !messagesWaiting && !keptPill ? (
         <p
           className="pointer-events-none fixed inset-x-0 z-20 px-4 text-center text-[12px] leading-4 text-muted"
           style={{ bottom: "calc(var(--tabbar-space) + 2px)" }}
           data-testid="lever-hint"
         >
-          {/* nothing stands under the face (D-208): the line teaches the face's own ways — the hold,
-              the pull, and what its tap brings out — the balls, by their own labels (D-60) */}
-          лицо: удержите — говорите, потяните вниз — текст
-          <br />
-          нажмите — {balls.map((ball) => ball.label.toLowerCase()).join(", ")}
+          {/* nothing stands under the mark (D-208): the line teaches the mark's own ways — the hold,
+              the pull, and what its tap brings out — the balls, by their own labels (D-60). Each way
+              leaves the line once it has been done (2026-11-26) */}
+          {hintWays.map((way, i) => (
+            <span key={way} className="block">
+              {i === 0 ? "маскот: " : null}
+              {way}
+            </span>
+          ))}
         </p>
       ) : null}
 
