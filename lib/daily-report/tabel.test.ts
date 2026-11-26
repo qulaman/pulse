@@ -12,6 +12,7 @@ import {
   holidayWords,
   isCalendarMonth,
   isDueDay,
+  handedByDay,
   missedByDay,
   tabelCell,
   tabelDayState,
@@ -194,6 +195,19 @@ describe("buildTabel", () => {
     expect(tabelTotals([of("b")])).toEqual({ people: 1, submitted: 0, missed: 0, excused: 0, rate: null, gaps: 0 });
     expect(tabelTotals([of("d")])).toEqual({ people: 0, submitted: 0, missed: 0, excused: 0, rate: null, gaps: 0 });
     expect(missedByDay([of("c")], 30)[10]).toBe(1);
+  });
+
+  it("how many handed in each day, of those who owed it — the folded card's row (D-201)", () => {
+    const handed = handedByDay(tabel.people, 30);
+    // the 2nd: only «a» owed it (one away, one not yet in the team, one gone) and handed in
+    expect(handed[1]).toEqual({ submitted: 1, due: 1, missed: 0 });
+    // the 4th: excused — owed, neither handed in nor a miss
+    expect(handed[3]).toEqual({ submitted: 0, due: 1, missed: 0 });
+    // the 11th: two missed, the one away owes nothing
+    expect(handed[10]).toEqual({ submitted: 0, due: 2, missed: 2 });
+    // a weekend and a day ahead: nothing was due
+    expect(handed[0]).toEqual({ submitted: 0, due: 0, missed: 0 });
+    expect(handed[12]).toEqual({ submitted: 0, due: 0, missed: 0 });
   });
 
   it("people who left: their misses stay in their row, at the bottom, out of the month's headline and «Не сдали»", () => {

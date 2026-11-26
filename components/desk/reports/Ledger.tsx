@@ -12,7 +12,7 @@ import { rangeText, taskMeta, tasksCount, timeOf } from "@/lib/daily-report/form
 import { useSeenOnScreen } from "@/lib/daily-report/review";
 import type { DailyReport, DailyReportTask, FeedReport } from "@/lib/daily-report/types";
 import { aqtobeIsoToYmdHm } from "@/lib/datetime/calendar";
-import { highlightParts, isChecked, isSeen } from "@/lib/desk/reports-feed";
+import { firstLine, highlightParts, isChecked, isSeen } from "@/lib/desk/reports-feed";
 
 /** «Только что» stays teal this long after the report came. */
 const FRESH_MS = 10 * 60_000;
@@ -211,8 +211,10 @@ export type EntryProps = {
   selected: boolean;
   /** Its person's diary is open in the panel. */
   opened: boolean;
-  /** «Не проверены»: once checked, it folds in place into one line instead of leaving. */
-  folding: boolean;
+  /** A checked report stands as one line — who and the first line of the words — until a click opens it (D-201). */
+  fold: boolean;
+  /** Its folded line offers «Отменить»: checked in this visit, or under «Не проверены». */
+  undo: boolean;
   checker: string | null;
   onSelect: (id: string) => void;
   onOpen: (report: FeedReport) => void;
@@ -220,30 +222,59 @@ export type EntryProps = {
 };
 
 /**
- * One report of the feed «Подряд» (D-198): who on the left (a teal dot while nobody has looked at
+ * One report of the feed (D-198): who on the left (a teal dot while nobody has looked at
  * it yet), the person's words in full at reading size and the day's tasks under them, and on the
  * right when it came, «просмотрено 17:41», «Проверить» / «Проверено 16:30». A press on the row
  * opens the person's «Дневник» on that day; the choice stays for the keys (↑ ↓, A). The report
- * counts as seen once it stayed whole on screen (`useSeenOnScreen`). Under «Не проверены» a
- * checked report folds in place into «✓ Имя · проверено · Отменить» — the list does not jump.
+ * counts as seen once it stayed whole on screen (`useSeenOnScreen`). A checked report folds in
+ * place into one line «✓ Имя · первая строка слов · проверено 19:05» (D-201): the day gets shorter
+ * as it is read; a click opens it again, «Отменить» takes the mark off.
  */
-export function LedgerEntry({ report, now, query, director, selected, opened, folding, checker, onSelect, onOpen, onCheck }: EntryProps) {
+export function LedgerEntry({ report, now, query, director, selected, opened, fold, undo, checker, onSelect, onOpen, onCheck }: EntryProps) {
   const [open, setOpen] = useState(false);
   const checked = isChecked(report);
+  // a folded report opened by hand stays open until it is checked anew
+  const [unfolded, setUnfolded] = useState(false);
+  const [wasChecked, setWasChecked] = useState(checked);
+  if (checked !== wasChecked) {
+    setWasChecked(checked);
+    if (checked) setUnfolded(false);
+  }
   // «новый» until a director had it on screen; a checked report has been read whatever the mark says
   const fresh = director && !isSeen(report) && !checked;
   const seenRef = useSeenOnScreen(report.id, fresh && report.status === "submitted");
   const words = report.summary?.trim() ?? "";
 
-  if (folding && checked) {
+  if (fold && checked && !unfolded) {
+    const line = firstLine(words) || tasksLine(report.tasks);
     return (
-      <li className="rep-feed-folded" data-testid="desk-feed-folded" data-row-key={report.id} data-checked="">
+      <li
+        className="rep-feed-folded"
+        data-testid="desk-feed-folded"
+        data-row-key={report.id}
+        data-user={report.user_id}
+        data-checked=""
+        data-selected={selected ? "" : undefined}
+        aria-current={selected ? "true" : undefined}
+        aria-label={`${report.full_name} — проверено, открыть отчёт`}
+        onClick={(event) => {
+          if (notForRow(event)) return;
+          onSelect(report.id);
+          setUnfolded(true);
+        }}
+      >
         <Check size={14} strokeWidth={2.4} className="rep-feed-folded-tick" aria-hidden />
+        <Face person={{ id: report.user_id, full_name: report.full_name, avatar_url: report.avatar_url }} size={20} />
         <span className="rep-feed-folded-name">{report.full_name}</span>
-        <span className="rep-feed-folded-word">· проверено</span>
-        <button type="button" className="rep-feed-folded-undo desk-focus" onClick={() => onCheck([report.id], false)} data-testid="desk-feed-uncheck">
-          Отменить
-        </button>
+        {line ? <span className="rep-feed-folded-line">{line}</span> : null}
+        <span className="rep-feed-folded-word nums" title={checker ? `Проверил ${checker}` : undefined}>
+          проверено {timeOf(report.checked_at)}
+        </span>
+        {undo ? (
+          <button type="button" className="rep-feed-folded-undo desk-focus" onClick={() => onCheck([report.id], false)} data-testid="desk-feed-uncheck">
+            Отменить
+          </button>
+        ) : null}
       </li>
     );
   }

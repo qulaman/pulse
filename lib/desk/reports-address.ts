@@ -1,22 +1,19 @@
 /**
- * The desk «Отчёты» address (D-183, D-198): what the page shows lives in the address — the day the
- * feed «Подряд» scrolls to, the feed's filters (one person, words, «Не проверены»), the period of
- * «Табель», the person whose «Дневник» is open — so «Назад», a reload and a link open the same
- * thing. Old links keep working: `?day=…&p=…` of «Команда» (the feed at that day, the diary open),
- * `?tab=period`. Pure: the page reads and writes through these, the tests pin them. Days are
- * Aqtobe wall-clock days ("YYYY-MM-DD").
+ * The desk «Отчёты» address (D-183, D-198, D-201): what the page shows lives in the address — the
+ * day the feed scrolls to, the feed's filters (one person, words, «Не проверены»), the period of
+ * the «Табель» card over it, the person whose «Дневник» is open — so «Назад», a reload and a link
+ * open the same thing. One page, no tabs (D-201): every part reads together. Old links keep
+ * working: `?day=…&p=…` of «Команда» (the feed at that day, the diary open), `?tab=tabel` and
+ * `?tab=period` (the card opens with its people — `asksSheet`). Pure: the page reads and writes
+ * through these, the tests pin them. Days are Aqtobe wall-clock days ("YYYY-MM-DD").
  */
 import { addDays, daysInclusive, mondayOf, MONTHS_RU, parseYmd, ymdOf, type Ymd } from "@/lib/datetime/calendar";
 import { PERIOD_MAX_DAYS } from "@/lib/daily-report/format";
-
-/** «Подряд» — the reports day after day (D-198, it replaced «День»), «Табель» — people × days. */
-export type ReportsTab = "feed" | "tabel";
 
 /** «Месяц» — a calendar month, «Неделя» — Monday to Sunday, «Свой» — any days up to 92. */
 export type TabelPeriod = { kind: "month"; month: string } | { kind: "week"; monday: Ymd } | { kind: "custom"; from: Ymd; to: Ymd };
 
 export type ReportsAddress = {
-  tab: ReportsTab;
   /** The day the feed scrolls to and the diary opens on; null — today, the top of the feed. */
   day: Ymd | null;
   /** «Табель»'s period; null — the current month. */
@@ -83,17 +80,20 @@ export function clampCustom(from: Ymd, to: Ymd): { from: Ymd; to: Ymd } {
   return daysInclusive(a, b) > PERIOD_MAX_DAYS ? { from: addDays(b, 1 - PERIOD_MAX_DAYS), to: b } : { from: a, to: b };
 }
 
+/**
+ * A link from before D-201 that meant «Табель» (`?tab=tabel`; `?tab=period` — its name before
+ * D-183, and what the phone's «Период» carries over): the card opens with its people for this visit.
+ */
+export function asksSheet(params: URLSearchParams): boolean {
+  const raw = params.get("tab");
+  return raw === "tabel" || raw === "period";
+}
+
 /** The address as the page reads it; anything broken reads as «not given». */
 export function readAddress(params: URLSearchParams): ReportsAddress {
-  const raw = params.get("tab");
-  // «period» — the name the tab had before D-183; «day» — before D-198: both still open
-  const tab: ReportsTab = raw === "tabel" || raw === "period" ? "tabel" : "feed";
   const person = params.get("p") || null;
   const day = validDay(params.get("day"));
-  if (tab === "feed") {
-    const q = (params.get("q") ?? "").trim().slice(0, QUERY_MAX);
-    return { tab, day, period: null, person, who: params.get("who") || null, q, unchecked: params.get("only") === "new" };
-  }
+  const q = (params.get("q") ?? "").trim().slice(0, QUERY_MAX);
   const month = params.get("month");
   const week = validDay(params.get("week"));
   const from = validDay(params.get("from"));
@@ -106,27 +106,23 @@ export function readAddress(params: URLSearchParams): ReportsAddress {
         : from && to
           ? { kind: "custom", ...clampCustom(from, to) }
           : null;
-  return { tab, day, period, person, who: null, q: "", unchecked: false };
+  return { day, period, person, who: params.get("who") || null, q, unchecked: params.get("only") === "new" };
 }
 
-/** The address of a state: only what differs from the defaults is written; the feed's filters only on the feed. */
+/** The address of a state: only what differs from the defaults is written. */
 export function writeAddress(address: ReportsAddress): string {
   const query = new URLSearchParams();
-  if (address.tab === "tabel") {
-    query.set("tab", "tabel");
-    const period = address.period;
-    if (period?.kind === "month") query.set("month", period.month);
-    else if (period?.kind === "week") query.set("week", period.monday);
-    else if (period?.kind === "custom") {
-      query.set("from", period.from);
-      query.set("to", period.to);
-    }
-  } else {
-    if (address.who) query.set("who", address.who);
-    const q = address.q.trim().slice(0, QUERY_MAX);
-    if (q) query.set("q", q);
-    if (address.unchecked) query.set("only", "new");
+  const period = address.period;
+  if (period?.kind === "month") query.set("month", period.month);
+  else if (period?.kind === "week") query.set("week", period.monday);
+  else if (period?.kind === "custom") {
+    query.set("from", period.from);
+    query.set("to", period.to);
   }
+  if (address.who) query.set("who", address.who);
+  const q = address.q.trim().slice(0, QUERY_MAX);
+  if (q) query.set("q", q);
+  if (address.unchecked) query.set("only", "new");
   if (address.day) query.set("day", address.day);
   if (address.person) query.set("p", address.person);
   return query.toString();

@@ -216,6 +216,26 @@ export function missedByDay(people: readonly TabelPerson[], count: number): numb
   return missed;
 }
 
+/**
+ * How many of the team handed in on each day and how many owed it, over the people given — the one
+ * row the folded card shows instead of the people (D-201). An away day owes nothing, as in the
+ * day's own count «сдали N из M»; a day nothing was due is 0 of 0.
+ */
+export function handedByDay(people: readonly TabelPerson[], count: number): { submitted: number; due: number; missed: number }[] {
+  const days = Array.from({ length: count }, () => ({ submitted: 0, due: 0, missed: 0 }));
+  for (const person of people) {
+    if (person.gone) continue;
+    person.cells.forEach((cell, index) => {
+      const day = days[index];
+      if (!day || !cell.due || cell.state === "away") return;
+      day.due += 1;
+      if (cell.state === "submitted") day.submitted += 1;
+      else if (cell.state === "missed") day.missed += 1;
+    });
+  }
+  return days;
+}
+
 export type TabelInput = {
   from: Ymd;
   to: Ymd;

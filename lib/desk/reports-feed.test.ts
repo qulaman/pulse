@@ -2,7 +2,24 @@ import { describe, expect, it } from "vitest";
 
 import type { FeedReport } from "@/lib/daily-report/types";
 
-import { allChecked, checkableIds, checkedText, dayCountLine, dayHead, highlightParts, landingDay, neighbourDay, nextUnchecked } from "./reports-feed";
+import {
+  allChecked,
+  checkableIds,
+  checkedText,
+  dayCountLine,
+  dayHead,
+  dayOfRowKey,
+  dayRowKey,
+  defaultOpenDays,
+  firstLine,
+  highlightParts,
+  isDayOpen,
+  landingDay,
+  neighbourDay,
+  nextUnchecked,
+  waitingCount,
+  waitingText,
+} from "./reports-feed";
 
 const report = (id: string, marks: Partial<FeedReport> = {}): FeedReport => ({
   id,
@@ -39,6 +56,59 @@ describe("dayCountLine", () => {
     expect(dayCountLine({ due: 0, submitted: 0, workday: false }, false)).toBe("выходной");
     expect(dayCountLine({ due: 0, submitted: 0, workday: false }, true)).toBe("праздник");
     expect(dayCountLine({ due: 0, submitted: 0, workday: true }, false)).toBe("отчёт не нужен");
+  });
+
+  it("today says who is still waited for", () => {
+    expect(dayCountLine({ due: 20, submitted: 4, workday: true, pending: 16 }, false)).toBe("сдали 4 из 20 · ждём 16");
+    expect(dayCountLine({ due: 20, submitted: 20, workday: true, pending: 0 }, false)).toBe("сдали 20 из 20");
+  });
+});
+
+describe("folding by days (D-201)", () => {
+  const days = [
+    { date: "2026-11-26", reports: [] },
+    { date: "2026-11-25", reports: [] },
+    { date: "2026-11-24", reports: [report("a")] },
+    { date: "2026-11-23", reports: [report("b")] },
+  ];
+
+  it("opens the newest day and, while it has no report, the days under it down to the first with reports", () => {
+    expect(defaultOpenDays(days, null)).toEqual(["2026-11-26", "2026-11-25", "2026-11-24"]);
+    expect(defaultOpenDays(days.slice(2), null)).toEqual(["2026-11-24"]);
+    expect(defaultOpenDays([], null)).toEqual([]);
+  });
+
+  it("skips today while it is only the morning's line", () => {
+    expect(defaultOpenDays(days.slice(0, 1).concat(days.slice(2)), "2026-11-26")).toEqual(["2026-11-24"]);
+  });
+
+  it("a day is open by the person's own choice first, then under a filter, then by the default", () => {
+    const base = ["2026-11-24"];
+    expect(isDayOpen("2026-11-24", base, new Map(), false)).toBe(true);
+    expect(isDayOpen("2026-11-23", base, new Map(), false)).toBe(false);
+    expect(isDayOpen("2026-11-23", base, new Map(), true)).toBe(true);
+    expect(isDayOpen("2026-11-23", base, new Map([["2026-11-23", true]]), false)).toBe(true);
+    expect(isDayOpen("2026-11-24", base, new Map([["2026-11-24", false]]), true)).toBe(false);
+  });
+
+  it("counts the handed-in reports that still wait and says the count", () => {
+    expect(waitingCount([report("a"), report("b", { checked_at: "y" }), report("m", { status: "missed" }), report("c", { seen_at: "x" })])).toBe(2);
+    expect(waitingText(1)).toBe("1 не проверен");
+    expect(waitingText(5)).toBe("5 не проверены");
+    expect(waitingText(21)).toBe("21 не проверен");
+  });
+
+  it("folds a checked report into the first line of its words", () => {
+    expect(firstLine("\n  Закрыл акт сверки \nвторая строка")).toBe("Закрыл акт сверки");
+    expect(firstLine("   ")).toBe("");
+    expect(firstLine(null)).toBe("");
+  });
+
+  it("keys a day's head among the rows", () => {
+    expect(dayRowKey("2026-11-24")).toBe("day:2026-11-24");
+    expect(dayOfRowKey("day:2026-11-24")).toBe("2026-11-24");
+    expect(dayOfRowKey("r-17")).toBeNull();
+    expect(dayOfRowKey(null)).toBeNull();
   });
 });
 

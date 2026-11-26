@@ -95,6 +95,8 @@ export type ReportsFeed = {
   /** The first page failed (the screen says so and offers a retry). */
   error: boolean;
   retry: () => void;
+  /** `days` are still the feed under the filter before this one — its own answer is on the way. */
+  placeholder: boolean;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -220,7 +222,7 @@ export function useReportsFeed(filter: ReportsFeedFilter, companyId: string | un
     on,
   );
 
-  const { data, hasNextPage, fetchNextPage, isFetchingNextPage, isError, refetch } = query;
+  const { data, hasNextPage, fetchNextPage, isFetchingNextPage, isError, isPlaceholderData, refetch } = query;
   const loadMore = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
@@ -238,6 +240,7 @@ export function useReportsFeed(filter: ReportsFeedFilter, companyId: string | un
     loadingMore: isFetchingNextPage,
     error: isError && !data,
     retry,
+    placeholder: isPlaceholderData,
   };
 }
 

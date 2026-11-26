@@ -1,6 +1,7 @@
 "use client";
 
-import { Fragment, memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react";
+import { ChevronDown } from "lucide-react";
+import { Fragment, memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { EmptyState } from "@/components/desk/ui/EmptyState";
@@ -9,27 +10,34 @@ import { SegmentTabs } from "@/components/desk/ui/Toolbar";
 import { Button } from "@/components/ui/Button";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { rangeText } from "@/lib/daily-report/format";
-import { cellSymbol, cellWords, holidayWords, missedByDay, tabelPeriodWords, tabelTotals } from "@/lib/daily-report/tabel";
+import { cellSymbol, cellWords, handedByDay, holidayWords, missedByDay, tabelPeriodWords, tabelTotals } from "@/lib/daily-report/tabel";
 import type { TeamPeriodRow } from "@/lib/daily-report/types";
 import { parseYmd, weekdayOf, WEEKDAYS_SHORT_RU, type Ymd } from "@/lib/datetime/calendar";
 
 import type { Tabel, TabelDay, TabelPerson } from "./tabel-data";
 
-export type TabelShow = "all" | "gaps";
+/** «Все» — the whole team, «С пропусками» — who missed a day of the period. */
+export type TabelShow = "team" | "gaps";
 
 export type TabelViewProps = {
   tabel: Tabel | undefined;
   stale: boolean;
   failed: boolean;
   onRetry: () => void;
-  match: (row: Pick<TeamPeriodRow, "full_name" | "position">) => boolean;
+  /** The period's controls (‹ Ноябрь 2026 ›, «Месяц | Неделя | Свой») — they stand in the card's own bar. */
+  controls: ReactNode;
+  /** The feed is narrowed to one person: the card shows that person's row alone, folded or not. */
+  who: string | null;
+  /** Folded — the days and how many handed in each one; open — the people under them (D-201). */
+  folded: boolean;
+  onFold: (folded: boolean) => void;
   show: TabelShow;
   onShow: (show: TabelShow) => void;
   selectedId: string | null;
   openId: string | null;
   onSelect: (id: string) => void;
   onOpen: (id: string | null) => void;
-  /** A day's head: the feed «Подряд» at that day. */
+  /** A day's head: the feed under the card at that day. */
   onDay: (day: Ymd) => void;
   /** A cell: the person's «Дневник» on that day — the words of it (D-198). */
   onCell: (id: string, day: Ymd) => void;
@@ -46,6 +54,8 @@ const NAME_W_NARROW = 168;
  * keeps its marks at 1440 (24.1 px a day); a mark is 20 px wide.
  */
 const MARK_MIN = 24;
+/** Folded, a day holds only a number of two digits: it keeps its numbers in a narrower window (a 1280-px laptop). */
+const COUNT_MIN = 18;
 const MARK_MAX = 64;
 const DENSE_MIN = 13;
 /** The totals' widths — reports-tabel.css `.rep-tabel-totals [data-col]` says the same. */
@@ -53,12 +63,12 @@ const TOTAL_W = { submitted: 44, missed: 58, excused: 48, rate: 50 } as const;
 
 type Mode = "marks" | "dense";
 
-function measures(width: number, days: number, excused: boolean) {
+function measures(width: number, days: number, excused: boolean, least: number = MARK_MIN) {
   const name = width > 0 && width < 920 ? NAME_W_NARROW : NAME_W;
   const totals = TOTAL_W.submitted + TOTAL_W.missed + TOTAL_W.rate + (excused ? TOTAL_W.excused : 0);
   const room = width - name - totals - 2;
-  const mode: Mode = width === 0 || room / Math.max(1, days) >= MARK_MIN ? "marks" : "dense";
-  const [min, max] = mode === "marks" ? [MARK_MIN, MARK_MAX] : [DENSE_MIN, 40];
+  const mode: Mode = width === 0 || room / Math.max(1, days) >= least ? "marks" : "dense";
+  const [min, max] = mode === "marks" ? [least, MARK_MAX] : [DENSE_MIN, 40];
   return {
     mode,
     totals,
@@ -74,39 +84,7 @@ const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 const weekday = (day: Ymd) => WEEKDAYS_SHORT_RU[weekdayOf(day)];
 /** «ср, 12 нояб.» */
 const dayLabel = (day: Ymd) => `${weekday(day)}, ${rangeText(day, day)}`;
-const percent = (rate: number) => `${Math.round(rate * 100)} %`;
 const SHORT_MONTHS = ["янв.", "февр.", "март", "апр.", "май", "июнь", "июль", "авг.", "сент.", "окт.", "нояб.", "дек."] as const;
-
-/** The one line over the sheet instead of a hero: «Ноябрь 2026 · сдано 87 % · пропусков 14 · уважительных 2». */
-function SumLine({ tabel }: { tabel: Tabel }) {
-  const t = tabel.totals;
-  return (
-    <p className="rep-tabel-sum nums" data-testid="desk-tabel-total">
-      <span className="rep-tabel-sum-period">{capital(tabelPeriodWords(tabel.from, tabel.to))}</span>
-      {t.rate === null ? (
-        <span>отчётов ещё не ждали</span>
-      ) : (
-        <>
-          <span>
-            сдано <b>{percent(t.rate)}</b>
-          </span>
-          {t.missed > 0 ? (
-            <span data-tone="danger">
-              пропусков <b>{t.missed}</b>
-            </span>
-          ) : (
-            <span>без пропусков</span>
-          )}
-          {t.excused > 0 ? (
-            <span>
-              уважительных <b>{t.excused}</b>
-            </span>
-          ) : null}
-        </>
-      )}
-    </p>
-  );
-}
 
 /* ---- one person's row ---- */
 
@@ -216,22 +194,41 @@ const TIP_DELAY = 280;
  * or the bottom row under the mouse says itself — who, which day, what stands there, the times.
  * After a short rest; once it shows it follows the mouse from cell to cell without waiting.
  */
-function useSheetTip(tabel: Tabel | undefined, shown: readonly TabelPerson[]) {
+function useSheetTip(tabel: Tabel | undefined, shown: readonly TabelPerson[], team: readonly TabelPerson[]) {
   const [tip, setTip] = useState<Tip | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const byId = useMemo(() => new Map(shown.map((person) => [person.row.user_id, person])), [shown]);
   const missed = useMemo(() => (tabel ? missedByDay(shown, tabel.days.length) : []), [tabel, shown]);
+  const handed = useMemo(() => (tabel ? handedByDay(team, tabel.days.length) : []), [tabel, team]);
 
   const textOf = (target: HTMLElement): string | null => {
     if (!tabel) return null;
-    const cell = target.closest<HTMLElement>("[data-i], [data-head], [data-foot], [data-tip]");
+    const cell = target.closest<HTMLElement>("[data-i], [data-head], [data-foot], [data-handed], [data-tip]");
     if (!cell) return null;
+    if (cell.dataset.handed !== undefined) {
+      const index = Number(cell.dataset.handed);
+      const day = tabel.days[index];
+      const count = handed[index];
+      if (!day || !count) return null;
+      const waited = day.today ? count.due - count.submitted - count.missed : 0;
+      const said =
+        count.due > 0
+          ? [`сдали ${count.submitted} из ${count.due}`, count.missed ? `не сдали ${count.missed}` : "", waited > 0 ? `ждём ${waited}` : ""].filter(Boolean).join(" · ")
+          : day.holiday
+            ? holidayWords(day.day)
+            : day.weekend
+              ? "выходной"
+              : day.future
+                ? "ещё впереди"
+                : "отчёт не нужен";
+      return `${capital(dayLabel(day.day))} · ${said}${count.due > 0 ? " — к этому дню" : ""}`;
+    }
     if (cell.dataset.head !== undefined || cell.dataset.foot !== undefined) {
       const index = Number(cell.dataset.head ?? cell.dataset.foot);
       const day = tabel.days[index];
       if (!day) return null;
       const extra = day.holiday ? holidayWords(day.day) : day.weekend ? "выходной" : day.future ? "ещё впереди" : `не сдали ${missed[index] ?? 0}`;
-      return `${capital(dayLabel(day.day))} · ${extra}${cell.dataset.head !== undefined && !day.future ? " — открыть день" : ""}`;
+      return `${capital(dayLabel(day.day))} · ${extra}${cell.dataset.head !== undefined && !day.future ? " — к этому дню" : ""}`;
     }
     const key = cell.closest<HTMLElement>("[data-row-key]")?.dataset.rowKey;
     const person = key ? byId.get(key) : undefined;
@@ -259,7 +256,7 @@ function useSheetTip(tabel: Tabel | undefined, shown: readonly TabelPerson[]) {
       hide();
       return;
     }
-    const box = (target.closest("[data-i], [data-head], [data-foot], [data-tip]") as HTMLElement).getBoundingClientRect();
+    const box = (target.closest("[data-i], [data-head], [data-foot], [data-handed], [data-tip]") as HTMLElement).getBoundingClientRect();
     const next: Tip = { text, x: box.left + box.width / 2, y: box.top < 64 ? box.bottom : box.top, below: box.top < 64 };
     if (timer.current) clearTimeout(timer.current);
     if (tip) {
@@ -325,7 +322,7 @@ function DayHeads({ days, mode, onDay }: { days: readonly TabelDay[]; mode: Mode
               data-testid="desk-tabel-day"
               data-day={day.day}
               disabled={day.future}
-              aria-label={`${capital(dayLabel(day.day))} — открыть день`}
+              aria-label={`${capital(dayLabel(day.day))} — к отчётам этого дня`}
               onClick={() => onDay(day.day)}
             >
               {label ? <span className="rep-tabel-dnum nums">{number}</span> : null}
@@ -352,6 +349,44 @@ function Foot({ days, missed, mode }: { days: readonly TabelDay[]; missed: reado
               ) : (
                 <span className="rep-tabel-foot-bar" style={{ height: `${Math.max(25, (n / most) * 100)}%` }} />
               )
+            ) : null}
+          </span>
+        );
+      })}
+    </>
+  );
+}
+
+/**
+ * The folded card's one row (D-201): how many handed in each day. A day everybody handed in is
+ * quiet, a day with a miss is red, a day still waited for is the ink; colour only — a bar of the
+ * share. A cell goes to that day in the feed, as its head does.
+ */
+function Handed({ days, handed, mode, onDay }: { days: readonly TabelDay[]; handed: readonly { submitted: number; due: number; missed: number }[]; mode: Mode; onDay: (day: Ymd) => void }) {
+  return (
+    <>
+      {days.map((day, index) => {
+        const count = handed[index];
+        const due = count?.due ?? 0;
+        // a miss is red; today while people are still waited for is the ink; any other day is quiet
+        const tone = !count || due === 0 ? undefined : count.missed > 0 ? "danger" : day.today && count.submitted < due ? "live" : "quiet";
+        return (
+          <span key={day.day} className="rep-tabel-foot-cell rep-tabel-handed" data-handed={index} data-tone={tone} {...dayAttrs(day, index)}>
+            {count && due > 0 ? (
+              <button
+                type="button"
+                className="desk-focus rep-tabel-handed-button"
+                data-testid="desk-tabel-handed"
+                data-day={day.day}
+                aria-label={`${capital(dayLabel(day.day))}: сдали ${count.submitted} из ${due}`}
+                onClick={() => onDay(day.day)}
+              >
+                {mode === "marks" ? (
+                  <span className="nums rep-tabel-handed-n">{count.submitted}</span>
+                ) : (
+                  <span className="rep-tabel-handed-bar" style={{ height: `${Math.max(20, (count.submitted / due) * 100)}%` }} />
+                )}
+              </button>
             ) : null}
           </span>
         );
@@ -389,21 +424,24 @@ function Legend({ tabel, mode }: { tabel: Tabel; mode: Mode }) {
           {item.label}
         </span>
       ))}
-      <span className="rep-tabel-legend-hint">По дню — «День», по имени — дневник</span>
+      <span className="rep-tabel-legend-hint">По дню — его отчёты ниже, по имени — дневник</span>
     </div>
   );
 }
 
-function TabelBone() {
+/** The card while it loads: its bar and the two rows of the folded sheet (D-122), the people's rows when it is open. */
+export function TabelBone({ folded = true }: { folded?: boolean }) {
   return (
-    <SkeletonGroup grow className="rep-tabel-bone">
-      <div className="flex h-9 items-center justify-between">
-        <Bone h={16} w={340} />
-        <Bone h={32} w={236} />
+    <SkeletonGroup className="rep-tabel rep-tabel-bone">
+      <div className="rep-tabel-bar">
+        <Bone h={16} w={64} />
+        <Bone h={32} w={420} />
+        <span className="flex-1" />
+        <Bone h={30} w={148} />
       </div>
       <div className="rep-tabel-bone-sheet">
-        <Bone h={36} />
-        {Array.from({ length: 9 }, (_, index) => (
+        <Bone h={40} />
+        {Array.from({ length: folded ? 1 : 9 }, (_, index) => (
           <div key={index} className="flex h-[30px] items-center gap-3 px-2.5">
             <Bone round w={20} h={20} />
             <Bone h={12} w={128} />
@@ -417,48 +455,41 @@ function TabelBone() {
 }
 
 /**
- * «Отчёты → Табель» on the desk (D-183): the period as people × days — a mark a day (✓ сдан, ✕ не
- * сдан, у уважительная, о/б away), weekends dimmed, holidays hatched, today outlined; the totals on
- * the right, the misses of each day at the bottom; never hours, never points. A day's head opens
- * «День» on it, a name the person's diary, a row is chosen by a click (↑/↓ on the page). A quarter
- * turns into colour only and scrolls sideways under the names. One line over it says the period.
+ * The «Табель» card over the feed of «Отчёты» (D-183; one page with the feed — D-201): the period
+ * as people × days — a mark a day (✓ сдан, ✕ не сдан, у уважительная, о/б away), weekends dimmed,
+ * holidays hatched, today outlined; the totals on the right; never hours, never points. Folded (as
+ * it opens) it is two rows — the days and how many handed in each one; «Показать людей» opens the
+ * people under them, with the misses of each day at the bottom. With the feed narrowed to one
+ * person it is that person's row. A day's head goes to that day in the feed, a name opens the
+ * person's diary, a cell — the diary on that day. A quarter turns into colour only and scrolls
+ * sideways under the names. The bar holds the period's controls; the period's totals are the right
+ * end of the bottom row.
  */
-export function TabelView({ tabel, stale, failed, onRetry, match, show, onShow, selectedId, openId, onSelect, onOpen, onDay, onCell }: TabelViewProps) {
+export function TabelView({ tabel, stale, failed, onRetry, controls, who, folded, onFold, show, onShow, selectedId, openId, onSelect, onOpen, onDay, onCell }: TabelViewProps) {
   const sheet = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
   const hasSheet = Boolean(tabel && tabel.people.length > 0);
-  // the sheet's width decides marks or colour; its top, how tall it may be to end at the window's
-  // edge with the legend under it — measured before the first paint, followed after
+  // the sheet's width decides marks or colour — measured before the first paint, followed after
   useLayoutEffect(() => {
     const node = sheet.current;
     if (!node) return;
-    const place = () => {
-      const main = node.closest<HTMLElement>("#desk-main");
-      const legend = node.parentElement?.querySelector<HTMLElement>(".rep-tabel-legend");
-      const top = node.getBoundingClientRect().top + (main?.scrollTop ?? 0);
-      // the gap, the legend, the page's own bottom margin
-      node.style.setProperty("--rep-tabel-top", `${Math.round(top + 12 + (legend?.offsetHeight ?? 16) + 44)}px`);
-    };
     setWidth(node.clientWidth);
-    place();
-    const observer = new ResizeObserver(([entry]) => {
-      setWidth(Math.round(entry.contentRect.width));
-      place();
-    });
+    const observer = new ResizeObserver(([entry]) => setWidth(Math.round(entry.contentRect.width)));
     observer.observe(node);
-    window.addEventListener("resize", place);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", place);
-    };
+    return () => observer.disconnect();
   }, [hasSheet]);
 
-  const matched = useMemo(() => (tabel ? tabel.people.filter((person) => match(person.row)) : []), [tabel, match]);
-  // «С пропусками» is about the team now: who left keeps their history under «Все», not a gap of today (D-194)
-  const shown = useMemo(() => (show === "gaps" ? matched.filter((person) => !person.gone && person.row.missed > 0) : matched), [matched, show]);
-  const tip = useSheetTip(tabel, shown);
+  const team = useMemo(() => tabel?.people ?? [], [tabel]);
+  // one person: their row alone; «С пропусками» is about the team now — who left keeps their
+  // history under «Все», not a gap of today (D-194); folded — no rows at all, the days speak
+  const shown = useMemo(() => {
+    if (who) return team.filter((person) => person.row.user_id === who);
+    if (folded) return [];
+    return show === "gaps" ? team.filter((person) => !person.gone && person.row.missed > 0) : team;
+  }, [team, who, folded, show]);
+  const tip = useSheetTip(tabel, shown, team);
 
-  // a person chosen by the keys comes into view under the sticky head
+  // a person chosen comes into view under the sticky head
   useEffect(() => {
     const node = sheet.current;
     if (!node || !selectedId) return;
@@ -474,7 +505,7 @@ export function TabelView({ tabel, stale, failed, onRetry, match, show, onShow, 
 
   if (!tabel) {
     return failed ? (
-      <div data-testid="desk-tabel">
+      <div className="rep-tabel" data-testid="desk-tabel">
         <EmptyState
           title="Не получилось загрузить табель"
           hint="Проверьте связь и попробуйте ещё раз"
@@ -487,32 +518,45 @@ export function TabelView({ tabel, stale, failed, onRetry, match, show, onShow, 
       </div>
     ) : (
       <div data-testid="desk-tabel" aria-busy>
-        <TabelBone />
+        <TabelBone folded={folded} />
       </div>
     );
   }
 
   const excused = tabel.people.some((person) => (person.row.excused ?? 0) > 0);
-  const m = measures(width, tabel.days.length, excused);
+  // folded — the days alone, with the team's own totals beside them; open — over the people shown
+  const days = !who && folded;
+  const m = measures(width, tabel.days.length, excused, days ? COUNT_MIN : MARK_MIN);
   const missed = missedByDay(shown, tabel.days.length);
-  const foot = tabelTotals(shown);
+  const handed = handedByDay(team, tabel.days.length);
+  const foot = days ? tabel.totals : tabelTotals(shown);
   // the counts over the team now (lib/daily-report/tabel.ts): who left stands under its own divider
-  const firstGone = shown.findIndex((person) => person.gone);
+  const firstGone = who ? -1 : shown.findIndex((person) => person.gone);
   const goneShown = firstGone < 0 ? 0 : shown.length - firstGone;
 
   return (
-    <div className="rep-tabel" data-testid="desk-tabel" data-stale={stale ? "" : undefined} aria-busy={stale || undefined}>
+    <section className="rep-tabel" aria-label="Табель" data-testid="desk-tabel" data-folded={days ? "" : undefined} data-stale={stale ? "" : undefined} aria-busy={stale || undefined}>
       <div className="rep-tabel-bar">
-        <SumLine tabel={tabel} />
-        <SegmentTabs<TabelShow>
-          aria-label="Кого показать"
-          value={show}
-          onChange={onShow}
-          items={[
-            { value: "all", label: "Все", count: tabel.totals.people },
-            { value: "gaps", label: "С пропусками", count: tabel.totals.gaps },
-          ]}
-        />
+        <h2 className="rep-tabel-title">Табель</h2>
+        {controls}
+        <span className="flex-1" />
+        {!who && !folded && tabel.people.length > 0 ? (
+          <SegmentTabs<TabelShow>
+            aria-label="Кого показать"
+            value={show}
+            onChange={onShow}
+            items={[
+              { value: "team", label: "Все", count: tabel.totals.people },
+              { value: "gaps", label: "С пропусками", count: tabel.totals.gaps },
+            ]}
+          />
+        ) : null}
+        {!who && tabel.people.length > 0 ? (
+          <button type="button" className="rep-tabel-fold desk-focus" aria-expanded={!folded} onClick={() => onFold(!folded)} data-testid="desk-tabel-fold">
+            {folded ? "Показать людей" : "Свернуть"}
+            <ChevronDown size={15} strokeWidth={2.25} aria-hidden />
+          </button>
+        ) : null}
       </div>
 
       {tabel.people.length === 0 ? (
@@ -529,7 +573,7 @@ export function TabelView({ tabel, stale, failed, onRetry, match, show, onShow, 
             onMouseDown={tip.hide}
             onScroll={tip.hide}
           >
-            <div role="table" aria-label={`Табель отчётов, ${tabelPeriodWords(tabel.from, tabel.to)}`} aria-rowcount={shown.length + (firstGone < 0 ? 2 : 3)} className="rep-tabel-grid">
+            <div role="table" aria-label={`Табель отчётов, ${tabelPeriodWords(tabel.from, tabel.to)}`} aria-rowcount={shown.length + (who ? 1 : 2) + (firstGone < 0 ? 0 : 1)} className="rep-tabel-grid">
               <div role="rowgroup" className="rep-tabel-head">
                 {m.mode === "dense" ? (
                   <div className="rep-tabel-row rep-tabel-months" aria-hidden>
@@ -541,7 +585,7 @@ export function TabelView({ tabel, stale, failed, onRetry, match, show, onShow, 
                 ) : null}
                 <div role="row" className="rep-tabel-row rep-tabel-heads">
                   <span role="columnheader" className="rep-tabel-name">
-                    Сотрудник
+                    {days ? "" : "Сотрудник"}
                   </span>
                   <DayHeads days={tabel.days} mode={m.mode} onDay={onDay} />
                   <span aria-hidden />
@@ -583,11 +627,11 @@ export function TabelView({ tabel, stale, failed, onRetry, match, show, onShow, 
                     />
                   </Fragment>
                 ))}
-                {shown.length === 0 ? (
+                {shown.length === 0 && !days ? (
                   <p className="rep-tabel-none">
-                    {matched.length === 0 ? "Никого не нашлось" : "За этот период без пропусков — все сдали"}
-                    {show === "gaps" ? (
-                      <Button size="sm" variant="ghost" onClick={() => onShow("all")}>
+                    {who ? "За этот период человек в табеле не стоит" : "За этот период без пропусков — все сдали"}
+                    {!who && show === "gaps" ? (
+                      <Button size="sm" variant="ghost" onClick={() => onShow("team")}>
                         Показать всех
                       </Button>
                     ) : null}
@@ -595,24 +639,26 @@ export function TabelView({ tabel, stale, failed, onRetry, match, show, onShow, 
                 ) : null}
               </div>
 
-              <div role="rowgroup" className="rep-tabel-foot" data-testid="desk-tabel-foot">
-                <div role="row" className="rep-tabel-row">
-                  <span role="rowheader" className="rep-tabel-name">
-                    Не сдали
-                  </span>
-                  <Foot days={tabel.days} missed={missed} mode={m.mode} />
-                  <span aria-hidden />
-                  <span role="cell" className="rep-tabel-end">
-                    <Totals row={{ submitted: foot.submitted, missed: foot.missed, excused: foot.excused, submit_rate: foot.rate }} excused={excused} as="foot" />
-                  </span>
+              {who ? null : (
+                <div role="rowgroup" className="rep-tabel-foot" data-testid="desk-tabel-foot">
+                  <div role="row" className="rep-tabel-row">
+                    <span role="rowheader" className="rep-tabel-name">
+                      {days ? "Сдали" : "Не сдали"}
+                    </span>
+                    {days ? <Handed days={tabel.days} handed={handed} mode={m.mode} onDay={onDay} /> : <Foot days={tabel.days} missed={missed} mode={m.mode} />}
+                    <span aria-hidden />
+                    <span role="cell" className="rep-tabel-end">
+                      <Totals row={{ submitted: foot.submitted, missed: foot.missed, excused: foot.excused, submit_rate: foot.rate }} excused={excused} as="foot" />
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
-          <Legend tabel={tabel} mode={m.mode} />
+          {days ? null : <Legend tabel={tabel} mode={m.mode} />}
         </>
       )}
       {tip.node}
-    </div>
+    </section>
   );
 }

@@ -1,7 +1,7 @@
 /**
  * Role B of tasks/022, waves 2–3 of D-154: /desk/team as the dispatcher's board (the peek in the
  * panel, the row's menu, the keys), the person's card with the editor in place, /desk/team/new,
- * /desk/reports «Подряд» / «Табель» with the filters and the panel, /desk/errands of the director
+ * /desk/reports — the «Табель» card over the feed folded by days, with the filters and the panel, /desk/errands of the director
  * (history filters) and the secretary's queue. Read only — nothing is saved, nobody is created, no
  * code is issued, no request is asked, taken, declined or thanked: the quick requests are counted,
  * never clicked; the forms are typed into and cancelled; the menus are opened and closed. Writes the
@@ -673,55 +673,91 @@ export async function checkReports(ctx: Ctx) {
   }
 }
 
-/** «Подряд» (D-198): the days in a row with their heads, the roll call, the filters in the address, the diary, the marks. */
+/** One page (D-201): the «Табель» card folded over the feed, the feed folded by days, the filters in the address, the diary, the marks. */
 async function reportsFeed(ctx: Ctx) {
   const { page } = ctx;
   await open(page, "/desk/reports");
-  const tabs = (await page.getByTestId("seg-feed").isVisible()) && (await page.getByTestId("seg-tabel").isVisible());
-  record("отчёты: вкладки «Подряд» и «Табель»", tabs);
+  const noTabs = (await page.getByTestId("seg-feed").count()) + (await page.getByTestId("seg-tabel").count()) === 0;
+  const card = await visible(ctx, "desk-tabel", 15_000);
   const list = await visible(ctx, "desk-feed-list", 15_000);
   if (!list) {
     const failed = await page.getByText("Не получилось загрузить").isVisible().catch(() => false);
-    record("отчёты «Подряд»: лента загрузилась", false, failed ? "лента не пришла — функция team_daily_reports_feed есть на базе? (миграция D-198)" : "нет desk-feed-list");
+    record("отчёты: лента загрузилась", false, failed ? "лента не пришла — функция team_daily_reports_feed есть на базе? (миграция D-198)" : "нет desk-feed-list");
     return;
   }
+  const fold = page.getByTestId("desk-tabel-fold");
+  await fold.waitFor({ timeout: 10_000 }).catch(() => undefined);
+  const hasSheet = (await fold.count()) > 0;
+  const folded = hasSheet ? (await fold.getAttribute("aria-expanded")) === "false" : true;
+  const peopleRows = await page.getByTestId("desk-tabel-row").count();
+  const handed = await page.getByTestId("desk-tabel-day").count();
+  record(
+    "отчёты: одна страница без вкладок — карточка «Табель» над лентой, свёрнута в дни и «Сдали»",
+    noTabs && card && folded && peopleRows === 0 && (!hasSheet || handed >= 28),
+    `вкладок нет: ${noTabs}; свёрнут: ${folded}; строк людей ${peopleRows}; дней ${handed}`,
+  );
   const heads = page.getByTestId("desk-feed-day-head");
   const morning = await page.getByTestId("desk-feed-morning").count();
-  const roll = await visible(ctx, "desk-rollcall", 10_000);
-  const rollText = roll ? ((await page.getByTestId("desk-rollcall").innerText()) ?? "").replace(/\s+/g, " ") : "";
+  const days = page.getByTestId("desk-feed-day");
+  const dayCount = await days.count();
+  const openDays = await page.locator('[data-testid="desk-feed-day"][data-open]').count();
+  const firstOpen = dayCount === 0 || (await days.first().getAttribute("data-open")) !== null;
   record(
-    "отчёты «Подряд»: дни подряд под своими заголовками, перекличка «N из M сдали»",
-    (await heads.count()) + morning > 0 && roll && /из \d+ сдали|выходной|праздник|не должен/i.test(rollText),
-    `дней ${await heads.count()}${morning ? " + утренняя строка" : ""}; ${rollText.slice(0, 80)}`,
+    "отчёты: дни под своими заголовками — верхний раскрыт, остальные строкой",
+    (await heads.count()) + morning > 0 && firstOpen && (dayCount < 3 || openDays < dayCount),
+    `дней ${dayCount}${morning ? " + утренняя строка" : ""}; раскрыто ${openDays}`,
   );
   const feedText = (await page.getByTestId("desk-feed-list").innerText()).replace(/\s+/g, " ");
-  record("отчёты «Подряд»: ни прихода, ни ухода, ни часов", !/\d{1,2}:\d\d\s*[–-]\s*\d{1,2}:\d\d|\d,\d ч\b|Пришёл|Ушёл/.test(feedText), feedText.slice(0, 100));
+  record("отчёты: ни прихода, ни ухода, ни часов", !/\d{1,2}:\d\d\s*[–-]\s*\d{1,2}:\d\d|\d,\d ч\b|Пришёл|Ушёл/.test(feedText), feedText.slice(0, 100));
   await ctx.shot("reports-feed");
 
-  // ← goes to an older day and writes ?day=, a reload keeps it, T comes back to the top
-  const days = await page.locator("[data-feed-day]").count();
-  if (days > 1) {
+  // a press on a folded day's head opens it, another one folds it back
+  const closed = page.locator('[data-testid="desk-feed-day"]:not([data-open])').first();
+  if ((await closed.count()) > 0) {
+    const date = (await closed.getAttribute("data-feed-day")) ?? "";
+    const one = page.locator(`[data-feed-day="${date}"]`);
+    await one.getByTestId("desk-feed-fold").click();
+    const opened = (await one.getAttribute("data-open")) !== null;
+    await one.getByTestId("desk-feed-fold").click();
+    const again = (await one.getAttribute("data-open")) === null;
+    record("отчёты: щелчок по заголовку дня раскрывает его и сворачивает обратно", opened && again, date);
+  } else {
+    skip("отчёты: свернуть и раскрыть день", "свёрнутых дней нет");
+  }
+
+  // ← goes to an older day, opens it and writes ?day=, a reload keeps it, T comes back to the top
+  if (dayCount > 1) {
     await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
     await page.keyboard.press("ArrowLeft");
     const written = await page.waitForURL((url) => url.searchParams.has("day"), { timeout: 5_000 }).then(() => true, () => false);
     const day = new URL(page.url()).searchParams.get("day");
+    const openedByKey = (await page.locator(`[data-feed-day="${day}"]`).getAttribute("data-open").catch(() => null)) !== null;
     await page.reload();
     await visible(ctx, "desk-feed-list", 15_000);
-    const kept = new URL(page.url()).searchParams.get("day") === day && (await page.locator(`[data-feed-day="${day}"]`).count()) > 0;
+    await page.waitForTimeout(800);
+    const kept = new URL(page.url()).searchParams.get("day") === day && (await page.locator(`[data-feed-day="${day}"][data-open]`).count()) > 0;
     await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
     await page.keyboard.press("KeyT");
     const top = await page.waitForURL((url) => !url.searchParams.has("day"), { timeout: 5_000 }).then(() => true, () => false);
-    record("отчёты «Подряд»: ← пишет ?day=, перезагрузка открывает тот же день, T — к сегодня", written && kept && top, `${day}`);
+    record("отчёты: ← ведёт к дню и раскрывает его (?day=), перезагрузка открывает тот же день, T — к сегодня", written && openedByKey && kept && top, `${day}`);
   } else {
-    skip("отчёты «Подряд»: ← → и T", "в ленте один день");
+    skip("отчёты: ← → и T", "в ленте один день");
   }
 
+  // a checked report stands as one line; a press opens it in full
+  const lines = page.getByTestId("desk-feed-folded");
+  if ((await page.getByTestId("desk-feed-entry").count()) === 0 && (await lines.count()) > 0) {
+    const before = await lines.count();
+    await lines.first().click({ position: { x: 300, y: 10 } });
+    await page.waitForTimeout(300);
+    record("отчёты: проверенный отчёт — одной строкой, щелчок раскрывает его", (await lines.count()) === before - 1 && (await page.getByTestId("desk-feed-entry").count()) > 0, `строк было ${before}`);
+  }
   const entries = page.getByTestId("desk-feed-entry");
   if ((await entries.count()) === 0) {
-    skip("отчёты «Подряд»: человек, дневник, отметки", "в ленте нет ни одного отчёта");
+    skip("отчёты: человек, дневник, отметки", "в раскрытых днях нет ни одного отчёта");
     return;
   }
-  // F — a person from the list under the field: the label «Имя ×», ?who=, the feed of that person alone
+  // F — a person from the list under the field: the label «Имя ×», ?who=, the feed of that person alone, the card — their row
   const first = entries.first();
   const userId = (await first.getAttribute("data-user")) ?? "";
   const name = (await first.getAttribute("aria-label")) ?? "";
@@ -734,89 +770,111 @@ async function reportsFeed(ctx: Ctx) {
   await visible(ctx, "desk-feed-who", 5_000);
   await page.waitForTimeout(800);
   const users = await page.locator('[data-testid="desk-feed-entry"]').evaluateAll((rows) => [...new Set(rows.map((row) => (row as HTMLElement).dataset.user))]);
-  record("отчёты «Подряд»: F — человек из списка, метка «Имя ×», ?who=, лента только его", listed && who && users.every((id) => id === userId), `${name}: ${users.length} чел.`);
+  const rowKeys = await page.locator('[data-testid="desk-tabel-row"]').evaluateAll((rows) => rows.map((row) => (row as HTMLElement).dataset.rowKey));
+  record(
+    "отчёты: F — человек из списка, метка «Имя ×», ?who=, лента только его, в табеле — его строка",
+    listed && who && users.every((id) => id === userId) && rowKeys.length <= 1 && rowKeys.every((id) => id === userId),
+    `${name}: в ленте ${users.length} чел., строк табеля ${rowKeys.length}`,
+  );
+  await ctx.shot("reports-who");
   await page.getByTestId("desk-feed-who").getByRole("button").click();
   const cleared = await page.waitForURL((url) => !url.searchParams.has("who"), { timeout: 5_000 }).then(() => true, () => false);
   // «Не проверены» — in the address
   await page.getByTestId("seg-new").click();
   const only = await page.waitForURL((url) => url.searchParams.get("only") === "new", { timeout: 5_000 }).then(() => true, () => false);
   await page.getByTestId("seg-all").click();
-  record("отчёты «Подряд»: × снимает человека, «Не проверены» — ?only=new", cleared && only, page.url());
+  record("отчёты: × снимает человека, «Не проверены» — ?only=new", cleared && only, page.url());
 
   // a click on a report opens the diary on its day (?p=&day=), with «Все отчёты ›»; Esc closes it
+  await page.waitForTimeout(600);
+  if ((await page.getByTestId("desk-feed-entry").count()) === 0 && (await lines.count()) > 0) await lines.first().click({ position: { x: 300, y: 10 } });
   await visible(ctx, "desk-feed-entry", 10_000);
   await page.getByTestId("desk-feed-entry").first().locator(".rep-day-who").click();
   const diary = await visible(ctx, "desk-diary", 8_000);
   const all = await page.getByTestId("desk-diary-all").isVisible().catch(() => false);
-  record("отчёты «Подряд»: щелчок по отчёту открывает дневник (?p=), в нём «Все отчёты ›»", diary && all && page.url().includes("p="), page.url());
+  record("отчёты: щелчок по отчёту открывает дневник (?p=), в нём «Все отчёты ›»", diary && all && page.url().includes("p="), page.url());
   await ctx.shot("reports-diary");
   await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
   await page.keyboard.press("Escape");
-  const closed = await page.waitForURL((url) => !url.searchParams.has("p"), { timeout: 5_000 }).then(() => true, () => false);
-  record("отчёты «Подряд»: Esc закрывает дневник и снимает ?p=", closed, page.url());
+  const shut = await page.waitForURL((url) => !url.searchParams.has("p"), { timeout: 5_000 }).then(() => true, () => false);
+  record("отчёты: Esc закрывает дневник и снимает ?p=", shut, page.url());
 
-  // «Проверить» on and off (answered in the browser): the button says it at once
-  const button = page.getByTestId("desk-feed-check").first();
+  // «Проверить» (answered in the browser): the report folds into its line at once, «Отменить» brings it back
+  const button = page.locator('[data-testid="desk-feed-check"][aria-pressed="false"]').first();
   if (await button.isVisible().catch(() => false)) {
-    const before = await button.getAttribute("aria-pressed");
+    const row = page.locator('[data-testid="desk-feed-entry"]', { has: page.locator('[data-testid="desk-feed-check"][aria-pressed="false"]') }).first();
+    const key = (await row.getAttribute("data-row-key")) ?? "";
     await button.click();
     await page.waitForTimeout(300);
-    const after = await page.getByTestId("desk-feed-check").first().getAttribute("aria-pressed");
-    await page.getByTestId("desk-feed-check").first().click();
+    const line = page.locator(`[data-testid="desk-feed-folded"][data-row-key="${key}"]`);
+    const foldedNow = (await line.count()) === 1;
+    await line.getByTestId("desk-feed-uncheck").click().catch(() => undefined);
     await page.waitForTimeout(300);
-    const back = await page.getByTestId("desk-feed-check").first().getAttribute("aria-pressed");
-    record("отчёты «Подряд»: «Проверить» ↔ «Проверено» сразу (запись — в браузере)", before !== after && back === before, `${before} → ${after} → ${back}`);
+    const back = (await page.locator(`[data-testid="desk-feed-entry"][data-row-key="${key}"] [data-testid="desk-feed-check"][aria-pressed="false"]`).count()) === 1;
+    record("отчёты: «Проверить» сворачивает отчёт в строку сразу, «Отменить» возвращает (запись — в браузере)", foldedNow && back, `свернулся: ${foldedNow}; вернулся: ${back}`);
   } else {
-    skip("отчёты «Подряд»: «Проверить»", "кнопок отметки нет (не директор?)");
+    skip("отчёты: «Проверить»", "непроверенных отчётов на экране нет (или не директор)");
   }
 }
 
-/** «Табель»: people × days of the calendar month, the month in the address, the paper, the diary from a cell. */
+/** The «Табель» card with its people: an old link opens it, the month in the address, the paper, the diary from a cell, the feed from a day. */
 async function reportsTabel(ctx: Ctx) {
   const { page } = ctx;
+  // a link from before D-201 that meant the tab: the card opens with its people
   await open(page, "/desk/reports?tab=tabel");
   const grid = await visible(ctx, "desk-tabel", 15_000);
   const rows = page.locator('[data-testid="desk-tabel-row"]');
   await rows.first().waitFor({ timeout: 10_000 }).catch(() => undefined);
   const dates = (await page.getByTestId("desk-period-dates").innerText().catch(() => "")).trim();
   const heads = await page.getByTestId("desk-tabel-day").count();
-  record("отчёты «Табель»: ?tab=tabel, месяц календарный, люди × дни", grid && /^[А-Я][а-я]+ \d{4}$/.test(dates) && heads >= 28 && heads <= 31 && (await rows.count()) > 0, `${dates}; дней ${heads}; людей ${await rows.count()}`);
+  const feedToo = await page.getByTestId("desk-feed-list").isVisible().catch(() => false);
+  record(
+    "отчёты «Табель»: старая ссылка ?tab=tabel раскрывает людей; месяц календарный, люди × дни, лента под карточкой",
+    grid && feedToo && /^[А-Я][а-я]+ \d{4}$/.test(dates) && heads >= 28 && heads <= 31 && (await rows.count()) > 0,
+    `${dates}; дней ${heads}; людей ${await rows.count()}`,
+  );
   const states = await page.locator('[data-testid="desk-tabel-cell"]').evaluateAll((cells) => [...new Set(cells.map((c) => (c as HTMLElement).dataset.state ?? ""))]);
   record("отчёты «Табель»: в клетках состояния, без часов", states.length > 0 && !(await page.locator('[data-testid="desk-tabel-cell"]').first().innerText()).match(/\d,\d|ч\b/), states.join(", "));
   await ctx.shot("reports-tabel");
 
-  // ← a month back, written into the address; T — this month again
-  await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
-  await page.keyboard.press("ArrowLeft");
+  // ‹ a month back, written into the address; «Этот месяц» — this month again
+  await page.getByTestId("desk-period-prev").click();
   await page.waitForTimeout(800);
   const before = (await page.getByTestId("desk-period-dates").innerText().catch(() => "")).trim();
   const month = new URL(page.url()).searchParams.get("month");
-  await page.keyboard.press("KeyT");
+  await page.getByTestId("desk-reports-today").click();
   await page.waitForTimeout(500);
   const again = (await page.getByTestId("desk-period-dates").innerText().catch(() => "")).trim();
-  record("отчёты «Табель»: ← — месяц раньше (?month=), T — этот месяц", before !== dates && Boolean(month) && again === dates, `${dates} → ${before} (${month}) → ${again}`);
+  record("отчёты «Табель»: ‹ — месяц раньше (?month=), «Этот месяц» возвращает", before !== dates && Boolean(month) && again === dates, `${dates} → ${before} (${month}) → ${again}`);
 
   // what the screen hands out: the табель for Excel — days as numbers, no points; the paper — every row
   const save = page.getByTestId("desk-report-csv");
-  if (await save.isEnabled()) {
-    const [file] = await Promise.all([page.waitForEvent("download"), save.click()]);
+  if ((await rows.count()) > 0 && (await save.isEnabled())) {
+    await save.click();
+    const [file] = await Promise.all([page.waitForEvent("download"), page.getByRole("menuitem", { name: /Табель/ }).click()]);
     const bytes = await readFile(await file.path());
     const text = bytes.toString("utf8");
     const bom = bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf;
     const head = text.replace(/^﻿/, "").split("\r\n")[0] ?? "";
     record(
-      "отчёты «Табель»: «Скачать для Excel» — табель по дням с BOM и CRLF, без очков",
+      "отчёты «Табель»: «Скачать для Excel → Табель» — табель по дням с BOM и CRLF, без очков",
       /^Табель отчётов .+ \d{4}\.csv$/.test(file.suggestedFilename()) && bom && head.startsWith("Сотрудник;") && /;1;2;3;/.test(head) && !/очк/i.test(head) && !/[^\r]\n/.test(text),
       `${file.suggestedFilename()}: ${head.slice(0, 80)}`,
     );
+    // «Распечатать → Табель» puts the табель on the paper (the print dialog itself is not opened here)
+    await page.evaluate("window.print = () => {}");
+    await page.getByTestId("desk-report-print").click();
+    await page.getByRole("menuitem", { name: /Табель/ }).click();
+    await page.waitForTimeout(300);
     const onScreen = await rows.count();
-    const printed = await page.getByTestId("desk-print-sheet").locator("tbody tr").count();
-    record("отчёты «Табель»: лист печати — все люди", printed === onScreen, `строк ${printed} из ${onScreen}`);
+    const sheet = page.getByTestId("desk-print-sheet");
+    const printed = await sheet.locator("tbody tr").count();
+    record("отчёты «Табель»: «Распечатать → Табель» — на листе все люди", (await sheet.getAttribute("data-kind")) === "tabel" && printed === onScreen, `строк ${printed} из ${onScreen}`);
   } else {
     skip("отчёты «Табель»: выгрузка и печать", "в табеле никого нет");
   }
 
-  // a name opens the diary; a cell — the diary on that day; a day's head — «Подряд» at that day
+  // a name opens the diary; a cell — the diary on that day; a day's head — that day in the feed, open
   if ((await rows.count()) > 0) {
     await rows.first().locator("button, a").first().click();
     const diary = await visible(ctx, "desk-diary", 8_000);
@@ -831,9 +889,24 @@ async function reportsTabel(ctx: Ctx) {
     await page.keyboard.press("Escape");
     await page.getByTestId("desk-panel").waitFor({ state: "detached", timeout: 5_000 }).catch(() => undefined);
   }
+
+  // «Свернуть»: the people go, the days and «Сдали» stay; the choice is this computer's
+  const fold = page.getByTestId("desk-tabel-fold");
+  if ((await fold.count()) > 0) {
+    await fold.click();
+    await page.waitForTimeout(300);
+    const none = (await rows.count()) === 0 && (await fold.getAttribute("aria-expanded")) === "false";
+    await ctx.shot("reports-tabel-folded");
+    await fold.click();
+    await page.waitForTimeout(300);
+    const kept = await page.evaluate("localStorage.getItem('pulse.desk.reports.sheet')");
+    record("отчёты «Табель»: «Свернуть» убирает людей, «Показать людей» возвращает; выбор запомнен", none && (await rows.count()) > 0 && kept === "open", `в памяти: ${kept}`);
+    // the smoke leaves the card as it found it: folded
+    await fold.click();
+  }
   await page.getByTestId("desk-tabel-day").first().click();
-  const toFeed = await page.waitForURL((url) => url.searchParams.get("tab") !== "tabel" && url.searchParams.has("day"), { timeout: 5_000 }).then(() => true, () => false);
-  record("отчёты «Табель»: заголовок дня открывает «Подряд» на этом дне", toFeed && (await visible(ctx, "desk-feed", 8_000)), page.url());
+  const toFeed = await page.waitForURL((url) => url.searchParams.has("day"), { timeout: 5_000 }).then(() => true, () => false);
+  record("отчёты «Табель»: заголовок дня ведёт к этому дню в ленте", toFeed && (await visible(ctx, "desk-feed", 8_000)), page.url());
 }
 
 /** On the secretary's desk (her page is signed in already). */

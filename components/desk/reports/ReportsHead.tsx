@@ -20,11 +20,10 @@ const STEP =
   "reports-step flex h-8 w-8 items-center justify-center rounded-[8px] text-muted hover:bg-surface-2 hover:text-text disabled:pointer-events-none disabled:opacity-35";
 
 function TodayMove({ at, label, hint, onToday }: { at: boolean; label: string; hint: string; onToday: () => void }) {
-  return at ? (
-    <span className="ml-1 w-[84px] text-right text-[13px] leading-4 text-muted">{label.toLowerCase()}</span>
-  ) : (
+  // on the period with today there is nowhere to go back to: the bar keeps its room for the rest
+  return at ? null : (
     <Tooltip label={hint} keys={["T"]}>
-      <Button size="sm" variant="ghost" className="ml-1 !min-h-8 w-[84px] !justify-end !px-0" onClick={onToday} data-testid="desk-reports-today">
+      <Button size="sm" variant="ghost" className="ml-1 !min-h-8 !px-2" onClick={onToday} data-testid="desk-reports-today">
         {label}
       </Button>
     </Tooltip>
@@ -33,7 +32,7 @@ function TodayMove({ at, label, hint, onToday }: { at: boolean; label: string; h
 
 /**
  * The feed's jump to a date (D-198): a calendar icon in the head, the month under it; a picked day
- * scrolls the feed «Подряд» to it (older weeks load on the way). Tomorrow is not a day yet.
+ * scrolls the feed to it and opens it (older weeks load on the way). Tomorrow is not a day yet.
  */
 export function JumpToDay({ value, today, now, onPick }: { value: Ymd; today: Ymd; now: Date; onPick: (day: Ymd) => void }) {
   const box = useRef<HTMLSpanElement>(null);
@@ -106,8 +105,8 @@ function DayPick({ label, value, max, now, onPick }: { label: string; value: Ymd
 }
 
 /**
- * The period of «Табель»: a calendar month or a Monday–Sunday week stepping back and forth (‹ ›,
- * ← →) and back to the one with today (T); «Свой» — two calendars, at most 92 days.
+ * The period of the «Табель» card: a calendar month or a Monday–Sunday week stepping back and
+ * forth (‹ ›) and back to the one with today (the button, T); «Свой» — two calendars, at most 92 days.
  */
 export function PeriodControls({
   period,
@@ -145,13 +144,13 @@ export function PeriodControls({
         </div>
       ) : (
         <div className="reports-stepper flex items-center gap-1">
-          <button type="button" className={STEP} aria-label={`Предыдущий период: ${unit}`} title="Раньше (←)" onClick={() => onStep(-1)} data-testid="desk-period-prev">
+          <button type="button" className={STEP} aria-label={`Предыдущий период: ${unit}`} title="Раньше" onClick={() => onStep(-1)} data-testid="desk-period-prev">
             <Icon name="left" size={16} />
           </button>
           <span key={range.from} className="reports-stepper-title nums min-w-[150px] text-center text-[14px] font-semibold leading-5" data-testid="desk-period-dates">
             {period.kind === "month" ? monthTitle(period.month) : rangeText(range.from, range.to)}
           </span>
-          <button type="button" className={STEP} aria-label={`Следующий период: ${unit}`} title="Позже (→)" disabled={atToday} onClick={() => onStep(1)}>
+          <button type="button" className={STEP} aria-label={`Следующий период: ${unit}`} title="Позже" disabled={atToday} onClick={() => onStep(1)}>
             <Icon name="right" size={16} />
           </button>
           <TodayMove at={atToday} label={period.kind === "month" ? "Этот месяц" : "Эта неделя"} hint="К периоду с сегодняшним днём" onToday={onToday} />

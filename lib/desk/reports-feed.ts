@@ -1,7 +1,8 @@
 /**
- * «Отчёты → Подряд» (D-198): the pure words and choices of the feed — a day's head, who is
- * without a report, which reports «Проверить все» takes, the next report for the key A, the words
- * a search found. The screen draws from these, the tests pin them. Days are Aqtobe "YYYY-MM-DD".
+ * The feed of «Отчёты» (D-198, D-201): the pure words and choices — a day's head, who is without a
+ * report, which days stand open and which fold into their one line, which reports «Проверить все»
+ * takes, the next report for the key A, the words a search found. The screen draws from these, the
+ * tests pin them. Days are Aqtobe "YYYY-MM-DD".
  */
 import { dayTitle } from "@/lib/daily-report/format";
 import type { DailyReport, FeedDay, FeedReport } from "@/lib/daily-report/types";
@@ -20,9 +21,9 @@ export function dayHead(date: Ymd, today: Ymd): { name: string; date: string } {
   return { name: weekday, date: `${rest}${year}` };
 }
 
-/** What the head says of the day's team: «сдали 4 из 10»; a day nothing was due — its name. */
-export function dayCountLine(day: Pick<FeedDay, "due" | "submitted" | "workday">, holiday: boolean): string {
-  if (day.due > 0) return `сдали ${day.submitted} из ${day.due}`;
+/** What the head says of the day's team: «сдали 4 из 10», today with «· ждём 6»; a day nothing was due — its name. */
+export function dayCountLine(day: Pick<FeedDay, "due" | "submitted" | "workday"> & Partial<Pick<FeedDay, "pending">>, holiday: boolean): string {
+  if (day.due > 0) return `сдали ${day.submitted} из ${day.due}${day.pending ? ` · ждём ${day.pending}` : ""}`;
   if (holiday) return "праздник";
   return day.workday ? "отчёт не нужен" : "выходной";
 }
@@ -41,6 +42,26 @@ export function checkableIds(reports: readonly FeedReport[]): string[] {
 export function allChecked(reports: readonly FeedReport[]): boolean {
   const handed = reports.filter(isSubmitted);
   return handed.length > 0 && handed.every(isChecked);
+}
+
+/** A day's handed-in reports that still wait for «Проверено» — the count in its folded line (D-201). */
+export function waitingCount(reports: readonly FeedReport[]): number {
+  return reports.filter((report) => isSubmitted(report) && !isChecked(report)).length;
+}
+
+/** «1 не проверен», «5 не проверены». */
+export function waitingText(count: number): string {
+  return `${count} ${pluralRu(count, ["не проверен", "не проверены", "не проверены"])}`;
+}
+
+/** The first line of a report's words — what a checked report folds into (D-201); "" — no words. */
+export function firstLine(text: string | null | undefined): string {
+  return (
+    (text ?? "")
+      .split("\n")
+      .map((line) => line.trim())
+      .find(Boolean) ?? ""
+  );
 }
 
 /** «Проверено 3 отчёта» — the toast of a batch. */
@@ -121,3 +142,40 @@ export function landingDay(days: readonly Ymd[], target: Ymd): Ymd | null {
 export function shownDays(days: readonly FeedDay[], filtered: boolean): FeedDay[] {
   return days.filter((day) => day.reports.length > 0 || day.missed_people.length > 0 || (day.today && !filtered));
 }
+
+/**
+ * Today is only a line yet — «Отчёты за сегодня — с 17:00», «Сегодня выходной»: nothing handed in,
+ * nothing narrows the feed, and it is a day off or still before `ask_from`.
+ */
+export function isMorningLine(day: Pick<FeedDay, "today" | "workday" | "reports">, at: { filtered: boolean; holiday: boolean; beforeAsk: boolean }): boolean {
+  return day.today && day.reports.length === 0 && !at.filtered && (!day.workday || at.holiday || at.beforeAsk);
+}
+
+/**
+ * The days that stand open when the feed comes (D-201): the newest day drawn as a section and,
+ * while it has no report yet, the days under it down to the first one with reports — so there is
+ * always something to read on top and the rest of the month is one line a day. `skip` — today
+ * while it is only the morning's line.
+ */
+export function defaultOpenDays(days: readonly Pick<FeedDay, "date" | "reports">[], skip: Ymd | null): Ymd[] {
+  const open: Ymd[] = [];
+  for (const day of days) {
+    if (day.date === skip) continue;
+    open.push(day.date as Ymd);
+    if (day.reports.length > 0) break;
+  }
+  return open;
+}
+
+/**
+ * Whether a day stands open: what the person chose by hand wins; under a filter (one person, words,
+ * «Не проверены») every day is open — the feed is already short; otherwise the days of `base`.
+ */
+export function isDayOpen(date: Ymd, base: readonly Ymd[], toggled: ReadonlyMap<string, boolean>, filtered: boolean): boolean {
+  return toggled.get(date) ?? (filtered || base.includes(date));
+}
+
+/** The key of a day's head among the feed's rows (↑ ↓ walk heads and reports alike). */
+export const dayRowKey = (date: string) => `day:${date}`;
+/** The day of a row key; null — the key is a report's. */
+export const dayOfRowKey = (key: string | null): Ymd | null => (key?.startsWith("day:") ? (key.slice(4) as Ymd) : null);

@@ -50,13 +50,13 @@ import { useNow } from "@/lib/useNow";
 
 import { ChangedLine, CheckButton, SeenLine } from "./Ledger";
 
-/** What the page mounts it with, in the shell's right-hand panel, for «Подряд» and «Табель» alike. */
+/** What the page mounts it with, in the shell's right-hand panel — from the feed and from the «Табель» card alike. */
 export type DiaryProps = {
   userId: string;
   /** The day to show first: its month, its entry ringed and scrolled to. */
   focus: Ymd;
   today: Ymd;
-  /** A day of the diary's calendar double-clicked or «Открыть этот день»: the feed «Подряд» at that day. */
+  /** A day of the diary's calendar double-clicked or «Открыть этот день»: that day in the feed, open. */
   onDay: (day: Ymd) => void;
   /** The director reads: «новый», «Просмотрено» and «Проверить» on the reports (D-198). */
   director: boolean;
@@ -76,7 +76,7 @@ function withoutTimes(rows: readonly PersonDailyReport[]): PersonDailyReport[] {
 const personKey = (userId: string, from: Ymd, to: Ymd) => ["daily-report", "team", "person", userId, from, to] as const;
 
 /**
- * «Дневник» (D-183): one person's daily reports in the desk's right-hand panel, the same for «Подряд»
+ * «Дневник» (D-183): one person's daily reports in the desk's right-hand panel, the same for the feed
  * and «Табель». The head — the face, the name, where they are, and the moves every desk card has
  * (D-194): «Дать задачу» (the person pinned in the command line), «Изменить», «Карточка», «⋯» —
  * «Начислить очки…» where the game is on, vacation or sick leave from today, back at work. Under it the
@@ -85,7 +85,7 @@ const personKey = (userId: string, from: Ymd, to: Ymd) => ["daily-report", "team
  * the day's tasks, a report without words in one line, a missed day in one red line and its one
  * move: answer the person's dispute of the minus, or write a good reason (the minus comes back).
  * A click on a day of the calendar rings its entry and brings it into view, a double click opens
- * that day in the feed «Подряд». No arrival, leaving or hours (D-198); the director's marks on each
+ * that day in the feed. No arrival, leaving or hours (D-198); the director's marks on each
  * handed-in report: «новый», «просмотрено 17:41», «Проверить» / «Проверено 16:30».
  */
 export function Diary({ userId, focus, today, onDay, director, onAll }: DiaryProps) {

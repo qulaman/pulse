@@ -19,24 +19,6 @@ html[data-surface="desk"][data-journal] {
     flex-direction: column;
     gap: 14px;
   }
-  .rep-day[data-stale] .rep-day-cols {
-    opacity: 0.55;
-    transition: opacity 160ms linear 120ms;
-  }
-
-  .rep-day-cols {
-    display: grid;
-    min-width: 0;
-    grid-template-columns: minmax(0, 1fr);
-    align-items: start;
-    gap: 14px;
-
-    &[data-wide] {
-      grid-template-columns: minmax(0, 1fr) clamp(300px, 24%, 340px);
-      gap: 20px;
-    }
-  }
-
   /* ---- the morning band: today's reports come later, the last working day is on screen ---- */
   .rep-day-band {
     display: flex;
@@ -422,20 +404,6 @@ html[data-surface="desk"][data-journal] {
   .rep-day-roll {
     min-width: 0;
   }
-  .rep-day-roll[data-mode="rail"] {
-    position: sticky;
-    top: 12px;
-    max-height: calc(100dvh - var(--rep-day-top, 150px));
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding: 16px 16px 14px;
-  }
-  .rep-day-roll-count {
-    color: var(--ink-2);
-    font-size: 15px;
-    font-weight: 500;
-    line-height: 22px;
-  }
   .rep-day-roll-figure {
     margin-right: 2px;
     color: var(--ink);
@@ -445,13 +413,6 @@ html[data-surface="desk"][data-journal] {
     line-height: 38px;
     letter-spacing: -0.02em;
   }
-  .rep-day-roll-sub {
-    margin-top: 2px;
-    color: var(--rep-ink-3);
-    font-size: 12px;
-    line-height: 16px;
-  }
-
   /* who owed the report as one thin bar: handed in, missed, excused; the track — still to come */
   .rep-day-share {
     display: flex;
@@ -612,7 +573,7 @@ html[data-surface="desk"][data-journal] {
     }
   }
 
-  /* narrow or with the panel open: one line that opens in place */
+  /* one line that opens in place */
   .rep-day-strip {
     display: flex;
     min-height: 44px;
@@ -695,9 +656,6 @@ html[data-surface="desk"][data-journal] {
     grid-template-columns: 208px minmax(0, 1fr) 64px;
     gap: 20px;
     padding: 14px 14px 15px 12px;
-  }
-  .rep-day-roll.rep-day-bone {
-    padding: 16px;
   }
 }
 

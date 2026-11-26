@@ -3,32 +3,48 @@
 import { Download, Printer } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, ViewTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 
 import { useDeskParams, writeDeskAddress } from "@/components/desk/DeskAddress";
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { InPanel } from "@/components/desk/ui/DeskPanel";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { IconButton } from "@/components/desk/ui/IconButton";
+import { Menu, type MenuItem } from "@/components/desk/ui/Menu";
 import { DeskPage } from "@/components/desk/ui/PageTitle";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
-import { SearchField, SegmentTabs } from "@/components/desk/ui/Toolbar";
+import { SegmentTabs } from "@/components/desk/ui/Toolbar";
 import { Button } from "@/components/ui/Button";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
-import { SWITCH_OR_STEP } from "@/lib/desk/motion";
 import { askFromOf } from "@/lib/daily-report/due";
 import { useCheckReports, useReportsFeed, useUncheckedReportsCount } from "@/lib/daily-report/review";
+import { tabelPeriodWords } from "@/lib/daily-report/tabel";
 import type { FeedDay, FeedReport, ReportsFeedFilter } from "@/lib/daily-report/types";
-import { todayYmd, type Ymd } from "@/lib/datetime/calendar";
+import { nowHm, todayYmd, type Ymd } from "@/lib/datetime/calendar";
 import { feedFileName, feedSheet, feedSheetTitle, tabelFileName, tabelSheet, tabelSheetTitle, toCsv } from "@/lib/desk/report-export";
-import { currentPeriod, holdsToday, periodRange, readAddress, stepPeriod, writeAddress, type ReportsAddress, type ReportsTab, type TabelPeriod } from "@/lib/desk/reports-address";
-import { checkableIds, checkedText, dayHead, isChecked, isSubmitted, neighbourDay, nextUnchecked, shownDays } from "@/lib/desk/reports-feed";
+import { asksSheet, currentPeriod, holdsToday, periodRange, readAddress, stepPeriod, writeAddress, type ReportsAddress, type TabelPeriod } from "@/lib/desk/reports-address";
+import {
+  checkableIds,
+  checkedText,
+  dayHead,
+  dayOfRowKey,
+  dayRowKey,
+  defaultOpenDays,
+  isChecked,
+  isDayOpen,
+  isMorningLine,
+  isSubmitted,
+  neighbourDay,
+  nextUnchecked,
+  shownDays,
+} from "@/lib/desk/reports-feed";
+import { readSheetOpen, sheetOpenOnServer, subscribeSheet, writeSheetOpen } from "@/lib/desk/reports-sheet";
 import { useCompanyCard } from "@/lib/desk/settings-queries";
 import { useCompanySettings } from "@/lib/dictionary-queries";
 import { shortName, useNamesKey } from "@/lib/people/names";
 import { usePeople } from "@/lib/people/queries";
-import { personFits } from "@/lib/people/search";
 import { useMe } from "@/lib/tasks/queries";
 import { useHydrated } from "@/lib/useHydrated";
 import { useNow } from "@/lib/useNow";
@@ -36,32 +52,51 @@ import { useNow } from "@/lib/useNow";
 import { arrowOf, onControl, stepKey, useScreenKeys } from "../team/keys";
 import { Diary } from "./Diary";
 import { FeedSearch, FilterChip, type SearchablePerson } from "./FeedSearch";
-import { FeedView, type FeedJump } from "./FeedView";
+import { FeedBone, FeedView, type FeedJump } from "./FeedView";
 import { PrintSheet, saveCsv } from "./PrintSheet";
 import { JumpToDay, PeriodControls } from "./ReportsHead";
 import { useTabel } from "./tabel-data";
-import { TabelView, type TabelShow } from "./TabelView";
+import { TabelBone, TabelView, type TabelShow } from "./TabelView";
 
-const TABS: { value: ReportsTab; label: string }[] = [
-  { value: "feed", label: "Подряд" },
-  { value: "tabel", label: "Табель" },
-];
+/** The feed's rows in the order on screen — ↑ ↓ walk the days' heads and the reports alike, A — the reports. */
+const FEED_ROWS = ["desk-feed-day-head", "desk-feed-entry", "desk-feed-folded"].map((id) => `[data-testid="desk-feed"] [data-testid="${id}"]`).join(", ");
 
-/** The reports of the feed in the order on screen — ↑ ↓ and A walk them. */
-const FEED_ROWS = '[data-testid="desk-feed"] [data-testid="desk-feed-entry"], [data-testid="desk-feed"] [data-testid="desk-feed-folded"]';
-const TABEL_ROWS = '[data-testid="desk-tabel"] [data-row-key]';
+/** ← → pressed within this time of each other count as one trip: the next press goes on from the last day reached. */
+const TRAVEL_MS = 800;
+
+/** Which days stand open: the ones that opened by themselves so far and what the person chose by hand. */
+type Fold = { key: string; opened: readonly Ymd[]; toggled: ReadonlyMap<string, boolean> };
+
+/** What the screen hands out: the reports on screen or the табель of the card's period. */
+type PaperKind = "day" | "tabel";
+
+/** A square of the head that opens a short menu under itself — «Скачать для Excel», «Печать». */
+function PaperButton({ label, icon, items, testId }: { label: string; icon: ReactNode; items: MenuItem[]; testId: string }) {
+  const box = useRef<HTMLSpanElement>(null);
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  return (
+    <>
+      <span ref={box} className="inline-flex">
+        <IconButton label={label} icon={icon} pressed={Boolean(anchor)} disabled={items.every((item) => item === "separator" || item.disabled)} onClick={() => setAnchor(anchor ? null : box.current)} testId={testId} />
+      </span>
+      <Menu open={Boolean(anchor)} onClose={() => setAnchor(null)} anchor={anchor} items={items} align="end" width={260} label={label} />
+    </>
+  );
+}
 
 /**
- * «Отчёты» on the desk (D-152; D-183; D-198): «Подряд» — every report day after day, today on top,
- * each day under its sticky head, the roll call of the day on top beside it; «Табель» — people ×
- * days of a calendar month, a Monday–Sunday week or one's own stretch. A person — «Дневник» in the
- * shell's right panel, the same on both tabs. The feed narrows to one person (through months), to
- * words (the server finds them, the screen marks them) and to «Не проверены». The director marks
- * a report «Проверено» (the button, A; Shift+A — the day on top, with 5 s «Отменить»); «Просмотрено»
- * comes by itself from what stayed on screen. Everything is in the address (`?who ?q ?only=new
- * ?day ?p`, `?tab=tabel&month|week|from&to`): «Назад», a reload and a link open the same. ← → —
- * the next day, T — today, F — the search, ↑ ↓ — the reports, Enter — the diary. «Скачать для
- * Excel» and «Печать» hand out what is shown, without points (a minus is not public, D-152).
+ * «Отчёты» on the desk (D-152; D-183; D-198; one page — D-201): the «Табель» card on top — the days
+ * of a calendar month (a week, one's own stretch) and how many handed in each one, «Показать людей»
+ * opens people × days under them — and under it every report folded by days: the newest day open,
+ * the days before it one line each. A person — «Дневник» in the shell's right panel. The feed
+ * narrows to one person (through months; the card then shows that person's row), to words (the
+ * server finds them, the screen marks them) and to «Не проверены». The director marks a report
+ * «Проверено» (the button, A; Shift+A — the whole day, with 5 s «Отменить») and it folds into one
+ * line; «Просмотрено» comes by itself from what stayed on screen. Everything is in the address
+ * (`?who ?q ?only=new ?day ?p ?month|week|from&to`): «Назад», a reload and a link open the same.
+ * ← → — the next day (it opens), T — today, F — the search, ↑ ↓ — the days and the reports, Enter —
+ * the diary or the day. «Скачать для Excel» and «Печать» hand out the feed's loaded days or the
+ * табель, without points (a minus is not public, D-152).
  */
 export function ReportsDesk() {
   // a namesake on screen gets the surname's initial once the roster has come (D-146)
@@ -73,7 +108,6 @@ export function ReportsDesk() {
   const pathname = usePathname();
   const params = useDeskParams();
   const address = readAddress(new URLSearchParams(params.toString()));
-  const { tab } = address;
   const openId = address.person;
 
   const settings = useCompanySettings();
@@ -87,35 +121,67 @@ export function ReportsDesk() {
   const director = me.data?.role === "director";
   const people = usePeople();
   const company = useCompanyCard();
+  const live = hydrated && !off && Boolean(companyId);
 
-  /* ---- «Подряд» ---- */
+  /* ---- the feed ---- */
   const filter = useMemo<ReportsFeedFilter>(() => ({ who: address.who, q: address.q, unchecked: address.unchecked }), [address.who, address.q, address.unchecked]);
   const filtered = Boolean(filter.who || filter.q || filter.unchecked);
-  const feed = useReportsFeed(filter, companyId, hydrated && tab === "feed" && !off && Boolean(companyId));
+  const feed = useReportsFeed(filter, companyId, live);
   const uncheckedCount = useUncheckedReportsCount(companyId, hydrated && !off && director);
   const { check } = useCheckReports();
   const days = useMemo(() => shownDays(feed.days ?? [], filtered), [feed.days, filtered]);
   const reportsById = useMemo(() => new Map(days.flatMap((day) => day.reports.map((report) => [report.id, report] as const))), [days]);
+  /** The chosen row: a report's id or a day's head. */
   const [picked, setPicked] = useState<string | null>(null);
   const [topDay, setTopDay] = useState<Ymd | null>(null);
-  const [jump, setJump] = useState<FeedJump>({ day: null, n: 0, smooth: false });
+  const [jump, setJump] = useState<FeedJump>({ day: null, n: 0, smooth: false, open: true });
   const searchRef = useRef<{ focus: () => void }>(null);
+  /** Checked in this visit: the folded line of such a report offers «Отменить». */
+  const [recent, setRecent] = useState<ReadonlySet<string>>(() => new Set());
 
-  /* ---- «Табель» ---- */
+  /* ---- which days stand open (D-201) ---- */
+  const filterKey = `${filter.who ?? ""}|${filter.q}|${filter.unchecked}`;
+  const morning = useMemo(() => {
+    const holidays: readonly string[] = rules?.holidays ?? [];
+    const line = days.find((day) => isMorningLine(day, { filtered, holiday: holidays.includes(day.date), beforeAsk: nowHm(now) < askFrom }));
+    return (line?.date ?? null) as Ymd | null;
+  }, [days, filtered, rules?.holidays, now, askFrom]);
+  // while the feed still shows the days of the filter before this one, nothing opens by itself
+  const defaults = useMemo(() => (feed.placeholder ? [] : defaultOpenDays(days, morning)), [feed.placeholder, days, morning]);
+  const [foldState, setFoldState] = useState<Fold>(() => ({ key: filterKey, opened: [], toggled: new Map() }));
+  // a day that opened by itself stays open while one reads — today's first report at 17:05 opens
+  // today and does not fold yesterday under the reader; another filter starts anew
+  let fold = foldState.key === filterKey ? foldState : { key: filterKey, opened: [], toggled: new Map<string, boolean>() };
+  const newlyOpen = defaults.filter((day) => !fold.opened.includes(day));
+  if (newlyOpen.length > 0) fold = { ...fold, opened: [...fold.opened, ...newlyOpen] };
+  if (fold !== foldState) setFoldState(fold);
+  const isOpen = (day: Ymd) => isDayOpen(day, fold.opened, fold.toggled, filtered);
+  const toggleDay = (day: Ymd, open: boolean) => setFoldState((was) => (was.toggled.get(day) === open ? was : { ...was, toggled: new Map(was.toggled).set(day, open) }));
+
+  /* ---- the «Табель» card ---- */
   const period: TabelPeriod = address.period ?? currentPeriod("month", today);
   const range = periodRange(period);
-  const [query, setQuery] = useState("");
-  const [tabelShow, setTabelShow] = useState<TabelShow>("all");
-  const [selected, setSelected] = useState<string | null>(openId);
-  const tabelSearch = useRef<HTMLInputElement>(null);
-  const tabel = useTabel(range.from, range.to, today, hydrated && tab === "tabel" && Boolean(companyId) && !off);
-  const match = (row: { full_name: string; position: string | null }) => personFits(row, query);
+  const [tabelShow, setTabelShow] = useState<TabelShow>("team");
+  const [tabelPick, setTabelPick] = useState<string | null>(null);
+  const tabel = useTabel(range.from, range.to, today, live);
+  // folded as it opens; this computer remembers «Показать людей»; an old link to «Табель» opens it for the visit
+  const remembered = useSyncExternalStore(subscribeSheet, readSheetOpen, sheetOpenOnServer);
+  const asks = asksSheet(new URLSearchParams(params.toString()));
+  const [link, setLink] = useState({ asks, open: asks });
+  // the page drops `tab` from the address at its first move: the card stays open for the visit, and
+  // opens again when «Назад» comes back to such a link
+  if (link.asks !== asks) setLink({ asks, open: asks || link.open });
+  const sheetOpen = link.open || remembered;
+  const foldSheet = (folded: boolean) => {
+    setLink({ asks, open: false });
+    writeSheetOpen(!folded);
+  };
 
   /**
    * Writes the address without a trip to the server: only what changed. Each move is a step of the
    * browser's history, so «Назад» goes back to the day, the filter or the diary before it; a held
-   * key replaces its own step. Through the desk's address (D-184): «Подряд» ↔ «Табель» swap as two
-   * pictures, another person's diary changes in the panel in place.
+   * key replaces its own step. Through the desk's address (D-184): another person's diary changes
+   * in the panel in place.
    */
   const go = (next: Partial<ReportsAddress>, replace = false) => {
     // from the address as it is now, not as drawn: another person may still wait for its transition
@@ -124,30 +190,29 @@ export function ReportsDesk() {
     const text = writeAddress(merged);
     const url = text ? `${pathname}?${text}` : pathname;
     if (url === `${pathname}${window.location.search}`) return;
-    const switched = next.tab !== undefined && next.tab !== tab;
-    const picking = !switched && next.person !== undefined && next.person !== openId && Boolean(next.person && openId);
-    writeDeskAddress(url, { push: !replace, type: switched ? "desk-switch" : picking ? "desk-pick" : undefined, burst: replace });
+    const picking = next.person !== undefined && next.person !== openId && Boolean(next.person && openId);
+    writeDeskAddress(url, { push: !replace, type: picking ? "desk-pick" : undefined, burst: replace });
   };
 
   // a day the page itself scrolled to is not scrolled to again when the address catches up; a day
   // that came from elsewhere (Back, a link, a filter) is
   const ownDay = useRef<{ key: string } | null>(null);
-  const jumpKey = `${tab}|${address.day ?? ""}|${filter.who ?? ""}|${filter.q}|${filter.unchecked}`;
+  const jumpKey = `${address.day ?? ""}|${filterKey}`;
   useEffect(() => {
-    if (tab !== "feed" || ownDay.current?.key === jumpKey) return;
+    if (ownDay.current?.key === jumpKey) return;
     ownDay.current = { key: jumpKey };
-    setJump((was) => ({ day: address.day, n: was.n + 1, smooth: false }));
-  }, [tab, jumpKey, address.day]);
+    setJump((was) => ({ day: address.day, n: was.n + 1, smooth: false, open: true }));
+  }, [jumpKey, address.day]);
   const keyFor = (patch: Partial<ReportsAddress>) => {
     const merged = { ...address, ...patch };
-    return `${merged.tab}|${merged.day ?? ""}|${merged.who ?? ""}|${merged.q}|${merged.unchecked}`;
+    return `${merged.day ?? ""}|${merged.who ?? ""}|${merged.q}|${merged.unchecked}`;
   };
-  /** Scrolls the feed to a day and writes it into the address in place (no history of every step). */
-  const toDay = (day: Ymd | null, smooth = true, push = false) => {
+  /** Scrolls the feed to a day, opens it and writes it into the address in place (no history of every step). */
+  const toDay = (day: Ymd | null, at: { smooth?: boolean; push?: boolean; open?: boolean; patch?: Partial<ReportsAddress> } = {}) => {
     const target = day && day >= today ? null : day;
     ownDay.current = { key: keyFor({ day: target }) };
-    go({ day: target }, !push);
-    setJump((was) => ({ day: target, n: was.n + 1, smooth }));
+    go({ ...at.patch, day: target }, !at.push);
+    setJump((was) => ({ day: target, n: was.n + 1, smooth: at.smooth ?? true, open: at.open ?? true }));
   };
   /** The diary of a person on a day — the feed stays where it is. */
   const openDiary = (userId: string, day: Ymd) => {
@@ -156,22 +221,45 @@ export function ReportsDesk() {
   };
   const openReport = (report: FeedReport) => {
     setPicked(report.id);
-    openDiary(report.user_id, report.report_date);
+    openDiary(report.user_id, report.report_date as Ymd);
   };
   const setFilter = (patch: Partial<Pick<ReportsAddress, "who" | "q" | "unchecked">>) => go({ ...patch, day: null });
 
+  /** «Проверено» on or off; what was just checked keeps «Отменить» on its folded line. */
+  const checkNow = (ids: string[], on: boolean) => {
+    check(ids, on);
+    setRecent((was) => {
+      const next = new Set(was);
+      for (const id of ids) {
+        if (on) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  };
   const checkDay = (day: FeedDay | undefined) => {
     if (!day || !director) return;
     const ids = checkableIds(day.reports);
     if (ids.length === 0) return;
-    check(ids, true);
+    checkNow(ids, true);
     // the batch is written at once; «Отменить» takes the same ids off (D-139's five seconds)
-    toast(`${checkedText(ids.length)} · ${dayHead(day.date, today).name.toLowerCase()}`, {
+    toast(`${checkedText(ids.length)} · ${dayHead(day.date as Ymd, today).name.toLowerCase()}`, {
       lifetimeMs: 5000,
-      action: { label: "Отменить", onClick: () => check(ids, false) },
+      action: { label: "Отменить", onClick: () => checkNow(ids, false) },
     });
   };
   const feedOrder = () => [...document.querySelectorAll<HTMLElement>(FEED_ROWS)].map((row) => row.dataset.rowKey ?? "").filter(Boolean);
+  const rowNode = (key: string) => document.querySelector<HTMLElement>(`[data-testid="desk-feed"] [data-row-key="${CSS.escape(key)}"]`);
+  /** The day of the chosen row while that row is in sight; null — nothing chosen, or it has scrolled away or folded. */
+  const pickedDay = (): Ymd | null => {
+    const node = picked ? rowNode(picked) : null;
+    const main = document.getElementById("desk-main");
+    if (!picked || !node || !main) return null;
+    const box = node.getBoundingClientRect();
+    const frame = main.getBoundingClientRect();
+    if (box.bottom <= frame.top || box.top >= frame.bottom) return null;
+    return dayOfRowKey(picked) ?? ((reportsById.get(picked)?.report_date ?? null) as Ymd | null);
+  };
   const waits = (id: string) => {
     const report = reportsById.get(id);
     return Boolean(report && isSubmitted(report) && !isChecked(report));
@@ -181,124 +269,127 @@ export function ReportsDesk() {
     const order = feedOrder();
     const report = picked ? reportsById.get(picked) : undefined;
     if (!report) {
-      const first = nextUnchecked(order, null, waits);
-      if (first) setPicked(first);
+      const first = nextUnchecked(order, picked, waits);
+      if (first) {
+        setPicked(first);
+        rowNode(first)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
       return;
     }
     const on = !isChecked(report);
-    check([report.id], on);
+    checkNow([report.id], on);
     if (!on) return;
     const next = nextUnchecked(order, report.id, (id) => id !== report.id && waits(id));
     if (next) {
       setPicked(next);
-      document.querySelector<HTMLElement>(`[data-testid="desk-feed-entry"][data-row-key="${CSS.escape(next)}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      rowNode(next)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
   };
 
-  const stepTabel = (dir: -1 | 1, replace = false) => {
+  // ← → pressed one after another go on from the day the last press went to
+  const travel = useRef<{ day: Ymd; at: number } | null>(null);
+  // a held ← → only travels; the day it stopped at opens when the key is let go
+  const held = useRef<Ymd | null>(null);
+  useEffect(() => {
+    const up = (event: KeyboardEvent) => {
+      if (event.code !== "ArrowLeft" && event.code !== "ArrowRight") return;
+      const day = held.current;
+      held.current = null;
+      if (day) setFoldState((was) => (was.toggled.get(day) === true ? was : { ...was, toggled: new Map(was.toggled).set(day, true) }));
+    };
+    window.addEventListener("keyup", up);
+    return () => window.removeEventListener("keyup", up);
+  }, []);
+
+  const stepTabel = (dir: -1 | 1) => {
     if (period.kind === "custom") return;
     const next = stepPeriod(period, dir);
     if (periodRange(next).from > today) return;
-    go({ period: next }, replace);
+    go({ period: next });
   };
-  const tabelToday = () => go({ period: currentPeriod(period.kind === "custom" ? "month" : period.kind, today) });
-  const dayOf = (day: Ymd | null) => days.find((item) => item.date === day);
+  const dayOf = (day: string | null | undefined) => days.find((item) => item.date === day);
+  /** T — the top of the feed and the period that holds today. */
+  const toToday = () => toDay(null, { patch: { period: period.kind === "week" ? currentPeriod("week", today) : null } });
 
-  const chosenPerson = selected ?? openId;
   useScreenKeys(
     (event) => {
-      const feedTab = tab === "feed";
       if (event.code === "ArrowLeft" || event.code === "ArrowRight") {
         const dir = event.code === "ArrowLeft" ? -1 : 1;
-        if (!feedTab) {
-          stepTabel(dir, event.repeat);
-          return true;
-        }
+        // from the day the key has just gone to (the scroll may still be on its way, and folded days
+        // may all fit one screen — then no head ever reaches the top); else from the chosen row's
+        // day while it is in sight; else from the day on top
+        const stamp = performance.now();
+        const from = travel.current && stamp - travel.current.at < TRAVEL_MS ? travel.current.day : (pickedDay() ?? topDay);
         const next = neighbourDay(
-          days.map((day) => day.date),
-          topDay,
+          days.map((day) => day.date as Ymd),
+          from,
           dir,
         );
-        if (next) toDay(next, !event.repeat);
-        else if (dir === -1 && feed.hasMore) feed.loadMore();
+        // a held key travels over the folded days; the day one stops at opens (the key's release), and
+        // ↑ ↓ go on from its head
+        if (next) {
+          toDay(next, { smooth: !event.repeat, open: !event.repeat });
+          setPicked(dayRowKey(next));
+          travel.current = { day: next, at: stamp };
+          held.current = event.repeat ? next : null;
+        } else if (dir === -1 && feed.hasMore) feed.loadMore();
         return true;
       }
       if (event.code === "KeyT") {
-        if (feedTab) toDay(null);
-        else tabelToday();
+        toToday();
         return true;
       }
       if (event.code === "KeyF") {
-        if (feedTab) searchRef.current?.focus();
-        else tabelSearch.current?.focus();
+        searchRef.current?.focus();
         return true;
       }
-      if (feedTab && event.code === "KeyA" && director) {
-        if (event.shiftKey) checkDay(dayOf(topDay) ?? days[0]);
-        else checkPicked();
+      if (event.code === "KeyA" && director) {
+        if (event.shiftKey) {
+          // the day of the chosen row while it is in sight; otherwise the day on top
+          checkDay(dayOf(pickedDay() ?? topDay) ?? days[0]);
+        } else checkPicked();
         return true;
       }
       const arrow = arrowOf(event);
       if (arrow) {
-        if (feedTab) {
-          const next = stepKey(feedOrder(), picked, arrow === "down");
-          if (!next) return false;
-          setPicked(next);
-          document.querySelector<HTMLElement>(`[data-testid="desk-feed"] [data-row-key="${CSS.escape(next)}"]`)?.scrollIntoView({ block: "nearest" });
-          // the diary follows the choice while it is open
-          const report = reportsById.get(next);
-          if (openId && report && report.user_id !== openId) {
-            ownDay.current = { key: keyFor({ day: report.report_date }) };
-            go({ person: report.user_id, day: report.report_date }, true);
-          }
-          return true;
+        const next = stepKey(feedOrder(), picked, arrow === "down");
+        if (!next) return false;
+        setPicked(next);
+        rowNode(next)?.scrollIntoView({ block: "nearest" });
+        // the diary follows the choice while it is open
+        const report = reportsById.get(next);
+        if (openId && report && report.user_id !== openId) {
+          ownDay.current = { key: keyFor({ day: report.report_date as Ymd }) };
+          go({ person: report.user_id, day: report.report_date as Ymd }, true);
         }
-        const keys = [...new Set([...document.querySelectorAll<HTMLElement>(TABEL_ROWS)].map((row) => row.dataset.rowKey ?? ""))].filter(Boolean);
-        const next = stepKey(keys, chosenPerson, arrow === "down");
-        if (next) {
-          setSelected(next);
-          if (openId && openId !== next) go({ person: next }, true);
-        }
-        return Boolean(next);
+        return true;
       }
       if ((event.code === "Enter" || event.code === "NumpadEnter" || event.code === "Space") && !onControl(event.target)) {
-        if (feedTab) {
-          const report = picked ? reportsById.get(picked) : undefined;
-          if (!report) return false;
-          if (event.code === "Space" && openId === report.user_id) go({ person: null });
-          else openReport(report);
+        const day = dayOfRowKey(picked);
+        if (day) {
+          toggleDay(day, !isOpen(day));
           return true;
         }
-        if (!chosenPerson) return false;
-        go({ person: event.code === "Space" && openId === chosenPerson ? null : chosenPerson });
+        const report = picked ? reportsById.get(picked) : undefined;
+        if (!report) return false;
+        if (event.code === "Space" && openId === report.user_id) go({ person: null });
+        else openReport(report);
         return true;
       }
       return false;
     },
     hydrated && !off,
   );
-  useShortcuts(
-    "Отчёты",
-    tab === "feed"
-      ? [
-          { keys: ["←", "→"], label: "Предыдущий / следующий день" },
-          { keys: ["T"], label: "К сегодняшнему дню" },
-          { keys: ["↑", "↓"], label: "Выбрать отчёт" },
-          { keys: ["A"], label: "Проверено / снять отметку — и к следующему" },
-          { keys: ["Shift", "A"], label: "Проверить все просмотренные за день наверху" },
-          { keys: ["Enter"], label: "Открыть дневник человека" },
-          { keys: ["F"], label: "Найти человека или слово" },
-          { keys: ["Ctrl P"], label: "Распечатать то, что на экране" },
-        ]
-      : [
-          { keys: ["←", "→"], label: "Предыдущий / следующий период" },
-          { keys: ["T"], label: "К периоду с сегодняшним днём" },
-          { keys: ["↑", "↓"], label: "Выбрать человека" },
-          { keys: ["Enter"], label: "Открыть дневник человека" },
-          { keys: ["F"], label: "Найти человека" },
-          { keys: ["Ctrl P"], label: "Распечатать то, что на экране" },
-        ],
-  );
+  useShortcuts("Отчёты", [
+    { keys: ["←", "→"], label: "Предыдущий / следующий день — и раскрыть его" },
+    { keys: ["T"], label: "К сегодняшнему дню" },
+    { keys: ["↑", "↓"], label: "Выбрать день или отчёт" },
+    { keys: ["Enter"], label: "Раскрыть или свернуть день · открыть дневник человека" },
+    { keys: ["A"], label: "Проверено / снять отметку — и к следующему" },
+    { keys: ["Shift", "A"], label: "Проверить все просмотренные за день" },
+    { keys: ["F"], label: "Найти человека или слово" },
+    { keys: ["Ctrl P"], label: "Распечатать отчёты ленты" },
+  ]);
 
   /* ---- who is who ---- */
   const searchable: SearchablePerson[] = useMemo(
@@ -316,92 +407,102 @@ export function ReportsDesk() {
   };
 
   /* ---- what the screen hands out ---- */
-  const tabelPeople = (tabel.data?.people ?? []).filter((person) => match(person.row) && (tabelShow === "all" || (!person.gone && person.row.missed > 0)));
+  const tabelPeople = (tabel.data?.people ?? []).filter((person) =>
+    filter.who ? person.row.user_id === filter.who : !sheetOpen || tabelShow === "team" || (!person.gone && person.row.missed > 0),
+  );
   const feedShown = days.reduce((sum, day) => sum + day.reports.length, 0);
   const narrowedBy = [whoPerson?.full_name, filter.q ? `«${filter.q}»` : "", filter.unchecked ? "не проверенные" : ""].filter(Boolean).join(" · ");
-  const paper =
-    tab === "feed"
-      ? feed.days && { kind: "day" as const, file: feedFileName(days), title: feedSheetTitle(days), sheet: feedSheet(days), note: narrowedBy ? `Только: ${narrowedBy}` : null, empty: feedShown === 0 }
-      : tabel.data && {
-          kind: "tabel" as const,
-          file: tabelFileName(tabel.data.from, tabel.data.to),
-          title: tabelSheetTitle(tabel.data.from, tabel.data.to),
-          sheet: tabelSheet(tabel.data, tabelPeople),
-          note: tabelPeople.length < tabel.data.people.length ? `Показано ${tabelPeople.length} из ${tabel.data.people.length}` : null,
-          empty: tabelPeople.length === 0 || tabel.isPlaceholderData,
-        };
-  const empty = !paper || paper.empty;
+  const feedPaper = feed.days
+    ? { kind: "day" as const, file: feedFileName(days), title: feedSheetTitle(days), sheet: feedSheet(days), note: narrowedBy ? `Только: ${narrowedBy}` : null, empty: feedShown === 0 }
+    : null;
+  const tabelPaper = tabel.data
+    ? {
+        kind: "tabel" as const,
+        file: tabelFileName(tabel.data.from, tabel.data.to),
+        title: tabelSheetTitle(tabel.data.from, tabel.data.to),
+        sheet: tabelSheet(tabel.data, tabelPeople),
+        note: tabelPeople.length < tabel.data.people.length ? `Показано ${tabelPeople.length} из ${tabel.data.people.length}` : null,
+        empty: tabelPeople.length === 0 || tabel.isPlaceholderData,
+      }
+    : null;
+  // the sheet in the page for Ctrl+P: the feed's reports until «Печать → Табель» asks for the other
+  const [paperKind, setPaperKind] = useState<PaperKind>("day");
+  const paper = (paperKind === "tabel" ? tabelPaper : feedPaper) ?? feedPaper ?? tabelPaper;
+  const print = (kind: PaperKind) => {
+    flushSync(() => setPaperKind(kind));
+    // Ctrl+P afterwards is the feed's reports again, as its hint says
+    window.addEventListener("afterprint", () => setPaperKind("day"), { once: true });
+    window.print();
+  };
+  const tabelWords = tabel.data ? tabelPeriodWords(tabel.data.from, tabel.data.to) : "";
+  const papers = (act: (kind: PaperKind) => void): MenuItem[] => [
+    // every day the feed has loaded under its filters, folded or open — the item names the stretch
+    { key: "day", label: feedPaper && !feedPaper.empty ? feedPaper.title : "Отчёты", disabled: !feedPaper || feedPaper.empty, onSelect: () => act("day") },
+    { key: "tabel", label: tabelWords ? `Табель · ${tabelWords}` : "Табель", disabled: !tabelPaper || tabelPaper.empty, onSelect: () => act("tabel") },
+  ];
+  const save = (kind: PaperKind) => {
+    const one = kind === "tabel" ? tabelPaper : feedPaper;
+    if (one) saveCsv(one.file, toCsv(one.sheet));
+  };
 
   const head = (
     <div className="desk-page-title rep-feed-title flex flex-wrap items-center gap-3" data-testid="desk-reports-head">
       <h1 className="mr-1 truncate font-display text-[28px] font-bold leading-[34px] tracking-[-0.025em]">Отчёты</h1>
       {hydrated && !off ? (
         <>
-          <SegmentTabs aria-label="Вид отчётов" value={tab} onChange={(next) => go({ tab: next })} items={TABS} />
           <span className="flex-1" />
           <div className="flex flex-wrap items-center gap-1.5" data-testid="desk-toolbar">
-            {tab === "feed" ? (
-              <>
-                <FeedSearch ref={searchRef} people={searchable} onPerson={(id) => setFilter({ who: id })} onWords={(text) => setFilter({ q: text })} />
-                <JumpToDay value={topDay ?? today} today={today} now={now} onPick={(day) => toDay(day, false, true)} />
-              </>
-            ) : (
-              <SearchField ref={tabelSearch} value={query} onChange={setQuery} placeholder="Найти человека  ·  F" width={220} aria-label="Найти человека" />
-            )}
-            <IconButton
-              label={tab === "feed" ? "Скачать для Excel — отчёты на экране" : "Скачать для Excel — табель"}
-              icon={<Download size={16} strokeWidth={2} aria-hidden />}
-              disabled={empty}
-              onClick={() => paper && saveCsv(paper.file, toCsv(paper.sheet))}
-              testId="desk-report-csv"
-            />
-            <IconButton label="Распечатать то, что на экране" keys={["Ctrl P"]} icon={<Printer size={16} strokeWidth={2} aria-hidden />} disabled={empty} onClick={() => window.print()} testId="desk-report-print" />
+            <FeedSearch ref={searchRef} people={searchable} onPerson={(id) => setFilter({ who: id })} onWords={(text) => setFilter({ q: text })} />
+            <JumpToDay value={topDay ?? today} today={today} now={now} onPick={(day) => toDay(day, { smooth: false, push: true })} />
+            <PaperButton label="Скачать для Excel" icon={<Download size={16} strokeWidth={2} aria-hidden />} items={papers(save)} testId="desk-report-csv" />
+            <PaperButton label="Распечатать" icon={<Printer size={16} strokeWidth={2} aria-hidden />} items={papers(print)} testId="desk-report-print" />
           </div>
         </>
       ) : null}
     </div>
   );
 
-  const controls =
-    tab === "feed" ? (
-      <div className="rep-feed-filters" data-testid="desk-feed-filters">
-        {director ? (
-          <SegmentTabs
-            aria-label="Какие отчёты"
-            value={filter.unchecked ? "new" : "all"}
-            onChange={(next) => setFilter({ unchecked: next === "new" })}
-            items={[
-              { value: "all", label: "Все" },
-              {
-                value: "new",
-                label: (
-                  <>
-                    Не проверены{uncheckedCount ? <span className="nums rep-feed-seg-count" data-testid="desk-feed-unchecked-count">{uncheckedCount}</span> : null}
-                  </>
-                ),
-              },
-            ]}
-          />
-        ) : null}
-        {filter.who ? <FilterChip face={whoPerson} label={whoPerson?.full_name ?? "Один человек"} onClear={() => setFilter({ who: null })} testId="desk-feed-who" /> : null}
-        {filter.q ? <FilterChip label={`«${filter.q}»`} onClear={() => setFilter({ q: "" })} testId="desk-feed-q" /> : null}
-      </div>
-    ) : (
-      <div className="rep-feed-filters">
-        <PeriodControls
-          period={period}
-          onKind={(kind) => go({ period: kind === "custom" ? { kind: "custom", ...range } : currentPeriod(kind, range.to > today ? today : range.to) })}
-          onPeriod={(next) => go({ period: next })}
-          onStep={stepTabel}
-          atToday={holdsToday(period, today)}
-          onToday={tabelToday}
-          today={today}
-          now={now}
+  const filters = (
+    <div className="rep-feed-filters" data-testid="desk-feed-filters">
+      {director ? (
+        <SegmentTabs
+          aria-label="Какие отчёты"
+          value={filter.unchecked ? "new" : "all"}
+          onChange={(next) => setFilter({ unchecked: next === "new" })}
+          items={[
+            { value: "all", label: "Все" },
+            {
+              value: "new",
+              label: (
+                <>
+                  Не проверены{uncheckedCount ? <span className="nums rep-feed-seg-count" data-testid="desk-feed-unchecked-count">{uncheckedCount}</span> : null}
+                </>
+              ),
+            },
+          ]}
         />
-      </div>
-    );
+      ) : null}
+      {filter.who ? <FilterChip face={whoPerson} label={whoPerson?.full_name ?? "Один человек"} onClear={() => setFilter({ who: null })} testId="desk-feed-who" /> : null}
+      {filter.q ? <FilterChip label={`«${filter.q}»`} onClear={() => setFilter({ q: "" })} testId="desk-feed-q" /> : null}
+    </div>
+  );
 
-  const diaryFocus: Ymd = address.day ?? (tab === "feed" ? today : range.to > today ? today : range.to);
+  const periodControls = (
+    <PeriodControls
+      period={period}
+      onKind={(kind) => go({ period: kind === "custom" ? { kind: "custom", ...range } : currentPeriod(kind, range.to > today ? today : range.to) })}
+      onPeriod={(next) => go({ period: next })}
+      onStep={stepTabel}
+      atToday={holdsToday(period, today)}
+      onToday={() => go({ period: currentPeriod(period.kind === "custom" ? "month" : period.kind, today) })}
+      today={today}
+      now={now}
+    />
+  );
+
+  // without a day in the address the diary came from a name of the card: it looks at the card's period
+  const diaryFocus: Ymd = address.day ?? (range.to > today ? today : range.to);
+  const chosenPerson = tabelPick ?? openId;
 
   return (
     <DeskPage>
@@ -419,66 +520,71 @@ export function ReportsDesk() {
           }
         />
       ) : !hydrated ? (
-        <SkeletonGroup grow>
-          <Bone h={32} w={300} />
-          <Bone h={120} className="mt-3.5" />
-          <Bone h={120} className="mt-3.5" />
-        </SkeletonGroup>
+        <div className="flex min-h-0 flex-1 flex-col gap-3.5">
+          <TabelBone />
+          <SkeletonGroup>
+            <Bone h={36} w={236} />
+          </SkeletonGroup>
+          <div className="rep-day rep-feed">
+            <FeedBone />
+          </div>
+        </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col gap-3.5" data-testid="desk-reports">
-          {controls}
-          {/* «Подряд» and «Табель» swap as two pictures (D-184) */}
-          <ViewTransition update={SWITCH_OR_STEP} default="none">
-            {tab === "feed" ? (
-              <FeedView
-                feed={feed}
-                filter={filter}
-                companyId={companyId}
-                director={director}
-                checkerName={checkerName}
-                now={now}
-                today={today}
-                askFrom={askFrom}
-                pointsOn={pointsEnabled}
-                jump={jump}
-                onTopDay={setTopDay}
-                selectedId={picked}
-                openId={openId}
-                onSelect={setPicked}
-                onOpenReport={openReport}
-                onOpenPerson={openDiary}
-                onCheck={check}
-                onCheckDay={checkDay}
-                onClearFilters={() => setFilter({ who: null, q: "", unchecked: false })}
-              />
-            ) : (
-              <TabelView
-                tabel={tabel.data}
-                stale={tabel.isPlaceholderData}
-                failed={tabel.isError && !tabel.data}
-                onRetry={() => void tabel.refetch()}
-                match={match}
-                show={tabelShow}
-                onShow={setTabelShow}
-                selectedId={chosenPerson}
-                openId={openId}
-                onSelect={(id) => {
-                  setSelected(id);
-                  if (openId && openId !== id) go({ person: id }, true);
-                }}
-                onOpen={(id) => {
-                  if (id) setSelected(id);
-                  if (id !== openId) go({ person: id });
-                }}
-                onCell={(id, day) => {
-                  setSelected(id);
-                  go({ person: id, day });
-                }}
-                onDay={(next) => go({ tab: "feed", day: next >= today ? null : next })}
-                today={today}
-              />
-            )}
-          </ViewTransition>
+          <TabelView
+            tabel={tabel.data}
+            stale={tabel.isPlaceholderData}
+            failed={tabel.isError && !tabel.data}
+            onRetry={() => void tabel.refetch()}
+            controls={periodControls}
+            who={filter.who}
+            folded={!sheetOpen}
+            onFold={foldSheet}
+            show={tabelShow}
+            onShow={setTabelShow}
+            selectedId={chosenPerson}
+            openId={openId}
+            onSelect={(id) => {
+              setTabelPick(id);
+              if (openId && openId !== id) go({ person: id }, true);
+            }}
+            onOpen={(id) => {
+              if (id) setTabelPick(id);
+              if (id !== openId) go({ person: id });
+            }}
+            onCell={(id, day) => {
+              setTabelPick(id);
+              openDiary(id, day);
+            }}
+            onDay={(day) => toDay(day, { push: true })}
+            today={today}
+          />
+          {filters}
+          <FeedView
+            feed={feed}
+            filter={filter}
+            companyId={companyId}
+            director={director}
+            checkerName={checkerName}
+            now={now}
+            today={today}
+            askFrom={askFrom}
+            pointsOn={pointsEnabled}
+            jump={jump}
+            onTopDay={setTopDay}
+            onLanded={(day) => toggleDay(day, true)}
+            isOpen={isOpen}
+            onToggle={toggleDay}
+            selectedId={picked}
+            openId={openId}
+            onSelect={setPicked}
+            onOpenReport={openReport}
+            onOpenPerson={openDiary}
+            onCheck={checkNow}
+            onCheckDay={checkDay}
+            recent={recent}
+            onClearFilters={() => setFilter({ who: null, q: "", unchecked: false })}
+          />
         </div>
       )}
       {hydrated && !off && openId ? (
@@ -488,8 +594,8 @@ export function ReportsDesk() {
             focus={diaryFocus}
             today={today}
             director={director}
-            onDay={(next) => go({ tab: "feed", day: next >= today ? null : next })}
-            onAll={() => go({ tab: "feed", person: null, day: null, who: openId, q: "", unchecked: false })}
+            onDay={(next) => go({ day: next >= today ? null : next })}
+            onAll={() => go({ person: null, day: null, who: openId, q: "", unchecked: false })}
           />
         </InPanel>
       ) : null}

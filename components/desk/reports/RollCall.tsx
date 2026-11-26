@@ -119,7 +119,7 @@ function Person({ row, note, end, select }: { row: TeamDayRow; note?: ReactNode;
   );
 }
 
-function Group({ kind, title, count, action, children }: { kind: "pending" | "missed" | "away"; title: string; count: number; action?: ReactNode; children: ReactNode }) {
+function Group({ kind, title, count, children }: { kind: "pending" | "missed" | "away"; title: string; count: number; children: ReactNode }) {
   return (
     <section className="rep-day-group" data-kind={kind} aria-label={title}>
       <div className="rep-day-group-head">
@@ -127,7 +127,6 @@ function Group({ kind, title, count, action, children }: { kind: "pending" | "mi
         <h3 className="rep-day-group-title">
           {title} <span className="nums rep-day-group-count">· {count}</span>
         </h3>
-        {action}
       </div>
       <ul className="rep-day-people">
         {/* one who handed in leaves «Ждём», the rest close up; the last one takes the section along (D-184) */}
@@ -156,16 +155,14 @@ function ShareLine({ count }: { count: RollCount }) {
 }
 
 /**
- * «Сводка»'s roll call (D-183): how many of those who owed the report handed it in, as a figure and
- * one thin bar; who we still wait for today — with «Напомнить» each and «Напомнить всем», and the
- * receipt of the push; who missed it (the minus, small, for the director only; an excused day
- * grey); who is away. Nobody who owed nothing is listed. Wide — a rail beside the ledger; narrow or
- * with the panel open — one line above it that opens in place.
+ * The roll call of a day (D-183; inside today's section of the feed — D-201): one line — how many of
+ * those who owed the report handed it in, one thin bar, «Напомнить всем» — that opens in place: who
+ * we still wait for, with «Напомнить» each and the receipt of the push; who missed it (the minus,
+ * small, for the director only; an excused day grey); who is away. Nobody who owed nothing is listed.
  */
 export function RollCall({
   day,
   rows,
-  wide,
   expanded,
   onExpand,
   live,
@@ -180,7 +177,6 @@ export function RollCall({
   day: TeamDay;
   /** The day's people the search lets through. */
   rows: readonly TeamDayRow[];
-  wide: boolean;
   expanded: boolean;
   onExpand: (open: boolean) => void;
   /** Away is today's availability: today, or a day the morning tick has not closed yet. */
@@ -223,9 +219,8 @@ export function RollCall({
   const window = settings.data?.delivery_window ?? DEFAULT_WINDOW;
   const early = beforeWindow(now, window);
   const late = afterWindow(now, window);
-  // the rail has a «Напомнить» on every row, so «всем» is for two and more; the strip's line is the only one
   const remindAll =
-    waiting.length > (wide ? 1 : 0) ? (
+    waiting.length > 0 ? (
       <button
         type="button"
         className="rep-day-remind desk-focus"
@@ -254,7 +249,7 @@ export function RollCall({
   const groups = (
     <>
       {pending.length > 0 ? (
-        <Group kind="pending" title="Ждём" count={pending.length} action={wide ? remindAll : null}>
+        <Group kind="pending" title="Ждём" count={pending.length}>
           {pending.map((row) => {
             const reminder = row.reminded;
             const busy = sending.has(row.user_id);
@@ -337,29 +332,8 @@ export function RollCall({
         <span className="nums rep-day-roll-figure">{count.submitted}</span> из <span className="nums">{count.due}</span> сдали
       </>
     );
-  const lastAt = day.rows.reduce<string | null>((last, row) => {
-    const at = row.state === "submitted" ? (row.report?.submitted_at ?? null) : null;
-    return at && (!last || at > last) ? at : last;
-  }, null);
-
   // a day off with nothing handed in and nobody to list: the line above the ledger says it all
   if (offWord !== null && count.submitted === 0 && !listed) return null;
-
-  if (wide) {
-    return (
-      <aside className="rep-day-roll" data-mode="rail" data-testid="desk-rollcall" aria-label="Перекличка">
-        <div>
-          <p className="rep-day-roll-count" data-testid="desk-rollcall-count">
-            {figure}
-          </p>
-          {lastAt && offWord === null ? <p className="rep-day-roll-sub">последний в {timeOf(lastAt)}</p> : null}
-          {offWord === null ? <ShareLine count={count} /> : null}
-        </div>
-        {groups}
-      </aside>
-    );
-  }
-
   const rest = offWord === null ? rollRest(count) : [];
   return (
     <section className="rep-day-roll" data-mode="strip" data-open={expanded ? "" : undefined} data-testid="desk-rollcall" aria-label="Перекличка">
