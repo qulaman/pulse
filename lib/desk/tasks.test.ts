@@ -303,14 +303,16 @@ describe("a row's moves and letters", () => {
 
   it("the hint names only the letters that work on this row", () => {
     const codes = (status: Row["status"], request = false) => rowKeys({ status }, { request }).map((k) => k.code);
-    expect(codes("pending_review")).toEqual(["KeyA", "KeyR", "KeyO"]);
-    expect(codes("accepted")).toEqual(["KeyO", "KeyN", "KeyD", "KeyT"]);
-    expect(codes("accepted", true)).toEqual(["KeyO", "KeyD", "KeyT"]);
+    expect(codes("pending_review")).toEqual(["KeyA", "KeyR", "KeyO", "KeyE"]);
+    expect(codes("accepted")).toEqual(["KeyO", "KeyN", "KeyD", "KeyT", "KeyE"]);
+    expect(codes("accepted", true)).toEqual(["KeyO", "KeyD", "KeyT", "KeyE"]);
     expect(rowKeys({ status: "accepted" }, { request: true }).find((k) => k.code === "KeyD")?.action).toBe("retime");
-    expect(codes("declined")).toEqual(["KeyO", "KeyT"]);
-    expect(codes("scheduled")).toEqual(["KeyO", "KeyD"]);
+    expect(codes("declined")).toEqual(["KeyO", "KeyT", "KeyE"]);
+    expect(codes("scheduled")).toEqual(["KeyO", "KeyD", "KeyE"]);
+    // closed work is history: no «Изменить» (D-200)
     expect(codes("done")).toEqual(["KeyO"]);
     expect(codes("revoked")).toEqual([]);
+    expect(keyOfAction("edit", rowKeys({ status: "sent" }))).toBe("E");
   });
 });
 

@@ -2665,6 +2665,10 @@ export type Database = {
       daily_report_on: { Args: { p_settings: Json }; Returns: boolean }
       daily_report_refund_early_fines: { Args: never; Returns: number }
       daily_report_reminders_due: { Args: { p_now?: string }; Returns: number }
+      daily_report_review_json: {
+        Args: { p_report: Database["public"]["Tables"]["daily_reports"]["Row"] }
+        Returns: Json
+      }
       daily_report_started_on: { Args: { p_settings: Json }; Returns: string }
       daily_report_state: {
         Args: {
@@ -2762,6 +2766,20 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      edit_task: {
+        Args: {
+          change_deadline?: boolean
+          client_request_id?: string
+          new_assignee_id?: string
+          new_body?: string
+          new_deadline?: string
+          new_priority?: Database["public"]["Enums"]["task_priority"]
+          new_title: string
+          note?: string
+          task_id: string
+        }
+        Returns: Json
       }
       employee_morning_briefs_due: { Args: { p_now?: string }; Returns: number }
       errand_answer: {
@@ -3224,6 +3242,20 @@ export type Database = {
         Returns: Json
       }
       subordinates: { Args: { mgr: string }; Returns: string[] }
+      task_handover: {
+        Args: {
+          p_assignee: string
+          p_body: string
+          p_deadline: string
+          p_name: string
+          p_note: string
+          p_priority: Database["public"]["Enums"]["task_priority"]
+          p_task: Database["public"]["Tables"]["tasks"]["Row"]
+          p_title: string
+        }
+        Returns: string
+      }
+      task_of_my_company: { Args: { p_task: string }; Returns: boolean }
       task_sent_at: {
         Args: { p_fallback: string; p_task: string }
         Returns: string

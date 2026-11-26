@@ -26,6 +26,7 @@ const SUBJECT: Partial<Record<string, string>> = {
   rework: "доработка уйдёт",
   done: "«Принято» уйдёт",
   deadline_extended: "новый срок уйдёт",
+  task_edited: "правка уйдёт",
   revoked: "отзыв уйдёт",
 };
 

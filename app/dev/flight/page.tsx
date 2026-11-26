@@ -111,6 +111,7 @@ function Sandbox() {
     sendNow: () => {},
     extend: () => {},
     reassign: () => {},
+    edit: () => {},
     sendMessage: () => {},
     remove: () => {},
     reissue: () => {},

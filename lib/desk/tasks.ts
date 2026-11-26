@@ -6,6 +6,7 @@ import type { BoardTask } from "@/lib/pulse/board";
 import { isWaiting, receiptText, type DeskAction, type DeskReason } from "@/lib/tasks/desk";
 import { isStaleUnaccepted, sentAtOf, type AttentionReason } from "@/lib/tasks/attention";
 import { compareTasks, groupTasks } from "@/lib/tasks/grouping";
+import { canEdit } from "@/lib/tasks/edit";
 import { canNudgeAgain, isWorking, untilWords, WORKING } from "@/lib/tasks/lifecycle";
 import {
   closedAtOf,
@@ -473,9 +474,9 @@ export function tableSections<T extends Grouped>(
 /* -------------------------------------------------------------------------- */
 
 /** The table's letters, by the physical key — a Russian layout presses the same «A». */
-export type MoveKey = "KeyA" | "KeyR" | "KeyO" | "KeyN" | "KeyD" | "KeyT";
+export type MoveKey = "KeyA" | "KeyR" | "KeyO" | "KeyN" | "KeyD" | "KeyT" | "KeyE";
 
-export const KEY_CAP: Record<MoveKey, string> = { KeyA: "A", KeyR: "R", KeyO: "O", KeyN: "N", KeyD: "D", KeyT: "T" };
+export const KEY_CAP: Record<MoveKey, string> = { KeyA: "A", KeyR: "R", KeyO: "O", KeyN: "N", KeyD: "D", KeyT: "T", KeyE: "E" };
 
 /**
  * One button of a row: the phone's action, a short word, the letter that does the same. `main` —
@@ -592,14 +593,18 @@ export function enterMove(moves: readonly Move[]): Move | null {
   return moves.find((move) => move.main && !move.held) ?? null;
 }
 
-/** A letter of the table and what it does to the chosen row. «reply» — the panel with the caret in the answer field. */
-export type RowKey = { code: MoveKey; action: DeskAction | "reply"; label: string };
+/**
+ * A letter of the table and what it does to the chosen row. «reply» — the panel with the caret in
+ * the answer field; «edit» — the form «Изменить задачу» (D-200), the desk's own, not a phone action.
+ */
+export type RowKey = { code: MoveKey; action: DeskAction | "reply" | "edit"; label: string };
 
 /**
  * The letters that work on this row — the hint under the table names only these (D-154). The
  * moves are the ones the phone allows the task (`allActionsFor`): A and R on handed-in work, N and
  * D while the work is in hand, T while it can still change hands. «Передать» by a letter always
- * asks whom — the suggested colleague is the button's one-click way, not a key's.
+ * asks whom — the suggested colleague is the button's one-click way, not a key's. E changes the
+ * whole task while it is open (D-200).
  */
 export function rowKeys(task: { status: TaskStatus }, flags: { request?: boolean } = {}): RowKey[] {
   const keys: RowKey[] = [];
@@ -612,6 +617,7 @@ export function rowKeys(task: { status: TaskStatus }, flags: { request?: boolean
   if ((inHand && !flags.request) || task.status === "scheduled") keys.push({ code: "KeyD", action: "extend", label: "срок" });
   else if (inHand) keys.push({ code: "KeyD", action: "retime", label: "другой срок" });
   if (inHand || task.status === "declined") keys.push({ code: "KeyT", action: "reassign", label: "передать" });
+  if (canEdit(task.status)) keys.push({ code: "KeyE", action: "edit", label: "изменить" });
   return keys;
 }
 
@@ -858,7 +864,7 @@ export const ACT_LABEL: Record<DeskAction, string> = {
 };
 
 /** The letter a move answers to in the table, the panel and the stack — shown in a menu only when it works on that row. */
-export function keyOfAction(action: DeskAction | "reply", keys: readonly RowKey[]): string | undefined {
+export function keyOfAction(action: DeskAction | "reply" | "edit", keys: readonly RowKey[]): string | undefined {
   const wanted = action === "answer" ? "reply" : action;
   const key = keys.find((one) => one.action === wanted);
   return key ? KEY_CAP[key.code] : undefined;

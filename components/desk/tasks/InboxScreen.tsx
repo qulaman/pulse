@@ -192,6 +192,7 @@ function InboxView({ me, board, load, onRetry }: { me: Me; board: readonly Board
     { keys: ["N"], label: "Напомнить" },
     { keys: ["D"], label: "Срок" },
     { keys: ["T"], label: "Передать" },
+    { keys: ["E"], label: "Изменить задачу — текст, срок, человек" },
     { keys: ["1…4"], label: "Быстрый ответ на вопрос" },
     { keys: ["S"], label: "Пропустить — в конец очереди" },
     { keys: ["."], label: "Все действия задачи" },
@@ -466,14 +467,14 @@ function InboxCard({
     : [];
   const keys = desk.letters;
 
-  const press = (action: DeskAction | "reply", target?: HTMLElement) => {
+  const press = (action: DeskAction | "reply" | "edit", target?: HTMLElement) => {
     if (!task) return;
     if (action === "answer" || action === "reply") {
       focusReply(thread.current);
       return;
     }
     desk.acts.press(action, task, { at: target, scope: card.current });
-    if (DONE_AT_ONCE.has(action)) onDone();
+    if (action !== "edit" && DONE_AT_ONCE.has(action)) onDone();
   };
   const pressMove = (move: Move, target?: HTMLElement) => {
     if (!move.held) press(move.action, target);

@@ -15,6 +15,8 @@ describe("transportFor — the fixed policy (D-114)", () => {
     // D-128: what the employee has to act on rings; «скоро срок» is worthless after its hour
     expect(transportFor({ event_kind: "deadline_moved", meta: {} })).toMatchObject({ silent: false, urgency: "high" });
     expect(transportFor({ event_kind: "deadline_kept", meta: {} })).toMatchObject({ silent: false, urgency: "high" });
+    // D-200: «Задача изменена» — new words to act on
+    expect(transportFor({ event_kind: "task_edited", meta: {} })).toEqual({ ttl: 86_400, urgency: "high", silent: false });
     expect(transportFor({ event_kind: "task_nudge", meta: {} })).toMatchObject({ silent: false, urgency: "high" });
     expect(transportFor({ event_kind: "deadline_soon", meta: {} })).toMatchObject({ ttl: 3600, urgency: "high" });
     expect(transportFor({ event_kind: "shop_ready", meta: {} })).toMatchObject({ silent: true });

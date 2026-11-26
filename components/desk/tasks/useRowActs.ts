@@ -44,6 +44,7 @@ export function useRowActs({
       ...actions,
       reissue: (input) => actions.reissue({ ...input, onOpen: openTask }),
       reassign: (input) => actions.reassign({ ...input, onOpen: openTask }),
+      edit: (input) => actions.edit({ ...input, onOpen: openTask }),
     },
     mark,
   );

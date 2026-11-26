@@ -67,6 +67,7 @@ export function Sandbox({ role, empty }: { role: "director" | "employee"; empty:
     sendNow: (taskId) => patch(taskId, { status: "sent", scheduled_send_at: stamp }),
     extend: ({ taskId, deadlineIso }) => patch(taskId, { deadline: deadlineIso }),
     reassign: ({ taskId, assigneeName }) => patch(taskId, { assignee: { full_name: assigneeName } }),
+    edit: ({ taskId, title, body }) => patch(taskId, { title, body }),
     sendMessage: ({ taskId }) => setBoard((list) => list.map((row) => (row.id === taskId ? { ...row, question: null } : row))),
     remove: (taskId) => {
       setTasks((list) => list.filter((task) => task.id !== taskId));

@@ -26,6 +26,7 @@ describe("heldLine", () => {
     expect(heldLine([row({ event_kind: "rework" })], NOW)).toBe("доработка уйдёт завтра 08:00");
     expect(heldLine([row({ event_kind: "done" })], NOW)).toBe("«Принято» уйдёт завтра 08:00");
     expect(heldLine([row({ event_kind: "deadline_extended" })], NOW)).toBe("новый срок уйдёт завтра 08:00");
+    expect(heldLine([row({ event_kind: "task_edited" })], NOW)).toBe("правка уйдёт завтра 08:00");
   });
 
   it("the newest move leads the line", () => {

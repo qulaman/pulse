@@ -17,12 +17,14 @@ import { shortName } from "@/lib/people/names";
 import { peopleQuery } from "@/lib/people/queries";
 import { useRecurrenceRules, useUpdateRule } from "@/lib/recurrence/queries";
 import type { DeskAction } from "@/lib/tasks/desk";
+import { canEdit } from "@/lib/tasks/edit";
 import { reassignNeedsDeadline, type Suggestion, type TimeRequest } from "@/lib/tasks/lifecycle";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { BUTTON, pluralRu, TEXT } from "@/lib/tasks/status-text";
 
 import { DeadlinePicker, PersonPicker, type Picked } from "./Pickers";
+import { TaskEditDialog } from "./TaskEditDialog";
 
 /** What waits on a task besides its status (D-128): the open question, a request for time, the suggested colleague. */
 export type ActFlags = { question: string | null; request: TimeRequest | null; suggestion: Suggestion | null };
@@ -37,6 +39,7 @@ type Ask =
   | { kind: "deadline"; mode: "pass" | "reissue"; ids: [string]; anchor: Anchor; person: Picked; note: string }
   | { kind: "people"; mode: "reassign" | "reissue"; ids: [string]; anchor: Anchor }
   | { kind: "rework"; ids: [string] }
+  | { kind: "edit"; ids: [string] }
   | { kind: "revoke"; ids: string[]; then?: () => void }
   | { kind: "remove"; ids: [string] };
 
@@ -65,6 +68,7 @@ function anchorFor(taskId: string, action: DeskAction, from: ActFrom | undefined
  * the field or the button that was pressed, a word for the rework and a «sure?» in a small dialog
  * where Enter answers. One hook for the table, «Сегодня», the panel and «Разобрать», so a move
  * cannot mean two things on two screens; the menus («⋯», a right click) are built here too.
+ * «Изменить» (E, D-200) is the desk's own form over the whole task — not a phone action.
  */
 export function useDeskActs({
   base,
@@ -120,6 +124,7 @@ export function useDeskActs({
     },
     reissue: (input) => base.reissue({ ...input, onOpen }),
     reassign: (input) => base.reassign({ ...input, onOpen }),
+    edit: (input) => base.edit({ ...input, onOpen }),
   };
 
   const reassignTo = (task: TaskWithPeople, person: Picked, note: string, anchor: Anchor) => {
@@ -147,8 +152,11 @@ export function useDeskActs({
     toast(named("Ответ ушёл", task));
   };
 
-  const press = (action: DeskAction | "reply", task: TaskWithPeople, from?: ActFrom) => {
+  const press = (action: DeskAction | "reply" | "edit", task: TaskWithPeople, from?: ActFrom) => {
     switch (action) {
+      case "edit":
+        if (canEdit(task.status)) open({ kind: "edit", ids: [task.id] });
+        return;
       case "reply":
       case "answer":
         onReply(task);
@@ -237,6 +245,8 @@ export function useDeskActs({
     const items: MenuItem[] = [];
     if (onOpenRow) items.push({ key: "open-row", label: "Открыть", hint: "Enter", onSelect: onOpenRow });
     if (task.status !== "revoked") items.push({ key: "reply", label: flags.question ? "Ответить на вопрос" : "Написать в переписку", hint: keyOfAction("reply", keys), onSelect: () => onReply(task) });
+    // the whole task in one form: the words, the details, the deadline, the person (D-200)
+    if (canEdit(task.status)) items.push({ key: "edit", label: "Изменить…", hint: keyOfAction("edit", keys), onSelect: () => press("edit", task) });
     const moves = all.filter((action) => !isDangerAction(action));
     if (items.length > 0 && moves.length > 0) items.push("separator");
     items.push(...moves.map(item));
@@ -335,6 +345,27 @@ export function useDeskActs({
             onPick={(person, note) => (ask.mode === "reassign" ? reassignTo(first, person, note, ask.anchor) : reissueTo(first, person, ask.anchor))}
           />
         </Popover>
+      );
+    } else if (ask.kind === "edit") {
+      node = (
+        <TaskEditDialog
+          key={first.id}
+          task={first}
+          onClose={close}
+          onSave={(plan) => {
+            const who = shortName(first.assignee?.full_name);
+            actions.edit({
+              taskId: first.id,
+              title: plan.title,
+              body: plan.body,
+              priority: plan.priority,
+              deadline: plan.deadline,
+              assignee: plan.assignee,
+              note: plan.note,
+              receipt: who ? `Изменено · ${who}` : "Изменено",
+            });
+          }}
+        />
       );
     } else if (ask.kind === "rework") {
       node = <ReworkDialog key={first.id} task={first} onClose={close} onSubmit={(comment) => actions.transition({ taskId: first.id, toStatus: "rework", comment })} />;

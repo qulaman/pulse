@@ -35,6 +35,7 @@ export function useStableActions(actions: TaskActions): TaskActions {
     sendNow: (taskId) => latest.current.sendNow(taskId),
     extend: (input) => latest.current.extend(input),
     reassign: (input) => latest.current.reassign(input),
+    edit: (input) => latest.current.edit(input),
     requestTime: (input) => latest.current.requestTime(input),
     answerTime: (input) => latest.current.answerTime(input),
     nudge: (input) => latest.current.nudge(input),

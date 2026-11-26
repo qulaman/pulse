@@ -16,7 +16,7 @@
 
 1. **Атомарность.** Многотабличная операция — только функция `security definer` через `rpc()`: supabase-js транзакций не умеет.
 2. **Идемпотентность.** Мутация несёт `client_request_id` с клиента, повтор отдаёт первый результат (принцип 7); как — §1.
-3. **Статус задачи меняет только RPC** (`transition_task`, `revoke_task`, `send_task_now`, `reassign_task`, `request_deadline`), не `update` из браузера или роута. Матрицу §7 держит триггер `trg_task_status_guard`.
+3. **Статус задачи меняет только RPC** (`transition_task`, `revoke_task`, `send_task_now`, `reassign_task`, `edit_task`, `request_deadline`), не `update` из браузера или роута. Матрицу §7 держит триггер `trg_task_status_guard`.
 4. **Формат ошибки**: `{ "error": { "code": "snake_case", "message_ru": "текст человеку" } }` (`apiError`), дополнительные поля (`audio_path`, `transcript`) — рядом с `error`.
 5. **Одна база на всех клиентов (D-134).** Граница — `company_id` и RLS; код не ветвится по клиенту и не предполагает одну компанию; настраиваемое — в `company.settings` (D-44). Service role сужена до компании вызывающего (§1).
 6. **Триггеры не зовут HTTP.** Уведомление — строка outbox, отправляет только воркер (G.20c, D-114).
@@ -52,6 +52,7 @@
 | `/api/tasks/[id]/send-now` | POST | Д | отправить отложенную | `send_task_now` |
 | `/api/tasks/[id]/deadline` | POST | Д | срок; прошедшее время — 422 `deadline_in_past`, раньше отправки отложенной — 422 `deadline_before_send`, закрытая задача — 409 `invalid_transition` | `extend_task_deadline` |
 | `/api/tasks/[id]/reassign` | POST | Д | передать другому | `reassign_task` |
+| `/api/tasks/[id]/edit` | POST | Д | «Изменить задачу» (D-200): текст и подробности всегда, «срочно», срок (`change_deadline`) и человек — когда меняются; пустой текст — 422 `empty_title`, прошедшее время — 422 `deadline_in_past`, раньше отправки отложенной — 422 `deadline_before_send`, чужой или ушедший человек — 404, закрытая задача или новый человек у сданной — 409 `invalid_transition` | `edit_task` |
 | `/api/tasks/[id]/deadline-request` | POST | исполнитель | просить срок | `request_deadline` |
 | `/api/tasks/[id]/deadline-answer` | POST | Д | ответ на просьбу | `answer_deadline_request` |
 | `/api/tasks/[id]/nudge` | POST | Д | напомнить | `nudge_task` |
@@ -149,9 +150,9 @@
 
 В нагрузке (`pushPayload()`) — слова, `url`, `tag` (одна задача — один пузырь), `delivery_id`, `task_id`; строка директора с `private` уходит без слов.
 
-**Пинок** — `kickDeliveries()` через `after()`, отправляет весь готовый хвост очереди. Зовут: `/api/voice/confirm`, `/api/tasks/[id]/transition`, `send-now`, `deadline`, `reassign`, `deadline-request`, `deadline-answer`, `nudge`, `/api/errands`, `/api/visits`, `/api/visits/[id]/answer`, `/api/push/test`. Записи мимо роутов (тред, кнопки секретаря, встречи, магазин, Эфир, досылка из офлайна) зовут `/api/push/kick` через `kickPush()`. Страховка — тик.
+**Пинок** — `kickDeliveries()` через `after()`, отправляет весь готовый хвост очереди. Зовут: `/api/voice/confirm`, `/api/tasks/[id]/transition`, `send-now`, `deadline`, `reassign`, `edit`, `deadline-request`, `deadline-answer`, `nudge`, `/api/errands`, `/api/visits`, `/api/visits/[id]/answer`, `/api/push/test`. Записи мимо роутов (тред, кнопки секретаря, встречи, магазин, Эфир, досылка из офлайна) зовут `/api/push/kick` через `kickPush()`. Страховка — тик.
 
-**Транспорт** — `RULES` в `lib/push/policy.ts`: по виду события срок жизни у push-сервиса и срочность. Работа (новая задача, доработка, отзыв, сообщение, на приёмку, отказ) — 24 ч, громко; хорошие новости (принято, срок продлён, реакция, готовый заказ) — тихо; «скоро срок» и «скоро встреча» — 1 ч; утренняя сводка `morning_brief` — 4 ч, `normal` (D-191); заявки и визиты секретаря — 20–30 мин; тревога (`meta.urgent`) — 5 мин, громко всегда; вид вне таблицы — 12 ч.
+**Транспорт** — `RULES` в `lib/push/policy.ts`: по виду события срок жизни у push-сервиса и срочность. Работа (новая задача, доработка, отзыв, сообщение, на приёмку, отказ, «Задача изменена» `task_edited` — D-200) — 24 ч, громко; хорошие новости (принято, срок продлён, реакция, готовый заказ) — тихо; «скоро срок» и «скоро встреча» — 1 ч; утренняя сводка `morning_brief` — 4 ч, `normal` (D-191); заявки и визиты секретаря — 20–30 мин; тревога (`meta.urgent`) — 5 мин, громко всегда; вид вне таблицы — 12 ч.
 
 **Окно и тихие часы.** Когда строка может уйти, решает база при вставке, триггером `trg_notification_deliveries_deliver_after`. Всем, кроме директора, — окно компании `settings.delivery_window` (по умолчанию 08:00–21:00 Asia/Aqtobe, D-38): что может подождать (отклик на задачу, сообщения исполнителю, Эфир, календарь, магазин), получает `deliver_after = next_delivery_slot(...)`; новая задача, напоминания о встречах и заметках, заявки и визиты идут сразу. Задача вне окна пуша не рождает: она лежит `scheduled`, тик выпускает её при открытии окна. Директору — его правила «Уведомления» в профиле (`lib/push/prefs.ts`, D-114): режим по категории («Сразу», «Тихо», «Сводкой», «Не присылать»), своя тишина, встречи, важные люди; тревога и системные не настраиваются; `set_notify_prefs` перестраивает ждущую очередь.
 

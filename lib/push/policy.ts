@@ -39,6 +39,8 @@ const RULES: Record<string, Rule> = {
   // D-128: a closer deadline and «срок прежний» are news to act on; «скоро срок» is stale after the hour
   deadline_moved: { ttl: 24 * HOUR, urgency: "high" },
   deadline_kept: { ttl: 24 * HOUR, urgency: "high" },
+  // D-200: the director rewrote the task — new words to act on
+  task_edited: { ttl: 24 * HOUR, urgency: "high" },
   task_nudge: { ttl: 12 * HOUR, urgency: "high" },
   deadline_soon: { ttl: 1 * HOUR, urgency: "high" },
   // D-152: «Сдайте отчёт за день» — worth it while the evening lasts, not the next morning

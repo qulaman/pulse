@@ -66,7 +66,7 @@ function TextField({ value, onChange, label, multiline = false, placeholder, tes
  * «Срочно» as what it is — a switch with a box (D-164): ticked, the task is urgent; the word never
  * reads as «срочно, снять». Space or a click turns it; the colour is the desk's «urgent» (warn).
  */
-function UrgentSwitch({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+export function UrgentSwitch({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
   return (
     <Tooltip label={on ? "Срочная — снять отметку" : "Отметить срочной"} side="bottom">
       <button

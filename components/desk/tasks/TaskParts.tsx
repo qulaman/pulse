@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, CalendarClock, Check, CircleCheck, CircleX, Clock, Ellipsis, Hourglass, MessageCircleQuestion, Repeat, RotateCcw, Send, TriangleAlert, Undo2, X } from "lucide-react";
+import { Ban, CalendarClock, Check, CircleCheck, CircleX, Clock, Ellipsis, Hourglass, MessageCircleQuestion, Pencil, Repeat, RotateCcw, Send, TriangleAlert, Undo2, X } from "lucide-react";
 import { useState, type CSSProperties, type ReactNode } from "react";
 
 import { Morph } from "@/components/desk/ui/Morph";
@@ -20,6 +20,7 @@ import { useGoneIds } from "@/lib/people/queries";
 import { useReactionPrices, useReactToTask, useTaskReactions } from "@/lib/points/game";
 import { isReactable, priceLabel, REACTION_CODES, REACTION_GLYPH, REACTION_LABEL, showsReactionBar } from "@/lib/points/reactions";
 import { answersFor, wantsWords } from "@/lib/tasks/answers";
+import { canEdit } from "@/lib/tasks/edit";
 import { BLIND_NUDGE_HINT, firstMoveOf, keysBesideCall } from "@/lib/tasks/reasons";
 import { heldLine } from "@/lib/tasks/held";
 import { isWorking, passedWord, untilWords } from "@/lib/tasks/lifecycle";
@@ -200,7 +201,8 @@ function Path({ desk, now }: { desk: DeskTask; now: Date }) {
  * The head of a task at the desk (D-154 wave 3): who holds it — a click passes it on — and the
  * stage; the title; the fields a director changes with one click (the deadline: a popover with
  * the quick choices and a month); the receipt (principle 8), the repeat, how much time is left or how
- * the work came in, and the path in four steps. `large` — the stack of «Разобрать», whose headline
+ * the work came in, and the path in four steps. «Изменить» (E) — and a double click on the words —
+ * opens the form over the whole open task (D-200). `large` — the stack of «Разобрать», whose headline
  * says the stage and the hand-in; `fly` — the panel, where the title arrives from its row (D-184).
  */
 export function TaskHead({ desk, now, large = false, scope, fly = false }: { desk: DeskTask; now: Date; large?: boolean; scope?: () => Element | null; fly?: boolean }) {
@@ -223,6 +225,14 @@ export function TaskHead({ desk, now, large = false, scope, fly = false }: { des
   // the person's face before the name, as the table has it (D-174)
   const avatars = useAvatars();
   const who = <FaceName id={task.assignee_id} name={task.assignee?.full_name} avatar={avatars.get(task.assignee_id)} size={26} gone={gone} full />;
+  const editable = canEdit(task.status);
+  const edit = () => desk.acts.press("edit", task);
+  const titleClass = `desk-task-title tasks-title mt-2 [overflow-wrap:anywhere] ${large ? "text-[28px] leading-8" : "text-[21px] leading-[26px]"}`;
+  const title = (
+    <h2 className={titleClass} onDoubleClick={editable ? edit : undefined} data-testid="desk-task-title">
+      {task.title}
+    </h2>
+  );
   return (
     <header className="tasks-head" data-large={large ? "" : undefined}>
       {/* the panel's «×» stands in the corner: the first line leaves it room */}
@@ -236,6 +246,19 @@ export function TaskHead({ desk, now, large = false, scope, fly = false }: { des
             who
           )}
         </div>
+        {editable ? (
+          <Tooltip label="Изменить задачу — текст, срок, человек" keys={["E"]} side="bottom">
+            <button
+              type="button"
+              onClick={edit}
+              data-testid="desk-task-edit"
+              className="tasks-edit-open inline-flex h-7 shrink-0 items-center gap-1.5 rounded-[2px] px-2 text-[13px] font-medium leading-4 text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            >
+              <Pencil aria-hidden size={14} strokeWidth={2} className="tasks-ico" />
+              Изменить
+            </button>
+          </Tooltip>
+        ) : null}
         {large ? null : (
           <span className="tasks-stage desk-label shrink-0 uppercase" style={{ color: stageInk }} data-testid="desk-task-stage">
             {stage.text}
@@ -245,10 +268,10 @@ export function TaskHead({ desk, now, large = false, scope, fly = false }: { des
       {/* `fly` — the panel: the title comes from the task's row and goes back to it (D-184) */}
       {fly ? (
         <Morph part="task" id={task.id}>
-          <h2 className={`desk-task-title tasks-title mt-2 [overflow-wrap:anywhere] ${large ? "text-[28px] leading-8" : "text-[21px] leading-[26px]"}`}>{task.title}</h2>
+          {title}
         </Morph>
       ) : (
-        <h2 className={`desk-task-title tasks-title mt-2 [overflow-wrap:anywhere] ${large ? "text-[28px] leading-8" : "text-[21px] leading-[26px]"}`}>{task.title}</h2>
+        title
       )}
 
       <dl className="tasks-fields mt-3 grid grid-cols-[76px_minmax(0,1fr)] gap-x-3 gap-y-1" data-testid="desk-task-fields">

@@ -44,6 +44,7 @@ export function DeckSandbox() {
     sendNow: () => {},
     extend: ({ taskId, deadlineIso }) => patch(taskId, { deadline: deadlineIso }),
     reassign: () => {},
+    edit: () => {},
     sendMessage: () => {},
     remove: (taskId) => setBoard((list) => list.filter((row) => row.id !== taskId)),
     reissue: () => {},

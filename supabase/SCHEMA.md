@@ -4,7 +4,7 @@
 
 Зачем он нужен. Схема базы — результат всех миграций по порядку. Функция при каждой правке записывается целиком заново, поэтому одно имя встречается в нескольких файлах, а действует только последнее определение. Указатель говорит, где оно лежит. Перед правкой функции открой файл из столбца «Действует» и копируй тело оттуда, а не из первого найденного поиском.
 
-Миграций — 95, строк — 27997. Функций — 222, их определений — 369; устаревших тел — 12003 строк (43 % текста миграций).
+Миграций — 96, строк — 28451. Функций — 224, их определений — 373; устаревших тел — 12160 строк (43 % текста миграций).
 
 ## Функции
 
@@ -51,6 +51,7 @@
 | `dispute_points` | `20261118120000_daily_report_remind_excuse.sql:167` | 3 |
 | `drop_announcement_pushes` | `20260924150000_push_foundation.sql:154` | 1 |
 | `edit_event` | `20260923200000_calendar_edit_delete.sql:108` | 1 |
+| `edit_task` | `20261126120000_edit_task.sql:174` | 1 |
 | `employee_morning_briefs_due` | `20261124110000_morning_brief.sql:111` | 1 |
 | `errand_answer` | `20260923235000_secretary_link.sql:172` | 1 |
 | `errand_ask` | `20260923235000_secretary_link.sql:126` | 1 |
@@ -158,7 +159,7 @@
 | `react_to_task` | `20261014120000_points_game.sql:209` | 1 |
 | `reaction_glyph` | `20261014120000_points_game.sql:42` | 1 |
 | `reaction_points` | `20261014120000_points_game.sql:33` | 1 |
-| `reassign_task` | `20260926120000_task_lifecycle.sql:630` | 3 |
+| `reassign_task` | `20261126120000_edit_task.sql:84` | 4 |
 | `recurrence_falls_on` | `20261022120000_recurrence_live.sql:81` | 1 |
 | `recurrence_in_phase` | `20261022120000_recurrence_live.sql:95` | 1 |
 | `recurrence_next_on` | `20261022120000_recurrence_live.sql:112` | 1 |
@@ -180,6 +181,7 @@
 | `set_shop_order_status` | `20261124180000_tenant_guards_tail.sql:216` | 3 |
 | `submit_daily_report` | `20261125120000_daily_report_checks.sql:118` | 3 |
 | `subordinates` | `20261124090000_tenant_guards.sql:158` | 2 |
+| `task_handover` | `20261126120000_edit_task.sql:17` | 1 |
 | `task_of_my_company` | `20261124180000_tenant_guards_tail.sql:18` | 1 |
 | `task_question_answered` | `20261123120000_deadline_fixes.sql:148` | 3 |
 | `task_sent_at` | `20261014120000_points_game.sql:61` | 1 |
@@ -187,7 +189,7 @@
 | `task_status_message` | `20260907120100_tasks_and_messages.sql:125` | 1 |
 | `task_streak_of` | `20261014120000_points_game.sql:74` | 1 |
 | `tasks_board_touch_tv` | `20261021150000_board_live_week.sql:253` | 1 |
-| `tasks_field_guard` | `20261123120000_deadline_fixes.sql:183` | 4 |
+| `tasks_field_guard` | `20261126120000_edit_task.sql:405` | 5 |
 | `tasks_points` | `20261014120000_points_game.sql:93` | 1 |
 | `team_channel_alerts_due` | `20260924160000_push_followups.sql:124` | 1 |
 | `team_daily_report_day` | `20261124130000_reports_count_the_team.sql:18` | 3 |

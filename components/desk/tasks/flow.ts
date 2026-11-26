@@ -70,6 +70,10 @@ export function taggedActions(base: TaskActions, mark: (taskId: string) => void)
       mark(input.taskId);
       base.reassign(input);
     },
+    edit: (input) => {
+      mark(input.taskId);
+      base.edit(input);
+    },
     answerTime: (input) => {
       mark(input.taskId);
       base.answerTime(input);

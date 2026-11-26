@@ -61,7 +61,7 @@
 
 **`tasks`** — поручение одному человеку; несколько исполнителей — копии с общим `group_id` (D-02). `parent_task_id` — у копии от «Переназначить», `passed_to` — у исходной (D-128). `source_audio_path`, `source_transcript` — фраза директора. `recurrence_rule_id` и `recurrence_on` — задача дня повтора, пара уникальна (D-148). Штампы `accepted_at`, `completed_at`, `closed_at` ставит только страж статуса. Читают автор, исполнитель, любой директор, менеджер — задачи подчинённых; `scheduled` видит только автор. Пишут только функции (§7.1).
 
-**`task_messages`** — всё, что происходит с задачей; только дописывается. `seq` — монотонный `bigserial` на всю базу. Читают и пишут участники задачи, отправитель — только сам; `meta` правят лишь функции и триггеры. Ключи `meta`: `old_status`, `new_status`; `duration_ms` голосового (D-66); `is_question` и `answered_at` (G.7, D-03); `decline_reason` с подсказкой коллеги `suggest_assignee_id`, `rework_comment`, `report` и его `partial`; просьба о сроке `time_request`, `proposed_deadline`, `words`, закрытие — `answered_at` и `answer` (`approved`, `kept`, `changed`, `replaced`, `closed`) (D-128); служебные `deadline_changed`, `deadline_kept`, `reassigned_to`, `passed_from`, `nudge`, `handoff_note`.
+**`task_messages`** — всё, что происходит с задачей; только дописывается. `seq` — монотонный `bigserial` на всю базу. Читают и пишут участники задачи, отправитель — только сам; `meta` правят лишь функции и триггеры. Ключи `meta`: `old_status`, `new_status`; `duration_ms` голосового (D-66); `is_question` и `answered_at` (G.7, D-03); `decline_reason` с подсказкой коллеги `suggest_assignee_id`, `rework_comment`, `report` и его `partial`; просьба о сроке `time_request`, `proposed_deadline`, `words`, закрытие — `answered_at` и `answer` (`approved`, `kept`, `changed`, `replaced`, `closed`) (D-128); служебные `deadline_changed`, `deadline_kept`, `reassigned_to`, `passed_from`, `nudge`, `handoff_note`; правка задачи `task_edited` с `old_title`, `new_title`, `old_body`, `new_body`, `old_priority`, `new_priority` (D-200).
 
 **`task_reads`** — курсор прочтения: строка на человека и задачу, `last_seq` (D-61); флага «прочитано» на сообщении нет. Читает сам, двигает `mark_thread_read`.
 
@@ -201,7 +201,8 @@ create policy things_select on things for select using (
 | `revoke_task` | директор | `scheduled` удаляет, остальное отзывает (D-01) | да |
 | `send_task_now` | директор | отложенная и её ждущие пуши команде уходят сейчас (D-129) | да |
 | `extend_task_deadline` | директор | новый срок со словами, закрывает просьбу о сроке; у `scheduled` меняет только дату — без строки в треде и пуша, не раньше отправки (`deadline_before_send`); прошедшее время — `deadline_in_past`; тот же срок — ничего не пишет, отвечает `unchanged` | да |
-| `reassign_task` | директор | копия новому исполнителю, исходная отозвана с `passed_to` | да |
+| `reassign_task` | директор | копия новому исполнителю, исходная отозвана с `passed_to`; копию делает `task_handover` | да |
+| `edit_task` | директор | «Изменить задачу» (D-200): незакрытая задача целиком — текст, подробности, «срочно», срок (`change_deadline`), человек. Ничего не изменилось — `unchanged`; отложенная меняется молча, человек тоже; новый человек у отправленной — `task_handover` с новыми словами, у сданной — `invalid_transition`; только срок — `extend_task_deadline`; иначе на месте, статус прежний: строка `task_edited` «Текст изменён · было «…»», строка срока, один пуш `task_edited` в окне — ждущий первый пуш задачи получает новый текст (слово передачи в нём остаётся), ждущий `task_edited` переписывается; хранимый текст сравнивается без пробелов по краям. Пустой текст — `empty_title`, прошедшее время — `deadline_in_past`, раньше отправки — `deadline_before_send` | да |
 | `request_deadline` | исполнитель | просьба о сроке; на `sent` заодно принимает | да |
 | `answer_deadline_request` | директор | «Согласовать» или «Оставить прежний» | да |
 | `nudge_task` | директор | «Напомнить», раз в 30 минут | да |
@@ -291,7 +292,7 @@ create policy things_select on things for select using (
 
 ### 7.8. Служебные
 
-Клиент их не зовёт: помощники RLS (`auth_session_live`, `subordinates`, `team_role`, `task_of_my_company`); чтение настроек (`points_rule`, `daily_report_workday`, `voice_retention_days`, `notify_prefs_of`, `morning_brief_on`); доставка (`next_delivery_slot`, `delivery_category`, `push_when` — слова срока как `lib/ai/time.ts`, `morning_brief_body` — слова утренней сводки); очки (`task_sent_at`, `task_streak_of`); стена (`tv_emit`, `tv_touch`, `tv_task_story`); календарь (`event_release`); заявки (`errand_recipients`); функции триггеров.
+Клиент их не зовёт: помощники RLS (`auth_session_live`, `subordinates`, `team_role`, `task_of_my_company`); чтение настроек (`points_rule`, `daily_report_workday`, `voice_retention_days`, `notify_prefs_of`, `morning_brief_on`); доставка (`next_delivery_slot`, `delivery_category`, `push_when` — слова срока как `lib/ai/time.ts`, `morning_brief_body` — слова утренней сводки); задачи (`task_handover` — копия новому человеку для `reassign_task` и `edit_task`); очки (`task_sent_at`, `task_streak_of`); стена (`tv_emit`, `tv_touch`, `tv_task_story`); календарь (`event_release`); заявки (`errand_recipients`); функции триггеров.
 
 ## 8. Триггеры
 
@@ -316,7 +317,7 @@ create policy things_select on things for select using (
 
 ### 8.2. Стражи полей
 
-- `trg_tasks_field_guard` — `deadline` меняет только директор и только у открытой задачи (`scheduled`, `sent`, `accepted`, `in_progress`, `rework`, `pending_review`); не директор и не автор меняет только `status`; без перехода штампы заморожены.
+- `trg_tasks_field_guard` — `deadline` меняет только директор и только у открытой задачи (`scheduled`, `sent`, `accepted`, `in_progress`, `rework`, `pending_review`, `declined` — D-200); не директор и не автор меняет только `status`; без перехода штампы заморожены.
 - `trg_profiles_guard` — компанию под токеном пользователя не меняет никто, директор тоже; руководитель — человек своей компании; не директор не меняет роль, компанию, `is_active`, руководителя, серию; секретарь на чужой строке меняет, но не директору и не в директоры; `avatar_url` — только директор и секретарь.
 - `trg_recurrence_rules_schedule` — расписание повтора: от ближайшего невыданного дня, после правки — от «сейчас»; человек не меняет владельца и служебные поля.
 - `trg_notes_branch_guard`, `trg_notes_branch_cascade`, `trg_notes_branch_follow` — подпункт только у живого пункта той же доски; корзина и переезд — веткой.

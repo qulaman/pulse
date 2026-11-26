@@ -311,6 +311,90 @@ export function useReassign() {
 }
 
 /* -------------------------------------------------------------------------- */
+/* «Изменить задачу» (D-200)                                                   */
+/* -------------------------------------------------------------------------- */
+
+export type EditInput = {
+  taskId: string;
+  requestId: string;
+  /** the words and the details as they should be — always the whole of them */
+  title: string;
+  body: string | null;
+  /** only when it changes */
+  priority?: TaskWithPeople["priority"];
+  /** only when it changes; `iso` null — «без срока» */
+  deadline?: { iso: string | null };
+  /** another person: the task goes to them as «Передать» gives it (a held one simply moves) */
+  assignee?: { id: string; name: string };
+  /** the director's word to the new person */
+  note?: string;
+  /** the receipt at the tap — «Изменено · Ерлан» */
+  receipt?: string;
+  /** the toast's «Открыть» of the new person's task */
+  onOpen?: (taskId: string) => void;
+};
+
+type EditResult = { new_task_id?: string | null; moved?: boolean; unchanged?: boolean };
+
+/**
+ * «Изменить задачу» (D-200): one call for everything the form changed. The words, «срочно» and the
+ * date change on every screen at the tap and the call goes after (offline it waits in the outbox
+ * and goes once — the key is the request's — and the screen keeps the new words); a refusal puts
+ * the task back with the server's words. Another person is «Передать»: no optimistic clone — the new task comes from the server,
+ * the toast leads to it.
+ */
+export function useEditTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: EditInput): Promise<EditResult> => {
+      const res = (await postJson(`/api/tasks/${input.taskId}/edit`, {
+        title: input.title,
+        body: input.body,
+        ...(input.priority ? { priority: input.priority } : {}),
+        ...(input.deadline ? { change_deadline: true, deadline_iso: input.deadline.iso } : {}),
+        ...(input.assignee ? { assignee_id: input.assignee.id } : {}),
+        ...(input.assignee && input.note?.trim() ? { note: input.note.trim() } : {}),
+        client_request_id: input.requestId,
+      })) as { result?: EditResult } | null;
+      return res?.result ?? {};
+    },
+    onMutate: async (input) => {
+      if (input.assignee) return { snapshot: undefined };
+      const patch = {
+        title: input.title,
+        body: input.body,
+        ...(input.priority ? { priority: input.priority } : {}),
+        ...(input.deadline ? { deadline: input.deadline.iso } : {}),
+      };
+      const snapshot = await optimistic(queryClient, (old: unknown) => patchCached(old, input.taskId, patch));
+      toast(input.receipt ?? "Изменено");
+      return { snapshot };
+    },
+    onSuccess: (result, input) => {
+      const person = input.assignee;
+      if (!person) return;
+      const newId = result.new_task_id ?? null;
+      const open = input.onOpen;
+      // a held task simply changes hands; a task already out goes to the new person as a new one
+      if (!newId) toast(`Изменено · ${shortName(person.name) || person.name}`);
+      else toast(`Передал: ${person.name}`, open ? { action: { label: "Открыть", onClick: () => open(newId) }, lifetimeMs: 5_000 } : undefined);
+    },
+    onError: (error, input, context) => {
+      // no network: the call waits in the outbox and goes once — the words stay as they will be
+      const offline = isNetworkError(error) || error instanceof NetworkError;
+      if (context?.snapshot && !offline) rollbackTask(queryClient, context.snapshot, input.taskId);
+      toastError(error);
+    },
+    onSettled: (_data, _error, input) => {
+      invalidateTasks(queryClient, input.taskId);
+      // «отправлю утром»: the push «изменена» may wait for the window
+      void queryClient.invalidateQueries({ queryKey: heldKeys.task(input.taskId) });
+    },
+  });
+}
+
+/* -------------------------------------------------------------------------- */
 /* D-128: «Нужно больше времени», its answer, «Напомнить»                      */
 /* -------------------------------------------------------------------------- */
 
@@ -643,6 +727,8 @@ export type TaskActions = {
   extend: (input: Omit<ExtendInput, "requestId">) => void;
   /** «Переназначить»: the same order to another person; the old task is revoked. */
   reassign: (input: Omit<ReassignInput, "requestId">) => void;
+  /** «Изменить задачу» (D-200): the words, details, «срочно», deadline and person in one call. */
+  edit: (input: Omit<EditInput, "requestId">) => void;
   /** «Нужно больше времени» / «Возьму, но к …» (D-128). */
   requestTime: (input: Omit<RequestTimeInput, "requestId">) => void;
   /** «Согласовать» / «Оставить прежний» (D-128). */
@@ -678,6 +764,7 @@ export function useTaskActions(me: Me | undefined): TaskActions {
   const sendNow = useSendNow();
   const extend = useExtendDeadline();
   const reassign = useReassign();
+  const edit = useEditTask();
   const requestTime = useRequestDeadline(me);
   const answerTime = useAnswerDeadline();
   const nudge = useNudge();
@@ -693,6 +780,7 @@ export function useTaskActions(me: Me | undefined): TaskActions {
     },
     extend: (input) => extend.mutate({ ...input, requestId: crypto.randomUUID() }),
     reassign: (input) => reassign.mutate({ ...input, requestId: crypto.randomUUID() }),
+    edit: (input) => edit.mutate({ ...input, requestId: crypto.randomUUID() }),
     requestTime: (input) => requestTime.mutate({ ...input, requestId: crypto.randomUUID() }),
     answerTime: (input) => answerTime.mutate({ ...input, requestId: crypto.randomUUID() }),
     nudge: (input) => nudge.mutate({ ...input, requestId: crypto.randomUUID() }),
@@ -713,6 +801,7 @@ export function useTaskActions(me: Me | undefined): TaskActions {
       sendNow.isPending ||
       extend.isPending ||
       reassign.isPending ||
+      edit.isPending ||
       requestTime.isPending ||
       answerTime.isPending ||
       nudge.isPending ||

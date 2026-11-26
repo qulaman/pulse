@@ -90,6 +90,7 @@ export function TaskPanel({
   useTaskKeys(desk, root, bodyKeys, now);
   useShortcuts("Панель задачи", [
     { keys: ["A", "R", "N", "D", "T"], label: "Принять, доработать, напомнить, срок, передать" },
+    { keys: ["E"], label: "Изменить задачу — текст, срок, человек" },
     { keys: ["O"], label: "Курсор в поле ответа" },
     { keys: ["1…4"], label: "Быстрый ответ на вопрос" },
     { keys: ["."], label: "Ещё — все действия" },

@@ -51,6 +51,7 @@ function Sandbox({ role, id }: { role: "director" | "employee"; id: string }) {
     sendNow: () => patch({ status: "sent", scheduled_send_at: stamp }),
     extend: ({ deadlineIso }) => patch({ deadline: deadlineIso }),
     reassign: ({ assigneeName }) => patch({ assignee: { full_name: assigneeName } }),
+    edit: ({ title, body }) => patch({ title, body }),
     sendMessage: () => {},
     remove: () => setTask(null),
     reissue: () => {},
