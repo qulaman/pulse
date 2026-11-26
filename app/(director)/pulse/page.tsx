@@ -107,13 +107,11 @@ const AT_REST: Scene = { mode: "idle", panel: null, view: "idle", cameFrom: "idl
 const CROWDED_GROW = 8;
 
 /**
- * The secretary's desk on the waiting screen (D-85): right of the face, level with it, clear
- * of the face's own button (152 px across) and of the rows of idlers below. px from the
- * middle of the face to the desk's top-left corner.
+ * The secretary on the waiting screen (D-85, D-210): a small mark right of the face, a little
+ * under its middle, clear of the face's own ring and of the rows of idlers below. px from the
+ * middle of the face to the top-left corner of the secretary's box.
  */
-const DESK_AT = { x: 80, y: -14 };
-/** The finishes the small secretary brings over as a cup — the big face takes it (D-97). */
-const DRINKS = new Set(["coffee", "tea", "water"]);
+const DESK_AT = { x: 82, y: -10 };
 
 /**
  * Пульс — the director's home (D-57, D-60): the mascot asleep in the middle of
@@ -361,8 +359,8 @@ export default function PulsePage() {
   // the desk is part of the waiting screen: shown there, and only when there is somebody at it
   const showDesk = hasSecretary && mode === "idle" && !phraseInHand && (stage === "idle" || stage === "recording");
   const asking = deskOpen && showDesk && stage === "idle";
-  // the small secretary has brought the cup over: the face takes it and looks at the desk
-  const handoff = showDesk && !asking && stage === "idle" && deskStage.phase === "done" && DRINKS.has(deskStage.scene ?? "");
+  // the small secretary has just finished a request and leans over with the tick: the face looks at it
+  const handoff = showDesk && !asking && stage === "idle" && deskStage.phase === "done";
   // an open ball is a job in the face's hands, and it does it while the panel is open (D-82)
   const panelFace: MascotState | null = mode === "panel" && panel ? PANEL_FACE[panel] : null;
   // A change on the board with an act of its own (tasks/020) is played by an awake face — a stamp
@@ -370,12 +368,12 @@ export default function PulsePage() {
   // when a panel is open; a change without one is still «reads the data» (D-65), but not over an
   // open card: the face keeps the card's job in its hands and the thought says the news (D-178)
   const newsAct = thought ? thoughtAct(thought.kind) : null;
-  // The order of the faces is `directorMascot`: the phrase in hand and its celebration; the cup brought
-  // over (it outranks the news of it: the face takes it, the thought says it); a phrase that did not
+  // The order of the faces is `directorMascot`: the phrase in hand and its celebration; a request the
+  // secretary has just finished (the face looks at it; the thought says the news); a phrase that did not
   // make it (tasks/020, phase B) — the face stays awake while the error is up and while its act
   // plays; «не разобрал», puzzled until the words are fixed, made a task or closed; the card's job;
-  // the news; the waiting screen — asking the secretary the face brings the cup (D-85), looking at
-  // somebody it is calm — or the ring
+  // the news; the waiting screen — asking the secretary or looking at somebody the face is calm and
+  // its eye is on them (D-210) — or the ring
   const mascot: MascotState = directorMascot({
     confirm: confirmFace,
     handoff,
@@ -386,7 +384,8 @@ export default function PulsePage() {
     newsAct: newsAct !== null,
     mood,
     idle: mode === "idle",
-    rest: asking ? "serving" : attending || reading ? "calm" : restFace,
+    // asked, the secretary gets the face's eye and nothing else: what is asked for shows in the secretary's own ring (D-210)
+    rest: asking || attending || reading ? "calm" : restFace,
     awake,
   });
   // where the face looks: the middle of the picked circle, the person whose card is open, or the small face at the desk
@@ -761,8 +760,8 @@ export default function PulsePage() {
                 </div>
               ) : null}
             </LocalPresence>
-            {/* the secretary at the desk, right of the face (D-85): types while nobody asks; a
-                tap turns it to the face, the face to it, and the errand buttons come out */}
+            {/* the secretary, right of the face (D-85, D-210): a small mark of its own; a tap turns
+                it to the face, the face's eye to it, and the errand buttons come out */}
             <LocalPresence>
               {showDesk ? (
                 <motion.div
@@ -813,8 +812,8 @@ export default function PulsePage() {
                   </div>
                   {desk.offerDnd && meetingNow && meetingEndsAt && dndAction && !asking ? (
                     // a meeting is on: one tap guards the door until it ends (D-99)
-                    // right-aligned under the desk: the desk sits right of the face, a centred pill ran off the screen
-                    <div className="absolute right-0 top-full mt-5 flex items-center gap-1 whitespace-nowrap" data-testid="dnd-offer">
+                    // right-aligned under the secretary: it stands right of the face, a centred pill ran off the screen
+                    <div className="absolute top-full mt-8 flex items-center gap-1 whitespace-nowrap" style={{ right: -42 }} data-testid="dnd-offer">
                       <button
                         type="button"
                         className="card-in rounded-full border px-3 py-1.5 text-[13px] font-semibold leading-4"

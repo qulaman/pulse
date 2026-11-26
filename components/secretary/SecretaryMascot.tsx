@@ -93,6 +93,7 @@ function lookOf({
   asleep,
   still,
   cheer,
+  mini,
 }: {
   scene: DeskScene | null;
   phase: DeskPhase;
@@ -102,6 +103,8 @@ function lookOf({
   asleep: boolean;
   still: boolean;
   cheer: boolean;
+  /** the small secretary beside the director's face: no headset to ring, awake and looking about at rest */
+  mini: boolean;
 }): StateLook {
   const party = cheer ? ({ extra: "confetti" } as const) : null;
   // the face is talking while the balls are out: no request in it
@@ -115,7 +118,7 @@ function lookOf({
       glyph: SCENE_GLYPH[scene],
       glow: "fast",
       all: urgency === 2 ? "bk-shake 0.3s linear infinite" : `bk-call ${urgency === 1 ? "1.3s" : "1.8s"} var(--ease-in-out) infinite`,
-      wearAnim: RING,
+      ...(mini ? null : { wearAnim: RING }),
       ...(alarm ? ({ ring: "dim", comet: true } as const) : null),
       ...party,
     };
@@ -132,23 +135,28 @@ function lookOf({
   // at rest: at night it dozes; on a screen nobody has touched it sits still; else it is at its desk
   if (asleep) return { color: TONE, glyph: "shut", glow: "sleep", extra: "zzz", all: "bk-sleep 5.8s var(--ease-in-out) infinite", halo: "bk-sleep-halo 5.8s var(--ease-in-out) infinite" };
   if (still) return { color: TONE, glow: "quiet", ...party };
-  return { color: TONE, glow: "pulse", look: "desk", blink: true, ringAnim: BREATH, ...party };
+  return { color: TONE, glow: "pulse", look: mini ? "wander" : "desk", blink: true, ringAnim: BREATH, ...party };
 }
 
 /**
  * What the secretary's ring wears (D-87): a headset — a band over the top, a cup at each side, a
  * microphone on a boom — and a bow tie under it. That is the whole difference from the mascot: the
- * same mark, in the secretary's teal, dressed for the reception.
+ * same mark, in the secretary's teal, dressed for the reception. `tieOnly` — the small secretary
+ * beside the director's face (D-210): the bow tie alone.
  */
-function Headset() {
+function Headset({ tieOnly = false }: { tieOnly?: boolean }) {
   const light = "color-mix(in srgb, currentColor 30%, #e6f2ef)";
   return (
-    <svg viewBox="-80 -80 160 160" aria-hidden data-prop="headset">
-      <path d="M -58 -12 A 59.5 59.5 0 0 1 58 -12" fill="none" stroke={light} strokeWidth="4.5" strokeLinecap="round" />
-      <rect x="-68" y="-16" width="15" height="32" rx="7" fill={light} />
-      <rect x="53" y="-16" width="15" height="32" rx="7" fill={light} />
-      <path d="M 61 15 Q 64 47 38 54" fill="none" stroke={light} strokeWidth="3.4" strokeLinecap="round" />
-      <circle cx="34" cy="55" r="6" fill="currentColor" stroke="var(--bg)" strokeWidth="2" />
+    <svg viewBox="-80 -80 160 160" aria-hidden data-prop={tieOnly ? "tie" : "headset"}>
+      {tieOnly ? null : (
+        <>
+          <path d="M -58 -12 A 59.5 59.5 0 0 1 58 -12" fill="none" stroke={light} strokeWidth="4.5" strokeLinecap="round" />
+          <rect x="-68" y="-16" width="15" height="32" rx="7" fill={light} />
+          <rect x="53" y="-16" width="15" height="32" rx="7" fill={light} />
+          <path d="M 61 15 Q 64 47 38 54" fill="none" stroke={light} strokeWidth="3.4" strokeLinecap="round" />
+          <circle cx="34" cy="55" r="6" fill="currentColor" stroke="var(--bg)" strokeWidth="2" />
+        </>
+      )}
       <path d="M 0 63 L -14 54 V 72 Z M 0 63 L 14 54 V 72 Z" fill={light} stroke={light} strokeWidth="3" strokeLinejoin="round" />
       <circle cx="0" cy="63" r="4" fill="currentColor" stroke="var(--bg)" strokeWidth="1.6" />
     </svg>
@@ -192,7 +200,7 @@ export function SecretaryMascot({
   size?: number;
   talking?: boolean;
   bare?: boolean;
-  /** the small secretary at the director's desk: its own request only, no small acts of its own */
+  /** the small secretary beside the director's face (D-210): no headset — the bow tie alone; its own request only, no small acts */
   mini?: boolean;
   act?: SecretaryAct | null;
   urgency?: Urgency;
@@ -224,12 +232,12 @@ export function SecretaryMascot({
       state={state}
       act={doing}
       size={size}
-      look={lookOf({ scene, phase, bare, talking, urgency, asleep, still: still || (mini && rest), cheer })}
+      look={lookOf({ scene, phase, bare, talking, urgency, asleep, still, cheer, mini })}
       part={doing ? ACTS[doing] : null}
       ms={doing ? SEC_ACT_MS[doing] : 0}
       gaze={look}
       season={season}
-      wear={<Headset />}
+      wear={<Headset tieOnly={mini} />}
       badge={waiting ? <span className="nums">+{queue}</span> : null}
     />
   );

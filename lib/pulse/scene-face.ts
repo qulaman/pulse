@@ -2,15 +2,15 @@ import type { MascotState } from "@/components/brand/Mascot";
 
 /**
  * Which face the director's Пульс shows, by weight (D-60, D-65, D-82, D-178):
- * the phrase in hand and the celebration after its throw over everything; the cup the secretary
- * brought; a failure (its act plays over the job or the mood); «не разобрал»; then the open card's
+ * the phrase in hand and the celebration after its throw over everything; a request the
+ * secretary has just finished (awake, the eye on the secretary — D-210); a failure (its act plays over the job or the mood); «не разобрал»; then the open card's
  * job — a thought or a news act that comes while a card is open does not take the job out of the
  * face's hands (the bubble still shows); then the news itself; then rest or awake.
  */
 export function directorMascot(scene: {
   /** sending, celebrating, offering or thinking while a phrase is in hand; null otherwise */
   confirm: MascotState | null;
-  /** the small secretary brought the cup over */
+  /** the small secretary has just finished a request: the face is awake and looks at it (D-210) */
   handoff: boolean;
   /** a failed phrase is up, or its act still plays */
   oops: boolean;
@@ -31,7 +31,7 @@ export function directorMascot(scene: {
   awake: MascotState;
 }): MascotState {
   if (scene.confirm) return scene.confirm;
-  if (scene.handoff) return "serving";
+  if (scene.handoff) return "calm";
   if (scene.oops) return scene.job ?? scene.mood ?? "calm";
   if (scene.unparsed) return "thinking";
   if (scene.job) return scene.job;

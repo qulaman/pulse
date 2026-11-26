@@ -45,7 +45,7 @@ describe("directorMascot", () => {
   it("rests on the waiting screen and is awake on the ring", () => {
     expect(directorMascot({ ...director, idle: true })).toBe("sleeping");
     expect(directorMascot({ ...director })).toBe("happy");
-    expect(directorMascot({ ...director, handoff: true, idle: true })).toBe("serving");
+    expect(directorMascot({ ...director, handoff: true, idle: true })).toBe("calm");
   });
 });
 

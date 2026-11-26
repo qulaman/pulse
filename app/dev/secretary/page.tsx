@@ -86,15 +86,15 @@ const DESKS: {
   etaLeft?: number;
   asking?: boolean;
 }[] = [
-  { caption: "Печатает", scene: null, phase: "rest" },
+  { caption: "На месте, просьб нет", scene: null, phase: "rest" },
   { caption: "Просьба ждёт", scene: "coffee", phase: "asked", urgency: 1 },
-  { caption: "Варит кофе — стоя у машины", scene: "coffee", phase: "doing" },
+  { caption: "Варит кофе", scene: "coffee", phase: "doing" },
   { caption: "Заваривает чай", scene: "tea", phase: "doing" },
   { caption: "Приглашает гостя", scene: "guest", phase: "doing" },
   { caption: "Распечатывает", scene: "print", phase: "doing" },
   { caption: "Вызывает машину", scene: "taxi", phase: "doing" },
   { caption: "Не беспокоить", scene: "dnd", phase: "doing" },
-  { caption: "Несёт чашку", scene: "coffee", phase: "done" },
+  { caption: "Готово — галочка", scene: "coffee", phase: "done" },
   { caption: "Смотрит на директора", scene: null, phase: "rest", attending: true },
   { caption: "Будет через 4 мин", scene: "tea", phase: "doing", etaLeft: 4 },
   { caption: "Секретарь спрашивает", scene: "coffee", phase: "doing", asking: true },
@@ -143,7 +143,7 @@ export default function SecretarySandboxPage() {
       <section className="mt-6">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted">Ушёл / вернулся</h2>
         <div className="mt-2 flex items-center gap-4 rounded-[20px] border border-border bg-surface/40 px-6 pb-8 pt-8" data-testid="desk-away-demo">
-          <div className="flex h-[96px] items-center justify-center pl-10">
+          <div className="flex h-[96px] items-center justify-center">
             <SecretaryDesk attending={false} count={0} tone="var(--ok)" label="Ушёл / вернулся" away={away} onTap={() => undefined} />
           </div>
           <button
@@ -157,11 +157,11 @@ export default function SecretarySandboxPage() {
         </div>
       </section>
       <section className="mt-6">
-        <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted">Стол секретаря у директора</h2>
+        <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted">Секретарь у директора</h2>
         <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
           {DESKS.map((desk) => (
             <figure key={desk.caption} className="flex flex-col items-center gap-2 rounded-[20px] border border-border bg-surface/40 px-2 pb-3 pt-8">
-              <div className="flex h-[96px] items-center justify-center pl-10">
+              <div className="flex h-[96px] items-center justify-center">
                 <SecretaryDesk
                   attending={desk.attending === true}
                   count={desk.phase === "asked" || desk.phase === "doing" ? 1 : 0}

@@ -726,55 +726,8 @@ html[data-tabbar="away"] .above-tabbar { translate: 0 calc(var(--tabbar-space) -
   80%, 100% { transform: scale(1.32); opacity: 0; }
 }
 
-/* The secretary at the desk (D-85): the small face types, the lines run on the screen, the
-   cursor blinks, steam rises off the mug. Transform and opacity only; all of it stops the
-   moment the secretary turns to the director's face. */
-/* four turns per cycle, the same motion: every loop boundary wakes the main thread (React listens for animationiteration), so a fast loop is written out four times */
-@keyframes sec-type {
-  0%, 11%, 25%, 36%, 50%, 61%, 75%, 86%, 100% { transform: translateY(0) rotate(0deg); }
-  5.5%, 30.5%, 55.5%, 80.5% { transform: translateY(-1.4px) rotate(1.4deg); }
-  16.5%, 41.5%, 66.5%, 91.5% { transform: translateY(-0.9px) rotate(-0.8deg); }
-}
-/* two turns per cycle, the same motion (see sec-type) */
-@keyframes sec-line {
-  0%, 50% { transform: scaleX(0); opacity: 1; }
-  14%, 43%, 64%, 93% { transform: scaleX(1); opacity: 1; }
-  49.999%, 100% { transform: scaleX(1); opacity: 0; }
-}
-/* four blinks per cycle (see sec-type) */
-@keyframes sec-cursor {
-  0%, 12.25%, 25%, 37.25%, 50%, 62.25%, 75%, 87.25% { opacity: 1; }
-  12.5%, 24.999%, 37.5%, 49.999%, 62.5%, 74.999%, 87.5%, 100% { opacity: 0; }
-}
-/* the key being pressed: one light hops from key to key in a typist's order (steps(1): it jumps,
-   so the desk repaints once a hop, not every frame) — the secretary's room keys, 5.4 apart */
-/* four runs per cycle (see sec-type) */
-@keyframes sec-key-hop {
-  0%, 15.625%, 25%, 40.625%, 50%, 65.625%, 75%, 90.625% { transform: translateX(0); }
-  3.125%, 28.125%, 53.125%, 78.125% { transform: translateX(16.2px); }
-  6.25%, 21.875%, 24.999%, 31.25%, 46.875%, 49.999%, 56.25%, 71.875%, 74.999%, 81.25%, 96.875%, 100% { transform: translateX(5.4px); }
-  9.375%, 18.75%, 34.375%, 43.75%, 59.375%, 68.75%, 84.375%, 93.75% { transform: translateX(21.6px); }
-  12.5%, 37.5%, 62.5%, 87.5% { transform: translateX(10.8px); }
-}
-/* the same on the director's desk, whose four keys are 5 apart */
-/* four runs per cycle (see sec-type) */
-@keyframes sec-key-hop-desk {
-  0%, 12.5%, 25%, 37.5%, 50%, 62.5%, 75%, 87.5% { transform: translateX(0); }
-  3.125%, 21.875%, 24.999%, 28.125%, 46.875%, 49.999%, 53.125%, 71.875%, 74.999%, 78.125%, 96.875%, 100% { transform: translateX(10px); }
-  6.25%, 18.75%, 31.25%, 43.75%, 56.25%, 68.75%, 81.25%, 93.75% { transform: translateX(5px); }
-  9.375%, 15.625%, 34.375%, 40.625%, 59.375%, 65.625%, 84.375%, 90.625% { transform: translateX(15px); }
-}
-/* two turns per cycle, the same motion (see sec-type) */
-@keyframes sec-steam {
-  0%, 50% { transform: translateY(0) scaleY(0.8); opacity: 0; }
-  15%, 65% { opacity: 0.75; }
-  49.999%, 100% { transform: translateY(-9px) scaleY(1.15); opacity: 0; }
-}
-@keyframes sec-turn {
-  0% { transform: translateY(0); }
-  40% { transform: translateY(-3px); }
-  100% { transform: translateY(0); }
-}
+/* The secretary beside the director's face (D-85, D-210): with nothing to show it holds still on a
+   screen nobody has touched (D-119). */
 .sec-paused, .sec-paused * { animation-play-state: paused !important; }
 
 /* ---- D-133: the director's reaction lights the task in gold ---------------------------- */
