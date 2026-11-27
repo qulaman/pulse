@@ -85,8 +85,8 @@ const DECISIONS_SHOWN = 6;
 const JUST_SENT_MS = 30 * 60_000;
 const JUST_SENT_SHOWN = 3;
 /** Where a dispute and an order are decided in full: words to the person, a cancelled order. */
-const DISPUTES_HREF = "/desk/settings/points?view=disputes";
-const ORDERS_HREF = "/desk/settings/points?view=shop";
+const DISPUTES_HREF = "/desk/rating?view=disputes";
+const ORDERS_HREF = "/desk/shop";
 
 /**
  * «Сегодня» is one column (D-196): every card one under another, the page's full width, from the same
@@ -637,7 +637,7 @@ function TodayView({
   const noSecretary = secretaries.data !== undefined && secretaries.data.length === 0;
   if (noSecretary) quiet.push({ key: "secretary", icon: ConciergeBell, ink: "muted", text: "Секретаря нет", more: "добавить в «Команде»", href: "/desk/team" });
   if (pointsEnabled && rating.data && leaders.length === 0) {
-    quiet.push({ key: "rating", icon: Trophy, ink: "muted", text: "Очков за неделю пока нет", hint: "Начислите строкой поручения: «Марату 50 очков за объект»", href: "/desk/settings/points" });
+    quiet.push({ key: "rating", icon: Trophy, ink: "muted", text: "Очков за неделю пока нет", hint: "Начислите строкой поручения: «Марату 50 очков за объект»", href: "/desk/rating" });
   }
 
   const figures: ReactNode[] = [];
@@ -646,7 +646,7 @@ function TodayView({
   if (pointsEnabled && (ratingLoad.kind === "failed" || rating.isPending)) {
     figures.push(
       <Card key="rating" ink="gold" index={1} testId="home-rating">
-        <Head icon={Trophy} sign="rating" title="Неделя" href="/desk/settings/points" />
+        <Head icon={Trophy} sign="rating" title="Неделя" href="/desk/rating" />
         {rating.isPending ? <RowsBone rows={3} wide="64%" /> : noteOf(ratingLoad, "Рейтинг не загрузился", () => void rating.refetch())}
       </Card>,
     );

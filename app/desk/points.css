@@ -1,9 +1,9 @@
-/* «Очки и магазин» on the desk (components/desk/settings/points/*): the game's office and its two
+/* «Очки и магазин» on the desk (components/desk/points/*): the game's office and its two
    dialogs, «Начислить» and a reward. Part of settings.css by its @import. Keyframes `pts-…`. */
 
-/* ---- «Очки и магазин»: the game's office (components/desk/settings/points/*) ------------------ */
+/* ---- «Очки и магазин»: the game's office (components/desk/points/*) ------------------ */
 html[data-surface="desk"][data-journal] {
-  /* the economy in one card: the total, thirty days by day, the week's three, what waits */
+  /* a head of the game's two sections: one card, its parts laid out by the section (D-215) */
   .pts-hero {
     display: flex;
     flex-direction: column;
@@ -60,60 +60,110 @@ html[data-surface="desk"][data-journal] {
     font-size: 11px;
     line-height: 14px;
   }
-  .pts-leaders {
-    flex: 0 0 auto;
+  /* «Рейтинг»: the podium beside what was given by day (D-215) */
+  .pts-hero.rate-hero {
+    display: grid;
+    grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+    align-items: stretch;
+    gap: 16px 40px;
   }
-  .pts-leaders-list {
+  .rate-hero-leaders,
+  .rate-hero-given {
     display: flex;
-    gap: 18px;
-    margin-top: 10px;
+    min-width: 0;
+    flex-direction: column;
   }
-  .pts-leader {
+  .rate-hero-given .pts-hero-foot {
+    margin-top: auto;
+  }
+  .rate-podium {
     display: flex;
-    min-width: 48px;
+    flex: 1;
+    align-items: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .rate-podium-none {
+    max-width: 240px;
+    margin-top: 8px;
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--text-muted);
+  }
+  .rate-step {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 0;
     flex-direction: column;
     align-items: center;
-    gap: 3px;
   }
-  .pts-leader-face {
-    position: relative;
-    display: inline-flex;
+  .rate-step-who {
+    display: flex;
+    max-width: 100%;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 6px;
+    border-radius: 8px;
   }
-  .pts-leader-place {
-    position: absolute;
-    right: -5px;
-    bottom: -4px;
-    min-width: 18px;
-    height: 18px;
-    padding: 0 4px;
-    border-radius: 9999px;
-    background: var(--surface-2);
-    color: var(--text);
-    font-size: 11px;
-    font-weight: 600;
-    line-height: 18px;
-    text-align: center;
-
-    &[data-place="1"] {
-      background: var(--gold);
-      color: #1a1205;
-    }
-  }
-  .pts-leader-name {
-    max-width: 72px;
+  .rate-step-name {
+    max-width: 100%;
     overflow: hidden;
-    margin-top: 4px;
-    font-size: 12px;
+    margin-top: 6px;
+    font-size: 13px;
     font-weight: 500;
-    line-height: 16px;
+    line-height: 18px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .pts-leader-points {
-    font-size: 12px;
+  .rate-step-points {
+    font-size: 13px;
     font-weight: 600;
-    line-height: 16px;
+    line-height: 18px;
     color: var(--gold);
+  }
+  /* the step a place stands on: the first the highest */
+  .rate-step-block {
+    display: flex;
+    width: 100%;
+    height: 32px;
+    align-items: center;
+    justify-content: center;
+    margin-top: 6px;
+    border-radius: 8px 8px 0 0;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 20px;
+  }
+  .rate-step[data-place="1"] .rate-step-block {
+    height: 64px;
+    font-size: 20px;
+    line-height: 24px;
+  }
+  .rate-step[data-place="2"] .rate-step-block {
+    height: 44px;
+  }
+  /* «Магазин»: what waits to be handed out, the points on hands, what was carried away (D-215) */
+  .pts-hero.shop-hero {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: start;
+    gap: 16px 48px;
+  }
+  .shop-hero-queue {
+    display: flex;
+    min-width: 180px;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+  }
+  .shop-hero-note {
+    font-size: 13px;
+    line-height: 18px;
+  }
+  .shop-hero-facts {
+    display: flex;
+    align-self: end;
+    justify-self: end;
   }
   .pts-hero-foot {
     display: flex;
@@ -438,19 +488,41 @@ html[data-surface="desk"][data-journal] {
   .pts-chart-axis {
     color: var(--ink-3);
   }
-  .pts-leader {
-    animation: settings-pop 320ms var(--ease-spring) both;
-  }
-  .pts-leader-place {
-    box-shadow: 0 0 0 2px var(--raise);
+  .rate-step-who {
+    transition: background-color 140ms linear;
 
-    &[data-place="2"] {
-      background: #c9ced6;
-      color: #16181b;
+    &:hover {
+      background: var(--hover);
+      transition-duration: 0ms;
     }
-    &[data-place="3"] {
-      background: #c98b5a;
-      color: #1a1006;
+  }
+  .rate-step-block {
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+    color: var(--ink-3);
+  }
+  /* the first place stands on the reward's gold */
+  .rate-step[data-place="1"] .rate-step-block {
+    background: color-mix(in srgb, var(--gold-ink) 16%, var(--surface-2));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold-ink) 30%, transparent);
+    color: var(--gold-ink);
+  }
+  .shop-hero-queue {
+    border-radius: 8px;
+
+    .pts-hero-figure {
+      color: var(--ink-3);
+      transition: color 140ms linear;
+    }
+    .shop-hero-note {
+      color: var(--ink-2);
+    }
+    /* something waits for the director: the figure in «ваш ход» */
+    &[data-on] .pts-hero-figure {
+      color: var(--warn);
+    }
+    &[data-on]:hover .shop-hero-note {
+      color: var(--ink);
     }
   }
   .pts-hero-foot {

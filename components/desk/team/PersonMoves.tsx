@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
 
 import { useDeskScope } from "@/components/desk/DeskScope";
-import { AwardDialog, type AwardFor } from "@/components/desk/settings/points/AwardDialog";
+import { AwardDialog, type AwardFor } from "@/components/desk/points/AwardDialog";
 import { MenuButton, type MenuItem } from "@/components/desk/ui/Menu";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { Button } from "@/components/ui/Button";

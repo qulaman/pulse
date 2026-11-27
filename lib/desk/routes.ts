@@ -23,15 +23,24 @@ export function deskHomeFor(role: Role | undefined): string {
   return role === "secretary" ? DESK_HOME.secretary : DESK_HOME.director;
 }
 
-export type DeskBadge = "today" | "tasks" | "errands" | "calendar";
+export type DeskBadge = "tasks" | "errands" | "calendar" | "rating" | "shop";
 
 /**
  * `key` — the letter after «G» that goes there (D-154 wave 3), matched by the physical key.
  * `group` — the sections stand in groups with air between them (D-214): the work, the people, the
- * plans, what is on air, the setup; a list is written group by group, top to bottom.
+ * points game (D-215), the plans, what is on air, the setup; a list is written group by group, top
+ * to bottom.
  */
-export type DeskNavGroup = "work" | "people" | "plans" | "air" | "setup";
-export type DeskNavItem = { href: string; label: string; group: DeskNavGroup; badge?: DeskBadge; key?: string };
+export type DeskNavGroup = "work" | "people" | "game" | "plans" | "air" | "setup";
+export type DeskNavItem = {
+  href: string;
+  label: string;
+  group: DeskNavGroup;
+  badge?: DeskBadge;
+  key?: string;
+  /** A section of the points game: the navigation lists it only while the company plays (`pointsEnabled`). */
+  game?: true;
+};
 
 /**
  * The side navigation by role. The secretary sees only her own tasks under RLS (`tasks_select`),
@@ -42,12 +51,15 @@ export const DESK_NAV: Record<DeskRole, DeskNavItem[]> = {
   // One thing, one word (D-194): a section is named what its screen and the «Сегодня» block
   // call it. «Ждут вас» carries no count of its own: it is the same number as «Задачи» (D-154)
   director: [
-    { href: "/desk/today", label: "Сегодня", group: "work", badge: "today", key: "S" },
+    { href: "/desk/today", label: "Сегодня", group: "work", key: "S" },
     { href: "/desk/tasks", label: "Задачи", group: "work", badge: "tasks", key: "T" },
     { href: "/desk/inbox", label: "Ждут вас", group: "work", key: "I" },
     { href: "/desk/team", label: "Команда", group: "people", key: "K" },
     { href: "/desk/reports", label: "Отчёты", group: "people", key: "O" },
     { href: "/desk/errands", label: "Секретарь", group: "people", badge: "errands", key: "Z" },
+    // the points game (D-215): who leads, and what the points buy — each counts what waits in it
+    { href: "/desk/rating", label: "Рейтинг", group: "game", badge: "rating", key: "R", game: true },
+    { href: "/desk/shop", label: "Магазин", group: "game", badge: "shop", key: "M", game: true },
     { href: "/desk/calendar", label: "Календарь", group: "plans", badge: "calendar", key: "C" },
     { href: "/desk/notes", label: "Заметки", group: "plans", key: "N" },
     { href: "/desk/boards", label: "Доски", group: "plans", key: "D" },
@@ -95,6 +107,8 @@ const DIRECTOR_ONLY = [
   "/desk/settings/lab",
   "/desk/settings/data",
   "/desk/settings/points",
+  "/desk/rating",
+  "/desk/shop",
 ];
 
 const within = (pathname: string, base: string) => pathname === base || pathname.startsWith(`${base}/`);
@@ -191,10 +205,10 @@ export function deskRouteFor(pathname: string, search: string, role: Role | unde
       return director ? withQuery("/desk/reports", keep(search, ["tab", "who", "only", "day"])) : null;
     case "/rating":
       // a dispute's push is `/rating#disputes`: the browser carries the hash over the redirect
-      return director ? "/desk/settings/points" : null;
+      return director ? "/desk/rating" : null;
     case "/shop":
       // the shop's pushes are orders to hand out
-      return director ? "/desk/settings/points?view=shop" : null;
+      return director ? "/desk/shop" : null;
     case "/feed":
       return director ? null : "/desk/errands";
     case "/ether":

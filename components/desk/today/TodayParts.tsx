@@ -261,8 +261,8 @@ export function Decisions({
             <ExtraRow key={extra.key} extra={extra} compact={compact} />
           ))}
           {moreExtras > 0 ? (
-            <Link key="more-extras" href="/desk/settings/points" prefetch className="desk-row flex items-center text-[13px] leading-4 text-muted hover:text-text">
-              …ещё {moreExtras} — в «Очках и магазине»
+            <Link key="more-extras" href="/desk/rating" prefetch className="desk-row flex items-center text-[13px] leading-4 text-muted hover:text-text">
+              …ещё {moreExtras} — в «Рейтинге» и «Магазине»
             </Link>
           ) : null}
         </WorkList>

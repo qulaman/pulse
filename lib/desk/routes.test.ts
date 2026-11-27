@@ -57,8 +57,8 @@ describe("deskRouteFor — the director", () => {
     expect(to("/reports", "?only=new")).toBe("/desk/reports?only=new");
     expect(to("/reports", "?who=u1&day=2026-11-20")).toBe("/desk/reports?who=u1&day=2026-11-20");
     expect(to("/reports", "?tab=period")).toBe("/desk/reports?tab=period");
-    expect(to("/rating")).toBe("/desk/settings/points");
-    expect(to("/shop")).toBe("/desk/settings/points?view=shop");
+    expect(to("/rating")).toBe("/desk/rating");
+    expect(to("/shop")).toBe("/desk/shop");
     expect(to("/profile")).toBe("/desk/profile");
   });
 
@@ -130,7 +130,7 @@ describe("mayHaveDeskRoute", () => {
 
 describe("deskAllows and the navigation", () => {
   it("keeps the secretary off the director's desk screens", () => {
-    for (const path of ["/desk/today", "/desk/tasks", "/desk/inbox", "/desk/reports", "/desk/notes", "/desk/notes/b/1", "/desk/boards", "/desk/boards/1", "/desk/screen", "/desk/settings/lab", "/desk/settings/data", "/desk/settings/points"]) {
+    for (const path of ["/desk/today", "/desk/tasks", "/desk/inbox", "/desk/reports", "/desk/notes", "/desk/notes/b/1", "/desk/boards", "/desk/boards/1", "/desk/screen", "/desk/settings/lab", "/desk/settings/data", "/desk/settings/points", "/desk/rating", "/desk/shop"]) {
       expect(deskAllows(path, "secretary")).toBe(false);
       expect(deskAllows(path, "director")).toBe(true);
     }

@@ -132,7 +132,7 @@ export function WeekTile({ rows, index }: { rows: readonly RatingRow[]; index: n
   }, [onWall]);
   return (
     <Card ink="gold" index={index} testId="home-rating">
-      <Head icon={Trophy} sign="rating" title="Неделя" href="/desk/settings/points">
+      <Head icon={Trophy} sign="rating" title="Неделя" href="/desk/rating">
         <Ghost
           icon={onWall ? Check : MonitorUp}
           done={onWall}

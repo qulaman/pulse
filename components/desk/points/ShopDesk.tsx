@@ -3,7 +3,7 @@
 import { EyeOff, Pencil, Plus } from "lucide-react";
 import { useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
-import { ItemDialog } from "@/components/desk/settings/points/ItemDialog";
+import { ItemDialog } from "@/components/desk/points/ItemDialog";
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { Face, useAvatars } from "@/components/desk/ui/Face";

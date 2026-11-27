@@ -1,8 +1,11 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { PointsScreen } from "@/components/desk/settings/points/PointsScreen";
-
-/** «Очки и магазин» on the desk (D-153): the director's — the shell leads the secretary home. */
-export default function DeskPointsPage() {
-  return <PointsScreen />;
+/**
+ * «Очки и магазин» lived here until its two halves became sections of the navigation (D-215): the
+ * address leads on — `?view=shop` to «Магазин», everything else to «Рейтинг» with its view.
+ */
+export default async function DeskPointsPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
+  const { view } = await searchParams;
+  if (view === "shop") redirect("/desk/shop");
+  redirect(view === "disputes" || view === "history" ? `/desk/rating?view=${view}` : "/desk/rating");
 }

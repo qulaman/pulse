@@ -299,7 +299,7 @@ function DeskSignals({ role, meId }: { role: DeskRole; meId: string }) {
   const lobby = visits.data ?? [];
   const signal = secretary
     ? secretarySignal({ meId, errands: rows, visits: lobby, now, catalogue: catalogue.data ?? [] })
-    : directorSignal({ meId, count: (counts.tasks ?? 0) + (counts.today ?? 0) + (counts.errands ?? 0), errands: rows, visits: lobby, reminder });
+    : directorSignal({ meId, count: (counts.tasks ?? 0) + (counts.rating ?? 0) + (counts.shop ?? 0) + (counts.errands ?? 0), errands: rows, visits: lobby, reminder });
   const title = tabTitle(signal);
 
   // what the head should say; the route's metadata says «Pulse» again on every screen, and a

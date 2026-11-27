@@ -146,7 +146,9 @@ async function checkShell(ctx: Ctx) {
   await page.waitForTimeout(600);
   record("тема: тёмная по умолчанию, кнопка переключает туда и обратно", themeAtStart === "dark" && themeSwitched === "light" && (await themeOf()) === "dark", `${themeAtStart} → ${themeSwitched}`);
   record("тема (D-184): другая тема расходится кругом от кнопки", spreadOn, spreadOn ? "круг" : "сразу");
-  record("боковая навигация директора: двенадцать разделов и профиль", nav === 13, `ссылок ${nav}`);
+  // «Рейтинг» and «Магазин» are listed only while the company plays for points (D-215): both or neither
+  const game = await page.locator('nav[aria-label="Разделы"] a[href="/desk/rating"], nav[aria-label="Разделы"] a[href="/desk/shop"]').count();
+  record("боковая навигация директора: двенадцать разделов, «Рейтинг» и «Магазин» при включённых очках, профиль", nav === 13 + game && (game === 0 || game === 2), `ссылок ${nav}, из них игры ${game}`);
 
   // the profile is a computer's account page: a label on the left, its control on the right (D-154 wave 3)
   const parts = ["desk-profile-password", "desk-profile-push", "desk-notify-rules", "desk-profile-view", "desk-profile-others", "desk-profile-signout"];
@@ -339,8 +341,8 @@ async function checkShell(ctx: Ctx) {
     [`/calendar?e=${nobody}`, `/desk/calendar?e=${nobody}`],
     [`/notes?n=${nobody}`, `/desk/notes?n=${nobody}`],
     ["/pulse", "/desk/today"],
-    ["/rating", "/desk/settings/points"],
-    ["/shop", "/desk/settings/points?view=shop"],
+    ["/rating", "/desk/rating"],
+    ["/shop", "/desk/shop"],
   ] as const) {
     const answer = await page.request.get(`${APP_URL}${from}`, { maxRedirects: 0, headers: { "user-agent": DESKTOP_UA } });
     const location = (answer.headers().location ?? "").replace(APP_URL, "");

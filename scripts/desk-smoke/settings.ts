@@ -77,7 +77,7 @@ async function tabs(ctx: Ctx) {
   const devTools = (await nav.getByTestId("settings-nav-lab").count()) + (await nav.getByTestId("settings-nav-data").count());
   record(
     "настройки: под-навигация директора — поиск, четыре вкладки и экраны рядом (без флага — без «Лаборатории» и «Данных»)",
-    items === 6 + devTools && devTools !== 1 && (await nav.getByLabel("Найти настройку").count()) === 1,
+    items === 5 + devTools && devTools !== 1 && (await nav.getByLabel("Найти настройку").count()) === 1,
     `пунктов ${items}, инструментов разработчика ${devTools}`,
   );
 
@@ -285,7 +285,12 @@ async function data(ctx: Ctx) {
 
 async function points(ctx: Ctx) {
   const { page } = ctx;
+  // «Рейтинг» and «Магазин» are sections of the navigation (D-215); the old address of «Очки и магазин» leads on
   await open(page, "/desk/settings/points");
+  await page.waitForURL((url) => url.pathname === "/desk/rating", { timeout: 15_000 }).catch(() => {});
+  record("очки: старый адрес «Очки и магазин» ведёт в «Рейтинг»", new URL(page.url()).pathname === "/desk/rating", page.url());
+  const inNav = await page.locator('nav[aria-label="Разделы"] a[href="/desk/rating"], nav[aria-label="Разделы"] a[href="/desk/shop"]').count();
+  record("очки: «Рейтинг» и «Магазин» — разделы навигации", inNav === 2, `пунктов ${inNav}`);
   const grid = page.getByRole("grid", { name: "Балансы команды" });
   const shown = await grid
     .getByTestId("desk-row")
@@ -295,20 +300,26 @@ async function points(ctx: Ctx) {
   const rows = shown ? await grid.getByTestId("desk-row").count() : 0;
   record("очки: таблица балансов", rows > 0, `строк ${rows}`);
 
-  // one hero instead of five equal tiles: the points on hands large, what waits — orders, disputes — beside it
-  const hero = page.getByTestId("points-hero");
+  // one hero instead of equal tiles: who leads — the podium or its «никто не получил» — beside what was given, the disputes at hand
+  const hero = page.getByTestId("rating-hero");
   const heroText = (await hero.isVisible()) ? await hero.innerText() : "";
   const tiles = await page.locator("#desk-main").getByTestId("stat-tile").count();
   record(
-    "очки: сводка — герой «На руках у команды», выдача и споры рядом, без плиток",
-    /на руках у команды/i.test(heroText) && (await page.getByTestId("points-hero-shop").count()) === 1 && (await page.getByTestId("points-hero-disputes").count()) === 1 && tiles === 0,
+    "рейтинг: шапка — лидеры периода, «Роздано по дням», споры рядом, без плиток",
+    /лидеры недели/i.test(heroText) && /роздано по дням/i.test(heroText) && (await page.getByTestId("points-hero-disputes").count()) === 1 && tiles === 0,
     heroText.split("\n").slice(0, 3).join(" · "),
   );
+  // the period is the podium's and the table's alike
+  await page.getByRole("tab", { name: "Месяц", exact: true }).click();
+  await page.waitForTimeout(500);
+  record("рейтинг: период меняет и пьедестал, и таблицу", /лидеры месяца/i.test(await hero.innerText()) && /за месяц/i.test(await grid.innerText().catch(() => "")));
+  await page.getByRole("tab", { name: "Неделя", exact: true }).click();
+  await page.waitForTimeout(300);
   // numbers apart by thousands and a real minus: no «1000880», no hyphen in front of a figure (D-154)
   const figures = `${heroText}\n${shown ? await grid.innerText() : ""}`;
   const raw = figures.match(/\d{4,}|(?:^|[\s(])-\d/gm) ?? [];
   record("очки: числа с разрядами и настоящим «−»", raw.length === 0, raw.slice(0, 4).join(" "));
-  await ctx.shot("settings-points");
+  await ctx.shot("rating");
 
   // «Начислить» opens its dialog with the people picker — closed without a word typed, nothing awarded
   const award = page.getByTestId("points-award");
@@ -319,7 +330,7 @@ async function points(ctx: Ctx) {
     const picker = await page.evaluate(() => document.activeElement?.getAttribute("role") === "combobox");
     record("очки: «Начислить» — диалог, курсор в поиске человека", opened && picker && (await dialog.getByLabel("Кому").count()) === 1);
     await page.waitForTimeout(300);
-    await ctx.shot("settings-points-award");
+    await ctx.shot("rating-award");
     await page.keyboard.press("Escape");
     await dialog.waitFor({ state: "detached", timeout: 5_000 }).catch(() => {});
   } else {
@@ -331,7 +342,6 @@ async function points(ctx: Ctx) {
   const views = [
     ["Digit2", "disputes", main.locator('[data-testid="dispute-card"], [data-testid="desk-empty"]')],
     ["Digit3", "history", main.getByRole("grid", { name: "История очков" }).or(main.getByTestId("desk-empty"))],
-    ["Digit4", "shop", main.getByRole("region", { name: "Награды" })],
   ] as const;
   const seen: string[] = [];
   for (const [key, view, mark] of views) {
@@ -340,7 +350,7 @@ async function points(ctx: Ctx) {
     const on = (await page.getByTestId(`seg-${view}`).getAttribute("aria-selected")) === "true";
     if (on && (await mark.first().waitFor({ timeout: 15_000 }).then(() => true, () => false))) seen.push(view);
     await page.waitForTimeout(600);
-    await ctx.shot(`settings-points-${view}`);
+    await ctx.shot(`rating-${view}`);
     if (view === "history") {
       // the ledger's sums: a plus in gold, a minus quiet with «−» — never a hyphen, never the alarm's red
       const sums = await main.getByRole("grid", { name: "История очков" }).locator(".nums").evaluateAll((nodes) =>
@@ -358,7 +368,18 @@ async function points(ctx: Ctx) {
       record("очки: история — минусы приглушённые с «−»", sums.length === 0 || bad.length === 0, `сумм ${sums.length}, не так ${bad.length}`);
     }
   }
-  record("очки: клавиши 2–4 — «Споры», «История», «Магазин»", seen.length === views.length, `${seen.join(", ")} · ${APP_URL}`);
+  record("рейтинг: клавиши 2–3 — «Споры», «История»", seen.length === views.length, `${seen.join(", ")} · ${APP_URL}`);
+
+  // «Магазин»: what waits to be handed out on top, the points on hands beside it, the rewards under
+  await open(page, "/desk/shop");
+  const shopHero = page.getByTestId("shop-hero");
+  const shopShown = await shopHero.waitFor({ timeout: 20_000 }).then(() => true, () => false);
+  const shopText = shopShown ? await shopHero.innerText() : "";
+  const shelf = await main.getByRole("region", { name: "Награды" }).first().waitFor({ timeout: 15_000 }).then(() => true, () => false);
+  record("магазин: шапка — «Ждут выдачи» и «На руках у команды», под ней награды", /ждут выдачи/i.test(shopText) && /на руках у команды/i.test(shopText) && shelf, shopText.split("\n").slice(0, 3).join(" · "));
+  const rawShop = shopText.match(/\d{4,}|(?:^|[\s(])-\d/gm) ?? [];
+  record("магазин: числа с разрядами и настоящим «−»", rawShop.length === 0, rawShop.slice(0, 4).join(" "));
+  await ctx.shot("shop");
 
   // «+ Награда» — the desk's form with the card's preview, closed with Esc; nothing saved
   const addItem = page.getByTestId("shop-add-item");
@@ -369,7 +390,7 @@ async function points(ctx: Ctx) {
     const form = opened ? await dialog.getByTestId("shop-item-form").count() : 0;
     record("очки: «+ Награда» — настольная форма с превью карточки", opened && form === 1);
     await page.waitForTimeout(300);
-    await ctx.shot("settings-points-item");
+    await ctx.shot("shop-item");
     await page.keyboard.press("Escape");
     await dialog.waitFor({ state: "detached", timeout: 5_000 }).catch(() => {});
   }

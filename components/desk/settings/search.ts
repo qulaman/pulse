@@ -65,8 +65,8 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { id: "page-lab-parser", href: "/desk/settings/lab?tab=parser", place: "Лаборатория", title: "Парсер: правила и песочница", words: "промпт корпус проверка", devTools: true },
   { id: "page-lab-costs", href: "/desk/settings/lab?tab=costs", place: "Лаборатория", title: "Себестоимость клиента", words: "цена расходы деньги", devTools: true },
   { id: "page-data", href: "/desk/settings/data", place: "Данные", title: "Таблицы компании", words: "база логи данные таблица", devTools: true },
-  { id: "page-points", href: "/desk/settings/points", place: "Очки и магазин", title: "Балансы, споры и история очков", words: "начислить баланс спор", director: true },
-  { id: "page-shop", href: "/desk/settings/points?view=shop", place: "Очки и магазин", title: "Магазин наград", words: "товар награда выдать заказ мерч", director: true },
+  { id: "page-points", href: "/desk/rating", place: "Рейтинг", title: "Места, балансы, споры и история очков", words: "начислить баланс спор рейтинг очки", director: true },
+  { id: "page-shop", href: "/desk/shop", place: "Магазин", title: "Награды и выдача заказов", words: "товар награда выдать заказ мерч магазин", director: true },
 ];
 
 const fold = (text: string) => foldRu(text).replace(/[«»"]/g, "");

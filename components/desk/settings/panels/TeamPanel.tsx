@@ -154,7 +154,7 @@ export function TeamPanel({ director }: { director: boolean }) {
         id="points"
         title="Очки и рейтинг"
         about="Очки начисляются сами за задачи, отчёты и реакции; директор добавляет свои. Тратятся в магазине."
-        action={director ? <GroupLink href="/desk/settings/points">Балансы и магазин</GroupLink> : null}
+        action={director ? <GroupLink href="/desk/rating">Рейтинг и балансы</GroupLink> : null}
       >
         <SettingRow id="points-enabled" label="Очки включены" hint="Без них нет рейтинга, начислений и штрафов; магазин работает" htmlFor="ctl-points-enabled" changed={draft.points_enabled !== server.points_enabled}>
           <Switch id="ctl-points-enabled" label="Очки включены" checked={draft.points_enabled} onChange={(points_enabled) => update({ points_enabled })} />

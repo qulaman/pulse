@@ -52,8 +52,9 @@ export type DeskBadges = { counts: Partial<Record<DeskBadge, number>>; tones: Pa
  * the director (danger with an overdue one, warn otherwise), «Заявки» — open errands and, for the
  * director, visitors waiting for an answer; for the secretary — requests nobody has taken yet,
  * «Календарь» — the invitations waiting for this person's «Буду / Не смогу», lit, as the phone's
- * ball calls (D-180), otherwise today's meetings still ahead, quiet; «Сегодня» — what waits for the
- * director besides tasks: open disputes and orders. The same counts name the browser tab (DeskShell).
+ * ball calls (D-180), otherwise today's meetings still ahead, quiet; «Рейтинг» — the minuses people
+ * dispute, «Магазин» — the orders to hand out (D-215: each waits in its own section, so «Сегодня»
+ * carries no count). The same counts name the browser tab (DeskShell).
  */
 export function useDeskBadges(role: DeskRole): DeskBadges {
   const me = useMe().data;
@@ -74,17 +75,17 @@ export function useDeskBadges(role: DeskRole): DeskBadges {
     const open = director
       ? activeCount(errands.data) + awaitingDirector(visits.data ?? []).length
       : (errands.data ?? []).filter((errand) => errand.status === "sent").length;
-    const besides = game ? (disputes.data?.length ?? 0) + ordersWaiting(orders.data ?? [], myId).length : 0;
     // an invitation that waits for my answer calls; with none, the day's meetings are only counted
     const owed = calendar.data && myId ? pendingInvites(calendar.data, myId, now).length : 0;
     return {
       counts: {
-        today: besides,
         tasks: ask?.total ?? 0,
+        rating: game ? (disputes.data?.length ?? 0) : 0,
+        shop: game ? ordersWaiting(orders.data ?? [], myId).length : 0,
         errands: open,
         calendar: owed > 0 ? owed : calendar.data ? todayCount(calendar.data, now) : 0,
       },
-      tones: { today: "warn", tasks: ask && ask.overdue > 0 ? "danger" : "warn", errands: "accent", calendar: owed > 0 ? "warn" : "muted" },
+      tones: { tasks: ask && ask.overdue > 0 ? "danger" : "warn", errands: "accent", calendar: owed > 0 ? "warn" : "muted", rating: "warn", shop: "warn" },
     };
   }, [calendar.data, director, disputes.data, errands.data, game, inbox.data, myId, now, orders.data, visits.data]);
 }
@@ -103,6 +104,8 @@ const ICON: Record<string, DeskIconName> = {
   "/desk/boards": "boards",
   "/desk/screen": "screen",
   "/desk/settings": "settings",
+  "/desk/rating": "rating",
+  "/desk/shop": "shop",
   [DESK_PROFILE]: "profile",
 };
 
@@ -214,6 +217,9 @@ function PulseGlyphMark() {
  */
 export function SideNav({ role, brand, folded = false, onToggle }: { role: DeskRole; brand: DeskBrand; folded?: boolean; onToggle?: () => void }) {
   const pathname = usePathname();
+  const { pointsEnabled } = useDeskScope();
+  // «Рейтинг» and «Магазин» are listed only while the company plays for points (D-215)
+  const items = DESK_NAV[role].filter((item) => !item.game || pointsEnabled);
   const badges = useDeskBadges(role);
   const unchecked = useUncheckedBadge(role);
   const active = deskNavActive(pathname, role);
@@ -236,7 +242,7 @@ export function SideNav({ role, brand, folded = false, onToggle }: { role: DeskR
         )}
       </div>
       <ul className="no-bar flex min-h-0 flex-col overflow-y-auto">
-        {DESK_NAV[role].map((item, index, items) => (
+        {items.map((item, index) => (
           // a new group starts with air above it (graphite.css)
           <li key={item.href} data-group-start={index > 0 && items[index - 1].group !== item.group ? "" : undefined}>
             <NavLink

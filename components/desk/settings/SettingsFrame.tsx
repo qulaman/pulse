@@ -63,7 +63,6 @@ const NAV_ICON: Record<string, DeskIconName> = {
   dictionary: "dictionary",
   lab: "lab",
   data: "data",
-  points: "shop",
 };
 
 /** The chosen item's plate glides from the last one: the toolbar's spring, no overshoot (D-171). */
@@ -247,15 +246,6 @@ function SettingsNav({ searchRef }: { searchRef: RefObject<HTMLInputElement | nu
             ) : null}
             {devTools ? (
               <NavItem href="/desk/settings/data" label="Данные" icon="data" active={within(pathname, "/desk/settings/data")} testId="settings-nav-data" />
-            ) : null}
-            {director ? (
-              <NavItem
-                href="/desk/settings/points"
-                label="Очки и магазин"
-                icon="points"
-                active={within(pathname, "/desk/settings/points")}
-                testId="settings-nav-points"
-              />
             ) : null}
           </div>
         </>

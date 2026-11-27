@@ -226,7 +226,7 @@ function DirectorFacts({ person, companyId, pointsOn, now }: { person: Person; c
   ];
   // no points came: no figure, rather than a zero
   if (pointsOn && person.role !== "director" && !balances.isLoadingError) {
-    facts.push({ key: "points", value: balance, label: "очков", tone: pointsTone(balance), href: "/desk/settings/points", title: "Очки и рейтинг" });
+    facts.push({ key: "points", value: balance, label: "очков", tone: pointsTone(balance), href: "/desk/rating", title: "Рейтинг" });
   }
   return (
     <>
