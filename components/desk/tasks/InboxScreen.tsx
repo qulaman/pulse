@@ -543,7 +543,7 @@ function InboxCard({
         {/* the headline and «Изменить» share the card's first line (D-203) */}
         <div className="flex items-start gap-3">
           <p
-            className="tasks-reason mb-2 text-[15px] font-semibold leading-5 [overflow-wrap:anywhere]"
+            className="tasks-reason mb-2 text-[14px] font-semibold leading-5 [overflow-wrap:anywhere]"
             style={{ color: tone, "--tone": tone } as CSSProperties}
             data-testid="desk-inbox-reason"
           >

@@ -68,7 +68,7 @@ export function Track({ errand, now, finished = false, alarm = false }: { errand
             {index === 1 && stage >= 1 && errand.claimed_by ? (
               <PersonFace id={errand.claimed_by} name={errand.claimed?.full_name ?? who} size={28} />
             ) : node.state === "done" || node.state === "end" ? (
-              <Check size={14} strokeWidth={3} />
+              <Check size={14} />
             ) : null}
             {/* a request nobody has taken: the one live dot of the card (frozen after quiet minutes) */}
             {index === 1 && stage === 0 ? <span className="pult-live" /> : null}
@@ -255,7 +255,7 @@ function PendingTrip({ row }: { row: PendingErrand }) {
         </span>
         <span className="pult-trip-figure">
           <span className="pult-trip-big" data-tone={row.waiting ? "warn" : "muted"}>
-            {row.waiting ? <CloudOff size={20} strokeWidth={2.25} aria-hidden /> : <LoaderCircle size={20} strokeWidth={2.25} className="desk-spin" aria-hidden />}
+            {row.waiting ? <CloudOff size={20} aria-hidden /> : <LoaderCircle size={20} className="desk-spin" aria-hidden />}
           </span>
           <span className="pult-trip-caption">{row.waiting ? "ждёт связи — уйдёт сама" : "отправляю…"}</span>
         </span>

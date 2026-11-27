@@ -350,7 +350,7 @@ export function RemoveDialog({
         <div className="flex items-center gap-3">
           <Face person={person} size={44} />
           <div className="min-w-0">
-            <p className="truncate text-[15px] font-semibold leading-5" data-testid="remove-name">
+            <p className="truncate text-[14px] font-semibold leading-5" data-testid="remove-name">
               {person.full_name}
             </p>
             {kiosk ? null : <p className="truncate text-[13px] leading-[18px] text-muted">{roleLine(person)}</p>}

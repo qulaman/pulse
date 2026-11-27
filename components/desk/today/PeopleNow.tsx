@@ -264,7 +264,7 @@ export function PersonHome({
     <div className="flex flex-col gap-3" data-testid="today-person-panel">
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
         <div className="min-w-0 flex-1">
-          <p className="desk-figure truncate text-[22px] leading-7" title={person.full_name}>
+          <p className="desk-figure truncate text-[20px] leading-7" title={person.full_name}>
             {person.full_name}
           </p>
           <p className="truncate text-[13px] leading-[18px] text-muted">

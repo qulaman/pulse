@@ -203,7 +203,7 @@ export function Select({ className = "", children, value, defaultValue, onChange
         data-select-for={rest.id}
       >
         <span className="min-w-0 flex-1 truncate">{chosen?.label ?? ""}</span>
-        <ChevronDown size={14} strokeWidth={2.25} aria-hidden className="desk-select-chevron shrink-0" />
+        <ChevronDown size={14} aria-hidden className="desk-select-chevron shrink-0" />
       </button>
       <Popover open={open} onClose={() => setOpen(false)} anchor={button} matchAnchor role="presentation">
         <div id={listId} role="listbox" aria-label={label} className="flex max-h-[min(60vh,360px)] flex-col overflow-y-auto p-1">
@@ -221,11 +221,11 @@ export function Select({ className = "", children, value, defaultValue, onChange
                 onMouseEnter={() => setActive(index)}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => pick(choice.value)}
-                className="desk-select-option flex h-8 w-full shrink-0 items-center gap-2 rounded-[7px] px-2.5 text-left text-[13px] leading-4 disabled:opacity-40"
+                className="desk-select-option flex h-8 w-full shrink-0 items-center gap-2 rounded-[6px] px-2.5 text-left text-[13px] leading-4 disabled:opacity-40"
                 data-active={index === active ? "" : undefined}
               >
                 <span className="min-w-0 flex-1 truncate">{choice.label}</span>
-                {on ? <Check size={14} strokeWidth={2.5} aria-hidden className="shrink-0 text-accent" /> : <span aria-hidden className="w-[14px] shrink-0" />}
+                {on ? <Check size={14} aria-hidden className="shrink-0 text-accent" /> : <span aria-hidden className="w-[14px] shrink-0" />}
               </button>
             );
           })}
@@ -255,7 +255,7 @@ export function SegmentTabs<V extends string>({
   // one plate per control: two tab rows on a screen never pull each other's plate
   const glide = `seg-${useId()}`;
   return (
-    <div role="tablist" aria-label={label} className="seg inline-flex h-9 items-center gap-0.5 rounded-[11px] p-0.5">
+    <div role="tablist" aria-label={label} className="seg inline-flex h-9 items-center gap-0.5 rounded-[12px] p-0.5">
       {items.map((item) => {
         const active = item.value === value;
         return (
@@ -266,7 +266,7 @@ export function SegmentTabs<V extends string>({
             aria-selected={active}
             data-testid={`seg-${item.value}`}
             onClick={() => onChange(item.value)}
-            className={`desk-focus relative flex h-8 items-center gap-1.5 rounded-[9px] px-3 font-display text-[13px] font-semibold leading-4 outline-none transition-colors duration-[120ms] ${
+            className={`desk-focus relative flex h-8 items-center gap-1.5 rounded-[8px] px-3 font-display text-[13px] font-semibold leading-4 outline-none transition-colors duration-[140ms] ${
               active ? "seg-thumb text-text" : "text-muted hover:text-text"
             }`}
           >

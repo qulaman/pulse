@@ -554,7 +554,7 @@ export function TabelView({ tabel, stale, failed, onRetry, controls, who, folded
         {!who && tabel.people.length > 0 ? (
           <button type="button" className="rep-tabel-fold desk-focus" aria-expanded={!folded} onClick={() => onFold(!folded)} data-testid="desk-tabel-fold">
             {folded ? "Показать людей" : "Свернуть"}
-            <ChevronDown size={15} strokeWidth={2.25} aria-hidden />
+            <ChevronDown size={16} aria-hidden />
           </button>
         ) : null}
       </div>

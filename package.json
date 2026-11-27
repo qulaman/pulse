@@ -18,6 +18,7 @@
     "db:types": "supabase gen types typescript --linked --schema public > lib/supabase/types.ts",
     "db:index": "tsx scripts/schema-index.ts",
     "decisions:index": "tsx scripts/decisions-index.ts",
+    "check:desk-scale": "tsx scripts/desk-scale.ts",
     "smoke:auth": "tsx scripts/smoke-auth.ts",
     "smoke:voice": "tsx scripts/smoke-voice.ts",
     "smoke:realtime": "tsx scripts/smoke-realtime.ts",

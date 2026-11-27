@@ -255,7 +255,7 @@ function QuickBody({
         </p>
         {clashes.length > 0 ? (
           <p className="cal-clash mt-1.5 flex items-start gap-1.5 text-[12px] leading-4" data-testid="desk-quick-clash">
-            <TriangleAlert aria-hidden size={13} strokeWidth={2.2} className="mt-px shrink-0" />
+            <TriangleAlert aria-hidden size={14} className="mt-px shrink-0" />
             <span className="min-w-0 [overflow-wrap:anywhere]">
               Пересекается с «{clashes[0].title}» {spanOf(clashes[0])}
               {clashes.length > 1 ? ` и ещё ${clashes.length - 1}` : ""}

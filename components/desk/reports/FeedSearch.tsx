@@ -64,7 +64,7 @@ export const FeedSearch = forwardRef<{ focus: () => void }, { people: readonly S
     return (
       <>
         <label ref={setField} className="field desk-search relative flex h-9 items-center px-3" style={{ width }}>
-          <Search size={15} strokeWidth={2} aria-hidden className="mr-2 shrink-0 text-muted" />
+          <Search size={16} aria-hidden className="mr-2 shrink-0 text-muted" />
           <input
             ref={input}
             type="search"
@@ -87,7 +87,7 @@ export const FeedSearch = forwardRef<{ focus: () => void }, { people: readonly S
           />
           {text ? (
             <button type="button" aria-label="Очистить" onClick={() => setText("")} className="ml-1 text-muted hover:text-text">
-              <X size={14} strokeWidth={2.2} aria-hidden />
+              <X size={14} aria-hidden />
             </button>
           ) : null}
         </label>
@@ -118,7 +118,7 @@ export const FeedSearch = forwardRef<{ focus: () => void }, { people: readonly S
                   </>
                 ) : (
                   <>
-                    <Search size={15} strokeWidth={2} aria-hidden className="ml-0.5 mr-0.5 shrink-0 text-muted" />
+                    <Search size={16} aria-hidden className="ml-0.5 mr-0.5 shrink-0 text-muted" />
                     <span className="min-w-0 flex-1 truncate">
                       Искать <b className="rep-feed-suggest-name">«{option.text}»</b> в отчётах
                     </span>
@@ -140,7 +140,7 @@ export function FilterChip({ face, label, onClear, testId }: { face?: Searchable
       {face ? <Face person={{ id: face.id, full_name: face.full_name, avatar_url: face.avatar_url }} size={20} /> : null}
       <span className="truncate">{label}</span>
       <button type="button" className="rep-feed-chip-x desk-focus" aria-label={`Убрать: ${label}`} onClick={onClear}>
-        <X size={13} strokeWidth={2.4} aria-hidden />
+        <X size={14} aria-hidden />
       </button>
     </span>
   );

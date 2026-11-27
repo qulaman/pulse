@@ -217,11 +217,11 @@ export function DeskScreen() {
         actions={
           <>
             <Tooltip label="Стена загрузится заново — если зависла или не обновилась" side="bottom">
-              <Button size="sm" variant="ghost" icon={<RotateCw aria-hidden size={14} strokeWidth={2.1} />} onClick={() => show({ reload: true }, "Экран перезапускается")} data-testid="desk-screen-reload">
+              <Button size="sm" variant="ghost" icon={<RotateCw aria-hidden size={14} />} onClick={() => show({ reload: true }, "Экран перезапускается")} data-testid="desk-screen-reload">
                 Перезапустить
               </Button>
             </Tooltip>
-            <Button size="sm" variant="secondary" icon={<Cast aria-hidden size={15} strokeWidth={2} />} onClick={() => setConnecting(true)} data-testid="desk-screen-connect">
+            <Button size="sm" variant="secondary" icon={<Cast aria-hidden size={16} />} onClick={() => setConnecting(true)} data-testid="desk-screen-connect">
               Подключить экран
             </Button>
           </>
@@ -250,7 +250,7 @@ export function DeskScreen() {
                 {loading ? (
                   <Bone h={28} w="55%" />
                 ) : (
-                  <p className="desk-figure text-[26px] leading-8 [overflow-wrap:anywhere]" data-testid="desk-screen-now-line">
+                  <p className="desk-figure text-[24px] leading-8 [overflow-wrap:anywhere]" data-testid="desk-screen-now-line">
                     {connected
                       ? wallNow(row, people.data ?? [], now, boards.data ?? [], { points, guest, taskTitle, boardPoints: wall.points.map((point) => point.id) })
                       : "Экран ещё не подключался"}
@@ -304,7 +304,7 @@ export function DeskScreen() {
               <SectionLabel className="mb-0.5">Доска на стене</SectionLabel>
               <div className="screen-cartridge-body flex flex-wrap items-center justify-between gap-3 border-t border-text py-2">
                 <div className="min-w-0">
-                  <p className="truncate text-[17px] font-semibold leading-6">{wall.board ? wall.board.title : wall.loading ? "" : "Доска другого директора"}</p>
+                  <p className="truncate text-[16px] font-semibold leading-6">{wall.board ? wall.board.title : wall.loading ? "" : "Доска другого директора"}</p>
                   <p className="nums text-[13px] leading-[18px] text-muted">
                     {wall.board?.deleted_at ? "в корзине — на стене её уже нет" : until ? cartridgeLine(wall.counts.get(wall.boardId), until) : ""}
                   </p>

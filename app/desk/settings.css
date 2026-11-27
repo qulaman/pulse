@@ -116,7 +116,7 @@ html[data-surface="desk"][data-journal] {
     justify-content: center;
     background: rgb(255 255 255 / 0.1);
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
   }
   .set-brand-button {
     flex-shrink: 0;
@@ -124,7 +124,7 @@ html[data-surface="desk"][data-journal] {
     background: var(--brand);
     color: #08090b;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 16px;
   }
   .set-brand-login {
@@ -161,24 +161,21 @@ html[data-surface="desk"][data-journal] {
     gap: 1px;
     margin-top: 2px;
   }
+  /* the same line as the side navigation's: 32 high, 400 at rest, 500 chosen (D-214) */
   .set-nav-item {
-    height: 34px;
+    height: 32px;
     padding: 0 10px;
     border-radius: 8px;
     color: var(--ink-2);
-    font-weight: 500;
+    font-weight: 400;
     transition:
       color 140ms linear,
-      background-color 140ms linear,
-      scale 220ms var(--ease-snap);
+      background-color 140ms linear;
 
     &:hover {
       color: var(--ink);
       background: var(--hover);
-    }
-    &:active {
-      scale: 0.97;
-      transition-duration: 70ms;
+      transition-duration: 0ms;
     }
     &[aria-current="page"] {
       color: var(--ink);
@@ -196,20 +193,19 @@ html[data-surface="desk"][data-journal] {
     color: var(--ink-3);
     transition: color 140ms linear;
   }
-  .set-nav-item:hover .set-nav-icon {
-    color: var(--ink-2);
-  }
+  .set-nav-item:hover .set-nav-icon,
   .set-nav-item[aria-current="page"] .set-nav-icon {
-    color: var(--pen);
+    color: var(--ink);
+  }
+  .set-nav-item[aria-current="page"] .desk-ico-dot {
+    fill: var(--pen);
+    animation: graphite-dot-beat 480ms var(--ease-snap) both;
   }
   .set-nav-plate {
     position: absolute;
     inset: 0;
     border-radius: 8px;
     background: var(--selected);
-    box-shadow:
-      inset 0 0 0 1px var(--rule-soft),
-      var(--lift);
     pointer-events: none;
   }
   .set-nav-rail {
@@ -218,7 +214,7 @@ html[data-surface="desk"][data-journal] {
     left: 0;
     border-radius: 0 2px 2px 0;
     background: var(--pen);
-    box-shadow: 0 0 10px color-mix(in srgb, var(--pen) 70%, transparent);
+    box-shadow: none;
   }
   .set-nav [data-testid="settings-search-results"] {
     gap: 2px;
@@ -236,7 +232,7 @@ html[data-surface="desk"][data-journal] {
   /* a group is a card: its title and what it is for on top, the settings under it */
   .set-card {
     position: relative;
-    border-radius: 14px;
+    border-radius: 12px;
     background: var(--raise);
     box-shadow: var(--shadow-card);
   }
@@ -270,7 +266,7 @@ html[data-surface="desk"][data-journal] {
     border-bottom: 0;
   }
   .set-card-title {
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
     line-height: 20px;
     letter-spacing: -0.01em;
@@ -308,19 +304,19 @@ html[data-surface="desk"][data-journal] {
     left: 0;
     border-radius: 0 2px 2px 0;
     background: var(--pen);
-    box-shadow: 0 0 10px color-mix(in srgb, var(--pen) 55%, transparent);
+    box-shadow: none;
     transform-origin: center;
-    animation: settings-mark 260ms cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+    animation: settings-mark 260ms var(--ease-spring) both;
   }
   .set-link {
     padding: 4px 6px 4px 8px;
     margin: -4px -6px -4px 0;
-    border-radius: 7px;
+    border-radius: 6px;
     color: var(--ink-2);
     text-decoration: none;
     transition:
-      color 120ms linear,
-      background-color 120ms linear;
+      color 140ms linear,
+      background-color 140ms linear;
 
     &:hover {
       color: var(--ink);
@@ -329,7 +325,7 @@ html[data-surface="desk"][data-journal] {
   }
   .set-link-arrow {
     display: inline-block;
-    transition: transform 180ms var(--ease-snap);
+    transition: transform 200ms var(--ease-snap);
   }
   .set-link:hover .set-link-arrow {
     transform: translateX(2px);
@@ -346,7 +342,7 @@ html[data-surface="desk"][data-journal] {
       var(--lift);
 
     .set-card-head {
-      border-radius: 14px 14px 0 0;
+      border-radius: 12px 12px 0 0;
       background: color-mix(in srgb, var(--pencil) 6%, transparent);
       border-bottom-color: color-mix(in srgb, var(--pencil) 22%, transparent);
     }
@@ -408,7 +404,7 @@ html[data-surface="desk"][data-journal] {
     }
   }
   .set-check-box {
-    border-radius: 5px;
+    border-radius: 4px;
     background: color-mix(in srgb, var(--ink) 3.5%, var(--raise));
     box-shadow: inset 0 0 0 1px var(--line);
     color: #fff;
@@ -442,14 +438,14 @@ html[data-surface="desk"][data-journal] {
   .set-days .set-day {
     width: 34px;
     padding: 0;
-    border-radius: 7px;
+    border-radius: 6px;
     color: var(--ink-3);
     font-weight: 500;
     transition:
       color 140ms linear,
-      background-color 160ms linear,
-      box-shadow 160ms linear,
-      scale 220ms var(--ease-snap);
+      background-color 140ms linear,
+      box-shadow 140ms linear,
+      scale 200ms var(--ease-snap);
 
     &[aria-pressed="true"] {
       background: var(--raise);
@@ -458,7 +454,7 @@ html[data-surface="desk"][data-journal] {
         var(--lift),
         0 1px 3px rgb(0 0 0 / 0.25);
       color: var(--ink);
-      font-weight: 600;
+      font-weight: 500;
     }
   }
   &[data-desk-theme="light"] .set-days .set-day[aria-pressed="true"] {
@@ -483,8 +479,8 @@ html[data-surface="desk"][data-journal] {
     height: 20px;
     border-radius: 6px;
     transition:
-      background-color 100ms linear,
-      color 100ms linear;
+      background-color 80ms linear,
+      color 80ms linear;
 
     &:hover {
       background: color-mix(in srgb, var(--pencil) 14%, transparent);
@@ -504,14 +500,14 @@ html[data-surface="desk"][data-journal] {
       0 0 0 1px var(--rule),
       inset 0 0 0 2px color-mix(in srgb, #fff 18%, transparent);
     cursor: pointer;
-    transition: scale 220ms var(--ease-snap);
+    transition: scale 200ms var(--ease-snap);
 
     &:hover {
       scale: 1.06;
     }
     &:active {
       scale: 0.94;
-      transition-duration: 70ms;
+      transition-duration: 80ms;
     }
     &:focus-within {
       box-shadow:
@@ -531,7 +527,7 @@ html[data-surface="desk"][data-journal] {
   .set-logo-well {
     width: 148px;
     height: 40px;
-    border-radius: 10px;
+    border-radius: 8px;
     background: #0e0f12 !important;
     transition:
       border-color 140ms linear,
@@ -553,7 +549,7 @@ html[data-surface="desk"][data-journal] {
     border-bottom: 1px solid rgb(255 255 255 / 0.06);
   }
   .set-brand-letter {
-    border-radius: 7px;
+    border-radius: 6px;
   }
   .set-brand-button {
     border-radius: 6px;
@@ -576,7 +572,7 @@ html[data-surface="desk"][data-journal] {
   .set-dayline-on {
     border-radius: 9999px;
     background: linear-gradient(90deg, color-mix(in srgb, var(--pen) 70%, transparent), var(--pen));
-    box-shadow: 0 0 12px color-mix(in srgb, var(--pen) 45%, transparent);
+    box-shadow: none;
     transform-origin: left center;
     animation: settings-grow 640ms var(--ease-snap) 120ms both;
   }
@@ -607,17 +603,17 @@ html[data-surface="desk"][data-journal] {
     padding: 0;
   }
   .set-icon-button {
-    border-radius: 7px;
+    border-radius: 6px;
     color: var(--ink-3);
     transition:
-      opacity 120ms linear,
-      background-color 100ms linear,
-      color 100ms linear,
+      opacity 140ms linear,
+      background-color 80ms linear,
+      color 80ms linear,
       scale 200ms var(--ease-snap);
 
     &:active:not(:disabled) {
       scale: 0.9;
-      transition-duration: 70ms;
+      transition-duration: 80ms;
     }
   }
 
@@ -632,13 +628,13 @@ html[data-surface="desk"][data-journal] {
     border-radius: 8px;
     color: var(--ink);
     transition:
-      scale 240ms var(--ease-snap),
+      scale 200ms var(--ease-snap),
       background-color 140ms linear,
-      box-shadow 180ms linear;
+      box-shadow 200ms linear;
 
     &:active {
       scale: 0.96;
-      transition-duration: 70ms;
+      transition-duration: 80ms;
     }
     svg {
       color: var(--ink-2);
@@ -656,7 +652,7 @@ html[data-surface="desk"][data-journal] {
     margin: 0 auto;
     padding: 8px 8px 8px 16px;
     border-top: 0;
-    border-radius: 14px;
+    border-radius: 12px;
     background: color-mix(in srgb, var(--sheet) 88%, transparent);
     -webkit-backdrop-filter: blur(22px) saturate(1.5);
     backdrop-filter: blur(22px) saturate(1.5);

@@ -51,7 +51,7 @@ export function MiniButton({
       }}
       // `desk-mini`: «Графит» gives the plain word a body (D-171). The letter is in the title only: keys
       // live in the «?» sheet and a button's tooltip, never printed on the button (owner, 2026-11-25)
-      className={`desk-mini inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[2px] border leading-4 transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50 ${height} ${look}`}
+      className={`desk-mini inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[2px] border leading-4 transition-colors duration-[140ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50 ${height} ${look}`}
     >
       {label}
     </button>
@@ -155,7 +155,7 @@ export function MoreButton({ items, taskId, testId = "desk-row-more", label = "�
           event.stopPropagation();
           setAnchor(anchor ? null : event.currentTarget);
         }}
-        className="-my-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-[2px] text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        className="-my-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-[2px] text-muted transition-colors duration-[140ms] hover:bg-surface-2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
           <circle cx="5.5" cy="12" r="1.7" />

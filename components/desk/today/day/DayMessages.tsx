@@ -37,7 +37,7 @@ export function DayMessages({ me, messages, now, onOpenTask, index }: { me: Me; 
 
   return (
     <Card ink="violet" index={index} testId="home-messages">
-      <Head icon={MessageSquareText} title="Сообщения" count={messages.length} corner={fresh.size > 0 ? "news" : "state"} key={fresh.size}>
+      <Head icon={MessageSquareText} sign="messages" title="Сообщения" count={messages.length} corner={fresh.size > 0 ? "news" : "state"} key={fresh.size}>
         {words.length >= 2 ? (
           <Ghost icon={CheckCheck} onPress={readAll} title="Отметить прочитанными сообщения без вопроса и просьбы о сроке" testId="home-messages-read-all">
             Прочитал все · {words.length}
@@ -67,7 +67,7 @@ export function DayMessages({ me, messages, now, onOpenTask, index }: { me: Me; 
                   <span className="truncate text-[12px] leading-4 day-muted">
                     {who ? <span className="font-medium text-[var(--ink)]">{who}</span> : MESSAGE_KIND_WORD[message.kind]} · {message.task.title}
                   </span>
-                  <span className="line-clamp-2 text-[13.5px] leading-5 [overflow-wrap:anywhere]">{message.text || "—"}</span>
+                  <span className="line-clamp-2 text-[13px] leading-5 [overflow-wrap:anywhere]">{message.text || "—"}</span>
                 </span>
                 <span className="day-when">{shortWhen(new Date(message.at), now)}</span>
               </button>

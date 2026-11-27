@@ -190,7 +190,7 @@ function DayHead({
     >
       <h2 className="rep-feed-head-title">
         <button type="button" className="rep-feed-fold desk-focus" aria-expanded={open} aria-controls={`rep-feed-day-${day.date}`} onClick={() => onToggle(!open)} data-testid="desk-feed-fold">
-          <ChevronRight size={15} strokeWidth={2.25} className="rep-feed-fold-chevron" aria-hidden />
+          <ChevronRight size={16} className="rep-feed-fold-chevron" aria-hidden />
           <span className="rep-feed-head-name">{head.name}</span>
           <span className="rep-feed-head-date">{head.date}</span>
         </button>
@@ -205,13 +205,13 @@ function DayHead({
       {director && open && ready.length > 0 ? (
         <Tooltip label="Отметить проверенными все просмотренные отчёты дня" keys={["Shift", "A"]}>
           <button type="button" className="rep-feed-all desk-focus" onClick={() => onCheckDay(day)} data-testid="desk-feed-check-day">
-            <CheckCheck size={15} strokeWidth={2.2} aria-hidden />
+            <CheckCheck size={16} aria-hidden />
             Проверить все · <span className="nums">{ready.length}</span>
           </button>
         </Tooltip>
       ) : director && done ? (
         <span className="rep-feed-head-ok" data-testid="desk-feed-day-done">
-          <Check size={14} strokeWidth={2.4} aria-hidden />
+          <Check size={14} aria-hidden />
           все проверены
         </span>
       ) : !open && waits > 0 ? (

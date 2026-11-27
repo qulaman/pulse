@@ -149,7 +149,7 @@ export function taskColumns({
                 event.stopPropagation();
                 onPick(task.id);
               }}
-              className={`tasks-pick relative flex h-4 w-4 items-center justify-center rounded-[2px] border transition-opacity duration-[120ms] after:absolute after:-inset-2 ${on ? "border-accent bg-accent text-bg opacity-100" : `border-muted/60 ${anyPicked ? "opacity-100" : "opacity-0 [.desk-row:hover_&]:opacity-100 focus-visible:opacity-100"}`}`}
+              className={`tasks-pick relative flex h-4 w-4 items-center justify-center rounded-[2px] border transition-opacity duration-[140ms] after:absolute after:-inset-2 ${on ? "border-accent bg-accent text-bg opacity-100" : `border-muted/60 ${anyPicked ? "opacity-100" : "opacity-0 [.desk-row:hover_&]:opacity-100 focus-visible:opacity-100"}`}`}
             >
               {on ? (
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>

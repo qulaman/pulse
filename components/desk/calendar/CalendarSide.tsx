@@ -190,7 +190,7 @@ function DayPanel({
     <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-1.5">
         <p className="cal-side-eyebrow flex items-center gap-1.5 text-[12px] font-medium leading-4 text-muted">
-          <CalendarClock aria-hidden size={13} strokeWidth={2} className="cal-side-icon" />
+          <CalendarClock aria-hidden size={14} className="cal-side-icon" />
           {dayHead(day, now)}
         </p>
         {dayEvents.length === 0 ? (
@@ -268,7 +268,7 @@ function DayPanel({
             <div className="mt-1 flex flex-col">
               {deadlines.map((mark) => (
                 <Link key={mark.id} href={`/desk/tasks?id=${mark.id}`} className="cal-side-row cal-side-deadline flex h-8 items-center gap-2 px-1.5" data-tone={mark.tone} data-testid="cal-side-deadline">
-                  <Diamond aria-hidden size={11} strokeWidth={2.4} className="cal-side-diamond shrink-0" />
+                  <Diamond aria-hidden size={11} className="cal-side-diamond shrink-0" />
                   <When className="nums w-10 shrink-0 text-[13px] leading-[18px]">{mark.time}</When>
                   <span className="min-w-0 flex-1 truncate text-[13px] leading-[18px]">{mark.title}</span>
                   <span className="max-w-[40%] shrink-0 truncate text-[12px] leading-4 text-muted">{mark.who ? shortName(mark.who) : `${mark.count} чел.`}</span>
@@ -497,7 +497,7 @@ function MeetingPanel({ open, now, meId, isDirector, onClose, onEdit }: { open: 
       <div className="cal-side-meeting flex flex-col gap-3" data-testid="desk-event-card" data-event-id={open.id} data-state="gone">
         <div className="flex items-start gap-2">
           <p className="min-w-0 flex-1 text-[16px] font-semibold leading-[22px]">Этой встречи уже нет</p>
-          <IconButton label="К дню" keys={["Esc"]} icon={<X aria-hidden size={16} strokeWidth={2} />} onClick={onClose} testId="desk-event-close" />
+          <IconButton label="К дню" keys={["Esc"]} icon={<X aria-hidden size={16} />} onClick={onClose} testId="desk-event-close" />
         </div>
         <p className="text-[13px] leading-[18px] text-muted">Её удалили — из календаря она исчезла у всех.</p>
         <div>
@@ -602,11 +602,11 @@ function Meeting({
         <div className="-mr-1.5 -mt-0.5 flex shrink-0 items-center">
           {isDirector ? (
             <>
-              <IconButton label="Изменить" keys={["E"]} icon={<Pencil aria-hidden size={16} strokeWidth={2} />} onClick={onEdit} testId="desk-event-edit" />
-              <IconButton label="Удалить" keys={["Del"]} icon={<Trash2 aria-hidden size={16} strokeWidth={2} />} onClick={() => onConfirming(true)} testId="desk-event-delete" tone="danger" />
+              <IconButton label="Изменить" keys={["E"]} icon={<Pencil aria-hidden size={16} />} onClick={onEdit} testId="desk-event-edit" />
+              <IconButton label="Удалить" keys={["Del"]} icon={<Trash2 aria-hidden size={16} />} onClick={() => onConfirming(true)} testId="desk-event-delete" tone="danger" />
             </>
           ) : null}
-          <IconButton label="К дню" keys={["Esc"]} icon={<X aria-hidden size={16} strokeWidth={2} />} onClick={onClose} testId="desk-event-close" />
+          <IconButton label="К дню" keys={["Esc"]} icon={<X aria-hidden size={16} />} onClick={onClose} testId="desk-event-close" />
         </div>
       </div>
 
@@ -615,7 +615,7 @@ function Meeting({
         <h2 className="mt-2 text-[20px] font-semibold leading-[26px] [overflow-wrap:anywhere]">{event.title}</h2>
       </Morph>
       <p className="cal-side-when mt-1 flex items-center gap-1.5 text-[13px] leading-[18px] text-muted">
-        <CalendarClock aria-hidden size={14} strokeWidth={2} className="cal-side-icon shrink-0" />
+        <CalendarClock aria-hidden size={14} className="cal-side-icon shrink-0" />
         <When>
           {capitalize(humanYmd(ymdOfEvent(event), now))} · {timeRange(event)}
           {length}
@@ -636,12 +636,12 @@ function Meeting({
 
       <div className="mt-3 flex flex-col gap-2 text-[13px] leading-[18px]">
         {event.location ? (
-          <Fact icon={<MapPin aria-hidden size={14} strokeWidth={2} />} word="Где">
+          <Fact icon={<MapPin aria-hidden size={14} />} word="Где">
             <span className="[overflow-wrap:anywhere]">{event.location}</span>
           </Fact>
         ) : null}
         {rule ? (
-          <Fact icon={<Repeat aria-hidden size={14} strokeWidth={2} />} word="Повтор">
+          <Fact icon={<Repeat aria-hidden size={14} />} word="Повтор">
             <span className="min-w-0 flex-1">
               {ruleLine(rule)}
               <span className="text-muted"> · {ruleState(rule).text}</span>
@@ -664,7 +664,7 @@ function Meeting({
           </Fact>
         ) : null}
         {event.body ? (
-          <Fact icon={<AlignLeft aria-hidden size={14} strokeWidth={2} />} word="Повестка">
+          <Fact icon={<AlignLeft aria-hidden size={14} />} word="Повестка">
             <span className="whitespace-pre-line [overflow-wrap:anywhere]">{event.body}</span>
           </Fact>
         ) : null}

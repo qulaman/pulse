@@ -26,28 +26,12 @@ html[data-surface="desk"][data-journal] {
     box-shadow:
       inset 0 0 0 1px var(--ps-ring),
       var(--lift, 0 0 0 transparent);
-    transition: box-shadow 180ms var(--ease-out);
-    animation: ps-in 380ms var(--ease-out) both;
-    animation-delay: calc(var(--i, 0) * 40ms);
+    transition: box-shadow 200ms var(--ease-out);
 
-    /* the light under the pointer */
-    &::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      z-index: -1;
-      pointer-events: none;
-      background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 0%), color-mix(in srgb, var(--ps-pen) 9%, transparent), transparent 70%);
-      opacity: 0;
-      transition: opacity 240ms var(--ease-out);
-    }
     &:hover {
       box-shadow:
         inset 0 0 0 1px var(--rule, var(--border)),
         var(--lift, 0 0 0 transparent);
-    }
-    &:hover::before {
-      opacity: 1;
     }
   }
 
@@ -75,12 +59,12 @@ html[data-surface="desk"][data-journal] {
   }
   .ps-value-unit {
     margin-left: 1px;
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 500;
     color: var(--text-muted);
   }
   .ps-small-value {
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 600;
     line-height: 24px;
     letter-spacing: -0.01em;
@@ -109,7 +93,7 @@ html[data-surface="desk"][data-journal] {
     padding: 0 7px;
     border-radius: 9999px;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 16px;
     white-space: nowrap;
     color: var(--tone);
@@ -190,7 +174,7 @@ html[data-surface="desk"][data-journal] {
   .ps-spark-end {
     transform-box: fill-box;
     transform-origin: center;
-    animation: ps-pop 300ms cubic-bezier(0.34, 1.56, 0.64, 1) 760ms both;
+    animation: ps-pop 300ms var(--ease-spring) 760ms both;
   }
 
   /* ---- the ring ---- */
@@ -290,7 +274,7 @@ html[data-surface="desk"][data-journal] {
     border-radius: 9999px;
     background: var(--ps-pen);
     box-shadow: 0 0 0 2px var(--sheet, var(--surface));
-    animation: ps-pop 340ms cubic-bezier(0.34, 1.56, 0.64, 1) 520ms both;
+    animation: ps-pop 340ms var(--ease-spring) 520ms both;
   }
   .ps-rank-me {
     background: var(--gold);
@@ -303,7 +287,7 @@ html[data-surface="desk"][data-journal] {
     gap: 4px;
   }
   .ps-days-head {
-    font-size: 10px;
+    font-size: 11px;
     line-height: 12px;
     text-align: center;
     color: var(--ink-3, var(--text-muted));
@@ -314,7 +298,7 @@ html[data-surface="desk"][data-journal] {
     border-radius: 4px;
     background: color-mix(in srgb, var(--text-muted) 13%, transparent);
     animation: ps-pop 260ms var(--ease-out) both;
-    transition: transform 120ms var(--ease-out);
+    transition: transform 140ms var(--ease-out);
 
     &[data-state="submitted"] {
       background: var(--ok);
@@ -344,12 +328,6 @@ html[data-surface="desk"][data-journal] {
   }
 }
 
-@keyframes ps-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-}
 @keyframes ps-fade {
   from {
     opacity: 0;

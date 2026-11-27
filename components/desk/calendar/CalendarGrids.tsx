@@ -213,7 +213,7 @@ export function MonthGrid({ days, byDay, today, now, meId, onOpen, openId, month
               data-weekend={off ? "" : undefined}
               // the mouse may take the whole cell; the keyboard has the date, «ещё N» and the chips
               onClick={() => onDay(ymd)}
-              className={`cal-cell group/day flex min-h-0 min-w-0 cursor-pointer flex-col gap-0.5 overflow-hidden p-1.5 transition-colors duration-[120ms] hover:bg-surface-2/50 ${
+              className={`cal-cell group/day flex min-h-0 min-w-0 cursor-pointer flex-col gap-0.5 overflow-hidden p-1.5 transition-colors duration-[140ms] hover:bg-surface-2/50 ${
                 index % 7 > 0 ? "border-l border-border/60" : ""
               } ${index >= 7 ? "border-t border-border/60" : ""}`}
             >
@@ -247,9 +247,9 @@ export function MonthGrid({ days, byDay, today, now, meId, onOpen, openId, month
                           click.stopPropagation();
                           onNew(ymd);
                         }}
-                        className="cal-cell-new desk-focus flex h-6 w-6 items-center justify-center text-[16px] leading-none text-muted opacity-0 transition-opacity duration-[120ms] hover:bg-surface-2 hover:text-accent focus-visible:opacity-100 group-hover/day:opacity-100"
+                        className="cal-cell-new desk-focus flex h-6 w-6 items-center justify-center text-[16px] leading-none text-muted opacity-0 transition-opacity duration-[140ms] hover:bg-surface-2 hover:text-accent focus-visible:opacity-100 group-hover/day:opacity-100"
                       >
-                        <Plus aria-hidden size={14} strokeWidth={2.2} />
+                        <Plus aria-hidden size={14} />
                       </button>
                     </Tooltip>
                   ) : null}
@@ -271,7 +271,7 @@ export function MonthGrid({ days, byDay, today, now, meId, onOpen, openId, month
                         click.stopPropagation();
                         onOpen(event);
                       }}
-                      className={`cal-chip desk-focus flex w-full min-w-0 items-center gap-1.5 border-l-2 px-1 py-[3px] text-left text-[12px] leading-4 transition-colors duration-[120ms] hover:bg-surface-2 ${
+                      className={`cal-chip desk-focus flex w-full min-w-0 items-center gap-1.5 border-l-2 px-1 py-[3px] text-left text-[12px] leading-4 transition-colors duration-[140ms] hover:bg-surface-2 ${
                         over || outside ? "text-muted" : ""
                       }`}
                     >

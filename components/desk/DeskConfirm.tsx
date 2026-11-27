@@ -259,8 +259,8 @@ export function DeskConfirm() {
     return (
       <section className="tasks-confirm flex flex-col gap-3" data-testid="desk-confirm" data-state="error" data-code={code}>
         <PanelHeader>
-          <h2 className="desk-task-title flex items-center gap-2 text-[21px] leading-[26px] text-danger">
-            <TriangleAlert aria-hidden size={20} strokeWidth={2.2} className="tasks-ico shrink-0" />
+          <h2 className="desk-task-title flex items-center gap-2 text-[20px] leading-[26px] text-danger">
+            <TriangleAlert aria-hidden size={20} className="tasks-ico shrink-0" />
             {failureTitle(code)}
           </h2>
           <p className="mt-1 text-[14px] leading-5" data-testid="desk-confirm-error">
@@ -302,8 +302,8 @@ export function DeskConfirm() {
     return (
       <section className="tasks-confirm flex flex-col gap-3" data-testid="desk-confirm" data-state="question">
         <PanelHeader>
-          <h2 className="desk-task-title flex items-center gap-2 text-[21px] leading-[26px]">
-            <CircleHelp aria-hidden size={20} strokeWidth={2.2} className="tasks-ico tasks-confirm-mark shrink-0" />
+          <h2 className="desk-task-title flex items-center gap-2 text-[20px] leading-[26px]">
+            <CircleHelp aria-hidden size={20} className="tasks-ico tasks-confirm-mark shrink-0" />
             {reply && !reply.understood ? "Не понял вопрос" : "Отвечаю"}
           </h2>
         </PanelHeader>
@@ -319,12 +319,12 @@ export function DeskConfirm() {
                   href={`/desk/tasks?id=${id}`}
                   prefetch={false}
                   data-testid="desk-answer-task"
-                  className="tasks-answer desk-focus group -mx-2 flex items-baseline gap-3 rounded-[2px] px-2 py-1 text-[14px] leading-5 text-text/90 transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
+                  className="tasks-answer desk-focus group -mx-2 flex items-baseline gap-3 rounded-[2px] px-2 py-1 text-[14px] leading-5 text-text/90 transition-colors duration-[140ms] hover:bg-surface-2 hover:text-text"
                 >
                   <span className="min-w-0 flex-1">{line}</span>
-                  <span className="inline-flex shrink-0 items-center gap-1 self-center text-[12px] leading-4 text-muted opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100 group-focus-visible:opacity-100">
+                  <span className="inline-flex shrink-0 items-center gap-1 self-center text-[12px] leading-4 text-muted opacity-0 transition-opacity duration-[140ms] group-hover:opacity-100 group-focus-visible:opacity-100">
                     Открыть
-                    <ArrowRight aria-hidden size={13} strokeWidth={2.2} className="tasks-ico" />
+                    <ArrowRight aria-hidden size={14} className="tasks-ico" />
                     <span aria-hidden className="tasks-journal-only">
                       →
                     </span>
@@ -356,8 +356,8 @@ export function DeskConfirm() {
     return (
       <section className="tasks-confirm flex flex-col gap-3" data-testid="desk-confirm" data-state="empty">
         <PanelHeader>
-          <h2 className="desk-task-title flex items-center gap-2 text-[21px] leading-[26px]">
-            <ScanText aria-hidden size={20} strokeWidth={2.2} className="tasks-ico tasks-confirm-mark shrink-0" />
+          <h2 className="desk-task-title flex items-center gap-2 text-[20px] leading-[26px]">
+            <ScanText aria-hidden size={20} className="tasks-ico tasks-confirm-mark shrink-0" />
             Не разобрал
           </h2>
           <p className="mt-1 text-[14px] leading-5 text-muted">Не нашёл здесь ни задач, ни объявлений. Поправьте слова и разберу заново — или сделаю из них задачу.</p>
@@ -413,14 +413,14 @@ export function DeskConfirm() {
   return (
     <section ref={section} className="tasks-confirm flex min-h-full flex-col" data-testid="desk-confirm" data-state="confirm" data-sending={sending ? "" : undefined}>
       <PanelHeader>
-        <h2 className="desk-task-title text-[19px] leading-6">Понял так: {entitiesSummary(entities)}</h2>
+        <h2 className="desk-task-title text-[20px] leading-6">Понял так: {entitiesSummary(entities)}</h2>
         {transcript ? (
           // what was heard or typed, with the way it came: the voice or the keys
           <p className="tasks-said mt-1 flex items-start gap-2 text-[13px] leading-[18px] text-muted" title={transcript}>
             {source === "voice" ? (
-              <AudioLines aria-hidden size={14} strokeWidth={2.2} className="tasks-ico mt-0.5 shrink-0" />
+              <AudioLines aria-hidden size={14} className="tasks-ico mt-0.5 shrink-0" />
             ) : (
-              <Keyboard aria-hidden size={14} strokeWidth={2.2} className="tasks-ico mt-0.5 shrink-0" />
+              <Keyboard aria-hidden size={14} className="tasks-ico mt-0.5 shrink-0" />
             )}
             <span className="line-clamp-2 min-w-0">«{transcript}»</span>
           </p>
@@ -444,7 +444,7 @@ export function DeskConfirm() {
         <div className="flex items-center gap-2">
           <Button size="sm" disabled={!canSend} loading={sending} onClick={() => void sendBatch(false)} data-testid="desk-confirm-send" className="tasks-confirm-send whitespace-nowrap">
             {label}
-            <SendHorizontal aria-hidden size={15} strokeWidth={2.2} className="tasks-ico tasks-send-icon" />
+            <SendHorizontal aria-hidden size={16} className="tasks-ico tasks-send-icon" />
           </Button>
           <Button size="sm" variant="secondary" disabled={sending} onClick={reset} data-testid="desk-confirm-cancel">
             Отменить

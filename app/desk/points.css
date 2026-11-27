@@ -90,7 +90,7 @@ html[data-surface="desk"][data-journal] {
     background: var(--surface-2);
     color: var(--text);
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 600;
     line-height: 18px;
     text-align: center;
 
@@ -161,8 +161,8 @@ html[data-surface="desk"][data-journal] {
     justify-content: center;
   }
   .pts-wait-value {
-    font-size: 15px;
-    font-weight: 700;
+    font-size: 14px;
+    font-weight: 600;
     color: var(--text);
   }
   .pts-wait[data-on] .pts-wait-value {
@@ -262,7 +262,7 @@ html[data-surface="desk"][data-journal] {
     flex-shrink: 0;
     align-items: center;
     justify-content: center;
-    font-size: 15px;
+    font-size: 14px;
     line-height: 1;
   }
   .pts-shelf {
@@ -311,7 +311,7 @@ html[data-surface="desk"][data-journal] {
     margin-left: auto;
     color: var(--text-muted);
     opacity: 0;
-    transition: opacity 120ms linear;
+    transition: opacity 140ms linear;
   }
   .pts-item:hover .pts-item-edit,
   .pts-item:focus-visible .pts-item-edit {
@@ -321,7 +321,7 @@ html[data-surface="desk"][data-journal] {
     width: 100%;
     margin-top: 12px;
     overflow: hidden;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
     line-height: 20px;
     text-overflow: ellipsis;
@@ -347,7 +347,7 @@ html[data-surface="desk"][data-journal] {
 
     .nums {
       font-size: 20px;
-      font-weight: 700;
+      font-weight: 600;
       line-height: 24px;
     }
   }
@@ -395,8 +395,8 @@ html[data-surface="desk"][data-journal] {
   .pts-rules-link {
     border-radius: 8px;
     transition:
-      color 120ms linear,
-      background-color 120ms linear;
+      color 140ms linear,
+      background-color 140ms linear;
 
     &:hover {
       background: var(--hover);
@@ -407,9 +407,7 @@ html[data-surface="desk"][data-journal] {
   .pts-hero.desk-total {
     gap: 16px;
     padding: 20px 22px 16px;
-    background:
-      radial-gradient(110% 150% at 0% 0%, color-mix(in srgb, var(--gold-ink) 10%, transparent), transparent 55%),
-      var(--raise);
+    background: var(--raise);
   }
   .pts-hero-label {
     color: var(--ink-2);
@@ -419,11 +417,11 @@ html[data-surface="desk"][data-journal] {
     animation: settings-rise 420ms var(--ease-snap) both;
   }
   .pts-chart-bar {
-    border-radius: 3px 3px 1px 1px;
+    border-radius: 2px 2px 2px 2px;
     background: color-mix(in srgb, var(--gold-ink) 62%, transparent);
     opacity: 1;
     transform-origin: bottom center;
-    transition: background-color 120ms linear;
+    transition: background-color 140ms linear;
     animation: pts-bar 560ms var(--ease-snap) both;
 
     &[data-zero] {
@@ -431,7 +429,7 @@ html[data-surface="desk"][data-journal] {
     }
     &[data-today] {
       background: var(--gold-ink);
-      box-shadow: 0 0 12px color-mix(in srgb, var(--gold-ink) 45%, transparent);
+      box-shadow: none;
     }
     &:hover {
       background: var(--gold-ink);
@@ -441,7 +439,7 @@ html[data-surface="desk"][data-journal] {
     color: var(--ink-3);
   }
   .pts-leader {
-    animation: settings-pop 320ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+    animation: settings-pop 320ms var(--ease-spring) both;
   }
   .pts-leader-place {
     box-shadow: 0 0 0 2px var(--raise);
@@ -463,16 +461,16 @@ html[data-surface="desk"][data-journal] {
   }
   .pts-wait {
     padding: 0 10px 0 6px;
-    border-radius: 10px;
+    border-radius: 8px;
     background: var(--surface-2);
     box-shadow:
       0 0 0 1px var(--rule-soft),
       var(--lift);
     color: var(--ink-2);
     transition:
-      scale 240ms var(--ease-snap),
+      scale 200ms var(--ease-snap),
       background-color 140ms linear,
-      box-shadow 160ms linear,
+      box-shadow 140ms linear,
       color 140ms linear;
 
     &:hover {
@@ -481,7 +479,7 @@ html[data-surface="desk"][data-journal] {
     }
     &:active {
       scale: 0.96;
-      transition-duration: 70ms;
+      transition-duration: 80ms;
     }
     &[data-on] {
       background: color-mix(in srgb, var(--warn-ink) 13%, transparent);
@@ -490,7 +488,7 @@ html[data-surface="desk"][data-journal] {
     }
   }
   .pts-wait-icon {
-    border-radius: 7px;
+    border-radius: 6px;
     background: color-mix(in srgb, var(--ink) 6%, transparent);
   }
   .pts-wait[data-on] .pts-wait-icon {
@@ -498,7 +496,7 @@ html[data-surface="desk"][data-journal] {
   }
   .pts-wait-arrow {
     opacity: 0.55;
-    transition: transform 180ms var(--ease-snap);
+    transition: transform 200ms var(--ease-snap);
   }
   .pts-wait:hover .pts-wait-arrow {
     transform: translateX(2px);
@@ -519,7 +517,7 @@ html[data-surface="desk"][data-journal] {
     animation: pts-fill 620ms var(--ease-snap) both;
   }
   .pts-row-award {
-    border-radius: 7px;
+    border-radius: 6px;
 
     &:hover {
       background: var(--hover);
@@ -535,7 +533,7 @@ html[data-surface="desk"][data-journal] {
 
     > span:first-of-type {
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 500;
       letter-spacing: 0;
       text-transform: none;
       color: var(--ink);
@@ -546,7 +544,7 @@ html[data-surface="desk"][data-journal] {
     height: 24px;
     align-items: center;
     padding: 0 8px;
-    border-radius: 7px;
+    border-radius: 6px;
     background: color-mix(in srgb, var(--ink) 6%, transparent);
 
     &[data-sign="plus"] {
@@ -557,9 +555,9 @@ html[data-surface="desk"][data-journal] {
   .pts-source {
     height: 24px;
     padding: 0 8px;
-    border-radius: 7px;
+    border-radius: 6px;
     background: color-mix(in srgb, var(--ink) 4%, transparent);
-    font-size: 12.5px;
+    font-size: 12px;
   }
 
   /* the disputes: one card each */
@@ -576,14 +574,14 @@ html[data-surface="desk"][data-journal] {
   .pts-dispute {
     gap: 8px;
     padding: 16px 18px;
-    border-radius: 14px;
+    border-radius: 12px;
     background: var(--raise);
     box-shadow: var(--shadow-card);
     animation: settings-rise 320ms var(--ease-snap) both;
   }
   .pts-dispute-quote {
     padding: 10px 12px 10px 34px;
-    border-radius: 10px;
+    border-radius: 8px;
     background: color-mix(in srgb, var(--ink) 4%, transparent);
   }
   .pts-dispute-mark {
@@ -612,7 +610,7 @@ html[data-surface="desk"][data-journal] {
 
   /* the shop */
   #desk-main .pts-shop-head h2 {
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
     line-height: 20px;
     letter-spacing: -0.01em;
@@ -623,9 +621,9 @@ html[data-surface="desk"][data-journal] {
     height: 24px;
     align-items: center;
     padding: 0 8px;
-    border-radius: 7px;
+    border-radius: 6px;
     background: color-mix(in srgb, var(--ink) 6%, transparent);
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 500;
 
     &[data-tone="warn"] {
@@ -636,21 +634,21 @@ html[data-surface="desk"][data-journal] {
     }
   }
   .pts-reward-icon {
-    border-radius: 7px;
+    border-radius: 6px;
     background: var(--surface-2);
     box-shadow: inset 0 0 0 1px var(--rule-soft);
   }
   .pts-item {
     border: 0;
-    border-radius: 14px;
+    border-radius: 12px;
     background: var(--raise);
     box-shadow: var(--shadow-card);
     cursor: pointer;
     transition:
-      transform 220ms var(--ease-snap),
-      scale 220ms var(--ease-snap),
-      box-shadow 180ms linear,
-      background-color 160ms linear;
+      transform 200ms var(--ease-snap),
+      scale 200ms var(--ease-snap),
+      box-shadow 200ms linear,
+      background-color 140ms linear;
     animation: settings-rise 340ms var(--ease-snap) both;
 
     &:hover {
@@ -662,7 +660,7 @@ html[data-surface="desk"][data-journal] {
     }
     &:active {
       scale: 0.97;
-      transition-duration: 70ms;
+      transition-duration: 80ms;
     }
     &[data-chosen] {
       box-shadow:
@@ -681,11 +679,9 @@ html[data-surface="desk"][data-journal] {
   }
   .pts-item-icon {
     border-radius: 12px;
-    background:
-      radial-gradient(100% 100% at 30% 20%, color-mix(in srgb, var(--gold-ink) 16%, transparent), transparent 70%),
-      var(--surface-2);
+    background: var(--surface-2);
     box-shadow: inset 0 0 0 1px var(--rule-soft);
-    transition: scale 260ms cubic-bezier(0.34, 1.4, 0.64, 1);
+    transition: scale 200ms var(--ease-spring);
   }
   .pts-item:hover .pts-item-icon {
     scale: 1.06;
@@ -795,9 +791,9 @@ html[data-surface="desk"][data-journal] {
     font-size: 13px;
     font-weight: 500;
     transition:
-      background-color 120ms linear,
+      background-color 140ms linear,
       box-shadow 140ms linear,
-      color 120ms linear,
+      color 140ms linear,
       scale 200ms var(--ease-snap);
 
     &:hover {
@@ -806,13 +802,13 @@ html[data-surface="desk"][data-journal] {
     }
     &:active {
       scale: 0.95;
-      transition-duration: 70ms;
+      transition-duration: 80ms;
     }
     &[aria-pressed="true"] {
       background: color-mix(in srgb, var(--pen) 14%, transparent);
       box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 55%, transparent);
       color: var(--ink);
-      font-weight: 600;
+      font-weight: 500;
     }
   }
   .award-form .award-chip + .award-chip,
@@ -821,20 +817,20 @@ html[data-surface="desk"][data-journal] {
   }
   .award-public {
     padding: 10px 12px;
-    border-radius: 10px;
+    border-radius: 8px;
     background: color-mix(in srgb, var(--ink) 3.5%, transparent);
     box-shadow: inset 0 0 0 1px var(--rule-soft);
   }
   .item-icon-choice {
     width: 38px !important;
     height: 38px;
-    border-radius: 10px;
+    border-radius: 8px;
     background: var(--surface-2);
     box-shadow: inset 0 0 0 1px var(--rule-soft);
     transition:
-      background-color 120ms linear,
+      background-color 140ms linear,
       box-shadow 140ms linear,
-      scale 220ms cubic-bezier(0.34, 1.4, 0.64, 1);
+      scale 200ms var(--ease-spring);
 
     &:hover {
       scale: 1.08;

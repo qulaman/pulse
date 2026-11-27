@@ -143,7 +143,7 @@ export function CheckLine({ checked, onChange, label, hint, disabled = false }: 
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`set-check flex min-h-9 items-center gap-2.5 text-left text-[14px] leading-5 transition-colors duration-[120ms] disabled:cursor-default ${FOCUS}`}
+      className={`set-check flex min-h-9 items-center gap-2.5 text-left text-[14px] leading-5 transition-colors duration-[140ms] disabled:cursor-default ${FOCUS}`}
     >
       <span aria-hidden className="set-check-box flex h-4 w-4 shrink-0 items-center justify-center" data-on={checked ? "" : undefined}>
         {checked ? (
@@ -367,7 +367,7 @@ export function Segmented<V extends string | number>({ id, value, onChange, item
             aria-checked={active}
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(item.value)}
-            className={`relative flex h-8 items-center whitespace-nowrap px-3 text-[13px] font-semibold leading-4 transition-colors duration-[120ms] ${FOCUS} ${
+            className={`relative flex h-8 items-center whitespace-nowrap px-3 text-[13px] font-semibold leading-4 transition-colors duration-[140ms] ${FOCUS} ${
               active ? "seg-thumb text-text" : "text-muted hover:text-text"
             }`}
           >
@@ -430,7 +430,7 @@ export function SaveBar({ changes, saving, onSave, onReset, blocked }: { changes
           <Kbd>Ctrl</Kbd>
           <Kbd>S</Kbd>
         </span>
-        <Button size="sm" loading={saving} disabled={Boolean(blocked)} onClick={onSave} data-testid="settings-save" icon={<Check size={15} strokeWidth={2.5} />}>
+        <Button size="sm" loading={saving} disabled={Boolean(blocked)} onClick={onSave} data-testid="settings-save" icon={<Check size={16} />}>
           Сохранить
         </Button>
       </div>
@@ -448,7 +448,7 @@ export function GroupLink({ href, children, testId }: { href: string; children: 
   return (
     <Link href={href} data-testid={testId} className="set-link inline-flex items-center gap-0.5 text-[13px] font-medium">
       {children}
-      <ChevronRight size={14} strokeWidth={2.25} aria-hidden className="set-link-arrow" />
+      <ChevronRight size={14} aria-hidden className="set-link-arrow" />
     </Link>
   );
 }

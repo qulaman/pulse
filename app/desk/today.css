@@ -11,9 +11,9 @@
    ========================================================================================== */
 
 :root[data-surface="desk"][data-journal][data-graphite] {
-  --day-snap: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --day-in: cubic-bezier(0.4, 0, 1, 1);
-  --day-pop: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --day-snap: var(--ease-snap);
+  --day-in: var(--ease-in);
+  --day-pop: var(--ease-spring);
 
   /* ---- the column: every card of «Сегодня» one under another, of one width (D-196) ----------- */
   .day-side {
@@ -21,6 +21,64 @@
     min-width: 0;
     flex-direction: column;
     gap: 16px;
+  }
+  /* the cards under «Сейчас»: one column in the screen's order — the work, the day's words, the
+     figures, the keypad, the people, the feed; from 1500 px of room the words, figures and feed
+     stand beside the work as a column of their own (D-214) */
+  .day-cols {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .day-main,
+  .day-aside {
+    display: contents;
+  }
+  .day-slot {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 16px;
+
+    &:empty {
+      display: none;
+    }
+    &[data-slot="work"] {
+      order: 1;
+    }
+    &[data-slot="yours"] {
+      order: 2;
+    }
+    &[data-slot="figures"] {
+      order: 3;
+    }
+    &[data-slot="pult"] {
+      order: 4;
+    }
+    &[data-slot="people"] {
+      order: 5;
+    }
+    &[data-slot="feed"] {
+      order: 6;
+    }
+  }
+  @container (min-width: 1500px) {
+    .day-cols {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 420px;
+      align-items: start;
+    }
+    .day-main,
+    .day-aside {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .day-aside .day-figures {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
   /* «Сейчас»: two cards side by side, each its own height; none — no room taken */
   .day-now {
@@ -49,24 +107,20 @@
     min-width: 0;
     flex-direction: column;
     padding: 14px 16px 12px;
-    border-radius: 14px;
+    border-radius: 12px;
     background: var(--raise);
     box-shadow: var(--shadow-card);
   }
   /* what happens now: one step up, lit from its corner by its ink — the Moment's own recipe */
   .day-card[data-now] {
-    background:
-      radial-gradient(120% 150% at 0% 0%, color-mix(in srgb, var(--tone) 13%, transparent), transparent 58%),
-      var(--sheet);
+    background: color-mix(in srgb, var(--tone) 6%, var(--sheet));
     box-shadow:
       0 0 0 1px color-mix(in srgb, var(--tone) 38%, transparent),
       var(--lift),
       0 10px 28px -14px rgb(0 0 0 / 0.55);
   }
   &[data-desk-theme="light"] .day-card[data-now] {
-    background:
-      radial-gradient(120% 150% at 0% 0%, color-mix(in srgb, var(--tone) 8%, transparent), transparent 58%),
-      var(--sheet);
+    background: color-mix(in srgb, var(--tone) 4%, var(--sheet));
     box-shadow:
       0 0 0 1px color-mix(in srgb, var(--tone) 30%, transparent),
       0 6px 18px -10px rgb(15 17 22 / 0.18);
@@ -110,7 +164,7 @@
     transform: translateX(-3px);
     transition:
       opacity 140ms linear,
-      transform 180ms var(--day-snap),
+      transform 200ms var(--day-snap),
       color 140ms linear;
   }
   .day-card:hover .day-chev,
@@ -137,12 +191,10 @@
     flex-shrink: 0;
     align-items: center;
     justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 7px;
-    background: color-mix(in srgb, var(--tone) 15%, transparent);
+    width: 18px;
+    height: 18px;
+    /* the block's ink is the sign's own colour: no plate under it (D-214) */
     color: var(--tone);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 24%, transparent);
 
     /* «there is something»: a still dot on the corner; news makes it beat twice */
     &[data-live]::after {
@@ -163,9 +215,6 @@
   .day-card[data-now] .day-tile[data-live]::after {
     box-shadow: 0 0 0 2px var(--sheet);
   }
-  .day-card:hover .day-tile svg {
-    animation: day-wiggle 420ms var(--day-snap) 1;
-  }
 
   /* ---- buttons ----------------------------------------------------------------------------- */
   /* a small move in a head: a ghost; the director's own move in the pen */
@@ -176,15 +225,15 @@
     align-items: center;
     gap: 5px;
     padding: 0 8px;
-    border-radius: 7px;
+    border-radius: 6px;
     color: var(--ink-2);
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 500;
     white-space: nowrap;
     transition:
-      background-color 120ms linear,
-      color 120ms linear,
-      scale 300ms var(--day-pop);
+      background-color 140ms linear,
+      color 140ms linear,
+      scale 320ms var(--day-pop);
 
     &:hover:not(:disabled) {
       background: var(--hover);
@@ -192,7 +241,7 @@
     }
     &:active:not(:disabled) {
       scale: 0.94;
-      transition-duration: 70ms;
+      transition-duration: 80ms;
     }
     &:disabled {
       opacity: 0.55;
@@ -201,7 +250,7 @@
       background: color-mix(in srgb, var(--pen) 12%, transparent);
       box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 32%, transparent);
       color: var(--pen-deep);
-      font-weight: 600;
+      font-weight: 500;
     }
     &[data-pen]:hover:not(:disabled) {
       background: color-mix(in srgb, var(--pen) 20%, transparent);
@@ -249,13 +298,13 @@
     line-height: 18px;
     white-space: nowrap;
     transition:
-      scale 300ms var(--day-pop),
-      filter 120ms linear,
-      box-shadow 160ms linear;
+      scale 320ms var(--day-pop),
+      filter 140ms linear,
+      box-shadow 140ms linear;
 
     &:active:not(:disabled) {
       scale: 0.95;
-      transition-duration: 70ms;
+      transition-duration: 80ms;
     }
   }
 
@@ -286,7 +335,7 @@
     font-size: 13px;
     line-height: 20px;
     text-align: left;
-    transition: background-color 120ms linear;
+    transition: background-color 140ms linear;
 
     &:is(button, a, [data-press]) {
       cursor: pointer;
@@ -329,8 +378,8 @@
     border-radius: 6px;
     background: color-mix(in srgb, var(--tone) 15%, transparent);
     color: var(--tone);
-    font-size: 11.5px;
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 500;
     white-space: nowrap;
   }
 
@@ -409,14 +458,14 @@
     background: color-mix(in srgb, var(--ink) 3%, var(--raise));
     box-shadow: 0 0 0 1px var(--rule-soft), var(--lift);
     color: var(--ink-2);
-    font-size: 12.5px;
+    font-size: 12px;
     line-height: 16px;
     white-space: nowrap;
     transition:
       background-color 140ms linear,
-      box-shadow 160ms linear,
+      box-shadow 140ms linear,
       color 140ms linear,
-      scale 300ms var(--day-pop);
+      scale 320ms var(--day-pop);
 
     /* only a capsule that leads somewhere answers the hand */
     &:is(a):hover {
@@ -426,7 +475,7 @@
     }
     &:is(a):active {
       scale: 0.95;
-      transition-duration: 70ms;
+      transition-duration: 80ms;
     }
     .day-cap-icon {
       display: inline-flex;
@@ -510,7 +559,7 @@
     align-items: center;
     justify-self: center;
     padding: 0 4px 4px;
-    border-radius: 14px;
+    border-radius: 12px;
     color: var(--ink);
     text-align: center;
     user-select: none;
@@ -529,7 +578,7 @@
     &:not(.day-sos):active .day-key-disc {
       scale: 0.9;
       translate: 0 0;
-      transition-duration: 70ms;
+      transition-duration: 80ms;
     }
     /* a state outweighs the hover: the key under the hand still says what it is doing */
     &[data-state="held"] .day-key-disc {
@@ -589,8 +638,8 @@
     transition:
       translate 320ms var(--day-pop),
       scale 320ms var(--day-pop),
-      background-color 160ms linear,
-      box-shadow 160ms linear;
+      background-color 140ms linear,
+      box-shadow 140ms linear;
   }
   &[data-desk-theme="light"] .day-key:not([data-state]):not(.day-sos) .day-key-disc {
     background: color-mix(in srgb, var(--tone) 9%, var(--sheet));
@@ -625,7 +674,7 @@
     line-height: 16px;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
-    transition: color 160ms linear;
+    transition: color 140ms linear;
   }
   .day-key-note {
     display: block;
@@ -679,7 +728,7 @@
 
     .day-key-word {
       color: var(--pencil-deep);
-      font-weight: 650;
+      font-weight: 500;
     }
     &:hover:not(:disabled) .day-sos-disc {
       translate: 0 -3px;
@@ -698,7 +747,7 @@
     &[data-holding]:hover .day-sos-disc {
       translate: 0 0;
       scale: 0.93;
-      transition-duration: 160ms;
+      transition-duration: 140ms;
     }
     &[data-holding] .day-sos-siren {
       animation: day-shake 300ms ease-in-out infinite;
@@ -778,10 +827,10 @@
     height: 36px;
     align-items: center;
     padding: 0 5px 0 12px;
-    border-radius: 10px;
+    border-radius: 8px;
     background: var(--surface-2);
     box-shadow: 0 0 0 1px var(--rule);
-    transition: box-shadow 160ms linear;
+    transition: box-shadow 140ms linear;
 
     &:focus-within {
       box-shadow:
@@ -867,7 +916,7 @@
     display: inline-flex;
     align-items: baseline;
     white-space: nowrap;
-    font-size: 34px;
+    font-size: 32px;
     font-weight: 600;
     line-height: 38px;
     letter-spacing: -0.035em;
@@ -879,7 +928,7 @@
   .day-figure-of {
     margin-left: 2px;
     color: var(--ink-3);
-    font-size: 19px;
+    font-size: 20px;
     font-weight: 500;
     letter-spacing: -0.02em;
   }
@@ -892,10 +941,10 @@
     display: inline-flex;
     border-radius: 9999px;
     animation: day-face-in 260ms var(--day-pop) both;
-    transition: opacity 300ms linear;
+    transition: opacity 320ms linear;
 
     .team-face {
-      transition: box-shadow 300ms linear;
+      transition: box-shadow 320ms linear;
     }
     &[data-state="submitted"] .team-face {
       box-shadow: 0 0 0 2px var(--raise), 0 0 0 3.5px var(--ok-ink);
@@ -929,7 +978,7 @@
     position: relative;
     flex: 1;
     overflow: hidden;
-    border-radius: 1px;
+    border-radius: 2px;
     background: color-mix(in srgb, var(--ink-2) 24%, transparent);
 
     > i {
@@ -938,7 +987,7 @@
       background: var(--seg);
       transform-origin: left center;
       transform: scaleX(var(--on, 0));
-      transition: transform 460ms var(--day-snap);
+      transition: transform 480ms var(--day-snap);
     }
   }
   .day-side[data-arrive] .day-seg > i {
@@ -1007,14 +1056,14 @@
     width: 2px;
     height: 15px;
     margin-left: -1px;
-    border-radius: 1px;
+    border-radius: 2px;
     background: var(--pen);
   }
   .day-pulse-tick {
     position: absolute;
     top: 18px;
     color: var(--ink-3);
-    font-size: 10.5px;
+    font-size: 11px;
     font-variant-numeric: tabular-nums;
     transform: translateX(-50%);
   }
@@ -1059,7 +1108,7 @@
     column-gap: 10px;
     margin-bottom: 6px;
     padding: 9px 10px;
-    border-radius: 10px;
+    border-radius: 8px;
     background: color-mix(in srgb, var(--pen) 6%, transparent);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 18%, transparent);
   }

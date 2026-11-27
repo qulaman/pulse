@@ -52,8 +52,8 @@
     align-self: flex-start;
     border-radius: 6px;
     color: var(--ink-3);
-    font-size: 12.5px;
-    transition: color 120ms linear;
+    font-size: 12px;
+    transition: color 140ms linear;
 
     &:hover {
       color: var(--ink);

@@ -119,7 +119,7 @@ export function TeamCard({
           <p className="team-card-chips">
             {away ? (
               <span className="team-chip" data-tone="muted">
-                <CalendarOff size={13} strokeWidth={2.25} aria-hidden />
+                <CalendarOff size={14} aria-hidden />
                 {AVAILABILITY_LABEL[person.availability].toLowerCase()}
               </span>
             ) : null}
@@ -130,7 +130,7 @@ export function TeamCard({
             ) : null}
             {phone ? (
               <span className="team-chip" data-tone="muted">
-                <Phone size={13} strokeWidth={2.25} aria-hidden />
+                <Phone size={14} aria-hidden />
                 <a href={phoneHref(phone)} className="nums hover:underline" data-testid="team-card-phone">
                   {phone}
                 </a>
@@ -139,7 +139,7 @@ export function TeamCard({
             ) : null}
             {deaf ? (
               <span className="team-chip" data-tone="danger" title="Пока пуши не доходят, человек узнаёт о задачах, только открыв Pulse">
-                <BellOff size={13} strokeWidth={2.25} aria-hidden />
+                <BellOff size={14} aria-hidden />
                 {push?.state === "broken" ? "пуш не прошёл" : "уведомления не включены"}
               </span>
             ) : null}

@@ -407,7 +407,7 @@ export function DeskBoard() {
         <header className="board-head flex items-end gap-4">
           <div className="min-w-0 flex-1">
             <Link href="/desk/boards" className="board-back desk-focus" data-testid="board-back">
-              <ChevronLeft aria-hidden size={14} strokeWidth={2.2} />
+              <ChevronLeft aria-hidden size={14} />
               Доски
             </Link>
             {title}
@@ -445,12 +445,12 @@ export function DeskBoard() {
           ) : (
             <div className="flex shrink-0 items-center gap-2 pb-1">
               {mode !== "handout" && toHand > 0 ? (
-                <Button size="sm" variant="secondary" icon={<Send aria-hidden size={14} strokeWidth={2.2} />} onClick={() => setMode("handout")} data-testid="desk-board-handout">
+                <Button size="sm" variant="secondary" icon={<Send aria-hidden size={14} />} onClick={() => setMode("handout")} data-testid="desk-board-handout">
                   Раздать поручения
                 </Button>
               ) : null}
               {onWall ? (
-                <Button size="sm" variant={mode === "handout" ? "secondary" : "primary"} icon={<Presentation aria-hidden size={15} strokeWidth={2.2} />} onClick={() => setMode("lead")} data-testid="desk-board-lead">
+                <Button size="sm" variant={mode === "handout" ? "secondary" : "primary"} icon={<Presentation aria-hidden size={16} />} onClick={() => setMode("lead")} data-testid="desk-board-lead">
                   Вести совещание
                 </Button>
               ) : (

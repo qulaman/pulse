@@ -93,10 +93,10 @@ function FieldButton({
         data-act={act}
         data-testid={testId}
         onClick={(event) => onPress(event.currentTarget)}
-        className="tasks-field-button -ml-1.5 inline-flex min-w-0 items-center gap-1.5 rounded-[2px] px-1.5 transition-colors duration-[120ms] hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        className="tasks-field-button -ml-1.5 inline-flex min-w-0 items-center gap-1.5 rounded-[2px] px-1.5 transition-colors duration-[140ms] hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
       >
         <span className="flex min-w-0 items-center">{children}</span>
-        <ChevronDown aria-hidden size={14} strokeWidth={2.25} className="desk-chevron" />
+        <ChevronDown aria-hidden size={14} className="desk-chevron" />
       </button>
     </Tooltip>
   );
@@ -128,7 +128,7 @@ function Receipt({ task, now, onSendNow }: { task: TaskWithPeople; now: Date; on
   const held = delivery.data ? heldLine(delivery.data.held, now) : null;
   if (held) {
     return (
-      <Field label="Доставка" icon={<Send size={14} strokeWidth={2} />}>
+      <Field label="Доставка" icon={<Send size={14} />}>
         <span className="flex items-center gap-1.5 text-muted" data-testid="desk-receipt">
           {held} ·
           <button type="button" className="text-accent underline-offset-2 hover:underline" onClick={onSendNow} data-testid="send-now">
@@ -140,7 +140,7 @@ function Receipt({ task, now, onSendNow }: { task: TaskWithPeople; now: Date; on
   }
   const line = task.status === "sent" ? deliveryLine(task, delivery.data?.receipt, now) : null;
   return line ? (
-    <Field label="Доставка" icon={<Send size={14} strokeWidth={2} />}>
+    <Field label="Доставка" icon={<Send size={14} />}>
       <ToneLine line={line} testId="desk-receipt" />
     </Field>
   ) : null;
@@ -183,7 +183,7 @@ function Path({ desk, now }: { desk: DeskTask; now: Date }) {
           >
             <span aria-hidden className="tasks-step-bar block h-[2px]" />
             <span aria-hidden className="tasks-step-dot">
-              {step.state === "done" ? <Check size={11} strokeWidth={3} /> : step.state === "bad" ? <X size={11} strokeWidth={3} /> : null}
+              {step.state === "done" ? <Check size={11} /> : step.state === "bad" ? <X size={11} /> : null}
             </span>
             <span className={`tasks-step-label mt-1 block truncate text-[12px] leading-4 ${pending ? "font-semibold" : step.state === "todo" ? "text-muted" : ""}`} style={pending ? { color: stepInk(step) } : undefined}>
               {step.label}
@@ -203,7 +203,7 @@ export function EditTaskButton({ desk, className = "ml-auto" }: { desk: DeskTask
   return (
     <Tooltip label="Изменить задачу" keys={["E"]} side="left" className={`${className} inline-flex shrink-0`}>
       <button type="button" onClick={() => desk.acts.press("edit", task)} data-testid="desk-task-edit" className="tasks-edit-open">
-        <Pencil aria-hidden size={14} strokeWidth={2} className="tasks-ico" />
+        <Pencil aria-hidden size={14} className="tasks-ico" />
         Изменить
       </button>
     </Tooltip>
@@ -257,7 +257,7 @@ export function TaskHead({
   const edit = () => desk.acts.press("edit", task);
   const title = (
     <h2
-      className={`desk-task-title tasks-title [overflow-wrap:anywhere] ${large ? "text-[28px] leading-8" : "text-[21px] leading-[26px]"}`}
+      className={`desk-task-title tasks-title [overflow-wrap:anywhere] ${large ? "text-[28px] leading-8" : "text-[20px] leading-[26px]"}`}
       onDoubleClick={editable ? edit : undefined}
       data-testid="desk-task-title"
     >
@@ -276,7 +276,7 @@ export function TaskHead({
           )}
           {form ? (
             <span className="tasks-edit-badge ml-auto shrink-0" data-testid="desk-task-editing">
-              <Pencil aria-hidden size={13} strokeWidth={2} className="tasks-ico" />
+              <Pencil aria-hidden size={14} className="tasks-ico" />
               Правка
             </span>
           ) : editable ? (
@@ -296,7 +296,7 @@ export function TaskHead({
           )}
 
           <dl className="tasks-fields grid gap-x-3" data-testid="desk-task-fields">
-            <Field label="Кому" icon={<UserRound size={14} strokeWidth={2} />}>
+            <Field label="Кому" icon={<UserRound size={14} />}>
               {canPass ? (
                 <FieldButton label="Передать другому" keys={["T"]} taskId={task.id} act="reassign handoff" onPress={(target) => desk.acts.press("reassign", task, from(target))} testId="desk-field-assignee">
                   {who}
@@ -307,7 +307,7 @@ export function TaskHead({
             </Field>
             <Field
               label={closed ? (task.status === "done" ? "Принята" : "Закрыта") : "Срок"}
-              icon={closed ? task.status === "done" ? <CircleCheck size={14} strokeWidth={2} /> : <CircleX size={14} strokeWidth={2} /> : <CalendarClock size={14} strokeWidth={2} />}
+              icon={closed ? task.status === "done" ? <CircleCheck size={14} /> : <CircleX size={14} /> : <CalendarClock size={14} />}
             >
               {closed ? (
                 <span className="nums">{humanAqtobe(new Date(closedAtOf(task)), now)}</span>
@@ -320,7 +320,7 @@ export function TaskHead({
               )}
               {task.priority === "high" && task.deadline && !closed ? (
                 <span className="tasks-urgent-mark" data-testid="desk-task-urgent">
-                  <Flame aria-hidden size={12} strokeWidth={2.2} />
+                  <Flame aria-hidden size={12} />
                   {TEXT.urgent}
                 </span>
               ) : null}
@@ -336,13 +336,13 @@ export function TaskHead({
               ) : null}
             </Field>
             {task.status === "scheduled" && task.scheduled_send_at ? (
-              <Field label="Уйдёт" icon={<Clock size={14} strokeWidth={2} />}>
+              <Field label="Уйдёт" icon={<Clock size={14} />}>
                 <span className="nums">{humanAqtobe(new Date(task.scheduled_send_at), now)}</span>
               </Field>
             ) : null}
             {task.status !== "revoked" && task.status !== "scheduled" ? <Receipt task={task} now={now} onSendNow={() => desk.acts.press("sendNow", task)} /> : null}
             {desk.rule ? (
-              <Field label="Повтор" icon={<Repeat size={14} strokeWidth={2} />}>
+              <Field label="Повтор" icon={<Repeat size={14} />}>
                 <span className="inline-flex min-w-0 items-center gap-1.5" data-testid="desk-task-repeat">
                   <span className="truncate">{ruleLine(desk.rule)}</span>
                   {desk.rule.is_active ? null : <span className="text-muted">· остановлен</span>}
@@ -394,7 +394,7 @@ function QuickReplies({ desk, now, onWords }: { desk: DeskTask; now: Date; onWor
   const question = desk.signals.question as string;
   const answers = answersFor(question, task.deadline, now);
   const words = wantsWords(question);
-  const chip = "inline-flex h-7 items-center gap-1.5 rounded-[2px] border px-2 text-[13px] font-medium leading-4 transition-colors duration-[120ms]";
+  const chip = "inline-flex h-7 items-center gap-1.5 rounded-[2px] border px-2 text-[13px] font-medium leading-4 transition-colors duration-[140ms]";
   return (
     <div className="tasks-quick mt-2 flex flex-wrap items-center gap-1" data-testid="quick-answers">
       {answers.map((answer, index) => (
@@ -447,19 +447,19 @@ export function TaskWaits({ desk, now, onWords }: { desk: DeskTask; now: Date; o
   return (
     <div className="tasks-waits" data-testid="desk-task-facts">
       {question ? (
-        <Callout tone="warn" icon={<MessageCircleQuestion size={15} strokeWidth={2} />} testId="desk-question">
+        <Callout tone="warn" icon={<MessageCircleQuestion size={16} />} testId="desk-question">
           <p className="text-text">«{question}»</p>
           <QuickReplies desk={desk} now={now} onWords={onWords} />
         </Callout>
       ) : null}
       {task.status === "declined" ? (
-        <Callout tone="danger" icon={<Ban size={15} strokeWidth={2} />}>
+        <Callout tone="danger" icon={<Ban size={16} />}>
           <span className="text-text">Отказ{declineReason ? `: ${declineReason}` : " без причины"}</span>
           {suggestion ? <span className="block text-muted">Предлагает передать: {suggestion.name}</span> : null}
         </Callout>
       ) : null}
       {request && isWorking(task.status) ? (
-        <Callout tone="warn" icon={<Hourglass size={15} strokeWidth={2} />}>
+        <Callout tone="warn" icon={<Hourglass size={16} />}>
           <span className="text-text">
             Просит срок {untilWords(request.proposed, now)}
             {request.words ? ` · «${request.words}»` : ""}
@@ -468,25 +468,25 @@ export function TaskWaits({ desk, now, onWords }: { desk: DeskTask; now: Date; o
         </Callout>
       ) : null}
       {task.status === "rework" ? (
-        <Callout tone="muted" icon={<RotateCcw size={15} strokeWidth={2} />}>
+        <Callout tone="muted" icon={<RotateCcw size={16} />}>
           <span className="text-text">На доработке — ждём новый отчёт</span>
         </Callout>
       ) : null}
       {showReport ? (
-        <Callout tone={partial && task.status === "pending_review" ? "warn" : "muted"} icon={<FileText size={15} strokeWidth={2} />} testId="desk-task-report">
+        <Callout tone={partial && task.status === "pending_review" ? "warn" : "muted"} icon={<FileText size={16} />} testId="desk-task-report">
           <span className="block whitespace-pre-line text-text [overflow-wrap:anywhere]">{report?.content ? `Отчёт: «${report.content.trim()}»` : "Отчёт без слов"}</span>
           {partial && task.status === "pending_review" ? <span className="block text-muted">Сдано не всё — что осталось, в отчёте</span> : null}
         </Callout>
       ) : null}
       {task.status === "revoked" ? (
-        <Callout tone="muted" icon={<Undo2 size={15} strokeWidth={2} />}>
+        <Callout tone="muted" icon={<Undo2 size={16} />}>
           <span className="text-text">{task.passed_to ? passedWord(task.passed?.full_name) : TEXT.revoked}</span>
         </Callout>
       ) : null}
       {/* the panel's «Напомнить» does not say it was pressed: this line does, so it is not pressed twice */}
       {nudgedAt && isWorking(task.status) ? (
         <p className="tasks-nudged mt-3 flex items-center gap-1.5 text-[13px] leading-5 text-muted" data-testid="nudged">
-          <Clock aria-hidden size={14} strokeWidth={2} className="tasks-ico" />
+          <Clock aria-hidden size={14} className="tasks-ico" />
           Напомнили <span className="nums">{humanAqtobe(new Date(nudgedAt), now)}</span>
         </p>
       ) : null}
@@ -521,7 +521,7 @@ export function TaskAbout({ desk }: { desk: DeskTask }) {
         <details className="tasks-transcript group mt-2">
           <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[13px] leading-5 text-muted hover:text-text [&::-webkit-details-marker]:hidden">
             Ваши слова
-            <ChevronDown aria-hidden size={14} strokeWidth={2.25} className="desk-chevron" />
+            <ChevronDown aria-hidden size={14} className="desk-chevron" />
           </summary>
           <blockquote className="-ml-3 mt-1 border-l-2 border-border pl-2.5 text-[13px] leading-5 text-muted">«{heard}»</blockquote>
         </details>
@@ -557,7 +557,7 @@ export function DeskReactions({ taskId, pointsEnabled }: { taskId: string; point
               aria-label={`${REACTION_LABEL[code]}${price ? `, ${price}` : ""}`}
               data-reaction={code}
               onClick={() => react.mutate({ taskId, code: lit ? null : code })}
-              className="flex h-7 w-8 items-center justify-center rounded-[8px] border text-[15px] transition-colors duration-[120ms] hover:bg-surface-2"
+              className="flex h-7 w-8 items-center justify-center rounded-[8px] border text-[14px] transition-colors duration-[140ms] hover:bg-surface-2"
               style={{ borderColor: lit ? "var(--gold)" : "transparent", background: lit ? "color-mix(in srgb, var(--gold) 14%, transparent)" : undefined }}
             >
               <span aria-hidden>{REACTION_GLYPH[code]}</span>
@@ -571,7 +571,7 @@ export function DeskReactions({ taskId, pointsEnabled }: { taskId: string; point
 
 /** «Ещё» of a task: a word like the row's other words, at the end of its line. */
 export const MORE_WORD =
-  "ml-auto inline-flex h-9 items-center gap-1.5 rounded-[2px] px-3 text-[14px] font-medium leading-4 text-text transition-colors duration-[120ms] hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
+  "ml-auto inline-flex h-9 items-center gap-1.5 rounded-[2px] px-3 text-[14px] font-medium leading-4 text-text transition-colors duration-[140ms] hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
 
 /**
  * The director's buttons of this task — the task screen's own (`screenKeysFor`, D-187, D-203), each with the letter
@@ -625,7 +625,7 @@ export function TaskKeys({ desk, me, now, pointsEnabled, scope }: { desk: DeskTa
           onClick={(event) => setMenuAt(menuAt ? null : event.currentTarget)}
           className={MORE_WORD}
         >
-          <Ellipsis aria-hidden size={16} strokeWidth={2.2} className="tasks-ico tasks-more-dots" />
+          <Ellipsis aria-hidden size={16} className="tasks-ico tasks-more-dots" />
           <span className="tasks-more-word">Ещё</span>
         </button>
         <Menu open={Boolean(menuAt)} onClose={() => setMenuAt(null)} anchor={menuAt} items={desk.acts.menu(task)} align="end" width={280} label="Все действия" />

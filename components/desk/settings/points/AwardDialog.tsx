@@ -105,7 +105,7 @@ function PersonPicker({ people, value, onChange, autoFocus, next }: { people: Aw
             }}
             className="award-clear flex h-6 w-6 items-center justify-center text-muted hover:bg-surface-2 hover:text-text"
           >
-            <X size={14} strokeWidth={2.25} aria-hidden />
+            <X size={14} aria-hidden />
           </button>
         ) : null}
       </div>
@@ -228,7 +228,7 @@ function AwardForm({ initialUser, people, onDone }: { initialUser?: string; peop
 
       {amount > 0 ? (
         <div className="award-public flex items-center gap-3 text-[14px] leading-5" data-testid="award-public">
-          <Megaphone size={16} strokeWidth={2} aria-hidden className="shrink-0 text-muted" />
+          <Megaphone size={16} aria-hidden className="shrink-0 text-muted" />
           <label htmlFor="award-public-switch" className="min-w-0 flex-1 cursor-pointer">
             Сказать в Эфире <span className="text-muted">· команда увидит похвалу, без пуша</span>
           </label>

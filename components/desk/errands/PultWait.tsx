@@ -170,7 +170,7 @@ function VisitCard({ visit, now, main, fresh }: { visit: Visit; now: Date; main:
     <Card id={visit.id} kind="visit" fresh={fresh} testId="visit-ask-card" status={visit.status}>
       <div className="pult-wait-row">
         <span aria-hidden className="pult-wait-tile" data-ink="warn">
-          <DoorOpen size={19} strokeWidth={2.25} />
+          <DoorOpen size={19} />
         </span>
         <div className="pult-wait-words">
           <p className="pult-wait-over">
@@ -204,7 +204,7 @@ function MessageCard({ visit, now, main, fresh }: { visit: Visit; now: Date; mai
     <Card id={visit.id} kind="message" fresh={fresh} testId="message-ask-card" status={visit.status}>
       <div className="pult-wait-row">
         <span aria-hidden className="pult-wait-tile" data-ink="sky">
-          <MessageSquareText size={19} strokeWidth={2.25} />
+          <MessageSquareText size={19} />
         </span>
         <div className="pult-wait-words">
           <p className="pult-wait-over">

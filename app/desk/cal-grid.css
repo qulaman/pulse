@@ -17,12 +17,12 @@
 html[data-surface="desk"][data-journal] {
   /* the days glide to their new widths when the focus moves (the data are already drawn) */
   .cal-cols {
-    transition: grid-template-columns 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition: grid-template-columns 200ms var(--ease-snap);
   }
   .cal-day-head {
     border-left: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
     cursor: pointer;
-    transition: background-color 120ms linear
+    transition: background-color 140ms linear
   }
   .cal-hour {
     color: var(--text-muted);
@@ -95,13 +95,13 @@ html[data-surface="desk"][data-journal] {
   /* ---- the week: a card of hours ------------------------------------------------------- */
   .cal-week {
     border-top: 0;
-    border-radius: 14px;
+    border-radius: 12px;
     background: var(--raise);
     box-shadow: var(--shadow-card);
   }
   .cal-week-head {
     border-bottom: 1px solid var(--rule);
-    border-radius: 14px 14px 0 0;
+    border-radius: 12px 12px 0 0;
     background: color-mix(in srgb, var(--raise) 86%, transparent);
     -webkit-backdrop-filter: blur(14px) saturate(1.4);
     backdrop-filter: blur(14px) saturate(1.4);
@@ -132,7 +132,7 @@ html[data-surface="desk"][data-journal] {
       padding: 0 6px;
       border-radius: 9999px;
       color: #fff;
-      box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--pen) 70%, transparent);
+      box-shadow: none;
     }
     &[data-today] {
       background: color-mix(in srgb, var(--pen) 5%, transparent);
@@ -214,7 +214,7 @@ html[data-surface="desk"][data-journal] {
 
     &[data-band="late"] {
       border-top-color: var(--rule);
-      border-radius: 0 0 14px 14px;
+      border-radius: 0 0 12px 12px;
     }
   }
   .cal-off-label {
@@ -243,7 +243,7 @@ html[data-surface="desk"][data-journal] {
       height: 2px;
       border-radius: 2px;
       background: var(--pencil);
-      box-shadow: 0 0 8px color-mix(in srgb, var(--pencil) 45%, transparent);
+      box-shadow: none;
     }
   }
   .cal-now-dot {
@@ -267,11 +267,11 @@ html[data-surface="desk"][data-journal] {
     height: 18px;
     margin-top: -1px;
     padding: 0 5px;
-    border-radius: 5px;
+    border-radius: 4px;
     background: var(--pencil);
     color: #fff;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 18px;
     transition: transform 900ms linear;
   }
@@ -295,14 +295,14 @@ html[data-surface="desk"][data-journal] {
     --tone: var(--sky);
     padding: 3px 5px 3px 10px;
     border: 0;
-    border-radius: 7px;
+    border-radius: 6px;
     background: color-mix(in srgb, var(--tone) 14%, var(--raise));
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 24%, transparent);
     color: var(--ink);
     transition:
       transform 200ms var(--ease-snap),
-      scale 220ms var(--ease-snap),
-      box-shadow 160ms linear,
+      scale 200ms var(--ease-snap),
+      box-shadow 140ms linear,
       background-color 140ms linear;
     animation: cal-event-in 340ms var(--ease-snap) backwards;
     animation-delay: calc(var(--day, 0) * 24ms);
@@ -315,7 +315,7 @@ html[data-surface="desk"][data-journal] {
       top: 3px;
       bottom: 3px;
       width: 3px;
-      border-radius: 3px;
+      border-radius: 2px;
       background: var(--tone);
     }
     &[data-tier="line"] {
@@ -335,7 +335,7 @@ html[data-surface="desk"][data-journal] {
     }
     &:active {
       scale: 0.98;
-      transition-duration: 70ms;
+      transition-duration: 80ms;
     }
     /* the open one: raised over the grid while the side shows it */
     &[data-open] {
@@ -349,7 +349,7 @@ html[data-surface="desk"][data-journal] {
       --tone: var(--pen);
 
       &::before {
-        box-shadow: 0 0 8px color-mix(in srgb, var(--pen) 60%, transparent);
+        box-shadow: none;
       }
     }
     /* an invitation not answered yet: a dashed edge, a lighter wash — a meeting that is not settled */
@@ -442,7 +442,7 @@ html[data-surface="desk"][data-journal] {
   }
   .cal-event-refused {
     color: var(--warn-deep);
-    font-weight: 600;
+    font-weight: 500;
   }
   /* a chip of the thin rows: the block's colours, one line */
   .cal-event-chip {
@@ -458,7 +458,7 @@ html[data-surface="desk"][data-journal] {
   /* the meeting being made: dashed in the accent, its words as they are typed */
   .cal-ghost {
     border: 1.5px dashed var(--pen);
-    border-radius: 7px;
+    border-radius: 6px;
     background: color-mix(in srgb, var(--pen) 13%, var(--raise));
     box-shadow: 0 12px 26px -12px rgb(0 0 0 / 0.6);
     animation: cal-pop 200ms var(--ease-snap) both;
@@ -466,7 +466,7 @@ html[data-surface="desk"][data-journal] {
   /* a meeting on its way to another time: where it lands, or that the past is closed to it */
   .cal-move {
     border: 1.5px dashed var(--sky);
-    border-radius: 7px;
+    border-radius: 6px;
     background: color-mix(in srgb, var(--sky) 16%, var(--raise));
     box-shadow: 0 14px 30px -12px rgb(0 0 0 / 0.65);
 
@@ -484,7 +484,7 @@ html[data-surface="desk"][data-journal] {
     background: color-mix(in srgb, var(--pen) 9%, transparent);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 32%, transparent);
     color: var(--pen-deep);
-    font-weight: 600;
+    font-weight: 500;
   }
 
   /* deadlines: a quiet strip on each day's right edge, a ◆ on the hour each order is due */
@@ -493,12 +493,12 @@ html[data-surface="desk"][data-journal] {
     background: color-mix(in srgb, var(--ink) 2%, transparent);
   }
   .cal-mark {
-    border-radius: 5px;
+    border-radius: 4px;
     color: var(--ink);
     font-weight: 600;
     transition:
-      background-color 120ms linear,
-      transform 180ms var(--ease-snap);
+      background-color 140ms linear,
+      transform 200ms var(--ease-snap);
 
     &:hover {
       background: var(--surface-2);

@@ -49,10 +49,10 @@ function MeMenu({ fullName, role, folded, onToggleNav }: { fullName: string; rol
         aria-expanded={Boolean(anchor)}
         aria-haspopup="menu"
         onClick={(event) => setAnchor(anchor ? null : event.currentTarget)}
-        className="desk-focus flex items-center gap-2 rounded-full py-1 pl-1 pr-2.5 transition-colors duration-[120ms] hover:bg-surface-2"
+        className="desk-focus flex h-8 items-center gap-2 rounded-[8px] pl-0.5 pr-2 transition-colors duration-[140ms] hover:bg-surface-2"
         data-testid="desk-me"
       >
-        <Avatar name={fullName} size={32} />
+        <Avatar name={fullName} size={28} />
         <span className="hidden max-w-[140px] truncate text-[13px] font-medium leading-4 xl:block">{shortName(fullName)}</span>
       </button>
       <Menu
@@ -87,9 +87,9 @@ function ThemeButton() {
         onClick={(event) => switchDeskTheme(next, centreOf(event.currentTarget))}
         data-testid="desk-theme"
         data-next={next}
-        className="desk-focus flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
+        className="desk-focus flex h-8 w-8 items-center justify-center rounded-[8px] text-muted transition-colors duration-[140ms] hover:bg-surface-2 hover:text-text"
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg className="lucide" width="16" height="16" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           {next === "light" ? (
             <>
               <circle cx="12" cy="12" r="4" />
@@ -113,7 +113,7 @@ function KeysButton() {
         aria-label="Клавиши"
         onClick={openShortcuts}
         data-testid="desk-keys"
-        className="desk-focus flex h-8 w-8 items-center justify-center rounded-full border border-border text-[14px] font-semibold leading-none text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
+        className="desk-focus flex h-8 w-8 items-center justify-center rounded-[8px] text-[14px] font-medium leading-none text-muted transition-colors duration-[140ms] hover:bg-surface-2 hover:text-text"
       >
         ?
       </button>
@@ -171,7 +171,7 @@ export function TopBar({ fullName, role, folded = false, onToggleNav }: { fullNa
   return (
     <header className="desk-head flex h-[72px] shrink-0 items-center gap-4 border-b border-border px-6">
       {role === "director" ? <CommandLine /> : <SecretaryCalls />}
-      <div className="ml-auto flex shrink-0 items-center gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-1">
         <DeskPulse />
         <ThemeButton />
         <KeysButton />

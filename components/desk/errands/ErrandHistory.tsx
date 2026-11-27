@@ -211,7 +211,7 @@ export function ErrandHistory({
                 <ThankButton errand={e} />
               ) : e.thanked_at ? (
                 <span className="errands-thanked" title="Спасибо отправлено">
-                  <Heart size={13} strokeWidth={2.25} aria-hidden />
+                  <Heart size={14} aria-hidden />
                   спасибо
                 </span>
               ) : null,

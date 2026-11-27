@@ -106,7 +106,7 @@ function Key({ action, digit, note, held, pressed, onPress, keyRef }: { action: 
       </span>
       <span className="pult-key-word">
         <span className="truncate">{action.label}</span>
-        {dnd ? <ChevronDown size={14} strokeWidth={2.5} aria-hidden className="shrink-0" /> : null}
+        {dnd ? <ChevronDown size={14} aria-hidden className="shrink-0" /> : null}
       </span>
       {/* the second line keeps its height: the words never move when the window starts */}
       <span className="pult-key-note">{held ? "уйдёт через 5 с" : (note ?? (dnd ? "на сколько?" : " "))}</span>

@@ -196,7 +196,7 @@ function FormBody({
           aria-label="Название"
           aria-invalid={tried && !name ? true : undefined}
           data-testid="desk-event-title"
-          className="field h-10 w-full px-0 text-[17px] font-semibold leading-6 outline-none placeholder:font-normal placeholder:text-muted"
+          className="field h-10 w-full px-0 text-[16px] font-semibold leading-6 outline-none placeholder:font-normal placeholder:text-muted"
         />
         {tried && !name ? <span className="text-[12px] leading-4 text-danger">Без названия не сохранить</span> : null}
       </div>

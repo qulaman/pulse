@@ -53,7 +53,7 @@ export function DayAgenda({
   const reminding = reminders && reminders.count > 0 ? reminders : null;
   return (
     <Card ink="sky" index={index} testId="today-agenda">
-      <Head icon={CalendarClock} title="Встречи и сроки" href="/desk/calendar" />
+      <Head icon={CalendarClock} sign="calendar" title="Встречи и сроки" href="/desk/calendar" />
       {note}
       <DayList>
         {events.map((event) => {
@@ -76,7 +76,7 @@ export function DayAgenda({
                   </Pill>
                 ) : (
                   <span className="inline-flex items-center gap-1 text-[12px] day-faint" title={`Участников: ${peopleCount(event)}`}>
-                    <Users size={12} strokeWidth={2.25} aria-hidden />
+                    <Users size={12} aria-hidden />
                     <span className="nums">{peopleCount(event)}</span>
                   </span>
                 )}

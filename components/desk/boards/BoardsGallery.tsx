@@ -232,9 +232,9 @@ export function BoardsGallery() {
     <DeskPage width="full">
       <div className="desk-page-title boards-head flex flex-wrap items-end justify-between gap-3" data-testid="desk-boards">
         <div className="flex min-w-0 items-baseline gap-3">
-          <h1 className="truncate font-display text-[28px] font-bold leading-[34px] tracking-[-0.025em]">Доски</h1>
+          <h1 className="truncate font-display text-[28px] font-semibold leading-[34px] tracking-[-0.025em]">Доски</h1>
           <p className="boards-privacy hidden items-center gap-1.5 text-[13px] leading-4 text-muted min-[1180px]:flex">
-            <Lock aria-hidden size={13} strokeWidth={2.2} />
+            <Lock aria-hidden size={14} />
             только вам · на стену — для кабинета
           </p>
         </div>
@@ -288,7 +288,7 @@ export function BoardsGallery() {
                 {tab === "live" && !needle ? (
                   <button type="button" className="boards-new" onClick={newBoard} data-testid="boards-new">
                     <span className="boards-new-plate">
-                      <Plus aria-hidden size={20} strokeWidth={2} />
+                      <Plus aria-hidden size={20} />
                       <span className="text-[14px] font-semibold leading-5 text-text">Новая доска</span>
                       <span className="flex items-center gap-1.5 text-[12px] leading-4 text-muted">
                         <Kbd>N</Kbd> пункты к встрече
@@ -338,7 +338,7 @@ function WallHero({ board, rows, summary, now, onOpen, onLead }: { board: MindBo
           <span aria-hidden className="boards-live-dot" />
           На стене{left !== null && until ? (left <= 90 ? ` · ещё ${left} мин` : ` · до ${tvTime(until)}`) : ""}
         </p>
-        <h2 className="mt-3 truncate font-display text-[22px] font-bold leading-[28px] tracking-[-0.02em]">{board.title}</h2>
+        <h2 className="mt-3 truncate font-display text-[20px] font-semibold leading-[28px] tracking-[-0.02em]">{board.title}</h2>
         <p className="mt-2 truncate text-[16px] leading-[22px] text-muted" data-testid="boards-hero-step">
           {stage.kind === "point" ? (
             <>
@@ -358,7 +358,7 @@ function WallHero({ board, rows, summary, now, onOpen, onLead }: { board: MindBo
           </span>
         ) : null}
         <div className="mt-5 flex flex-wrap items-center gap-2">
-          <Button size="sm" icon={<Presentation aria-hidden size={15} strokeWidth={2.2} />} onClick={onLead} data-testid="boards-hero-lead">
+          <Button size="sm" icon={<Presentation aria-hidden size={16} />} onClick={onLead} data-testid="boards-hero-lead">
             Вести совещание
             <Kbd>Enter</Kbd>
           </Button>

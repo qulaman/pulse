@@ -19,7 +19,7 @@
   /* ====================================================================================== */
   [data-desk-tasks] {
     .tasks-face-name {
-      font-size: 13.5px;
+      font-size: 13px;
       line-height: 18px;
     }
 
@@ -37,14 +37,14 @@
     .tasks-pick {
       width: 16px;
       height: 16px;
-      border-radius: 5px;
+      border-radius: 4px;
       border-color: var(--line);
       background: var(--raise);
       box-shadow: var(--lift);
       transition:
-        opacity 120ms linear,
-        background-color 120ms linear,
-        border-color 120ms linear,
+        opacity 140ms linear,
+        background-color 140ms linear,
+        border-color 140ms linear,
         scale 200ms var(--ease-snap);
 
       &:hover {
@@ -52,7 +52,7 @@
       }
       &:active {
         scale: 0.88;
-        transition-duration: 70ms;
+        transition-duration: 80ms;
       }
       &[data-on] {
         border-color: var(--pen);
@@ -102,7 +102,7 @@
         box-shadow: inset 0 0 0 1px var(--rule-soft);
         color: var(--ink-2);
         font-size: 11px;
-        font-weight: 600;
+        font-weight: 500;
         line-height: 18px;
         opacity: 1;
       }
@@ -183,12 +183,12 @@
       .desk-mini {
         height: 26px;
         padding: 0 8px;
-        border-radius: 7px;
-        font-size: 12.5px;
+        border-radius: 6px;
+        font-size: 12px;
       }
     }
     [data-testid="desk-row-more"] {
-      border-radius: 7px;
+      border-radius: 6px;
       color: var(--ink-3);
     }
     .desk-row:hover [data-testid="desk-row-more"],
@@ -207,7 +207,7 @@
       background: color-mix(in srgb, var(--pen) 14%, transparent);
       box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 30%, transparent);
       font-size: 11px;
-      font-weight: 600;
+      font-weight: 500;
       line-height: 18px;
 
       &::before {
@@ -225,7 +225,7 @@
     gap: 2px;
     padding: 5px;
     border: 0;
-    border-radius: 13px;
+    border-radius: 12px;
     background: color-mix(in srgb, var(--sheet) 80%, transparent);
     -webkit-backdrop-filter: blur(22px) saturate(1.6);
     backdrop-filter: blur(22px) saturate(1.6);
@@ -233,20 +233,20 @@
     animation: tasks-bulk-in 280ms var(--ease-snap) both;
 
     button {
-      border-radius: 9px;
+      border-radius: 8px;
       font-family: var(--font-body);
       font-size: 13px;
       font-weight: 500;
       transition:
-        background-color 120ms linear,
-        scale 220ms var(--ease-snap);
+        background-color 140ms linear,
+        scale 200ms var(--ease-snap);
 
       &:hover:not(:disabled) {
         background: var(--hover);
       }
       &:active:not(:disabled) {
         scale: 0.96;
-        transition-duration: 70ms;
+        transition-duration: 80ms;
       }
       .tasks-ico {
         color: var(--ink-2);
@@ -273,8 +273,8 @@
     border-radius: 8px;
     background: var(--pen);
     color: var(--page);
-    font-size: 12.5px;
-    font-weight: 700;
+    font-size: 12px;
+    font-weight: 500;
     animation: tasks-pop 260ms var(--ease-snap) both;
   }
   .tasks-bulk-rule {
@@ -294,7 +294,7 @@
   .tasks-head {
     .tasks-fields .tasks-face-name {
       font-size: 14px;
-      font-weight: 600;
+      font-weight: 500;
       line-height: 20px;
     }
     [data-testid="desk-field-assignee"] {
@@ -319,7 +319,7 @@
     height: 20px;
     padding: 0;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 20px;
     letter-spacing: 0.02em;
     white-space: nowrap;
@@ -349,10 +349,10 @@
     font-weight: 500;
     line-height: 16px;
     transition:
-      background-color 120ms linear,
-      color 120ms linear,
+      background-color 140ms linear,
+      color 140ms linear,
       box-shadow 140ms linear,
-      scale 220ms var(--ease-snap);
+      scale 200ms var(--ease-snap);
 
     &:hover {
       background: var(--hover);
@@ -361,7 +361,7 @@
     }
     &:active {
       scale: 0.96;
-      transition-duration: 70ms;
+      transition-duration: 80ms;
     }
     &:focus-visible {
       outline: none;
@@ -389,14 +389,14 @@
     align-items: center;
     gap: 4px;
     color: var(--warn);
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 600;
   }
   /* the one chevron of the desk's fields (D-203): the select's own, turning over while open */
   .desk-chevron {
     flex: none;
     color: var(--ink-3);
-    transition: transform 160ms var(--ease-out);
+    transition: transform 140ms var(--ease-out);
   }
   :is(.tasks-person, .tasks-when)[aria-expanded="true"] .desk-chevron,
   details[open] > summary .desk-chevron {
@@ -404,15 +404,15 @@
   }
   .tasks-title {
     margin-top: 10px;
-    font-size: 22px;
-    font-weight: 650;
+    font-size: 20px;
+    font-weight: 600;
     line-height: 28px;
     letter-spacing: -0.022em;
   }
   .tasks-head[data-large] .tasks-title {
     margin-top: 10px;
-    font-size: 30px;
-    font-weight: 650;
+    font-size: 28px;
+    font-weight: 600;
     line-height: 36px;
     letter-spacing: -0.03em;
   }
@@ -433,7 +433,7 @@
     [data-testid="desk-field-deadline"] {
       margin-block: -2px;
       padding-block: 2px;
-      border-radius: 7px;
+      border-radius: 6px;
     }
   }
   .tasks-field-icon {
@@ -455,7 +455,7 @@
 
     .tasks-step-label {
       margin-top: 0;
-      font-size: 12.5px;
+      font-size: 12px;
       line-height: 16px;
     }
   }
@@ -540,7 +540,7 @@
     margin: 12px 0 0;
     padding: 10px 12px 10px 38px;
     border-left: 0;
-    border-radius: 11px;
+    border-radius: 12px;
     background: color-mix(in srgb, var(--tone) 8%, transparent);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 24%, transparent);
     animation: tasks-rise 280ms var(--ease-snap) both;
@@ -569,9 +569,9 @@
       background: var(--raise);
       box-shadow: 0 0 0 1px var(--rule), var(--lift);
       transition:
-        background-color 120ms linear,
-        box-shadow 160ms linear,
-        scale 220ms var(--ease-snap);
+        background-color 140ms linear,
+        box-shadow 140ms linear,
+        scale 200ms var(--ease-snap);
 
       &:hover {
         background: color-mix(in srgb, var(--pen) 12%, var(--raise));
@@ -579,7 +579,7 @@
       }
       &:active {
         scale: 0.96;
-        transition-duration: 70ms;
+        transition-duration: 80ms;
       }
       > span[aria-hidden]:first-child {
         display: inline-flex;
@@ -587,11 +587,11 @@
         height: 18px;
         align-items: center;
         justify-content: center;
-        border-radius: 5px;
+        border-radius: 4px;
         background: var(--surface-2);
         box-shadow: inset 0 0 0 1px var(--rule);
         color: var(--ink-2);
-        font-weight: 600;
+        font-weight: 500;
       }
       &:not([data-quick-answer]):not(.desk-move) {
         padding: 0 8px 0 10px;
@@ -617,7 +617,7 @@
     box-shadow: 0 0 0 1px var(--rule), 0 8px 24px -14px rgb(0 0 0 / 0.6);
 
     img {
-      transition: transform 420ms var(--ease-snap);
+      transition: transform 480ms var(--ease-snap);
     }
     &:hover img {
       transform: scale(1.03);
@@ -627,7 +627,7 @@
     width: fit-content;
     margin-left: -8px;
     padding: 2px 8px;
-    border-radius: 7px;
+    border-radius: 6px;
 
     &:hover {
       background: var(--hover);
@@ -637,7 +637,7 @@
     margin: 6px 0 0;
     padding: 8px 12px;
     border-left: 0;
-    border-radius: 9px;
+    border-radius: 8px;
     background: var(--surface-2);
     box-shadow: inset 0 0 0 1px var(--rule-soft);
     color: var(--ink-2);
@@ -665,13 +665,13 @@
     [data-reaction] {
       width: 34px;
       height: 30px;
-      border-radius: 9px;
+      border-radius: 8px;
       transition:
-        background-color 120ms linear,
-        scale 220ms var(--ease-snap);
+        background-color 140ms linear,
+        scale 200ms var(--ease-snap);
 
       > span {
-        transition: transform 260ms var(--ease-snap);
+        transition: transform 200ms var(--ease-snap);
       }
       &:hover {
         background: var(--hover);
@@ -681,7 +681,7 @@
       }
       &:active {
         scale: 0.9;
-        transition-duration: 70ms;
+        transition-duration: 80ms;
       }
       &[aria-pressed="true"] {
         box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 50%, transparent);
@@ -698,7 +698,7 @@
     align-items: center;
     padding: 8px 10px;
     border: 0;
-    border-radius: 10px;
+    border-radius: 8px;
     background: color-mix(in srgb, var(--ok) 10%, transparent);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 26%, transparent);
     animation: tasks-rise 260ms var(--ease-snap) both;
@@ -812,8 +812,8 @@
     padding: 0 0 2px 36px;
     border-top: 0;
     color: var(--ink-3);
-    font-size: 11.5px;
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 500;
 
     &::after {
       content: "";
@@ -834,8 +834,8 @@
     padding: 0 8px;
     border-radius: 9999px;
     background: color-mix(in srgb, var(--tone) 13%, transparent);
-    font-size: 11.5px;
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 500;
   }
   .tasks-msg .tasks-photo,
   .tasks-msg .tasks-voice {
@@ -852,13 +852,13 @@
   /* the answer field: a raised card that lights up when it has the caret */
   .tasks-composer {
     border: 0;
-    border-radius: 13px;
+    border-radius: 12px;
     background: var(--raise);
     box-shadow:
       0 0 0 1px var(--line),
       var(--lift),
       0 10px 28px -16px rgb(0 0 0 / 0.55);
-    transition: box-shadow 180ms linear;
+    transition: box-shadow 200ms linear;
 
     &:focus-within {
       box-shadow:
@@ -887,11 +887,11 @@
   .tasks-send {
     height: 30px;
     padding: 0 10px 0 12px;
-    border-radius: 9px;
+    border-radius: 8px;
     background: var(--pen);
     box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25);
     color: var(--page);
-    font-weight: 600;
+    font-weight: 500;
 
     &:hover:not(:disabled) {
       background: color-mix(in srgb, var(--pen) 86%, #fff);
@@ -970,7 +970,7 @@
   }
   .tasks-skel-card {
     padding: 22px 26px;
-    border-radius: 18px;
+    border-radius: 16px;
     background: var(--sheet);
     box-shadow: var(--shadow-pop);
 
@@ -1021,7 +1021,7 @@
       }
       &[data-s="now"]::after {
         background: var(--pen);
-        box-shadow: 0 0 10px color-mix(in srgb, var(--pen) 60%, transparent);
+        box-shadow: none;
         transform: none;
         animation: tasks-seg-fill 320ms var(--ease-snap) both;
       }
@@ -1048,7 +1048,7 @@
       position: absolute;
       inset: 0;
       z-index: -1;
-      border-radius: 18px;
+      border-radius: 16px;
       background: var(--sheet);
       box-shadow: var(--shadow-pop);
     }
@@ -1084,7 +1084,7 @@
     border-radius: 9999px;
     background: color-mix(in srgb, var(--tone) 11%, transparent);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 26%, transparent);
-    font-size: 13.5px;
+    font-size: 13px;
     line-height: 18px;
   }
   .tasks-inbox-thread {
@@ -1136,14 +1136,14 @@
   }
   .tasks-queue-item {
     padding: 7px 8px;
-    border-radius: 10px;
+    border-radius: 8px;
     transition:
-      background-color 120ms linear,
-      scale 220ms var(--ease-snap);
+      background-color 140ms linear,
+      scale 200ms var(--ease-snap);
 
     &:active {
       scale: 0.98;
-      transition-duration: 70ms;
+      transition-duration: 80ms;
     }
     .team-face {
       box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
@@ -1157,7 +1157,7 @@
   /* «Всё разобрано»: the tick draws itself */
   .tasks-done [data-testid="desk-empty"] {
     padding: 26px 26px;
-    border-radius: 18px;
+    border-radius: 16px;
 
     > span[aria-hidden] {
       width: 48px;
@@ -1177,7 +1177,7 @@
       }
     }
     p.font-display {
-      font-size: 18px;
+      font-size: 20px;
       line-height: 24px;
     }
   }
@@ -1220,7 +1220,7 @@
   .tasks-answer {
     margin-inline: -10px;
     padding: 6px 10px;
-    border-radius: 9px;
+    border-radius: 8px;
   }
 
   /* each entity a card, rising in one after another */
@@ -1237,12 +1237,12 @@
   }
   .tasks-entity {
     padding: 10px 14px 14px;
-    border-radius: 14px;
+    border-radius: 12px;
     background: var(--raise);
     box-shadow:
       0 0 0 1px var(--rule),
       var(--lift);
-    transition: box-shadow 160ms linear;
+    transition: box-shadow 140ms linear;
     animation: tasks-entity-in 380ms var(--ease-snap) both;
     animation-delay: calc(var(--i, 0) * 70ms + 40ms);
 
@@ -1285,7 +1285,7 @@
     border-radius: 9999px;
     background: color-mix(in srgb, currentColor 13%, transparent);
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
   }
   .tasks-entity-label {
     color: var(--ink-3);
@@ -1319,7 +1319,7 @@
     &[data-size="field"] {
       height: 36px;
       padding: 0 12px 0 10px;
-      border-radius: 9px;
+      border-radius: 8px;
     }
     &[data-on] {
       background: color-mix(in srgb, var(--warn) 14%, transparent);
@@ -1347,7 +1347,7 @@
     min-height: 36px;
     padding: 0 10px;
     border: 0;
-    border-radius: 9px;
+    border-radius: 8px;
     background: var(--surface-2);
     box-shadow: inset 0 0 0 1px var(--rule-soft);
     transition:
@@ -1384,7 +1384,7 @@
     height: 36px;
     padding-left: 10px;
     border: 0;
-    border-radius: 9px;
+    border-radius: 8px;
     background-color: var(--surface-2);
     box-shadow: inset 0 0 0 1px var(--rule-soft);
 
@@ -1401,7 +1401,7 @@
   }
   .tasks-edit .tasks-edit-title {
     padding: 7px 10px;
-    font-size: 17px;
+    font-size: 16px;
     font-weight: 600;
     line-height: 24px;
     letter-spacing: -0.012em;
@@ -1473,9 +1473,9 @@
       0 0 0 1px var(--rule),
       var(--lift);
     transition:
-      background-color 120ms linear,
-      box-shadow 160ms linear,
-      scale 220ms var(--ease-snap);
+      background-color 140ms linear,
+      box-shadow 140ms linear,
+      scale 200ms var(--ease-snap);
 
     &:hover {
       background: color-mix(in srgb, var(--pen) 12%, var(--raise));
@@ -1483,7 +1483,7 @@
     }
     &:active {
       scale: 0.96;
-      transition-duration: 70ms;
+      transition-duration: 80ms;
     }
     kbd {
       order: 3;
@@ -1513,7 +1513,7 @@
   .tasks-why {
     margin-top: 12px;
     padding: 8px 12px;
-    border-radius: 10px;
+    border-radius: 8px;
     background: color-mix(in srgb, var(--warn) 9%, transparent);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 26%, transparent);
   }
@@ -1530,7 +1530,7 @@
     padding-inline: 14px 12px;
 
     .tasks-send-icon {
-      transition: transform 220ms var(--ease-snap);
+      transition: transform 200ms var(--ease-snap);
     }
     &:hover:not(:disabled) .tasks-send-icon {
       transform: translateX(2px);
@@ -1539,7 +1539,7 @@
   /* sent: the cards lift off as it goes; a failure brings them back down */
   .tasks-confirm[data-sending] {
     .tasks-entity {
-      animation: tasks-entity-send 520ms cubic-bezier(0.55, 0, 0.7, 0.2) both;
+      animation: tasks-entity-send 520ms var(--ease-in) both;
       animation-delay: calc(var(--i, 0) * 60ms);
     }
   }

@@ -13,7 +13,7 @@ html[data-surface="desk"][data-journal] {
     --rep-pen-deep: var(--pen-deep, var(--pen));
     --rep-pencil-deep: var(--pencil-deep, var(--pencil));
     --rep-hover: var(--hover, var(--surface-2));
-    --rep-ease: var(--ease-snap, cubic-bezier(0.2, 0.8, 0.2, 1));
+    --rep-ease: var(--ease-snap, var(--ease-snap));
     display: flex;
     min-width: 0;
     flex-direction: column;
@@ -41,13 +41,13 @@ html[data-surface="desk"][data-journal] {
     min-width: 0;
     flex: 1 1 auto;
     color: var(--ink);
-    font-size: 13.5px;
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: 500;
     line-height: 20px;
   }
   .rep-day-band-quiet {
     color: var(--ink-2);
-    font-weight: 450;
+    font-weight: 400;
   }
   .rep-day-band-go {
     display: inline-flex;
@@ -59,10 +59,10 @@ html[data-surface="desk"][data-journal] {
     border-radius: 8px;
     color: var(--rep-pen-deep);
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 16px;
     white-space: nowrap;
-    transition: background-color 120ms linear;
+    transition: background-color 140ms linear;
 
     &:hover {
       background: color-mix(in srgb, var(--pen) 12%, transparent);
@@ -74,12 +74,12 @@ html[data-surface="desk"][data-journal] {
     padding: 0 4px;
     color: var(--ink-2);
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 20px;
   }
   .rep-day-off-quiet {
     color: var(--rep-ink-3);
-    font-weight: 450;
+    font-weight: 400;
   }
 
   /* ---- the ledger --------------------------------------------------------------------------- */
@@ -103,7 +103,7 @@ html[data-surface="desk"][data-journal] {
     flex-shrink: 0;
     color: var(--ink);
     font-size: 13px;
-    font-weight: 650;
+    font-weight: 600;
     line-height: 18px;
     letter-spacing: 0;
   }
@@ -131,7 +131,7 @@ html[data-surface="desk"][data-journal] {
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 45%, transparent);
     color: var(--rep-pen-deep);
     font-size: 13px;
-    font-weight: 650;
+    font-weight: 500;
     line-height: 16px;
     white-space: nowrap;
   }
@@ -159,7 +159,7 @@ html[data-surface="desk"][data-journal] {
     padding: 14px 14px 15px 12px;
     border-radius: 12px;
     cursor: default;
-    transition: background-color 120ms linear;
+    transition: background-color 140ms linear;
 
     &:hover {
       background: var(--rep-hover);
@@ -190,7 +190,7 @@ html[data-surface="desk"][data-journal] {
       top: 10px;
       bottom: 10px;
       width: 3px;
-      border-radius: 0 3px 3px 0;
+      border-radius: 0 2px 2px 0;
       background: var(--pen);
     }
     &[data-words="0"] {
@@ -226,7 +226,7 @@ html[data-surface="desk"][data-journal] {
   .rep-day-name {
     color: var(--ink);
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 20px;
   }
   .rep-day-position {
@@ -252,7 +252,7 @@ html[data-surface="desk"][data-journal] {
     display: -webkit-box;
     overflow: hidden;
     color: var(--ink);
-    font-size: 15px;
+    font-size: 14px;
     line-height: 22px;
     white-space: pre-line;
     overflow-wrap: anywhere;
@@ -272,7 +272,7 @@ html[data-surface="desk"][data-journal] {
     border-radius: 4px;
     color: var(--ink-2);
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 20px;
 
     &:hover {
@@ -302,7 +302,7 @@ html[data-surface="desk"][data-journal] {
     min-width: 0;
     flex: 0 1 auto;
     color: var(--ink);
-    font-weight: 550;
+    font-weight: 500;
 
     &:hover {
       text-decoration: underline;
@@ -324,7 +324,7 @@ html[data-surface="desk"][data-journal] {
   .rep-day-compact {
     min-width: 0;
     color: var(--ink-2);
-    font-size: 13.5px;
+    font-size: 13px;
     line-height: 20px;
   }
   .rep-day-compact-span {
@@ -346,7 +346,7 @@ html[data-surface="desk"][data-journal] {
   .rep-day-fresh {
     color: var(--rep-pen-deep);
     font-size: 12px;
-    font-weight: 650;
+    font-weight: 500;
     line-height: 16px;
   }
   .rep-day-late,
@@ -360,7 +360,7 @@ html[data-surface="desk"][data-journal] {
   }
   .rep-day-ledger-empty-title {
     color: var(--ink);
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
     line-height: 22px;
   }
@@ -407,8 +407,8 @@ html[data-surface="desk"][data-journal] {
   .rep-day-roll-figure {
     margin-right: 2px;
     color: var(--ink);
-    font-size: 34px;
-    font-weight: 650;
+    font-size: 32px;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
     line-height: 38px;
     letter-spacing: -0.02em;
@@ -467,7 +467,7 @@ html[data-surface="desk"][data-journal] {
     flex: 1 1 auto;
     color: var(--ink);
     font-size: 13px;
-    font-weight: 650;
+    font-weight: 600;
     line-height: 18px;
     letter-spacing: 0;
   }
@@ -493,7 +493,7 @@ html[data-surface="desk"][data-journal] {
     padding: 4px 8px;
     border-radius: 8px;
     cursor: default;
-    transition: background-color 120ms linear;
+    transition: background-color 140ms linear;
 
     &:hover {
       background: var(--rep-hover);
@@ -512,14 +512,14 @@ html[data-surface="desk"][data-journal] {
       top: 7px;
       bottom: 7px;
       width: 3px;
-      border-radius: 0 3px 3px 0;
+      border-radius: 0 2px 2px 0;
       background: var(--pen);
     }
   }
   .rep-day-person-name {
     display: block;
     color: var(--ink);
-    font-size: 13.5px;
+    font-size: 13px;
     font-weight: 500;
     line-height: 18px;
   }
@@ -533,7 +533,7 @@ html[data-surface="desk"][data-journal] {
     flex-shrink: 0;
     color: var(--rep-pencil-deep);
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
   .rep-day-excused {
@@ -552,14 +552,14 @@ html[data-surface="desk"][data-journal] {
     background: var(--surface-2);
     box-shadow: 0 0 0 1px var(--rule);
     color: var(--ink);
-    font-size: 12.5px;
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 500;
     line-height: 16px;
     white-space: nowrap;
     transition:
-      background-color 120ms linear,
-      box-shadow 120ms linear,
-      scale 120ms ease-out;
+      background-color 140ms linear,
+      box-shadow 140ms linear,
+      scale 140ms ease-out;
 
     &:hover:not(:disabled) {
       background: color-mix(in srgb, var(--pen) 12%, var(--surface-2));
@@ -595,11 +595,11 @@ html[data-surface="desk"][data-journal] {
     padding: 8px 10px;
     border-radius: 8px;
     color: var(--ink-2);
-    font-size: 13.5px;
+    font-size: 13px;
     line-height: 20px;
     text-align: left;
     white-space: nowrap;
-    transition: background-color 120ms linear;
+    transition: background-color 140ms linear;
 
     &:hover:not(:disabled) {
       background: var(--rep-hover);
@@ -611,7 +611,7 @@ html[data-surface="desk"][data-journal] {
   .rep-day-strip-count {
     flex-shrink: 0;
     color: var(--ink);
-    font-weight: 650;
+    font-weight: 600;
 
     .rep-day-roll-figure {
       margin: 0;
@@ -632,7 +632,7 @@ html[data-surface="desk"][data-journal] {
     align-self: center;
     margin-left: 6px;
     color: var(--rep-ink-3);
-    transition: rotate 160ms var(--rep-ease);
+    transition: rotate 140ms var(--rep-ease);
   }
   .rep-day-strip-toggle[aria-expanded="true"] .rep-day-strip-chevron {
     rotate: 180deg;
@@ -691,11 +691,11 @@ html[data-surface="desk"][data-journal] {
       box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 46%, transparent);
     }
     &[data-open]::after {
-      box-shadow: 0 0 10px color-mix(in srgb, var(--pen) 60%, transparent);
+      box-shadow: none;
     }
   }
   .rep-day-person[data-open]::after {
-    box-shadow: 0 0 10px color-mix(in srgb, var(--pen) 60%, transparent);
+    box-shadow: none;
   }
   .rep-day-ledger-empty {
     padding-left: 14px;
@@ -707,7 +707,7 @@ html[data-surface="desk"][data-journal] {
   }
   .rep-day-pill {
     animation: rep-day-pill-in 220ms var(--ease-snap) both;
-    transition: scale 120ms ease-out;
+    transition: scale 140ms ease-out;
 
     &:active {
       scale: 0.96;
@@ -718,12 +718,12 @@ html[data-surface="desk"][data-journal] {
   }
   .rep-day-entry[data-open]::after,
   .rep-day-person[data-open]::after {
-    animation: rep-day-rail 240ms cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+    animation: rep-day-rail 240ms var(--ease-spring) both;
   }
   .rep-day-share i {
     transform-origin: left center;
     animation: rep-day-grow 300ms var(--ease-snap) both;
-    transition: width 300ms var(--ease-snap);
+    transition: width 320ms var(--ease-snap);
   }
   .rep-day-roll-body {
     animation: rep-day-in 200ms var(--ease-snap) both;

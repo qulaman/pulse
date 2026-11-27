@@ -199,7 +199,7 @@ function PersonChip({ label, name, note = null, onRemove }: { label: string; nam
         aria-label={`Убрать: ${label}`}
         onMouseDown={(event) => event.preventDefault()}
         onClick={onRemove}
-        className="flex h-6 w-6 items-center justify-center rounded-[6px] text-[15px] leading-none text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-danger"
+        className="flex h-6 w-6 items-center justify-center rounded-[6px] text-[14px] leading-none text-muted transition-colors duration-[140ms] hover:bg-surface-2 hover:text-danger"
       >
         ×
       </button>

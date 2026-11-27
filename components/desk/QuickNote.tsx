@@ -254,7 +254,7 @@ export function QuickNote({ me }: { me: { userId: string; companyId: string } })
       ref={card}
       role="dialog"
       aria-label="Мысль в заметки"
-      className="desk-pop fixed z-[65] flex flex-col rounded-[14px] border border-border bg-surface px-4 pb-3 pt-3.5"
+      className="desk-pop fixed z-[65] flex flex-col rounded-[12px] border border-border bg-surface px-4 pb-3 pt-3.5"
       style={{
         left: place?.left ?? -9999,
         top: place?.top ?? -9999,
@@ -267,7 +267,7 @@ export function QuickNote({ me }: { me: { userId: string; companyId: string } })
       data-listening={stage === "recording" ? "" : undefined}
     >
       <div className="mb-2 flex items-center gap-2 text-[12px] leading-4 text-muted">
-        <NotebookPen aria-hidden size={14} strokeWidth={2} className="shrink-0" />
+        <NotebookPen aria-hidden size={14} className="shrink-0" />
         <span className="font-semibold text-text">Мысль в заметки</span>
         <span className="truncate">· только вам, без разбора</span>
         <span className="ml-auto flex shrink-0 items-center gap-1">
@@ -301,10 +301,10 @@ export function QuickNote({ me }: { me: { userId: string; companyId: string } })
         </span>
         {remindAt ? (
           <span className="ml-1 inline-flex h-7 shrink-0 items-center gap-1 rounded-[8px] pl-2 pr-1 text-[12px] font-medium leading-4" style={{ color: "var(--warn-deep, var(--warn))", background: "color-mix(in srgb, var(--warn-ink, var(--warn)) 13%, transparent)" }} data-testid="quick-note-remind-chip">
-            <BellRing aria-hidden size={13} strokeWidth={2.2} />
+            <BellRing aria-hidden size={14} />
             напомню {humanAqtobe(remindAt, now)}
             <button type="button" aria-label="Без напоминания" onClick={() => setRemindAt(null)} className="desk-focus ml-0.5 flex h-5 w-5 items-center justify-center rounded-[6px] opacity-80 hover:opacity-100">
-              <X aria-hidden size={12} strokeWidth={2.4} />
+              <X aria-hidden size={12} />
             </button>
           </span>
         ) : (
@@ -314,11 +314,11 @@ export function QuickNote({ me }: { me: { userId: string; companyId: string } })
             align="start"
             width={200}
             testId="quick-note-remind"
-            className="desk-focus ml-1 inline-flex h-7 shrink-0 items-center gap-1 rounded-[8px] px-2 text-[12px] font-medium leading-4 text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
+            className="desk-focus ml-1 inline-flex h-7 shrink-0 items-center gap-1 rounded-[8px] px-2 text-[12px] font-medium leading-4 text-muted transition-colors duration-[140ms] hover:bg-surface-2 hover:text-text"
           >
-            <BellRing aria-hidden size={13} strokeWidth={2.2} />
+            <BellRing aria-hidden size={14} />
             Напомнить
-            <ChevronDown aria-hidden size={12} strokeWidth={2.2} />
+            <ChevronDown aria-hidden size={12} />
           </MenuButton>
         )}
         <span className="ml-auto flex shrink-0 items-center gap-2">

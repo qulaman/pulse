@@ -77,8 +77,8 @@ html[data-surface="desk"][data-journal] {
       0 0 0 4px color-mix(in srgb, var(--lamp) 18%, transparent),
       0 0 16px color-mix(in srgb, var(--lamp) 45%, transparent);
     transition:
-      background-color 300ms linear,
-      box-shadow 300ms linear;
+      background-color 320ms linear,
+      box-shadow 320ms linear;
 
     &[data-state="busy"] {
       --lamp: var(--warn-ink, var(--gold-ink, var(--warn)));
@@ -112,7 +112,7 @@ html[data-surface="desk"][data-journal] {
     border-radius: 9999px;
     color: var(--ink, var(--text));
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 16px;
     white-space: nowrap;
     transition: background-color 140ms linear;
@@ -180,7 +180,7 @@ html[data-surface="desk"][data-journal] {
 
     > h2 {
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 500;
       line-height: 18px;
       color: var(--ink, var(--text));
     }
@@ -189,7 +189,7 @@ html[data-surface="desk"][data-journal] {
     display: inline-flex;
 
     &[data-pop] {
-      animation: stoika-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+      animation: stoika-pop 320ms var(--ease-spring) both;
     }
   }
   .stoika-card {
@@ -207,7 +207,7 @@ html[data-surface="desk"][data-journal] {
 
     > h2 {
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 500;
       line-height: 18px;
     }
   }
@@ -263,7 +263,7 @@ html[data-surface="desk"][data-journal] {
   }
   .stoika-door-title {
     margin-top: 2px;
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 600;
     line-height: 26px;
     letter-spacing: -0.015em;
@@ -313,7 +313,7 @@ html[data-surface="desk"][data-journal] {
   .stoika-dayline-dnd {
     top: 18px;
     height: 10px;
-    border-radius: 5px;
+    border-radius: 4px;
   }
   .stoika-dayline-track {
     left: 0;
@@ -346,7 +346,7 @@ html[data-surface="desk"][data-journal] {
     width: 2px;
     height: 30px;
     margin-left: -1px;
-    border-radius: 1px;
+    border-radius: 2px;
     background: var(--ink, var(--text));
 
     > b {
@@ -355,7 +355,7 @@ html[data-surface="desk"][data-journal] {
       left: 50%;
       transform: translateX(-50%);
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 500;
       line-height: 16px;
       white-space: nowrap;
     }
@@ -527,7 +527,7 @@ html[data-surface="desk"][data-journal] {
 
       > b {
         color: var(--ink, var(--text));
-        font-weight: 600;
+        font-weight: 500;
       }
     }
   }
@@ -597,7 +597,7 @@ html[data-surface="desk"][data-journal] {
     background: color-mix(in srgb, var(--tone) 13%, transparent);
     color: var(--tone-ink);
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 16px;
     white-space: nowrap;
 
@@ -645,7 +645,7 @@ html[data-surface="desk"][data-journal] {
       box-shadow: inset 3px 0 0 var(--pen, var(--accent));
     }
     &[data-came] {
-      animation: stoika-slide 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+      animation: stoika-slide 300ms var(--ease-snap) both;
     }
   }
   .stoika-row-tile {
@@ -659,7 +659,7 @@ html[data-surface="desk"][data-journal] {
     white-space: nowrap;
 
     > b {
-      font-weight: 600;
+      font-weight: 500;
     }
   }
   .stoika-row > div > .stoika-who {
@@ -702,7 +702,7 @@ html[data-surface="desk"][data-journal] {
     color: var(--ink-2, var(--text-muted));
     grid-template-columns: 72px 30px minmax(0, 1fr);
     min-height: 56px;
-    transition: background-color 120ms linear;
+    transition: background-color 140ms linear;
 
     &:hover {
       background: var(--hover, var(--surface-2));
@@ -790,7 +790,7 @@ html[data-surface="desk"][data-journal] {
     font-size: 14px;
     line-height: 20px;
     text-align: left;
-    transition: background-color 120ms linear;
+    transition: background-color 140ms linear;
 
     &:hover {
       background: var(--hover, var(--surface-2));
@@ -815,7 +815,7 @@ html[data-surface="desk"][data-journal] {
     color: var(--pencil, var(--danger));
 
     &[data-fresh] > svg {
-      animation: stoika-heart 360ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+      animation: stoika-heart 360ms var(--ease-spring) both;
     }
   }
   .stoika-tally {
@@ -846,7 +846,7 @@ html[data-surface="desk"][data-journal] {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-weight: 600;
+    font-weight: 500;
   }
   .stoika-tally-thanks {
     color: var(--pencil, var(--danger));
@@ -863,7 +863,7 @@ html[data-surface="desk"][data-journal] {
     box-shadow:
       0 0 0 1px var(--rule),
       var(--lift);
-    font-weight: 600;
+    font-weight: 500;
     letter-spacing: -0.005em;
 
     &:hover {
@@ -897,7 +897,7 @@ html[data-surface="desk"][data-journal] {
   .stoika-card {
     padding: 14px 16px;
     border-top: 0;
-    border-radius: 14px;
+    border-radius: 12px;
     background: var(--raise);
     box-shadow: var(--shadow-card);
   }
@@ -909,7 +909,7 @@ html[data-surface="desk"][data-journal] {
   .stoika-door {
     --door-ink: var(--ok-ink);
     border-top: 0;
-    border-radius: 14px;
+    border-radius: 12px;
     background: var(--raise);
     box-shadow: var(--shadow-card);
 
@@ -919,8 +919,8 @@ html[data-surface="desk"][data-journal] {
       position: absolute;
       inset: 0;
       pointer-events: none;
-      background: radial-gradient(560px 200px at 0% 0%, color-mix(in srgb, var(--door-ink) 13%, transparent), transparent 70%);
-      transition: opacity 300ms linear;
+      background: color-mix(in srgb, var(--door-ink) 6%, transparent);
+      transition: opacity 320ms linear;
     }
     &[data-state="busy"] {
       --door-ink: var(--warn-ink);
@@ -944,10 +944,10 @@ html[data-surface="desk"][data-journal] {
 
   .stoika-ticket {
     border: 0;
-    border-radius: 14px;
+    border-radius: 12px;
     background: var(--raise);
     box-shadow: var(--shadow-card);
-    transition: box-shadow 180ms linear;
+    transition: box-shadow 200ms linear;
 
     &[data-chosen] {
       outline: 0;
@@ -971,7 +971,7 @@ html[data-surface="desk"][data-journal] {
     }
     /* a request that has just come: it drops into its place, its tile rings twice, a ring of the pen goes out once */
     &[data-arrived] {
-      animation: stoika-drop 340ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+      animation: stoika-drop 340ms var(--ease-spring) both;
 
       &::after {
         content: "";

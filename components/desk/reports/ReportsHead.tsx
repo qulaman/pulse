@@ -42,7 +42,7 @@ export function JumpToDay({ value, today, now, onPick }: { value: Ymd; today: Ym
       <span ref={box} className="inline-flex">
         <IconButton
           label="Перейти к дню"
-          icon={<CalendarDays size={16} strokeWidth={2} aria-hidden />}
+          icon={<CalendarDays size={16} aria-hidden />}
           pressed={Boolean(anchor)}
           onClick={() => setAnchor(anchor ? null : box.current)}
           testId="desk-feed-jump"

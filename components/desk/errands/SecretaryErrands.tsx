@@ -64,7 +64,7 @@ function Colleague({ id, name, rows, now, catalogue, onOpen }: { id: string; nam
 function StoikaBone() {
   return (
     <SkeletonGroup grow className="flex flex-col gap-4">
-      <Bone h={168} className="!rounded-[14px]" />
+      <Bone h={168} className="!rounded-[12px]" />
       <Bone h={44} className="!rounded-[12px]" />
     </SkeletonGroup>
   );

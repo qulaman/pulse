@@ -145,7 +145,7 @@ function RowPanel({ row, crids, recordings }: { row: LabRow; crids: string[]; re
         <p className="desk-label uppercase">
           {whenAqtobe(row.created_at)} · {row.source ?? "?"}
         </p>
-        <p className="mt-1.5 text-[15px] leading-[22px]">{row.transcript ?? "—"}</p>
+        <p className="mt-1.5 text-[14px] leading-[22px]">{row.transcript ?? "—"}</p>
       </div>
       <dl className="desk-list text-[13px] leading-[18px]">
         <div className="py-2">
@@ -305,10 +305,10 @@ function LabTopStrip() {
             target="_blank"
             rel="noreferrer"
             title="Откроется в новой вкладке"
-            className="lab-shelf-link inline-flex items-center gap-1 px-2 py-1 text-[13px] text-muted transition-colors duration-[120ms] hover:text-text"
+            className="lab-shelf-link inline-flex items-center gap-1 px-2 py-1 text-[13px] text-muted transition-colors duration-[140ms] hover:text-text"
           >
             {page.title}
-            <ArrowUpRight size={13} strokeWidth={2.25} aria-hidden />
+            <ArrowUpRight size={14} aria-hidden />
           </a>
         ))}
       </span>

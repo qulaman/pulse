@@ -33,16 +33,16 @@ html[data-surface="desk"] {
     flex-direction: column;
     align-items: center;
     padding: 20px 12px 14px;
-    border-radius: 14px;
+    border-radius: 12px;
     background: var(--raise, var(--surface));
     box-shadow: 0 0 0 1px var(--rule, var(--border)), var(--lift, 0 0 #0000);
     text-align: center;
     cursor: pointer;
     transition:
-      transform 220ms var(--ease-snap, ease-out),
-      scale 220ms var(--ease-snap, ease-out),
-      box-shadow 180ms linear,
-      background-color 160ms linear;
+      transform 200ms var(--ease-snap, ease-out),
+      scale 200ms var(--ease-snap, ease-out),
+      box-shadow 200ms linear,
+      background-color 140ms linear;
 
     &:hover {
       transform: translateY(-2px);
@@ -53,7 +53,7 @@ html[data-surface="desk"] {
     }
     &:active {
       scale: 0.97;
-      transition-duration: 70ms;
+      transition-duration: 80ms;
     }
     &[data-chosen] {
       box-shadow:
@@ -64,8 +64,7 @@ html[data-surface="desk"] {
     &[data-open] {
       background: color-mix(in srgb, var(--accent) 7%, var(--raise, var(--surface)));
       box-shadow:
-        0 0 0 2px var(--accent),
-        0 14px 34px -14px color-mix(in srgb, var(--accent) 55%, transparent);
+        0 0 0 2px var(--accent);
     }
     &[data-state="gone"] {
       opacity: 0.6;
@@ -93,7 +92,7 @@ html[data-surface="desk"] {
     box-shadow:
       0 0 0 2px var(--raise, var(--surface)),
       0 0 0 4px var(--ring, transparent);
-    transition: box-shadow 220ms linear;
+    transition: box-shadow 200ms linear;
 
     &[data-state="late"] {
       --ring: var(--danger);
@@ -158,7 +157,7 @@ html[data-surface="desk"] {
     box-shadow: 0 0 0 2px var(--raise, var(--surface));
     color: #fff;
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 600;
     line-height: 20px;
     animation: crew-pop 360ms var(--ease-out) both;
   }
@@ -168,7 +167,7 @@ html[data-surface="desk"] {
     overflow: hidden;
     color: var(--text);
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 20px;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -222,7 +221,7 @@ html[data-surface="desk"] {
   .team-chip {
     height: 26px;
     padding: 0 10px;
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 500;
 
     &[data-tone="muted"] {
@@ -250,7 +249,7 @@ html[data-surface="desk"] {
     box-shadow: var(--shadow-pop, 0 0 0 1px var(--border));
     /* where View Transitions are, the card comes as one (transitions.css, D-184); here — itself */
     @supports not (view-transition-class: none) {
-      animation: team-card-in 340ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+      animation: team-card-in 340ms var(--ease-snap) both;
     }
 
     /* the notch: a corner of the sheet pointing up at the open tile */
@@ -262,11 +261,11 @@ html[data-surface="desk"] {
       width: 14px;
       height: 14px;
       margin-left: -7px;
-      border-radius: 3px 0 0 0;
+      border-radius: 2px 0 0 0;
       background: inherit;
       box-shadow: -1px -1px 0 0 var(--rule, var(--border));
       transform: rotate(45deg);
-      transition: left 260ms var(--ease-snap, ease-out);
+      transition: left 200ms var(--ease-snap, ease-out);
     }
   }
   .team-card-head {
@@ -278,8 +277,8 @@ html[data-surface="desk"] {
   .team-card-name {
     overflow: hidden;
     color: var(--text);
-    font-size: 22px;
-    font-weight: 650;
+    font-size: 20px;
+    font-weight: 600;
     line-height: 28px;
     letter-spacing: -0.02em;
     text-overflow: ellipsis;

@@ -198,9 +198,15 @@ async function teamGrid(ctx: Ctx) {
   const opened = await card.waitFor({ timeout: 5_000 }).then(() => true, () => false);
   // the card comes down 10 px into its place: measured once it has landed
   await page.waitForTimeout(450);
-  const tileBox = await tile.boundingBox();
-  const cardBox = opened ? await card.boundingBox() : null;
-  const under = Boolean(tileBox && cardBox && cardBox.y >= tileBox.y + tileBox.height - 1);
+  // both boxes in one frame: the screen scrolls the card into view about now, and two readings a
+  // frame apart put the card above its own tile
+  const under = opened
+    ? await page.evaluate((key) => {
+        const tileBox = document.querySelector(`[data-row-key="${key}"]`)?.getBoundingClientRect();
+        const cardBox = document.querySelector('[data-testid="team-card"]')?.getBoundingClientRect();
+        return Boolean(tileBox && cardBox && cardBox.top >= tileBox.bottom - 1);
+      }, who)
+    : false;
   const lit = (await tile.getAttribute("data-open")) !== null;
   record("команда: щелчок по плитке — карточка под её рядом, плитка подсвечена, ?p= в адресе", opened && under && lit && page.url().includes("p="), page.url());
   await page.waitForTimeout(500);

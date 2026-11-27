@@ -61,7 +61,7 @@ function ErrorLine({ text }: { text: string | null }) {
 
 const CHECK = (
   <span className="login-landed-mark" aria-hidden>
-    <Check size={18} strokeWidth={2.75} />
+    <Check size={20} />
   </span>
 );
 
@@ -97,7 +97,7 @@ function CodePanel({ person, autoIssue, onDone, focus }: { person: Person; autoI
     return (
       <div className="login-idle" data-testid="desk-code-idle">
         <span className="login-key" aria-hidden>
-          <KeyRound size={18} strokeWidth={2} />
+          <KeyRound size={20} />
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[14px] font-semibold leading-5">Код входа</p>
@@ -216,7 +216,7 @@ function FreshCredentials({ person, email, password, onDone }: { person: Person;
         </div>
         <div className="flex min-h-[34px] items-center gap-3">
           <dt className="w-16 shrink-0 text-[13px] leading-5 text-muted">Пароль</dt>
-          <dd className="nums min-w-0 flex-1 select-all text-[17px] leading-6" data-testid="credentials-password">
+          <dd className="nums min-w-0 flex-1 select-all text-[16px] leading-6" data-testid="credentials-password">
             {password}
           </dd>
           <CopyButton text={() => password} label="Скопировать пароль" done="Скопировал пароль" />
@@ -375,7 +375,7 @@ export function LoginBlock({ person, handed, manage, focus = false }: { person: 
         {done ? (
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2 border-y border-border py-1">
-              <span className="nums min-w-0 flex-1 select-all text-[19px] leading-7" data-testid="credentials-password">
+              <span className="nums min-w-0 flex-1 select-all text-[20px] leading-7" data-testid="credentials-password">
                 {password}
               </span>
               <CopyButton text={() => password} label="Скопировать пароль" done="Скопировал пароль" />

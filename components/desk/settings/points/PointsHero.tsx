@@ -206,8 +206,8 @@ export function PointsHero({
           <Fact label="унесено в магазин" value={summary ? formatNum(summary.spent) : "—"} />
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Waiting icon={<Gift size={16} strokeWidth={2} />} label="ждут выдачи" hint={waiting > 0 ? "выдать в магазине" : "выдавать нечего"} value={waiting} onClick={onShop} testId="points-hero-shop" />
-          <Waiting icon={<Scale size={16} strokeWidth={2} />} label="оспаривают" hint={disputes > 0 ? "вернуть или оставить" : "споров нет"} value={disputes} onClick={onDisputes} testId="points-hero-disputes" />
+          <Waiting icon={<Gift size={16} />} label="ждут выдачи" hint={waiting > 0 ? "выдать в магазине" : "выдавать нечего"} value={waiting} onClick={onShop} testId="points-hero-shop" />
+          <Waiting icon={<Scale size={16} />} label="оспаривают" hint={disputes > 0 ? "вернуть или оставить" : "споров нет"} value={disputes} onClick={onDisputes} testId="points-hero-disputes" />
         </div>
       </div>
     </section>
@@ -236,7 +236,7 @@ function Waiting({ icon, label, hint, value, onClick, testId }: { icon: ReactNod
       </span>
       <span className="nums pts-wait-value">{formatNum(value)}</span>
       <span className="pts-wait-label">{label}</span>
-      <ChevronRight size={14} strokeWidth={2.25} aria-hidden className="pts-wait-arrow" />
+      <ChevronRight size={14} aria-hidden className="pts-wait-arrow" />
     </button>
   );
 }

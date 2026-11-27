@@ -436,7 +436,7 @@ export function DeskCalendar() {
   }
 
   return (
-    <DeskPage>
+    <DeskPage width="full">
       <PageTitle
         title="Календарь"
         state={upcoming.data ? stateLine(screen, running) : null}
@@ -475,7 +475,7 @@ export function DeskCalendar() {
               <>
                 <CalendarOnWallButton view={view} />
                 <Tooltip label="Новая встреча" keys={["N"]} side="bottom">
-                  <Button size="sm" icon={<Plus size={15} strokeWidth={2.2} aria-hidden />} onClick={() => newMeeting()} data-testid="desk-event-new">
+                  <Button size="sm" icon={<Plus size={16} aria-hidden />} onClick={() => newMeeting()} data-testid="desk-event-new">
                     Новая встреча
                   </Button>
                 </Tooltip>
@@ -551,9 +551,9 @@ function DeadlinesToggle({ on, count, tone, onToggle }: { on: boolean; count: nu
         onClick={onToggle}
         data-testid="desk-deadlines-toggle"
         data-tone={tone}
-        className={`cal-deadlines flex h-8 items-center gap-1.5 text-[14px] leading-5 transition-colors duration-[120ms] ${on ? "font-semibold text-text shadow-[inset_0_-2px_0_var(--text)]" : "text-muted hover:text-text"}`}
+        className={`cal-deadlines flex h-8 items-center gap-1.5 text-[14px] leading-5 transition-colors duration-[140ms] ${on ? "font-semibold text-text shadow-[inset_0_-2px_0_var(--text)]" : "text-muted hover:text-text"}`}
       >
-        <Diamond aria-hidden size={13} strokeWidth={2.2} className="cal-deadlines-icon" />
+        <Diamond aria-hidden size={14} className="cal-deadlines-icon" />
         Сроки
         {count > 0 ? (
           <span className="cal-deadlines-count nums text-[12px]" style={{ color: tone === "danger" ? "var(--danger)" : undefined }}>

@@ -103,7 +103,7 @@ export function MomentBar({
           </svg>
         )}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[17px] font-semibold leading-[22px] @max-[900px]:text-[15px] @max-[900px]:leading-5" data-testid="desk-moment-label">
+          <p className="truncate text-[16px] font-semibold leading-[22px] @max-[900px]:text-[14px] @max-[900px]:leading-5" data-testid="desk-moment-label">
             {eyebrow ? <span className="desk-label mr-2 uppercase">{eyebrow}</span> : null}
             {screen.label}
           </p>

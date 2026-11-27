@@ -144,11 +144,11 @@ export function PointsScreen() {
               data-testid="points-rules-link"
               title="Режим рейтинга и правила — во вкладке «Очки и отчёты»"
             >
-              <SlidersHorizontal size={15} strokeWidth={2} aria-hidden />
+              <SlidersHorizontal size={16} aria-hidden />
               Правила очков
             </Link>
             {/* the button always starts at «Кому»: a name typed after it must never land in the sum */}
-            <Button size="sm" disabled={!on} onClick={() => setAward({})} data-testid="points-award" title="Начислить · N — выбранному в таблице" icon={<Plus size={15} strokeWidth={2.5} />}>
+            <Button size="sm" disabled={!on} onClick={() => setAward({})} data-testid="points-award" title="Начислить · N — выбранному в таблице" icon={<Plus size={16} />}>
               Начислить
             </Button>
           </>

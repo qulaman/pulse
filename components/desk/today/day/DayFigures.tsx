@@ -39,7 +39,7 @@ export function ReportsTile({ day, index }: { day: TeamDay; index: number }) {
   const quiet = !day.workday ? "Сегодня не рабочий день — отчёты не ждём" : due.length === 0 ? "Сегодня отчёт сдавать некому" : null;
   return (
     <Card ink="ok" ok={all} index={index} testId="today-reports">
-      <Head icon={ClipboardCheck} title="Отчёты" href="/desk/reports">
+      <Head icon={ClipboardCheck} sign="reports" title="Отчёты" href="/desk/reports">
         {missed > 0 ? <Pill ink="pencil">нет отчёта · {missed}</Pill> : null}
       </Head>
       {quiet ? (
@@ -92,7 +92,7 @@ export function ReportsTile({ day, index }: { day: TeamDay; index: number }) {
 export function ReportsFailedTile({ note, index }: { note: ReactNode; index: number }) {
   return (
     <Card ink="ok" index={index} testId="today-reports">
-      <Head icon={ClipboardCheck} title="Отчёты" href="/desk/reports" />
+      <Head icon={ClipboardCheck} sign="reports" title="Отчёты" href="/desk/reports" />
       {note}
     </Card>
   );
@@ -132,7 +132,7 @@ export function WeekTile({ rows, index }: { rows: readonly RatingRow[]; index: n
   }, [onWall]);
   return (
     <Card ink="gold" index={index} testId="home-rating">
-      <Head icon={Trophy} title="Неделя" href="/desk/settings/points">
+      <Head icon={Trophy} sign="rating" title="Неделя" href="/desk/settings/points">
         <Ghost
           icon={onWall ? Check : MonitorUp}
           done={onWall}
@@ -180,8 +180,8 @@ export function WeekTile({ rows, index }: { rows: readonly RatingRow[]; index: n
                     <RollingNumber value={row.points} />
                   </span>
                   {first && row.delta_vs_prev > 0 ? (
-                    <span className="nums inline-flex items-center gap-0.5 text-[11.5px]" style={{ color: "var(--ok-ink)" }} title={`На ${row.delta_vs_prev} больше, чем за прошлую неделю`}>
-                      <TrendingUp size={11} strokeWidth={2.5} aria-hidden />
+                    <span className="nums inline-flex items-center gap-0.5 text-[11px]" style={{ color: "var(--ok-ink)" }} title={`На ${row.delta_vs_prev} больше, чем за прошлую неделю`}>
+                      <TrendingUp size={11} aria-hidden />
                       {row.delta_vs_prev}
                     </span>
                   ) : null}

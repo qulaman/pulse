@@ -297,9 +297,9 @@ export function DeskPanelColumn({
             type="button"
             aria-label="Закрыть панель"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-[8px] text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
+            className="flex h-8 w-8 items-center justify-center rounded-[8px] text-muted transition-colors duration-[140ms] hover:bg-surface-2 hover:text-text"
           >
-            <X aria-hidden size={16} strokeWidth={2} />
+            <X aria-hidden size={16} />
           </button>
         </Tooltip>
       </div>

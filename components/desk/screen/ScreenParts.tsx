@@ -66,9 +66,9 @@ export function Switch({ on, onToggle, label, testId, disabled }: { on: boolean;
       disabled={disabled}
       onClick={onToggle}
       data-testid={testId}
-      className="screen-switch relative shrink-0 transition-colors duration-[120ms] disabled:opacity-40"
+      className="screen-switch relative shrink-0 transition-colors duration-[140ms] disabled:opacity-40"
     >
-      <span aria-hidden className="absolute transition-transform duration-[120ms]" />
+      <span aria-hidden className="absolute transition-transform duration-[140ms]" />
     </button>
   );
 }
@@ -96,7 +96,7 @@ function PickRow({ children, lit, onClick, testId, note, minutes }: { children: 
       data-testid={testId}
       aria-pressed={lit}
       data-lit={lit ? "" : undefined}
-      className={`screen-pick-row flex min-h-9 w-full items-center gap-2 border-b border-border/60 pr-1 text-left transition-colors duration-[120ms] last:border-b-0 hover:bg-surface-2/60 ${lit ? "bg-accent/[0.08] pl-2 shadow-[inset_2px_0_0_var(--accent)]" : "pl-0"}`}
+      className={`screen-pick-row flex min-h-9 w-full items-center gap-2 border-b border-border/60 pr-1 text-left transition-colors duration-[140ms] last:border-b-0 hover:bg-surface-2/60 ${lit ? "bg-accent/[0.08] pl-2 shadow-[inset_2px_0_0_var(--accent)]" : "pl-0"}`}
     >
       <span className="min-w-0 flex-1">{children}</span>
       {note ? (
@@ -264,7 +264,7 @@ export function Visits({
               {waiting ? "К вам посетитель" : "Посетитель ждёт"} · {waitedSince(visit.created_at, now)}
               {waiting ? " · на стене поверх всего" : ""}
             </p>
-            <p className="mt-0.5 text-[15px] font-semibold leading-5">{visit.note?.trim() || "Без имени"}</p>
+            <p className="mt-0.5 text-[14px] font-semibold leading-5">{visit.note?.trim() || "Без имени"}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {ANSWERS.map((option) => (
                 <Button
@@ -285,7 +285,7 @@ export function Visits({
       {messages.map((message) => (
         <article key={message.id} className="screen-visit py-2.5 pl-3 shadow-[inset_2px_0_0_var(--accent)]" data-waiting="">
           <p className="text-[12px] leading-4 text-muted">Сообщение секретаря · {waitedSince(message.created_at, now)} · на стене поверх всего</p>
-          <p className="mt-0.5 text-[15px] font-semibold leading-5 [overflow-wrap:anywhere]">{message.note?.trim()}</p>
+          <p className="mt-0.5 text-[14px] font-semibold leading-5 [overflow-wrap:anywhere]">{message.note?.trim()}</p>
           <div className="mt-2">
             <Button size="sm" variant="secondary" className="desk-move" disabled={busyId === message.id} onClick={() => onAnswer(message, "read")}>
               Понятно

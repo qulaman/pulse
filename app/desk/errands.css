@@ -80,7 +80,7 @@ html[data-surface="desk"][data-journal] {
     box-shadow: 0 0 0 2px var(--raise, var(--surface));
     color: var(--text-muted);
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 500;
   }
   .errands-siren {
     display: inline-flex;
@@ -96,7 +96,7 @@ html[data-surface="desk"][data-journal] {
     justify-content: center;
     width: 56px;
     height: 56px;
-    border-radius: 14px;
+    border-radius: 12px;
     color: var(--tone);
     background: color-mix(in srgb, var(--tone) 13%, transparent);
 
@@ -172,7 +172,7 @@ html[data-surface="desk"][data-journal] {
     box-shadow: 0 0 0 1px var(--rule, var(--border));
     font-weight: 500;
     transition:
-      scale 240ms var(--ease-snap, ease-out),
+      scale 200ms var(--ease-snap, ease-out),
       background-color 140ms linear;
 
     &:hover:not(:disabled) {
@@ -183,7 +183,7 @@ html[data-surface="desk"][data-journal] {
     }
     &:active:not(:disabled) {
       scale: 0.96;
-      transition-duration: 70ms;
+      transition-duration: 80ms;
     }
     &:disabled {
       opacity: 0.45;
@@ -299,19 +299,13 @@ html[data-surface="desk"][data-journal] {
   /* the hero takes the moment's ink in its corner: the pen by default, the pencil at an alarm */
   .errands-hero {
     &[data-tone="ok"] {
-      background:
-        radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--ok-ink) 11%, transparent), transparent 55%),
-        var(--raise);
+      background: color-mix(in srgb, var(--ok-ink) 5%, var(--raise));
     }
     &[data-tone="warn"] {
-      background:
-        radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--warn-ink) 12%, transparent), transparent 55%),
-        var(--raise);
+      background: color-mix(in srgb, var(--warn-ink) 5%, var(--raise));
     }
     &[data-tone="danger"] {
-      background:
-        radial-gradient(120% 180% at 0% 0%, color-mix(in srgb, var(--pencil) 22%, transparent), transparent 60%),
-        var(--raise);
+      background: color-mix(in srgb, var(--pencil) 10%, var(--raise));
       box-shadow:
         0 0 0 1px color-mix(in srgb, var(--pencil) 55%, transparent),
         0 14px 40px -16px color-mix(in srgb, var(--pencil) 60%, transparent);

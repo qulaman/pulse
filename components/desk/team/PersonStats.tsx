@@ -13,7 +13,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useId, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useId, useState, type PointerEvent, type ReactNode } from "react";
 
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { RollingNumber } from "@/components/ui/RollingNumber";
@@ -108,13 +108,6 @@ export function PersonStats({ person, now }: { person: Person; now: Date }) {
 
 /* ---- the pieces every tile is made of ----------------------------------------------------------- */
 
-/** A light that follows the pointer over a tile: written to the element, never through React state. */
-function follow(event: PointerEvent<HTMLElement>) {
-  const box = event.currentTarget.getBoundingClientRect();
-  event.currentTarget.style.setProperty("--mx", `${Math.round(event.clientX - box.left)}px`);
-  event.currentTarget.style.setProperty("--my", `${Math.round(event.clientY - box.top)}px`);
-}
-
 function Tile({
   tileKey,
   icon: Glyph,
@@ -133,7 +126,7 @@ function Tile({
   children: ReactNode;
 }) {
   return (
-    <article data-testid={`person-stat-${tileKey}`} className={`ps-tile ${className}`} style={{ "--i": index } as CSSProperties} onPointerMove={follow}>
+    <article data-testid={`person-stat-${tileKey}`} className={`ps-tile ${className}`} data-order={index}>
       <header className="flex min-h-5 items-center gap-2">
         <Glyph aria-hidden size={14} strokeWidth={2} className="ps-icon shrink-0" />
         <h3 className="truncate text-[12px] font-medium leading-4 text-muted">{label}</h3>
@@ -360,7 +353,7 @@ function OnTimeTile({ source, index, className }: { source: Source<TaskStats>; i
             // «100 %» and a full ring over one task read as a verdict on the person: the counts, in words
             return (
               <div className="flex flex-1 flex-col gap-1" data-testid="person-stat-ontime-words">
-                <p className="text-[15px] font-medium leading-6">{onTimeWords(stats.current.onTime, stats.current.late)}</p>
+                <p className="text-[14px] font-medium leading-6">{onTimeWords(stats.current.onTime, stats.current.late)}</p>
                 <p className="mt-auto text-[12px] leading-4 text-muted">
                   Долю в срок покажу от {ENOUGH.onTime} задач со сроком за {PERIOD_DAYS} дней
                 </p>
@@ -509,7 +502,7 @@ function SpeedTile({ source, index, className }: { source: Source<TaskStats>; in
                 <Quiet>За {PERIOD_DAYS} дней сданных задач нет</Quiet>
               ) : few ? (
                 <div className="flex flex-col gap-1" data-testid="person-stat-speed-words">
-                  <p className="text-[15px] font-medium leading-6">{speedWords(stats.spans)}</p>
+                  <p className="text-[14px] font-medium leading-6">{speedWords(stats.spans)}</p>
                   <p className="text-[12px] leading-4 text-muted">
                     от выдачи до сдачи · обычное время покажу от {ENOUGH.speed} сданных
                   </p>
@@ -528,7 +521,7 @@ function SpeedTile({ source, index, className }: { source: Source<TaskStats>; in
               {/* «без возвратов» says something only of work that was handed in */}
               {typical !== null || stats.current.returned > 0 ? (
                 <p className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] leading-5 text-muted ${typical === null ? "mt-auto" : ""}`}>
-                  <RotateCcw aria-hidden size={13} strokeWidth={2} className="ps-icon shrink-0" />
+                  <RotateCcw aria-hidden size={14} className="ps-icon shrink-0" />
                   {stats.current.returned > 0 ? (
                     <span>
                       на доработку — <span className="nums font-medium text-text">{stats.current.returned}</span>

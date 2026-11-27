@@ -31,11 +31,11 @@ export function InFlight() {
   return (
     <section className="flex flex-col gap-4" data-testid="desk-ingest-flight" data-stage={stage}>
       <PanelHeader>
-        <h2 className="desk-task-title flex items-baseline gap-2.5 text-[21px] leading-[26px]" aria-live="polite">
+        <h2 className="desk-task-title flex items-baseline gap-2.5 text-[20px] leading-[26px]" aria-live="polite">
           {/* the mascot's small self beside the words of the stage (D-209): the bars of the voice, then the arcs at work */}
           <MiniMark state={recording ? "listening" : "busy"} size={20} tone="var(--accent)" className="self-center" />
           {STAGE_LINE[stage] ?? "Разбираю…"}
-          {recording ? <Elapsed className="font-mono text-[15px] font-medium leading-5 text-muted" /> : null}
+          {recording ? <Elapsed className="font-mono text-[14px] font-medium leading-5 text-muted" /> : null}
         </h2>
         {pinned ? (
           <p className="mt-1 text-[14px] leading-5 text-muted">
@@ -66,7 +66,7 @@ export function InFlight() {
       ) : (
         <>
           {words.trim() ? (
-            <p className="-ml-3 border-l-2 border-accent pl-2.5 text-[15px] leading-[22px]" data-testid="desk-ingest-words">
+            <p className="-ml-3 border-l-2 border-accent pl-2.5 text-[14px] leading-[22px]" data-testid="desk-ingest-words">
               «{words.trim()}»
             </p>
           ) : (

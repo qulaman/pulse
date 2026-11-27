@@ -35,7 +35,7 @@ export function ErrandsHero({
     <section className="desk-total errands-hero @container flex flex-col gap-3.5" data-testid="desk-errands-hero" data-tone={tone ?? undefined}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
         <div className="min-w-0 flex-1">
-          <p className="text-[17px] font-semibold leading-[22px] [overflow-wrap:anywhere]" data-testid="hero-title">
+          <p className="text-[16px] font-semibold leading-[22px] [overflow-wrap:anywhere]" data-testid="hero-title">
             {title}
           </p>
           {sub ? <p className="mt-0.5 text-[13px] leading-[18px] text-muted">{sub}</p> : null}
@@ -64,7 +64,7 @@ export function PultBand({ band, facts }: { band: Band; facts: HeroFact[] | null
           <PersonFace id={band.face.id} name={band.face.full_name} size={64} ring={band.ring ? RING_INK[band.ring] : null} away={band.ring === "away"} />
         ) : (
           <span aria-hidden className="pult-band-nobody">
-            <ConciergeBell size={26} strokeWidth={2} />
+            <ConciergeBell size={24} />
           </span>
         )}
         {Glyph ? (

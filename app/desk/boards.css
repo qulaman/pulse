@@ -32,7 +32,7 @@ html[data-surface="desk"][data-journal] {
     overflow: hidden;
     font-family: var(--font-display);
     font-size: 6cqw;
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1.2;
     letter-spacing: -0.02em;
     text-overflow: ellipsis;
@@ -118,7 +118,7 @@ html[data-surface="desk"][data-journal] {
     b {
       color: var(--sheet-ink);
       font-size: 3.4cqw;
-      font-weight: 600;
+      font-weight: 500;
     }
   }
   /* the hero draws the same sheet larger: smaller type in its own units, more lines */
@@ -206,8 +206,8 @@ html[data-surface="desk"][data-journal] {
     border: 1px dashed var(--rule);
     border-radius: 12px;
     transition:
-      background-color 120ms linear,
-      border-color 120ms linear;
+      background-color 140ms linear,
+      border-color 140ms linear;
   }
   .boards-new:hover .boards-new-plate {
     border-color: var(--line);
@@ -218,7 +218,7 @@ html[data-surface="desk"][data-journal] {
     height: 3px;
     margin-top: 8px;
     overflow: hidden;
-    border-radius: 3px;
+    border-radius: 2px;
     background: color-mix(in srgb, var(--ink) 10%, transparent);
 
     i {
@@ -259,7 +259,7 @@ html[data-surface="desk"][data-journal] {
     background: color-mix(in srgb, var(--accent) 14%, transparent);
     color: var(--pen-deep, var(--accent));
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
   }
   .boards-live-dot,
   .board-live-dot {
@@ -309,7 +309,7 @@ html[data-surface="desk"][data-journal] {
     flex-shrink: 0;
     color: var(--text-muted);
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
   }
   .boards-bin-purge,
   .boards-bin-clear {
@@ -333,7 +333,7 @@ html[data-surface="desk"][data-journal] {
   .board-title {
     font-family: var(--font-display);
     font-size: 28px;
-    font-weight: 700;
+    font-weight: 600;
     line-height: 34px;
     letter-spacing: -0.025em;
   }
@@ -386,7 +386,7 @@ html[data-surface="desk"][data-journal] {
     background: color-mix(in srgb, var(--accent) 14%, transparent);
     color: var(--pen-deep, var(--accent));
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 16px;
   }
 
@@ -415,7 +415,7 @@ html[data-surface="desk"][data-journal] {
   .board-stage-point {
     font-family: var(--font-display);
     font-size: 28px;
-    font-weight: 700;
+    font-weight: 600;
     line-height: 34px;
     letter-spacing: -0.02em;
 
@@ -437,10 +437,10 @@ html[data-surface="desk"][data-journal] {
     border: 1px solid var(--rule);
     border-radius: 9999px;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 500;
     transition:
-      background-color 120ms linear,
-      border-color 120ms linear;
+      background-color 140ms linear,
+      border-color 140ms linear;
     &:disabled {
       opacity: 0.5;
     }
@@ -526,7 +526,7 @@ html[data-surface="desk"][data-journal] {
     background: color-mix(in srgb, var(--accent) 14%, transparent);
     color: var(--pen-deep, var(--accent));
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
 
     button {
       display: inline-flex;
@@ -550,7 +550,7 @@ html[data-surface="desk"][data-journal] {
     display: flex;
     flex-direction: column;
     padding: 4px;
-    border-radius: 10px;
+    border-radius: 8px;
   }
   .board-who-option {
     display: flex;
@@ -620,8 +620,8 @@ html[data-surface="desk"][data-journal][data-graphite] {
   .boards-hero-sheet {
     box-shadow: 0 0 0 1px rgb(255 255 255 / 0.07);
     transition:
-      transform 220ms var(--ease-snap),
-      box-shadow 160ms linear;
+      transform 200ms var(--ease-snap),
+      box-shadow 140ms linear;
 
     &:hover {
       box-shadow:
@@ -639,9 +639,7 @@ html[data-surface="desk"][data-journal][data-graphite] {
   .boards-hero {
     border: 0;
     border-radius: 16px;
-    background:
-      radial-gradient(90% 120% at 0% 0%, color-mix(in srgb, var(--pen) 9%, transparent), transparent 60%),
-      var(--raise);
+    background: var(--raise);
     box-shadow: var(--shadow-card);
   }
   .board-wall-card,
@@ -649,7 +647,7 @@ html[data-surface="desk"][data-journal][data-graphite] {
   .board-handout,
   .boards-bin {
     border: 0;
-    border-radius: 14px;
+    border-radius: 12px;
     background: var(--raise);
     box-shadow: var(--shadow-card);
   }
@@ -684,14 +682,14 @@ html[data-surface="desk"][data-journal][data-graphite] {
     }
   }
   .board-stage .screen-bezel {
-    border-radius: 14px;
+    border-radius: 12px;
   }
   /* the outline: a card of lines, a point's number in a circle that turns green with its tick
      (moved here from planning.css, D-177) */
   [data-testid="desk-board"] [data-testid="desk-outline"] {
     padding: 6px;
     border-top: 0;
-    border-radius: 14px;
+    border-radius: 12px;
     background: var(--raise);
     box-shadow: var(--shadow-card);
 
@@ -732,12 +730,12 @@ html[data-surface="desk"][data-journal][data-graphite] {
       border-color: var(--line);
       background: var(--surface-2);
       color: var(--ink-3);
-      font-weight: 600;
+      font-weight: 500;
       transition:
-        background-color 160ms linear,
-        border-color 160ms linear,
-        color 160ms linear,
-        scale 220ms var(--ease-snap);
+        background-color 140ms linear,
+        border-color 140ms linear,
+        color 140ms linear,
+        scale 200ms var(--ease-snap);
 
       &:hover:not(:disabled) {
         border-color: color-mix(in srgb, var(--pen) 70%, transparent);
@@ -745,7 +743,7 @@ html[data-surface="desk"][data-journal][data-graphite] {
       }
       &:active:not(:disabled) {
         scale: 0.88;
-        transition-duration: 70ms;
+        transition-duration: 80ms;
       }
       &[aria-checked="true"] {
         border-color: var(--ok-ink);
@@ -757,7 +755,7 @@ html[data-surface="desk"][data-journal][data-graphite] {
       border-radius: 6px;
     }
     [data-testid="desk-outline-menu"] {
-      border-radius: 7px;
+      border-radius: 6px;
     }
     .desk-phone-look {
       border-radius: 8px;

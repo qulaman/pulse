@@ -130,7 +130,7 @@ const ARRIVAL_MS = 1_600;
 export function AlarmGlyph({ size = 16 }: { size?: number }) {
   return (
     <span aria-hidden className="errands-siren">
-      <Siren size={size} strokeWidth={2.25} />
+      <Siren size={size} />
     </span>
   );
 }

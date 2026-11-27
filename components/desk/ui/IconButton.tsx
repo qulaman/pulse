@@ -13,7 +13,7 @@ import { Tooltip } from "@/components/desk/ui/Tooltip";
  * `pressed` keeps it lit (a pin that is on). Pressing gives a small squeeze.
  */
 const SQUARE =
-  "desk-icon-button desk-focus flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] transition-[background-color,color,scale] duration-[120ms] ease-linear hover:bg-surface-2 active:scale-[.92] active:duration-[70ms] disabled:pointer-events-none disabled:opacity-40";
+  "desk-icon-button desk-focus flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] transition-[background-color,color,scale] duration-[140ms] ease-linear hover:bg-surface-2 active:scale-[.92] active:duration-[80ms] disabled:pointer-events-none disabled:opacity-40";
 
 function tint(tone: "default" | "danger", pressed: boolean) {
   if (pressed) return "bg-surface-2 text-accent";
@@ -109,7 +109,7 @@ export function MoreMenu({
           }}
           className={`${SQUARE} ${open ? "bg-surface-2 text-text" : "text-muted hover:text-text"} ${className}`}
         >
-          <Ellipsis aria-hidden size={16} strokeWidth={2.2} />
+          <Ellipsis aria-hidden size={16} />
         </button>
       </Tooltip>
       <Menu open={open} onClose={() => setAnchor(null)} anchor={anchor} items={items} align={align} width={width} label={label} />

@@ -188,7 +188,7 @@ export function AiPanel() {
         {devTools ? (
           <SettingRow id="parser-rules" label="Правила компании" hint={rules?.text ? `Действует версия ${rules.version}. Меняются только после проверки на корпусе` : "Своих нет — разбор идёт по ядру промпта"}>
             <Link href="/desk/settings/lab?tab=parser" data-testid="settings-parser-rules" className="set-open btn-secondary inline-flex h-9 items-center gap-2 px-3 text-[13px] font-semibold">
-              <FlaskConical size={15} strokeWidth={2} aria-hidden />
+              <FlaskConical size={16} aria-hidden />
               Открыть в Лаборатории
             </Link>
           </SettingRow>
@@ -202,7 +202,7 @@ export function AiPanel() {
           hint={`${people.data ? `${names} ${pluralRu(names, ["имя", "имени", "имён"])}` : "имена"} · ${words ? `${words} ${pluralRu(words, ["слово", "слова", "слов"])}` : "слов нет"}`}
         >
           <Link href="/desk/settings/dictionary" data-testid="settings-dictionary" className="set-open btn-secondary inline-flex h-9 items-center gap-2 px-3 text-[13px] font-semibold">
-            <BookText size={15} strokeWidth={2} aria-hidden />
+            <BookText size={16} aria-hidden />
             Открыть словарь
           </Link>
         </SettingRow>

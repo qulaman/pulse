@@ -75,7 +75,7 @@ export function RingState() {
       <span className="ring-state" data-state="on" data-testid="desk-ring-state">
         <Tooltip label="Новая просьба прозвенит на этом компьютере, даже когда вкладка закрыта или в фоне">
           <span className="ring-state-word">
-            <BellRing size={15} strokeWidth={2.25} aria-hidden />
+            <BellRing size={16} aria-hidden />
             Звонит
           </span>
         </Tooltip>
@@ -89,7 +89,7 @@ export function RingState() {
     <span className="ring-state" data-state="off" data-testid="desk-ring-state">
       <Tooltip label={missing(push, sound)}>
         <span className="ring-state-word">
-          <BellOff size={15} strokeWidth={2.25} aria-hidden />
+          <BellOff size={16} aria-hidden />
           Не звонит
         </span>
       </Tooltip>

@@ -92,11 +92,11 @@ function ItemCardDesk({ item, taken, chosen, index, onOpen, onChoose }: { item: 
         </span>
         {item.is_active ? null : (
           <span className="pts-item-flag">
-            <EyeOff size={12} strokeWidth={2.25} aria-hidden />
+            <EyeOff size={12} aria-hidden />
             скрыта
           </span>
         )}
-        <Pencil size={14} strokeWidth={2} aria-hidden className="pts-item-edit" />
+        <Pencil size={14} aria-hidden className="pts-item-edit" />
       </span>
       <span className="pts-item-title">{item.title}</span>
       <span className="pts-item-about">{item.description || " "}</span>
@@ -289,7 +289,7 @@ export function ShopDesk() {
           title="Награды"
           count={list.length}
           end={
-            <Button size="sm" variant="secondary" onClick={() => setEditing("new")} data-testid="shop-add-item" icon={<Plus size={15} strokeWidth={2.25} />}>
+            <Button size="sm" variant="secondary" onClick={() => setEditing("new")} data-testid="shop-add-item" icon={<Plus size={16} />}>
               Награда
             </Button>
           }
@@ -311,7 +311,7 @@ export function ShopDesk() {
             title="Наград пока нет"
             hint="Добавьте первую: что человек получит и сколько это стоит в очках"
             action={
-              <Button size="sm" variant="secondary" onClick={() => setEditing("new")} icon={<Plus size={15} strokeWidth={2.25} />}>
+              <Button size="sm" variant="secondary" onClick={() => setEditing("new")} icon={<Plus size={16} />}>
                 Награда
               </Button>
             }
@@ -341,7 +341,7 @@ export function ShopDesk() {
             ))}
             <div role="listitem" className="contents">
               <button type="button" className="pts-item pts-item-add" onClick={() => setEditing("new")} aria-label="Добавить награду">
-                <Plus size={20} strokeWidth={2} aria-hidden />
+                <Plus size={20} aria-hidden />
                 <span>Новая награда</span>
               </button>
             </div>

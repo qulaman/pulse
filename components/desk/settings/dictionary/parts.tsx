@@ -30,9 +30,9 @@ export function Pill({ label, fresh, waiting, onRemove }: { label: string; fresh
             event.stopPropagation();
             onRemove();
           }}
-          className="dict-pill-x flex h-5 w-4 shrink-0 items-center justify-center text-muted opacity-0 transition-opacity duration-[120ms] hover:text-danger focus-visible:opacity-100 [.desk-row:hover_&]:opacity-100 [.desk-row[aria-selected=true]_&]:opacity-100"
+          className="dict-pill-x flex h-5 w-4 shrink-0 items-center justify-center text-muted opacity-0 transition-opacity duration-[140ms] hover:text-danger focus-visible:opacity-100 [.desk-row:hover_&]:opacity-100 [.desk-row[aria-selected=true]_&]:opacity-100"
         >
-          <X size={12} strokeWidth={2.5} aria-hidden />
+          <X size={12} aria-hidden />
         </button>
       ) : null}
     </span>
@@ -52,7 +52,7 @@ export function OfferPill({ label, onTake, disabled }: { label: string; onTake: 
       aria-label={`Добавить «${label}»`}
       className="dict-offer inline-flex h-6 items-center gap-1 whitespace-nowrap text-[14px] leading-5 text-accent hover:underline disabled:opacity-40"
     >
-      <Plus size={13} strokeWidth={2.5} aria-hidden />
+      <Plus size={14} aria-hidden />
       {label}
     </button>
   );
@@ -89,9 +89,9 @@ export function GuideButton({ steps }: { steps: GuideStep[] }) {
         aria-label="Как это работает"
         title="Как это работает"
         onClick={(event) => setAnchor(anchor ? null : event.currentTarget)}
-        className="dict-guide inline-flex items-center gap-1.5 whitespace-nowrap text-[13px] leading-5 text-muted transition-colors duration-[120ms] hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45"
+        className="dict-guide inline-flex items-center gap-1.5 whitespace-nowrap text-[13px] leading-5 text-muted transition-colors duration-[140ms] hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45"
       >
-        <CircleHelp size={15} strokeWidth={2} aria-hidden />
+        <CircleHelp size={16} aria-hidden />
         Как это работает
       </button>
       <Popover open={Boolean(anchor)} onClose={() => setAnchor(null)} anchor={anchor} align="end" width={420} label="Как это работает">

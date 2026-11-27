@@ -170,12 +170,12 @@ export function MeetingStage({
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Tooltip label="Предыдущий пункт" keys={["←"]}>
-          <Button size="sm" variant="secondary" icon={<ChevronLeft aria-hidden size={15} strokeWidth={2.2} />} disabled={stage.kind !== "point" || stage.at === 0} onClick={() => presenter.step(-1)} data-testid="board-stage-back">
+          <Button size="sm" variant="secondary" icon={<ChevronLeft aria-hidden size={16} />} disabled={stage.kind !== "point" || stage.at === 0} onClick={() => presenter.step(-1)} data-testid="board-stage-back">
             Назад
           </Button>
         </Tooltip>
         <Tooltip label={done ? "Снять отметку" : "Отметить и дальше"} keys={["Ctrl", "Enter"]}>
-          <Button size="sm" variant={done ? "secondary" : "primary"} icon={<Check aria-hidden size={15} strokeWidth={2.4} />} disabled={stage.kind !== "point"} onClick={mark} data-testid="board-stage-mark">
+          <Button size="sm" variant={done ? "secondary" : "primary"} icon={<Check aria-hidden size={16} />} disabled={stage.kind !== "point"} onClick={mark} data-testid="board-stage-mark">
             {done ? "Отмечен" : "Отметить"}
           </Button>
         </Tooltip>
@@ -188,7 +188,7 @@ export function MeetingStage({
             data-testid="board-stage-next"
           >
             {stage.kind === "point" ? "Дальше" : "Начать"}
-            <ChevronRight aria-hidden size={15} strokeWidth={2.2} className="-mr-1" />
+            <ChevronRight aria-hidden size={16} className="-mr-1" />
           </Button>
         </Tooltip>
         <span className="ml-auto flex items-center gap-2">

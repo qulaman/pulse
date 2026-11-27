@@ -28,9 +28,9 @@ export type MoveHandlers = Partial<Record<MoveKey, () => void>>;
 
 /** The icon beside a menu move — only where it says something a word does not. */
 const ICON: Partial<Record<MoveKey, ReactNode>> = {
-  vacation: <Plane size={15} strokeWidth={2} />,
-  sick: <Thermometer size={15} strokeWidth={2} />,
-  back: <UserCheck size={15} strokeWidth={2} />,
+  vacation: <Plane size={16} />,
+  sick: <Thermometer size={16} />,
+  back: <UserCheck size={16} />,
 };
 
 /**
@@ -188,7 +188,7 @@ export function PersonMovesBar({
               href={href}
               prefetch
               // a way to the page, not a move on the person: quiet, as a link — the row stays one line in the panel
-              className="inline-flex h-9 items-center gap-1 rounded-[8px] px-2 text-[13px] font-medium leading-4 text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              className="inline-flex h-9 items-center gap-1 rounded-[8px] px-2 text-[13px] font-medium leading-4 text-muted transition-colors duration-[140ms] hover:bg-surface-2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
               data-testid={`${testId}-open`}
               onClick={(event) => {
                 if (event.metaKey || event.ctrlKey || event.shiftKey) return;
@@ -197,7 +197,7 @@ export function PersonMovesBar({
               }}
             >
               {move.label}
-              <ArrowRight size={14} strokeWidth={2.25} aria-hidden />
+              <ArrowRight size={14} aria-hidden />
             </Link>,
           );
         }
@@ -214,7 +214,7 @@ export function PersonMovesBar({
           items={more}
           label="Ещё"
           testId={`${testId}-more`}
-          className="flex h-9 w-9 items-center justify-center rounded-[8px] text-[18px] leading-none text-muted hover:bg-surface-2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          className="flex h-9 w-9 items-center justify-center rounded-[8px] text-[20px] leading-none text-muted hover:bg-surface-2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
         >
           ⋯
         </MenuButton>
@@ -228,7 +228,7 @@ export function PersonMovesBar({
             className="flex h-9 w-9 items-center justify-center rounded-[8px] text-muted hover:bg-surface-2 hover:text-text"
             data-testid={`${testId}-close`}
           >
-            <X size={18} strokeWidth={2} aria-hidden />
+            <X size={20} aria-hidden />
           </button>
         </Tooltip>
       ) : null}

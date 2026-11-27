@@ -111,7 +111,7 @@ export function AliasChips({
     <>
       <div className="field flex min-h-9 flex-wrap items-center gap-1.5 px-1.5 py-1" onClick={(event) => (event.currentTarget.querySelector("input") as HTMLInputElement | null)?.focus()}>
         {value.map((alias, index) => (
-          <span key={`${alias}-${index}`} className="inline-flex h-6 items-center gap-1 rounded-[7px] border border-border bg-surface px-2 text-[13px] leading-4" data-testid="alias-chip">
+          <span key={`${alias}-${index}`} className="inline-flex h-6 items-center gap-1 rounded-[6px] border border-border bg-surface px-2 text-[13px] leading-4" data-testid="alias-chip">
             {alias}
             <button
               type="button"
@@ -148,7 +148,7 @@ export function AliasChips({
               key={s}
               type="button"
               onClick={() => onChange([...value, s])}
-              className="desk-alias-add inline-flex h-6 items-center rounded-[7px] border border-dashed border-border px-2 text-[12px] font-medium leading-4 text-text/85 transition-colors hover:border-accent/50 hover:text-text"
+              className="desk-alias-add inline-flex h-6 items-center rounded-[6px] border border-dashed border-border px-2 text-[12px] font-medium leading-4 text-text/85 transition-colors hover:border-accent/50 hover:text-text"
             >
               + {s}
             </button>
@@ -166,7 +166,7 @@ function IconButton({ label, keys, onClick, children }: { label: string; keys?: 
         type="button"
         aria-label={label}
         onClick={onClick}
-        className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        className="flex h-7 w-7 items-center justify-center rounded-[6px] text-muted transition-colors duration-[140ms] hover:bg-surface-2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
       >
         {children}
       </button>
@@ -207,7 +207,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, { id?: string; value: 
           autoFocus={autoFocus}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="nums min-w-0 flex-1 bg-transparent text-[15px] leading-5 outline-none"
+          className="nums min-w-0 flex-1 bg-transparent text-[14px] leading-5 outline-none"
           data-testid="password-input"
         />
         <IconButton label="Другой пароль" onClick={() => onChange(generatePassword())}>

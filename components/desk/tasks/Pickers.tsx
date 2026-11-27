@@ -118,7 +118,7 @@ export function MonthGrid({
                 onMouseEnter={onHover ? () => onHover(day) : undefined}
                 aria-pressed={chosen}
                 data-day={day}
-                className={`nums relative h-7 rounded-[2px] text-[12px] leading-7 transition-colors duration-[120ms] disabled:text-muted/35 ${
+                className={`nums relative h-7 rounded-[2px] text-[12px] leading-7 transition-colors duration-[140ms] disabled:text-muted/35 ${
                   chosen ? "bg-accent text-bg disabled:text-bg" : within?.(day) ? "bg-accent/10 hover:bg-accent/20" : "hover:bg-surface-2 disabled:hover:bg-transparent"
                 } ${day === today && !chosen ? "underline underline-offset-4" : ""} ${day === cursor ? "outline outline-1 -outline-offset-1 outline-accent" : ""}`}
               >
@@ -224,7 +224,7 @@ export function DeadlinePicker({
             <button
               type="button"
               onClick={() => onPick(preset.iso)}
-              className="flex h-8 w-full items-center gap-2.5 px-3 text-left text-[13px] leading-4 transition-colors duration-[120ms] hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none"
+              className="flex h-8 w-full items-center gap-2.5 px-3 text-left text-[13px] leading-4 transition-colors duration-[140ms] hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none"
               data-testid="deadline-preset"
             >
               <span className="min-w-0 flex-1 truncate">{preset.label}</span>

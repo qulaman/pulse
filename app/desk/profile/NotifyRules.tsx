@@ -71,7 +71,7 @@ function SaveState({ pending, saved }: { pending: boolean; saved: boolean }) {
   if (saved)
     return (
       <span className="profile-saved">
-        <Check size={14} strokeWidth={2.5} aria-hidden />
+        <Check size={14} aria-hidden />
         Сохранено
       </span>
     );

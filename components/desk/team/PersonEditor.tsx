@@ -59,7 +59,7 @@ function Plane({ step, title, done, hint, children }: { step: number; title: str
     <section className="newp-step" data-done={done ? "" : undefined}>
       <header className="newp-step-head">
         <span className="newp-step-mark" aria-hidden>
-          {done ? <Check size={13} strokeWidth={3} /> : step}
+          {done ? <Check size={14} /> : step}
         </span>
         <h2 className="newp-step-title">{title}</h2>
         {hint ? <span className="newp-step-hint">{hint}</span> : null}

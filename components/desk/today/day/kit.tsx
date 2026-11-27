@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
 import { Face, useAvatars } from "@/components/desk/ui/Face";
+import { DeskIcon, type DeskIconName } from "@/components/desk/ui/icons";
 
 /*
  * The parts every block of the right side of «Сегодня» is made of (D-196): the card with its ink,
@@ -72,6 +73,7 @@ export type Corner = "state" | "news" | null;
  */
 export function Head({
   icon: Glyph,
+  sign,
   title,
   href,
   count,
@@ -80,6 +82,8 @@ export function Head({
   children,
 }: {
   icon: LucideIcon;
+  /** the block is a section of the desk: its own sign instead of the library's icon (D-214) */
+  sign?: DeskIconName;
   title: string;
   /** the section it leads to; none — the name is a plain title */
   href?: string;
@@ -92,7 +96,7 @@ export function Head({
   const label = (
     <>
       <span aria-hidden className={`day-tile ${swing ? "day-door-swing" : ""}`} data-live={corner ?? undefined}>
-        <Glyph size={14} strokeWidth={2.25} />
+        {sign ? <DeskIcon name={sign} size={16} /> : <Glyph size={16} />}
       </span>
       <span className="truncate">{title}</span>
       {count && count > 0 ? <span className="day-count nums">{count}</span> : null}
@@ -103,7 +107,7 @@ export function Head({
       {href ? (
         <Link href={href} prefetch className="day-head-link desk-focus">
           {label}
-          <ChevronRight size={14} strokeWidth={2.25} aria-hidden className="day-chev" />
+          <ChevronRight size={14} aria-hidden className="day-chev" />
         </Link>
       ) : (
         <h2 className="day-head-link">{label}</h2>

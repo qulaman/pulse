@@ -455,7 +455,7 @@ export function WindowsSide({
                     <span className="cal-wside-words nums">
                       {humanYmd(window.ymd, now)} · {lengthWords(window.end - window.start)}
                     </span>
-                    <Copy aria-hidden size={13} className="cal-wside-copy" />
+                    <Copy aria-hidden size={14} className="cal-wside-copy" />
                   </button>
                 </Tooltip>
               </li>

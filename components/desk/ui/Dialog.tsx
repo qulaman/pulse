@@ -121,7 +121,7 @@ export function Dialog({
         }}
       >
         {title ? (
-          <h2 id={titleId} className="mb-3 pr-8 font-display text-[17px] font-semibold leading-6">
+          <h2 id={titleId} className="mb-3 pr-8 font-display text-[16px] font-semibold leading-6">
             {title}
           </h2>
         ) : null}
@@ -130,9 +130,9 @@ export function Dialog({
           type="button"
           aria-label="Закрыть"
           onClick={onClose}
-          className="absolute right-3 top-4 flex h-8 w-8 items-center justify-center rounded-[8px] text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
+          className="absolute right-3 top-4 flex h-8 w-8 items-center justify-center rounded-[8px] text-muted transition-colors duration-[140ms] hover:bg-surface-2 hover:text-text"
         >
-          <X aria-hidden size={16} strokeWidth={2} />
+          <X aria-hidden size={16} />
         </button>
         {children}
       </div>

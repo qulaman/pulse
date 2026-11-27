@@ -106,7 +106,7 @@ function DeafChip({ personId }: { personId: string }) {
   if (!push || (push.state !== "off" && push.state !== "broken")) return null;
   return (
     <span className="team-chip" data-tone="danger" title="Пока пуши не доходят, человек узнаёт о задачах, только открыв Pulse">
-      <BellOff size={13} strokeWidth={2.25} aria-hidden />
+      <BellOff size={14} aria-hidden />
       {push.state === "broken" ? "пуш не прошёл" : "уведомления не включены"}
     </span>
   );
@@ -156,14 +156,14 @@ function PersonHero({
           <p className="person-hero-chips">
             {away ? (
               <span className="team-chip" data-tone="muted">
-                <CalendarOff size={13} strokeWidth={2.25} aria-hidden />
+                <CalendarOff size={14} aria-hidden />
                 {AVAILABILITY_LABEL[person.availability].toLowerCase()}
               </span>
             ) : null}
             {director && works && isCrew(person) ? <LoadChip person={person} /> : null}
             {phone && person.role !== "tv" ? (
               <span className="team-chip" data-tone="muted">
-                <Phone size={13} strokeWidth={2.25} aria-hidden />
+                <Phone size={14} aria-hidden />
                 <a href={phoneHref(phone)} className="nums hover:underline">
                   {phone}
                 </a>
@@ -198,12 +198,12 @@ function TodayReport({ personId, companyId, now }: { personId: string; companyId
             : "в отпуске";
   return (
     <Link href={personFeedHref(personId, todayYmd(now))} className="person-report" data-state={row.state} data-testid="desk-person-report">
-      <ClipboardCheck size={16} strokeWidth={2.25} className="person-report-icon" aria-hidden />
+      <ClipboardCheck size={16} className="person-report-icon" aria-hidden />
       <span className="flex min-w-0 flex-col">
         <span className="person-report-value">{text}</span>
         <span className="person-report-label">отчёт за сегодня</span>
       </span>
-      <ArrowRight size={14} strokeWidth={2.25} className="person-report-arrow" aria-hidden />
+      <ArrowRight size={14} className="person-report-arrow" aria-hidden />
     </Link>
   );
 }
@@ -231,7 +231,7 @@ function DirectorFacts({ person, companyId, pointsOn, now }: { person: Person; c
   return (
     <>
       {loads.isLoading ? (
-        <span className="skeleton block h-[58px] w-[420px] max-w-full rounded-[10px] bg-surface-2" />
+        <span className="skeleton block h-[58px] w-[420px] max-w-full rounded-[8px] bg-surface-2" />
       ) : loads.isLoadingError ? (
         <LoadFailed what="нагрузку" onRetry={() => void loads.refetch()} />
       ) : (
@@ -319,7 +319,7 @@ function DirectorLists({ person, meId, now }: { person: Person; meId: string; no
               {tasks.length > 0 ? (
                 <Link href={`/desk/tasks?who=${person.id}`} className="person-section-move">
                   Все в «Задачах»
-                  <ArrowRight size={13} strokeWidth={2.25} aria-hidden />
+                  <ArrowRight size={14} aria-hidden />
                 </Link>
               ) : null}
             </>
@@ -452,7 +452,7 @@ export function PushBlock({ userId }: { userId: string }) {
     <CardSection id="person-push" title="Уведомления" testId="desk-person-push">
       <div className="person-push" data-tone={tone}>
         <span className="person-push-icon" aria-hidden>
-          {deaf ? <BellOff size={17} strokeWidth={2} /> : <Bell size={17} strokeWidth={2} />}
+          {deaf ? <BellOff size={16} /> : <Bell size={16} />}
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-[14px] font-medium leading-5">

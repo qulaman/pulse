@@ -169,18 +169,18 @@ export function BulkBar({
         <span aria-hidden className="tasks-bulk-rule h-5 w-px bg-border" />
         <Tooltip label="Тем, кому не напоминали последние полчаса">
           <Button size="sm" variant="ghost" className="!min-h-8 !px-2.5 !text-text" disabled={plan.nudge.length === 0} onClick={onNudge} data-bulk="nudge">
-            <Bell aria-hidden size={14} strokeWidth={2} className="tasks-ico" />
+            <Bell aria-hidden size={14} className="tasks-ico" />
             Напомнить <span className="nums text-muted">{plan.nudge.length}</span>
           </Button>
         </Tooltip>
         <Tooltip label="Один новый срок всем, кто в работе">
           <Button size="sm" variant="ghost" className="!min-h-8 !px-2.5 !text-text" disabled={plan.extend.length === 0} onClick={onExtend} data-bulk="extend">
-            <CalendarClock aria-hidden size={14} strokeWidth={2} className="tasks-ico" />
+            <CalendarClock aria-hidden size={14} className="tasks-ico" />
             Перенести срок <span className="nums text-muted">{plan.extend.length}</span>
           </Button>
         </Tooltip>
         <Button size="sm" variant="ghost" className="!min-h-8 !px-2.5 !text-danger" disabled={plan.revoke.length === 0} onClick={onRevoke} data-bulk="revoke">
-          <Undo2 aria-hidden size={14} strokeWidth={2} className="tasks-ico" />
+          <Undo2 aria-hidden size={14} className="tasks-ico" />
           Отозвать <span className="nums opacity-70">{plan.revoke.length}</span>
         </Button>
         <span aria-hidden className="tasks-bulk-rule h-5 w-px bg-border" />

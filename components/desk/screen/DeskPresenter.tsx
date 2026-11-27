@@ -101,7 +101,7 @@ export function DeskPresenter({ boardId, points, now }: { boardId: string; point
       {words.line ? <p className="truncate text-[12px] leading-4 text-muted">{words.line}</p> : null}
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <Tooltip label="Предыдущий пункт" keys={["←"]}>
-          <Button size="sm" variant="secondary" aria-label="Предыдущий пункт" icon={<ChevronLeft aria-hidden size={15} strokeWidth={2.2} />} disabled={stage.kind !== "point" || stage.at === 0} onClick={() => presenter.step(-1)}>
+          <Button size="sm" variant="secondary" aria-label="Предыдущий пункт" icon={<ChevronLeft aria-hidden size={16} />} disabled={stage.kind !== "point" || stage.at === 0} onClick={() => presenter.step(-1)}>
             Назад
           </Button>
         </Tooltip>
@@ -110,7 +110,7 @@ export function DeskPresenter({ boardId, points, now }: { boardId: string; point
             size="sm"
             variant={done ? "secondary" : "primary"}
             aria-label={done ? "Снять отметку с пункта" : "Отметить пункт и перейти к следующему"}
-            icon={<Check aria-hidden size={15} strokeWidth={2.4} />}
+            icon={<Check aria-hidden size={16} />}
             disabled={stage.kind !== "point"}
             onClick={mark}
           >
@@ -126,7 +126,7 @@ export function DeskPresenter({ boardId, points, now }: { boardId: string; point
             onClick={() => presenter.step(1)}
           >
             {stage.kind === "point" ? "Дальше" : "Начать"}
-            <ChevronRight aria-hidden size={15} strokeWidth={2.2} className="-mr-1" />
+            <ChevronRight aria-hidden size={16} className="-mr-1" />
           </Button>
         </Tooltip>
         <Button size="sm" variant="ghost" disabled={stage.kind !== "point"} onClick={presenter.clear}>

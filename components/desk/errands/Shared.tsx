@@ -22,7 +22,7 @@ export function LoadFailedHero({ busy, onRetry }: { busy: boolean; onRetry: () =
       tone="warn"
       lead={
         <span className="errands-figure-tile" data-tone="warn">
-          <CloudOff size={24} strokeWidth={2.25} aria-hidden />
+          <CloudOff size={24} aria-hidden />
         </span>
       }
       title="Заявки не загрузились"

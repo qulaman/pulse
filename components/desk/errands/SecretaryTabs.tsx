@@ -85,10 +85,10 @@ export function SecretaryTabs({ view, count }: { view: SecretaryView; count?: nu
       value={view}
       onChange={switchSecretaryView}
       items={[
-        { value: "now", label: <Label icon={<Radio size={14} strokeWidth={2.25} aria-hidden />}>Заявки</Label>, count: count && count > 0 ? count : undefined },
-        { value: "history", label: <Label icon={<History size={14} strokeWidth={2.25} aria-hidden />}>История</Label> },
-        { value: "buttons", label: <Label icon={<LayoutGrid size={14} strokeWidth={2.25} aria-hidden />} dirty={dirty.buttons}>Кнопки</Label> },
-        { value: "settings", label: <Label icon={<SlidersHorizontal size={14} strokeWidth={2.25} aria-hidden />} dirty={dirty.settings}>Настройки</Label> },
+        { value: "now", label: <Label icon={<Radio size={14} aria-hidden />}>Заявки</Label>, count: count && count > 0 ? count : undefined },
+        { value: "history", label: <Label icon={<History size={14} aria-hidden />}>История</Label> },
+        { value: "buttons", label: <Label icon={<LayoutGrid size={14} aria-hidden />} dirty={dirty.buttons}>Кнопки</Label> },
+        { value: "settings", label: <Label icon={<SlidersHorizontal size={14} aria-hidden />} dirty={dirty.settings}>Настройки</Label> },
       ]}
     />
   );

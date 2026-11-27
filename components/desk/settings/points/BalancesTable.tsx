@@ -97,7 +97,7 @@ function Before({ row }: { row: RatingRow }) {
   const delta = row.delta_vs_prev;
   return (
     <span className="inline-flex items-center justify-end gap-1">
-      {delta > 0 ? <TrendingUp size={13} strokeWidth={2.25} aria-hidden style={{ color: "var(--gold)" }} /> : delta < 0 ? <TrendingDown size={13} strokeWidth={2.25} aria-hidden className="text-muted" /> : null}
+      {delta > 0 ? <TrendingUp size={14} aria-hidden style={{ color: "var(--gold)" }} /> : delta < 0 ? <TrendingDown size={14} aria-hidden className="text-muted" /> : null}
       <Num value={prev} signed tone={prev === 0 ? null : "muted"} />
     </span>
   );
@@ -232,7 +232,7 @@ export function BalancesTable({
           onClick={() => onAward(line.row.user_id)}
           data-testid="points-award-row"
           title="Начислить · N"
-          icon={<Plus size={14} strokeWidth={2.25} />}
+          icon={<Plus size={14} />}
           className="pts-row-award !min-h-7 !px-2 opacity-0 focus-visible:opacity-100 [.desk-row:hover_&]:opacity-100 [.desk-row[aria-selected=true]_&]:opacity-100"
         >
           Начислить

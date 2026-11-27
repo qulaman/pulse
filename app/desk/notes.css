@@ -86,10 +86,10 @@ html[data-surface="desk"] .nb {
     flex-direction: column;
     gap: 4px;
     padding: 12px 14px 10px;
-    border-radius: 14px;
+    border-radius: 12px;
     background: var(--nb-paper);
     box-shadow: var(--nb-card);
-    transition: box-shadow 160ms linear;
+    transition: box-shadow 140ms linear;
 
     &:focus-within {
       box-shadow:
@@ -98,8 +98,7 @@ html[data-surface="desk"] .nb {
     }
     &[data-listening] {
       box-shadow:
-        0 0 0 1.5px var(--nb-pen),
-        0 10px 30px -14px color-mix(in srgb, var(--nb-pen) 60%, transparent);
+        0 0 0 1.5px var(--nb-pen);
     }
   }
   .nb-capture-head {
@@ -150,7 +149,7 @@ html[data-surface="desk"] .nb {
     background: transparent;
     color: var(--nb-ink);
     font: inherit;
-    font-size: 15px;
+    font-size: 14px;
     line-height: 22px;
     outline: none;
 
@@ -227,7 +226,7 @@ html[data-surface="desk"] .nb {
     border-radius: 12px;
     outline: none;
     cursor: default;
-    transition: background-color 120ms linear;
+    transition: background-color 140ms linear;
     /* hundreds of rows: the browser lays out only those on screen */
     content-visibility: auto;
     contain-intrinsic-size: auto 62px;
@@ -319,7 +318,7 @@ html[data-surface="desk"] .nb {
     border-radius: 8px;
     color: var(--nb-ink-2);
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
 
     &:hover {
       background: var(--nb-hover);
@@ -353,7 +352,7 @@ html[data-surface="desk"] .nb {
     &[data-tone="warn"] {
       background: color-mix(in srgb, var(--nb-amber) 16%, transparent);
       color: var(--nb-warn);
-      font-weight: 600;
+      font-weight: 500;
     }
     &[data-tone="pen"] {
       background: color-mix(in srgb, var(--nb-pen) 12%, transparent);
@@ -462,12 +461,12 @@ html[data-surface="desk"] .nb {
     border-radius: 8px;
     color: var(--nb-ink);
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 16px;
     white-space: nowrap;
     transition:
-      background-color 120ms linear,
-      scale 220ms var(--ease-snap, ease-out);
+      background-color 140ms linear,
+      scale 200ms var(--ease-snap, ease-out);
 
     svg {
       flex-shrink: 0;
@@ -479,7 +478,7 @@ html[data-surface="desk"] .nb {
     }
     &:active:not(:disabled) {
       scale: 0.96;
-      transition-duration: 70ms;
+      transition-duration: 80ms;
     }
     &:disabled {
       opacity: 0.4;
@@ -508,7 +507,7 @@ html[data-surface="desk"] .nb {
     border-radius: 8px;
     color: var(--nb-ink);
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
 
     &:hover {
       background: var(--nb-hover);
@@ -598,8 +597,8 @@ html[data-surface="desk"] .nb {
   }
   /* the first line read as a title — still the same plain text (D-75) */
   .nb-title-field {
-    font-size: 22px;
-    font-weight: 700;
+    font-size: 20px;
+    font-weight: 600;
     letter-spacing: -0.01em;
     line-height: 30px;
   }
@@ -632,7 +631,7 @@ html[data-surface="desk"] .nb {
     margin-top: 14px;
     color: var(--nb-ink);
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 500;
     text-decoration: underline;
     text-underline-offset: 3px;
   }

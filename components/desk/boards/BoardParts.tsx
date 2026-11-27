@@ -15,8 +15,8 @@ export function BoardBones() {
         <Bone className="mt-3" w="40%" h={34} />
         <Bone className="mt-2" w="24%" h={16} />
         <div className="board-body mt-5">
-          <span className="block h-[360px] rounded-[14px] bg-surface-2" />
-          <span className="block aspect-video rounded-[14px] bg-surface-2" />
+          <span className="block h-[360px] rounded-[12px] bg-surface-2" />
+          <span className="block aspect-video rounded-[12px] bg-surface-2" />
         </div>
       </SkeletonGroup>
     </DeskPage>

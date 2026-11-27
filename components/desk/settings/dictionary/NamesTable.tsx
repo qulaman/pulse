@@ -216,16 +216,16 @@ export function NamesTable({
                     event.stopPropagation();
                     open(line);
                   }}
-                  className="dict-add inline-flex h-6 items-center gap-1 text-[13px] leading-4 text-muted opacity-0 transition-opacity duration-[120ms] hover:text-text focus-visible:opacity-100 [.desk-row:hover_&]:opacity-100 [.desk-row[aria-selected=true]_&]:opacity-100"
+                  className="dict-add inline-flex h-6 items-center gap-1 text-[13px] leading-4 text-muted opacity-0 transition-opacity duration-[140ms] hover:text-text focus-visible:opacity-100 [.desk-row:hover_&]:opacity-100 [.desk-row[aria-selected=true]_&]:opacity-100"
                 >
-                  <Plus size={12} strokeWidth={2.5} aria-hidden />
+                  <Plus size={12} aria-hidden />
                   имя
                 </button>
               ) : null}
             </div>
             {line.report.shared.map((s) => (
               <p key={s.alias} className="dict-shared flex items-center gap-1.5 text-[12px] leading-4 text-muted">
-                <Users size={12} strokeWidth={2.25} aria-hidden className="shrink-0" />
+                <Users size={12} aria-hidden className="shrink-0" />
                 «{s.alias}» есть и у: {s.people.join(", ")} — ИИ спросит, кого
               </p>
             ))}

@@ -29,7 +29,7 @@ html[data-surface="desk"][data-journal] {
     min-width: 0;
     flex: none;
     flex-direction: column;
-    border-radius: 14px;
+    border-radius: 12px;
     background: var(--rt-raise);
     box-shadow: 0 0 0 1px var(--rule-soft, var(--rule));
   }
@@ -41,7 +41,7 @@ html[data-surface="desk"][data-journal] {
   }
   .rep-tabel[data-stale] .rep-tabel-sheet {
     opacity: 0.6;
-    transition: opacity 160ms linear 120ms;
+    transition: opacity 140ms linear 140ms;
   }
 
   /* ---- the card's bar: «Табель», the period, «Все | С пропусками», «Показать людей» ---- */
@@ -56,8 +56,8 @@ html[data-surface="desk"][data-journal] {
   .rep-tabel-title {
     margin-right: 2px;
     color: var(--ink);
-    font-size: 15px;
-    font-weight: 650;
+    font-size: 14px;
+    font-weight: 600;
     line-height: 20px;
     letter-spacing: -0.005em;
   }
@@ -73,17 +73,17 @@ html[data-surface="desk"][data-journal] {
     background: color-mix(in srgb, var(--ink) 3.5%, transparent);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 11%, transparent);
     color: var(--ink);
-    font-size: 12.5px;
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 500;
     line-height: 16px;
     white-space: nowrap;
     transition:
-      box-shadow 120ms linear,
-      scale 120ms ease-out;
+      box-shadow 140ms linear,
+      scale 140ms ease-out;
 
     svg {
       color: var(--ink-2);
-      transition: rotate 180ms var(--ease-snap, ease-out);
+      transition: rotate 200ms var(--ease-snap, ease-out);
     }
     &[aria-expanded="true"] svg {
       rotate: 180deg;
@@ -110,7 +110,7 @@ html[data-surface="desk"][data-journal] {
   }
   /* the sheet closes the card unless the legend stands under it */
   .rep-tabel-sheet:last-child {
-    border-radius: 0 0 14px 14px;
+    border-radius: 0 0 12px 12px;
   }
   .rep-tabel-grid {
     min-width: var(--rep-tabel-least, 0);
@@ -194,7 +194,7 @@ html[data-surface="desk"][data-journal] {
     padding: 0 10px 0 12px;
     color: var(--rt-ink-3);
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -214,7 +214,7 @@ html[data-surface="desk"][data-journal] {
   }
   .rep-tabel-row[data-open] .rep-tabel-name-text {
     color: var(--rt-pen-deep);
-    font-weight: 600;
+    font-weight: 500;
   }
 
   /* ---- a day: its column's place (weekend, holiday, a new week, today), then its mark ---- */
@@ -249,9 +249,9 @@ html[data-surface="desk"][data-journal] {
     max-width: 40px;
     height: 22px;
     place-items: center;
-    border-radius: 5px;
+    border-radius: 4px;
     font-size: 12px;
-    font-weight: 650;
+    font-weight: 600;
     line-height: 1;
   }
   .rep-tabel-cell[data-state="submitted"] > .rep-tabel-mark {
@@ -261,7 +261,7 @@ html[data-surface="desk"][data-journal] {
   .rep-tabel-cell[data-state="missed"] > .rep-tabel-mark {
     background: var(--rt-miss-cell);
     color: var(--rt-pencil-deep);
-    font-weight: 700;
+    font-weight: 600;
   }
   .rep-tabel-cell[data-state="excused"] > .rep-tabel-mark {
     background: var(--rt-grey-cell);
@@ -269,7 +269,7 @@ html[data-surface="desk"][data-journal] {
   }
   .rep-tabel-cell[data-state="away"] > .rep-tabel-mark {
     color: var(--rt-ink-3);
-    font-size: 11.5px;
+    font-size: 12px;
     font-weight: 600;
   }
   /* colour only: a quarter in one look */
@@ -277,7 +277,7 @@ html[data-surface="desk"][data-journal] {
     .rep-tabel-mark {
       width: calc(100% - 3px);
       height: 13px;
-      border-radius: 3px;
+      border-radius: 2px;
     }
     .rep-tabel-cell[data-state="submitted"] > .rep-tabel-mark {
       background: color-mix(in srgb, var(--ok-ink) 62%, transparent);
@@ -366,7 +366,7 @@ html[data-surface="desk"][data-journal] {
   }
   .rep-tabel-dwd {
     color: var(--rt-ink-3);
-    font-size: 10.5px;
+    font-size: 11px;
     line-height: 12px;
   }
   .rep-tabel-dhead[data-off] .rep-tabel-dnum,
@@ -377,7 +377,7 @@ html[data-surface="desk"][data-journal] {
   }
   .rep-tabel-dhead[data-today] .rep-tabel-dnum {
     color: var(--rt-pen-deep);
-    font-weight: 700;
+    font-weight: 600;
   }
   .rep-tabel-sheet[data-mode="dense"] .rep-tabel-head .rep-tabel-dhead {
     padding: 0;
@@ -385,7 +385,7 @@ html[data-surface="desk"][data-journal] {
   }
   .rep-tabel-sheet[data-mode="dense"] .rep-tabel-dhead-button {
     align-items: flex-start;
-    border-radius: 3px;
+    border-radius: 2px;
   }
   .rep-tabel-sheet[data-mode="dense"] .rep-tabel-dnum {
     position: relative;
@@ -401,7 +401,7 @@ html[data-surface="desk"][data-journal] {
     padding: 3px 0 0 2px;
     color: var(--ink-2);
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 14px;
     white-space: nowrap;
   }
@@ -446,7 +446,7 @@ html[data-surface="desk"][data-journal] {
     }
     [data-tone="danger"] {
       color: var(--rt-pencil-deep);
-      font-weight: 650;
+      font-weight: 500;
     }
     [data-tone="quiet"] {
       color: var(--rt-ink-3);
@@ -462,7 +462,7 @@ html[data-surface="desk"][data-journal] {
       }
     }
     &[data-as="foot"] > span {
-      font-weight: 600;
+      font-weight: 500;
     }
   }
   .rep-tabel-foot {
@@ -477,7 +477,7 @@ html[data-surface="desk"][data-journal] {
     }
     .rep-tabel-name {
       color: var(--ink-2);
-      font-weight: 600;
+      font-weight: 500;
     }
   }
   .rep-tabel-foot-cell {
@@ -488,7 +488,7 @@ html[data-surface="desk"][data-journal] {
   .rep-tabel-foot-n {
     color: var(--rt-pencil-deep);
     font-size: 12px;
-    font-weight: 650;
+    font-weight: 500;
   }
   .rep-tabel-sheet[data-mode="dense"] .rep-tabel-foot-cell {
     align-items: flex-end;
@@ -528,16 +528,16 @@ html[data-surface="desk"][data-journal] {
     }
   }
   .rep-tabel-handed-n {
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 500;
     line-height: 16px;
   }
   .rep-tabel-handed[data-tone="live"] .rep-tabel-handed-button {
     color: var(--ink);
-    font-weight: 650;
+    font-weight: 500;
   }
   .rep-tabel-handed[data-tone="live"] .rep-tabel-handed-n {
-    font-weight: 650;
+    font-weight: 500;
   }
   .rep-tabel-handed[data-tone="danger"] .rep-tabel-handed-button {
     background: var(--rt-miss-cell);
@@ -548,7 +548,7 @@ html[data-surface="desk"][data-journal] {
     }
   }
   .rep-tabel-handed[data-tone="danger"] .rep-tabel-handed-n {
-    font-weight: 700;
+    font-weight: 500;
   }
   .rep-tabel-sheet[data-mode="dense"] .rep-tabel-handed {
     padding: 4px 0;
@@ -604,8 +604,8 @@ html[data-surface="desk"][data-journal] {
     place-items: center;
     padding: 0 3px;
     border-radius: 4px;
-    font-size: 10.5px;
-    font-weight: 650;
+    font-size: 11px;
+    font-weight: 600;
     line-height: 1;
 
     &[data-state="submitted"] {
@@ -734,7 +734,7 @@ html[data-surface="desk"][data-journal] {
     }
     th {
       font-size: 7pt;
-      font-weight: 600;
+      font-weight: 500;
       line-height: 8pt;
       text-transform: none;
     }

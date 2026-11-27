@@ -76,7 +76,7 @@ export function PersonField({
     <div ref={setBox} className="tasks-person desk-input relative flex h-9 items-center gap-2" data-tone={!value && !open ? tone : undefined} aria-expanded={open}>
       {/* «Графит»: the chosen person's face at the field's start, an empty one asks with a silhouette */}
       <span aria-hidden className="tasks-ico tasks-person-face shrink-0">
-        {value && name && query === null ? <TileFace person={{ id: value, full_name: name, avatar_url: null }} size={20} /> : <UserRound size={15} strokeWidth={2} />}
+        {value && name && query === null ? <TileFace person={{ id: value, full_name: name, avatar_url: null }} size={20} /> : <UserRound size={16} />}
       </span>
       <input
         value={query ?? name ?? ""}
@@ -317,5 +317,5 @@ function Tick({ on }: { on: boolean }) {
 
 export function Chevron() {
   // the desk's one chevron (D-203): the select's own size and stroke, turning over while its list is open
-  return <ChevronDown aria-hidden size={14} strokeWidth={2.25} className="desk-chevron" />;
+  return <ChevronDown aria-hidden size={14} className="desk-chevron" />;
 }

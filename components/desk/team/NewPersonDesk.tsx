@@ -39,7 +39,7 @@ function CheckLine({ state, children }: { state: CheckState; children: ReactNode
   return (
     <li className="newp-check" data-state={state}>
       <span className="newp-check-mark" aria-hidden>
-        {state === "ok" ? <Check size={12} strokeWidth={3} /> : <Circle size={8} strokeWidth={3} />}
+        {state === "ok" ? <Check size={12} /> : <Circle size={8} />}
       </span>
       <span className="min-w-0">{children}</span>
     </li>
@@ -77,12 +77,12 @@ function CardPreview({ view, managers }: { view: EditorView; managers: Person[] 
           <span className="team-tile-facts">
             {phone ? (
               <span className="team-fact" data-tone="muted">
-                <Phone size={12} strokeWidth={2.25} />
+                <Phone size={12} />
                 <span className="nums">{phone}</span>
               </span>
             ) : null}
             <span className="team-fact" data-tone="muted">
-              {withEmail ? <Mail size={12} strokeWidth={2.25} /> : <KeyRound size={12} strokeWidth={2.25} />}
+              {withEmail ? <Mail size={12} /> : <KeyRound size={12} />}
               {withEmail ? "почта и пароль" : "вход по коду"}
             </span>
           </span>

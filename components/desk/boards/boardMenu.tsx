@@ -54,7 +54,7 @@ export function boardMenu(board: MindBoard, onWall: boolean, counts: BoardCounts
       },
     },
     ...(toHand > 0 ? [{ key: "handout", label: "Раздать поручения", icon: <NoteIcon name="task" size={14} />, onSelect: run.handout }] : []),
-    { key: "sketch", label: "Рисунок — новым пунктом…", icon: <Brush aria-hidden size={14} strokeWidth={2} />, onSelect: run.sketch },
+    { key: "sketch", label: "Рисунок — новым пунктом…", icon: <Brush aria-hidden size={14} />, onSelect: run.sketch },
     ...(open > 0 ? [{ key: "copy", label: `Новая доска из открытых · ${openWords(open)}`, icon: <NoteIcon name="stack" size={14} />, onSelect: run.carry }] : []),
     ...(ticks > 0 ? [{ key: "untick", label: `Снять все отметки · ${ticks}`, icon: <NoteIcon name="retry" size={14} />, onSelect: run.untick }] : []),
     ...(summary.total > 0 ? [{ key: "text", label: "Скопировать текстом", icon: <NoteIcon name="copy" size={14} />, onSelect: run.copy }] : []),
@@ -62,10 +62,10 @@ export function boardMenu(board: MindBoard, onWall: boolean, counts: BoardCounts
     ...(onWall
       ? [
           { key: "extend", label: `Ещё ${EXTEND_MINUTES} минут на стене`, icon: <NoteIcon name="wall" size={14} />, onSelect: run.extend },
-          { key: "look", label: "Вид и время на стене…", icon: <MonitorUp aria-hidden size={14} strokeWidth={2} />, onSelect: run.look },
+          { key: "look", label: "Вид и время на стене…", icon: <MonitorUp aria-hidden size={14} />, onSelect: run.look },
           { key: "eject", label: "Убрать со стены", icon: <NoteIcon name="x" size={14} />, onSelect: run.eject },
         ]
-      : [{ key: "look", label: "Вид, время, доска недели…", icon: <MonitorUp aria-hidden size={14} strokeWidth={2} />, onSelect: run.look }]),
+      : [{ key: "look", label: "Вид, время, доска недели…", icon: <MonitorUp aria-hidden size={14} />, onSelect: run.look }]),
     "separator",
     {
       key: "finish",

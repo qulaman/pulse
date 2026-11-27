@@ -195,7 +195,7 @@ export function DataGrid<T>({
               {column.title}
               {/* the arrow speaks for the sorted column only; the others show theirs on hover */}
               {column.sort ? (
-                <span aria-hidden className={`text-[10px] transition-opacity duration-[120ms] ${sorted ? "text-accent" : "text-muted opacity-0 group-hover:opacity-60"}`}>
+                <span aria-hidden className={`text-[11px] transition-opacity duration-[140ms] ${sorted ? "text-accent" : "text-muted opacity-0 group-hover:opacity-60"}`}>
                   {sorted === -1 ? "▼" : "▲"}
                 </span>
               ) : null}
@@ -211,7 +211,7 @@ export function DataGrid<T>({
               {column.sort ? (
                 <button
                   type="button"
-                  className="group w-full text-left uppercase transition-colors duration-[120ms] hover:text-text"
+                  className="group w-full text-left uppercase transition-colors duration-[140ms] hover:text-text"
                   onClick={() =>
                     setSort((prev) => (prev?.key === column.key ? (prev.dir === 1 ? { key: column.key, dir: -1 } : null) : { key: column.key, dir: 1 }))
                   }
@@ -252,9 +252,9 @@ export function DataGrid<T>({
                       title={group.collapsed ? "Развернуть" : "Свернуть"}
                       onClick={group.onToggle}
                       data-testid="desk-group-toggle"
-                      className="-my-1 -ml-1 inline-flex items-center gap-2 rounded-[6px] py-1 pl-1 pr-1.5 text-muted transition-colors duration-[120ms] hover:text-text"
+                      className="-my-1 -ml-1 inline-flex items-center gap-2 rounded-[6px] py-1 pl-1 pr-1.5 text-muted transition-colors duration-[140ms] hover:text-text"
                     >
-                      <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden className={`transition-transform duration-[120ms] ${group.collapsed ? "-rotate-90" : ""}`}>
+                      <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden className={`transition-transform duration-[140ms] ${group.collapsed ? "-rotate-90" : ""}`}>
                         <path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                       {group.tone ? <span aria-hidden className="desk-dot h-1.5 w-1.5 rounded-full" style={{ background: TONE_VAR[group.tone] }} /> : null}

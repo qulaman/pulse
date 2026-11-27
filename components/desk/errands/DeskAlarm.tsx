@@ -146,7 +146,7 @@ function AlarmField({ alarm, meId, main, busy, onAct, onFold }: { alarm: Errand;
     <section ref={field} tabIndex={-1} className="desk-alarm" data-state={state} role="alertdialog" aria-labelledby="desk-alarm-title" aria-describedby="desk-alarm-who" data-testid="desk-alarm">
       <div className="desk-alarm-body">
         <span className="desk-alarm-tile" aria-hidden>
-          <Siren size={44} strokeWidth={2} />
+          <Siren size={44} />
         </span>
         <h2 id="desk-alarm-title" className="desk-alarm-title" data-testid="desk-alarm-title">
           {taken ? "Охрана вызывается" : "Вызови охрану!"}
@@ -157,13 +157,13 @@ function AlarmField({ alarm, meId, main, busy, onAct, onFold }: { alarm: Errand;
         {alarm.note ? <p className="desk-alarm-note">«{alarm.note}»</p> : null}
 
         <div className="desk-alarm-phone" data-testid="desk-alarm-phone">
-          <Phone size={22} strokeWidth={2} aria-hidden className="desk-alarm-phone-icon" />
+          <Phone size={20} aria-hidden className="desk-alarm-phone-icon" />
           {phone ? (
             <>
               <span className="desk-alarm-phone-label">Охрана</span>
               <span className="desk-alarm-phone-number">{phone}</span>
               <button type="button" className="desk-alarm-copy" onClick={copy} data-testid="desk-alarm-copy" aria-live="polite">
-                {copied ? <Check size={15} strokeWidth={2.5} aria-hidden /> : <Copy size={15} strokeWidth={2.25} aria-hidden />}
+                {copied ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />}
                 <span>{copied ? "Скопировано" : "Копировать"}</span>
               </button>
             </>
@@ -200,7 +200,7 @@ function AlarmStrip({ alarm, state, onOpen }: { alarm: Errand; state: "calling" 
   if (state === "theirs") {
     return (
       <div className="desk-alarm-strip" data-state="theirs" role="status" data-testid="desk-alarm-strip">
-        <Siren size={16} strokeWidth={2.25} aria-hidden />
+        <Siren size={16} aria-hidden />
         <span>Охрану вызывает {shortName(alarm.claimed?.full_name ?? "") || "секретарь"}</span>
         <span aria-hidden>·</span>
         {time}
@@ -209,14 +209,14 @@ function AlarmStrip({ alarm, state, onOpen }: { alarm: Errand; state: "calling" 
   }
   return (
     <button type="button" className="desk-alarm-strip" data-state={state} onClick={onOpen} data-testid="desk-alarm-strip">
-      <Siren size={16} strokeWidth={2.25} aria-hidden />
+      <Siren size={16} aria-hidden />
       <span className="font-semibold">Охрана</span>
       <span aria-hidden>·</span>
       {state === "taken" ? <span>вызываете</span> : null}
       {time}
       <span className="desk-alarm-strip-open">
         развернуть
-        <ChevronDown size={15} strokeWidth={2.25} aria-hidden />
+        <ChevronDown size={16} aria-hidden />
       </span>
     </button>
   );

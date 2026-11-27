@@ -116,7 +116,7 @@ function BlockBone({ rows, height, label = "34%", wide = "64%" }: { rows: number
 /** The frame while the first data lands: the head, the moment, the column's first cards (D-122). */
 export function TodaySkeleton() {
   return (
-    <DeskPage>
+    <DeskPage width="full">
       <div className={COLUMN}>
         {/* the date line's room is kept: the head does not move when the day lands */}
         <PageTitle title="Сегодня" state={{ text: " " }} />
@@ -646,7 +646,7 @@ function TodayView({
   if (pointsEnabled && (ratingLoad.kind === "failed" || rating.isPending)) {
     figures.push(
       <Card key="rating" ink="gold" index={1} testId="home-rating">
-        <Head icon={Trophy} title="Неделя" href="/desk/settings/points" />
+        <Head icon={Trophy} sign="rating" title="Неделя" href="/desk/settings/points" />
         {rating.isPending ? <RowsBone rows={3} wide="64%" /> : noteOf(ratingLoad, "Рейтинг не загрузился", () => void rating.refetch())}
       </Card>,
     );
@@ -691,7 +691,7 @@ function TodayView({
   );
 
   return (
-    <DeskPage>
+    <DeskPage width="full">
       <div className={COLUMN}>
         <PageTitle
           title="Сегодня"
@@ -699,7 +699,15 @@ function TodayView({
           actions={load.kind === "stale" ? <LoadNote state={load} failed="" now={now} onRetry={onRetry} /> : undefined}
         />
         <div className="@container">
-          <DayColumn head={head} quiet={quiet} band={band}>
+          <DayColumn
+            head={head}
+            quiet={quiet}
+            band={band}
+            yours={yours}
+            figures={figures.length > 0 ? <div className="day-figures">{figures}</div> : null}
+            pult={noSecretary ? null : <DayPult me={me} index={0} />}
+            work={
+              <>
             <JustSent tasks={justSent} now={now} onOpen={openTask} openId={openId} />
             <Decisions
               items={decisions}
@@ -752,9 +760,9 @@ function TodayView({
               now={now}
               drafts={drafts}
             />
-            {yours}
-            {figures.length > 0 ? <div className="day-figures">{figures}</div> : null}
-            {noSecretary ? null : <DayPult me={me} index={0} />}
+              </>
+            }
+            people={
             <PeopleNow
               rows={teamRows}
               loading={peopleLoad.kind === "loading"}
@@ -786,6 +794,8 @@ function TodayView({
                 ) : null
               }
             />
+            }
+            feed={
             <DayFeed
               events={feed.data ?? []}
               loading={feedLoad.kind === "loading"}
@@ -797,7 +807,8 @@ function TodayView({
               onAnnounce={() => useComposeStore.getState().request("Всем: ")}
               index={0}
             />
-          </DayColumn>
+            }
+          />
         </div>
       </div>
 

@@ -62,7 +62,7 @@ function Thanked({ errand, now }: { errand: Errand; now: Date }) {
   const fresh = now.getTime() - Date.parse(errand.thanked_at) < FRESH_THANK_MS;
   return (
     <span className="stoika-heart" data-fresh={fresh ? "" : undefined} title="Директор сказал «спасибо»">
-      <Heart size={13} strokeWidth={2.5} fill="currentColor" aria-hidden />
+      <Heart size={14} fill="currentColor" aria-hidden />
       <span className="sr-only">спасибо</span>
     </span>
   );
@@ -72,7 +72,7 @@ function HistoryLink() {
   return (
     <button type="button" onClick={() => writeParams({ view: "history" }, { type: "desk-switch" })} className="stoika-link desk-focus" data-testid="desk-errands-all">
       История
-      <ArrowRight size={14} strokeWidth={2.25} aria-hidden />
+      <ArrowRight size={14} aria-hidden />
     </button>
   );
 }
@@ -142,7 +142,7 @@ export function DayTally({ day }: { day: DayClosed }) {
     ) : null,
     day.thanks > 0 ? (
       <span key="thanks" className="stoika-tally-item stoika-tally-thanks" title="Директор сказал «спасибо»">
-        <Heart size={13} strokeWidth={2.5} fill="currentColor" aria-hidden />
+        <Heart size={14} fill="currentColor" aria-hidden />
         <span className="nums">{day.thanks}</span>
       </span>
     ) : null,

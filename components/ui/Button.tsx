@@ -47,8 +47,11 @@ export function Button({ variant = "primary", size = "md", block, loading, busyL
       type="button"
       disabled={disabled || loading}
       aria-busy={loading || undefined}
+      data-size={size}
+      data-variant={variant}
       className={[
-        "relative inline-flex select-none items-center justify-center gap-2 rounded-[12px] font-display tracking-[-0.01em]",
+        // `btn` and the two data attributes are the desk's hooks (app/desk/graphite.css, D-214): the phone draws nothing from them
+        "btn relative inline-flex select-none items-center justify-center gap-2 rounded-[12px] font-display tracking-[-0.01em]",
         // `scale`: Tailwind 4 writes `active:scale-*` into it — without it the press jumped, never sank
         "transition-[transform,scale,background-color,box-shadow,color] duration-[120ms] ease-out",
         // only a button that cannot be pressed fades; one at work stays lit (it is `disabled` too, for the clicks)

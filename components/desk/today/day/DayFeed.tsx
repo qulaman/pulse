@@ -178,7 +178,7 @@ export function DayFeed({
     <Card ink="sky" index={index} testId="today-feed">
       {/* the corner beats as the first move of five minutes comes; the head is never re-mounted for
           the next one — that would take the keyboard's focus off «Объявить» under the director's hand */}
-      <Head icon={Activity} title="Лента дня" href="/desk/ether" corner={recent ? "news" : null}>
+      <Head icon={Activity} sign="ether" title="Лента дня" href="/desk/ether" corner={recent ? "news" : null}>
         {director ? (
           <Ghost
             icon={Megaphone}
@@ -251,7 +251,7 @@ function Pinned({ pin, team, now }: { pin: Pin | null; team: readonly TeamPerson
               <Mark icon={Megaphone} ink="pen" size={16} />
             </span>
             <span className="flex min-w-0 flex-col gap-1.5">
-              <span className="line-clamp-2 text-[13.5px] leading-5 [overflow-wrap:anywhere]">{pin.item.transcript}</span>
+              <span className="line-clamp-2 text-[13px] leading-5 [overflow-wrap:anywhere]">{pin.item.transcript}</span>
               <span className="day-muted flex min-w-0 items-center gap-2 text-[12px]">
                 <span className="nums">{shortWhen(new Date(pin.item.created_at), now)}</span>
                 {pin.until ? <Held until={pin.until} now={now} /> : <Reach item={pin.item} team={team} />}
@@ -285,7 +285,7 @@ function Reach({ item, team }: { item: Announcement; team: readonly TeamPerson[]
   if (!reach || reach.of === 0) {
     return (
       <span className="nums inline-flex items-center gap-1" data-testid="home-ether-reach">
-        <Check size={13} strokeWidth={2.5} aria-hidden />
+        <Check size={14} aria-hidden />
         ознакомились: {item.acks.length}
       </span>
     );
@@ -293,7 +293,7 @@ function Reach({ item, team }: { item: Announcement; team: readonly TeamPerson[]
   if (reach.seen >= reach.of) {
     return (
       <span className="inline-flex items-center gap-1" style={{ color: "var(--ok-ink)" }} title="Ознакомились все" data-testid="home-ether-reach">
-        <CheckCheck size={13} strokeWidth={2.5} aria-hidden /> ознакомились все
+        <CheckCheck size={14} aria-hidden /> ознакомились все
       </span>
     );
   }

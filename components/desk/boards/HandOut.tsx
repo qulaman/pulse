@@ -108,7 +108,7 @@ export function HandOut({
             <b>{now ? "утром" : "сразу"}</b>
           </button>
         ) : null}
-        <Button size="sm" icon={<Send aria-hidden size={15} strokeWidth={2.2} />} disabled={ready.length === 0 || assign.isPending} onClick={send} data-testid="board-handout-send">
+        <Button size="sm" icon={<Send aria-hidden size={16} />} disabled={ready.length === 0 || assign.isPending} onClick={send} data-testid="board-handout-send">
           {ready.length > 0 ? `Отправить ${ready.length}` : "Отправить"}
         </Button>
         <Button size="sm" variant="ghost" onClick={onClose} data-testid="board-handout-close">
@@ -194,7 +194,7 @@ function WhoField({ team, chosen, onPick, onStep }: { team: Person[]; chosen: Wh
         <span className="board-who-chip" data-testid="board-handout-chosen">
           {shortName(chosen.full_name)}
           <button type="button" aria-label={`Убрать ${chosen.full_name}`} onClick={() => onPick(null)} className="desk-focus">
-            <X aria-hidden size={12} strokeWidth={2.4} />
+            <X aria-hidden size={12} />
           </button>
         </span>
       ) : null}

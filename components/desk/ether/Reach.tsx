@@ -40,7 +40,7 @@ export function ReachLine({ item, reach, team, held }: { item: Announcement; rea
         </span>
       ) : null}
       <span className="nums ether-reach-count" data-testid="ether-reach">
-        {all ? <Check size={13} strokeWidth={2.75} aria-hidden /> : null}
+        {all ? <Check size={14} aria-hidden /> : null}
         {reach ? (
           <>
             {reach.seen}

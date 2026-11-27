@@ -25,8 +25,13 @@ export function deskHomeFor(role: Role | undefined): string {
 
 export type DeskBadge = "today" | "tasks" | "errands" | "calendar";
 
-/** `key` — the letter after «G» that goes there (D-154 wave 3), matched by the physical key. */
-export type DeskNavItem = { href: string; label: string; badge?: DeskBadge; key?: string };
+/**
+ * `key` — the letter after «G» that goes there (D-154 wave 3), matched by the physical key.
+ * `group` — the sections stand in groups with air between them (D-214): the work, the people, the
+ * plans, what is on air, the setup; a list is written group by group, top to bottom.
+ */
+export type DeskNavGroup = "work" | "people" | "plans" | "air" | "setup";
+export type DeskNavItem = { href: string; label: string; group: DeskNavGroup; badge?: DeskBadge; key?: string };
 
 /**
  * The side navigation by role. The secretary sees only her own tasks under RLS (`tasks_select`),
@@ -37,25 +42,25 @@ export const DESK_NAV: Record<DeskRole, DeskNavItem[]> = {
   // One thing, one word (D-194): a section is named what its screen and the «Сегодня» block
   // call it. «Ждут вас» carries no count of its own: it is the same number as «Задачи» (D-154)
   director: [
-    { href: "/desk/today", label: "Сегодня", badge: "today", key: "S" },
-    { href: "/desk/tasks", label: "Задачи", badge: "tasks", key: "T" },
-    { href: "/desk/inbox", label: "Ждут вас", key: "I" },
-    { href: "/desk/team", label: "Команда", key: "K" },
-    { href: "/desk/errands", label: "Секретарь", badge: "errands", key: "Z" },
-    { href: "/desk/ether", label: "Эфир", key: "A" },
-    { href: "/desk/reports", label: "Отчёты", key: "O" },
-    { href: "/desk/calendar", label: "Календарь", badge: "calendar", key: "C" },
-    { href: "/desk/notes", label: "Заметки", key: "N" },
-    { href: "/desk/boards", label: "Доски", key: "D" },
-    { href: "/desk/screen", label: "Экран", key: "E" },
-    { href: "/desk/settings", label: "Настройки", key: "H" },
+    { href: "/desk/today", label: "Сегодня", group: "work", badge: "today", key: "S" },
+    { href: "/desk/tasks", label: "Задачи", group: "work", badge: "tasks", key: "T" },
+    { href: "/desk/inbox", label: "Ждут вас", group: "work", key: "I" },
+    { href: "/desk/team", label: "Команда", group: "people", key: "K" },
+    { href: "/desk/reports", label: "Отчёты", group: "people", key: "O" },
+    { href: "/desk/errands", label: "Секретарь", group: "people", badge: "errands", key: "Z" },
+    { href: "/desk/calendar", label: "Календарь", group: "plans", badge: "calendar", key: "C" },
+    { href: "/desk/notes", label: "Заметки", group: "plans", key: "N" },
+    { href: "/desk/boards", label: "Доски", group: "plans", key: "D" },
+    { href: "/desk/ether", label: "Эфир", group: "air", key: "A" },
+    { href: "/desk/screen", label: "Экран", group: "air", key: "E" },
+    { href: "/desk/settings", label: "Настройки", group: "setup", key: "H" },
   ],
   secretary: [
-    { href: "/desk/errands", label: "Секретарь", badge: "errands", key: "Z" },
-    { href: "/desk/team", label: "Команда", key: "K" },
-    { href: "/desk/ether", label: "Эфир", key: "A" },
-    { href: "/desk/calendar", label: "Календарь", badge: "calendar", key: "C" },
-    { href: "/desk/settings", label: "Настройки", key: "H" },
+    { href: "/desk/errands", label: "Секретарь", group: "work", badge: "errands", key: "Z" },
+    { href: "/desk/team", label: "Команда", group: "people", key: "K" },
+    { href: "/desk/calendar", label: "Календарь", group: "plans", badge: "calendar", key: "C" },
+    { href: "/desk/ether", label: "Эфир", group: "air", key: "A" },
+    { href: "/desk/settings", label: "Настройки", group: "setup", key: "H" },
   ],
 };
 

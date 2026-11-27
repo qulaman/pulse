@@ -42,7 +42,7 @@ export function LevelBars({ height = 16, bar = 3, gap = 2, className = "" }: { h
   return (
     <span ref={box} aria-hidden className={`inline-flex items-center ${className}`} style={{ height, gap }} data-testid="voice-level">
       {Array.from({ length: BARS }, (_, i) => (
-        <span key={i} className="block h-full rounded-[1px] bg-current" style={{ width: bar, transform: "scaleY(0.18)", transition: "transform 60ms linear" }} />
+        <span key={i} className="block h-full rounded-[2px] bg-current" style={{ width: bar, transform: "scaleY(0.18)", transition: "transform 60ms linear" }} />
       ))}
     </span>
   );
@@ -109,7 +109,7 @@ export function RecordingPill({
       aria-label={ariaLabel}
       data-testid={testId}
       data-recording="1"
-      className={`desk-focus flex h-8 shrink-0 items-center gap-2 border border-accent px-2.5 text-accent transition-colors duration-[120ms] hover:bg-accent/10 ${className}`}
+      className={`desk-focus flex h-8 shrink-0 items-center gap-2 border border-accent px-2.5 text-accent transition-colors duration-[140ms] hover:bg-accent/10 ${className}`}
     >
       <MiniMark state="listening" size={16} />
       {clock}
@@ -206,7 +206,7 @@ export function MicButton({ pin }: { pin: VoicePin | null }) {
         aria-label={label}
         data-testid="command-mic"
         data-recording="0"
-        className="desk-focus flex h-8 w-8 shrink-0 items-center justify-center rounded-[2px] text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted"
+        className="desk-focus flex h-8 w-8 shrink-0 items-center justify-center rounded-[2px] text-muted transition-colors duration-[140ms] hover:bg-surface-2 hover:text-text disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted"
       >
         <MicGlyph />
       </button>

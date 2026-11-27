@@ -189,10 +189,10 @@ export function WordsTab({
           items={kindItems(fact)}
           align="start"
           width={200}
-          className="dict-kind inline-flex h-6 items-center gap-1 text-[13px] text-muted transition-colors duration-[120ms] hover:text-text"
+          className="dict-kind inline-flex h-6 items-center gap-1 text-[13px] text-muted transition-colors duration-[140ms] hover:text-text"
         >
           {kindLabel(kinds, fact.kind)}
-          <ChevronDown size={12} strokeWidth={2.25} aria-hidden />
+          <ChevronDown size={12} aria-hidden />
         </MenuButton>
       ),
     },
@@ -271,7 +271,7 @@ export function WordsTab({
               ))}
               <option value="">{NO_KIND_LABEL}</option>
             </Select>
-            <Button size="sm" disabled={!(entries.length > 1 || plan.add.length > 0)} onClick={submit} icon={<Plus size={15} strokeWidth={2.5} />}>
+            <Button size="sm" disabled={!(entries.length > 1 || plan.add.length > 0)} onClick={submit} icon={<Plus size={16} />}>
               Добавить
             </Button>
           </div>
@@ -353,7 +353,7 @@ export function WordsTab({
                     onClick={() => dismiss.mutate(s.keys)}
                     className="dict-x -ml-1 flex h-6 w-6 shrink-0 items-center justify-center text-muted hover:bg-surface-2 hover:text-text"
                   >
-                    <X size={14} strokeWidth={2.25} aria-hidden />
+                    <X size={14} aria-hidden />
                   </button>
                 </li>
               ))}
@@ -366,11 +366,11 @@ export function WordsTab({
           <span className="nums text-[12px] leading-4 text-muted">{shown.length === facts.length ? facts.length : `${shown.length} из ${facts.length}`}</span>
           <span className="ml-auto flex items-center gap-1">
             {stale.length ? (
-              <Button size="sm" variant="ghost" onClick={() => setCleanup(true)} data-testid="words-cleanup" title={`Никто не произносил ${STALE_DAYS} дней — подсказка распознаванию несёт их зря`} icon={<Trash2 size={14} strokeWidth={2} />}>
+              <Button size="sm" variant="ghost" onClick={() => setCleanup(true)} data-testid="words-cleanup" title={`Никто не произносил ${STALE_DAYS} дней — подсказка распознаванию несёт их зря`} icon={<Trash2 size={14} />}>
                 Не встречались · {stale.length} — убрать…
               </Button>
             ) : null}
-            <Button size="sm" variant="ghost" onClick={() => setTypesOpen(true)} icon={<Tags size={14} strokeWidth={2} />}>
+            <Button size="sm" variant="ghost" onClick={() => setTypesOpen(true)} icon={<Tags size={14} />}>
               Типы слов…
             </Button>
           </span>

@@ -447,15 +447,15 @@ export function ReportsDesk() {
 
   const head = (
     <div className="desk-page-title rep-feed-title flex flex-wrap items-center gap-3" data-testid="desk-reports-head">
-      <h1 className="mr-1 truncate font-display text-[28px] font-bold leading-[34px] tracking-[-0.025em]">Отчёты</h1>
+      <h1 className="mr-1 truncate font-display text-[28px] font-semibold leading-[34px] tracking-[-0.025em]">Отчёты</h1>
       {hydrated && !off ? (
         <>
           <span className="flex-1" />
           <div className="flex flex-wrap items-center gap-1.5" data-testid="desk-toolbar">
             <FeedSearch ref={searchRef} people={searchable} onPerson={(id) => setFilter({ who: id })} onWords={(text) => setFilter({ q: text })} />
             <JumpToDay value={topDay ?? today} today={today} now={now} onPick={(day) => toDay(day, { smooth: false, push: true })} />
-            <PaperButton label="Скачать для Excel" icon={<Download size={16} strokeWidth={2} aria-hidden />} items={papers(save)} testId="desk-report-csv" />
-            <PaperButton label="Распечатать" icon={<Printer size={16} strokeWidth={2} aria-hidden />} items={papers(print)} testId="desk-report-print" />
+            <PaperButton label="Скачать для Excel" icon={<Download size={16} aria-hidden />} items={papers(save)} testId="desk-report-csv" />
+            <PaperButton label="Распечатать" icon={<Printer size={16} aria-hidden />} items={papers(print)} testId="desk-report-print" />
           </div>
         </>
       ) : null}
@@ -505,7 +505,7 @@ export function ReportsDesk() {
   const chosenPerson = tabelPick ?? openId;
 
   return (
-    <DeskPage>
+    <DeskPage width="full">
       {head}
       {off ? (
         <EmptyState

@@ -343,7 +343,7 @@ export function RollCall({
             {figure}
           </span>
           {rest.length > 0 ? <span className="rep-day-strip-rest">· {rest.join(" · ")}</span> : null}
-          {listed ? <ChevronDown size={15} strokeWidth={2.25} className="rep-day-strip-chevron" aria-hidden /> : null}
+          {listed ? <ChevronDown size={16} className="rep-day-strip-chevron" aria-hidden /> : null}
         </button>
         {offWord === null ? <ShareLine count={count} /> : null}
         {remindAll}

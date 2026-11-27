@@ -265,9 +265,9 @@ export function CommandLine() {
     <div className="relative min-w-0 flex-1">
       <div className="desk-command field flex h-12 items-center gap-2.5 rounded-[2px] pl-3.5 pr-2.5">
         {pin ? (
-          <span className="inline-flex shrink-0 items-center gap-0.5 text-[15px] font-medium leading-5 text-accent" data-testid="command-pin">
+          <span className="inline-flex shrink-0 items-center gap-0.5 text-[14px] font-medium leading-5 text-accent" data-testid="command-pin">
             {pin.name}
-            <button type="button" aria-label="Убрать исполнителя" onClick={() => setPin(null)} className="flex h-5 w-5 items-center justify-center text-[15px] leading-none text-muted hover:text-text">
+            <button type="button" aria-label="Убрать исполнителя" onClick={() => setPin(null)} className="flex h-5 w-5 items-center justify-center text-[14px] leading-none text-muted hover:text-text">
               ×
             </button>
           </span>
@@ -340,7 +340,7 @@ export function CommandLine() {
           autoComplete="off"
           spellCheck={false}
           data-testid="command-line"
-          className="min-w-0 flex-1 bg-transparent text-[15px] leading-5 outline-none placeholder:text-text/45"
+          className="min-w-0 flex-1 bg-transparent text-[14px] leading-5 outline-none placeholder:text-text/45"
           style={{ caretColor: "var(--accent)" }}
         />
         {recording ? (

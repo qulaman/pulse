@@ -26,6 +26,7 @@
 |---|---|---|
 | Типы, линт | `pnpm typecheck`, `pnpm lint` | всегда |
 | Unit | `pnpm test` | всегда (§3) |
+| Линейка компьютера | `pnpm check:desk-scale` | правка стилей или компонентов `/desk`: скругление, размер слова, длительность `transition` и свечение вне шкалы (D-214); тот же прогон — `tests/desk-scale.test.ts` в `pnpm test` |
 | pgTAP | `pnpm test:rls` | миграция, политика, RPC (§2) |
 | Evals | `pnpm eval:parser` | промпт, схема, few-shot (§4) |
 | СТТ-гейт | `pnpm test:stt` | смена STT-провайдера; записи фраз в git нет |

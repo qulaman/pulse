@@ -69,7 +69,7 @@ html[data-surface="desk"][data-journal] {
   .cal-cell-load {
     color: var(--ink-3, var(--text-muted));
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 16px;
     white-space: nowrap;
   }
@@ -80,14 +80,14 @@ html[data-surface="desk"][data-journal] {
     width: 100%;
     height: 5px;
     margin: 1px 0 3px;
-    border-radius: 3px;
+    border-radius: 2px;
     background: color-mix(in srgb, var(--ink, var(--text)) 7%, transparent);
 
     > i {
       position: absolute;
       top: 0;
       height: 100%;
-      border-radius: 3px;
+      border-radius: 2px;
       background: repeating-linear-gradient(
         135deg,
         color-mix(in srgb, var(--warn-ink, var(--warn)) var(--cal-win-hatch), transparent) 0 3px,
@@ -192,7 +192,7 @@ html[data-surface="desk"][data-journal] {
     > span {
       color: var(--ink-2, var(--text-muted));
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 500;
     }
     > b {
       font-size: 16px;
@@ -217,7 +217,7 @@ html[data-surface="desk"][data-journal] {
     }
     &[data-tone="dnd"] {
       color: var(--violet, var(--accent));
-      font-weight: 600;
+      font-weight: 500;
     }
   }
   .cal-win-lane {
@@ -274,13 +274,13 @@ html[data-surface="desk"][data-journal] {
     border-radius: 6px;
     color: var(--ok-deep, var(--ok));
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 14px;
     white-space: nowrap;
     cursor: copy;
     transition:
-      background-color 120ms linear,
-      box-shadow 120ms linear;
+      background-color 140ms linear,
+      box-shadow 140ms linear;
 
     &:hover {
       background: color-mix(in srgb, var(--ok-ink, var(--ok)) 9%, transparent);
@@ -302,7 +302,7 @@ html[data-surface="desk"][data-journal] {
     background: var(--raise, var(--surface));
     color: var(--warn-deep, var(--text-muted));
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 14px;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -371,7 +371,7 @@ html[data-surface="desk"][data-journal] {
     z-index: 4;
     width: 2px;
     margin-left: -1px;
-    border-radius: 1px;
+    border-radius: 2px;
     background: var(--pencil, var(--danger));
     pointer-events: none;
 
@@ -384,7 +384,7 @@ html[data-surface="desk"][data-journal] {
       background: var(--pencil, var(--danger));
       color: var(--raise, #fff);
       font-size: 11px;
-      font-weight: 700;
+      font-weight: 500;
       line-height: 14px;
       transform: translateX(-50%);
       white-space: nowrap;
@@ -422,7 +422,7 @@ html[data-surface="desk"][data-journal] {
     flex-direction: column;
     gap: 4px;
     padding: 12px;
-    border-radius: 10px;
+    border-radius: 8px;
     background: var(--hover, var(--surface-2));
 
     &[data-state="busy"] {
@@ -493,7 +493,7 @@ html[data-surface="desk"][data-journal] {
     font-size: 13px;
     line-height: 18px;
     text-align: left;
-    transition: background-color 120ms linear;
+    transition: background-color 140ms linear;
 
     &:hover {
       background: var(--hover, var(--surface-2));
@@ -511,7 +511,7 @@ html[data-surface="desk"][data-journal] {
   .cal-wside-time {
     flex: none;
     min-width: 92px;
-    font-weight: 600;
+    font-weight: 500;
   }
   .cal-wside-words {
     min-width: 0;
@@ -542,7 +542,7 @@ html[data-surface="desk"][data-journal] {
     flex: none;
     color: var(--warn-deep, var(--warn));
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 500;
   }
   .cal-wside-empty {
     color: var(--ink-3, var(--text-muted));
@@ -551,7 +551,7 @@ html[data-surface="desk"][data-journal] {
   }
   .cal-wside-link {
     color: var(--ink, var(--text));
-    font-weight: 600;
+    font-weight: 500;
     text-decoration: underline;
     text-underline-offset: 2px;
   }
@@ -579,7 +579,7 @@ html[data-surface="desk"][data-journal] {
       display: inline-block;
       width: 18px;
       height: 8px;
-      border-radius: 3px;
+      border-radius: 2px;
     }
     i[data-kind="busy"] {
       background: repeating-linear-gradient(
@@ -609,7 +609,7 @@ html[data-surface="desk"][data-journal] {
   /* ---- the month: weeks of seven in one card --------------------------------------------- */
   .cal-month {
     border-top: 0;
-    border-radius: 14px;
+    border-radius: 12px;
     background: var(--raise);
     box-shadow: var(--shadow-card);
   }
@@ -628,7 +628,7 @@ html[data-surface="desk"][data-journal] {
   .cal-cell {
     padding: 8px;
     border-color: var(--rule-soft);
-    transition: background-color 120ms linear;
+    transition: background-color 140ms linear;
 
     &[data-weekend] {
       background-color: var(--cal-weekend);
@@ -654,22 +654,22 @@ html[data-surface="desk"][data-journal] {
     min-width: 26px;
     border-radius: 9999px;
     font-size: 13px;
-    font-weight: 600;
-    transition: background-color 120ms linear;
+    font-weight: 500;
+    transition: background-color 140ms linear;
 
     &:hover:not(.desk-today) {
       background: var(--hover);
     }
     &.desk-today {
       color: #fff;
-      box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--pen) 70%, transparent);
+      box-shadow: none;
     }
   }
   &[data-desk-theme="dark"] .cal-cell-day.desk-today {
     color: var(--on-pen);
   }
   .cal-cell-new {
-    border-radius: 7px;
+    border-radius: 6px;
     color: var(--ink-3);
 
     &:hover {
@@ -684,8 +684,8 @@ html[data-surface="desk"][data-journal] {
     border-left: 0;
     border-radius: 6px;
     transition:
-      background-color 120ms linear,
-      transform 180ms var(--ease-snap);
+      background-color 140ms linear,
+      transform 200ms var(--ease-snap);
     animation: cal-rise 300ms var(--ease-snap) backwards;
 
     &:hover {
@@ -736,7 +736,7 @@ html[data-surface="desk"][data-journal] {
   .cal-win,
   .cal-wside {
     border: 0;
-    border-radius: 14px;
+    border-radius: 12px;
     background: var(--raise);
     box-shadow: var(--shadow-card);
   }
@@ -760,13 +760,12 @@ html[data-surface="desk"][data-journal] {
   }
   .cal-win-free[data-next] {
     box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--ok-ink) 45%, transparent),
-      0 0 12px -4px color-mix(in srgb, var(--ok-ink) 45%, transparent);
+      inset 0 0 0 1px color-mix(in srgb, var(--ok-ink) 45%, transparent);
   }
   .cal-win-pill {
     transition:
-      background-color 120ms linear,
-      transform 180ms var(--ease-snap);
+      background-color 140ms linear,
+      transform 200ms var(--ease-snap);
 
     &:hover {
       background: color-mix(in srgb, var(--tone) 24%, var(--raise));
@@ -774,7 +773,7 @@ html[data-surface="desk"][data-journal] {
     }
   }
   .cal-win-now {
-    box-shadow: 0 0 8px color-mix(in srgb, var(--pencil) 55%, transparent);
+    box-shadow: none;
   }
   &[data-desk-theme] .cal-win-now > b {
     color: var(--on-pencil);

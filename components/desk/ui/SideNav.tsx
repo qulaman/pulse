@@ -1,31 +1,17 @@
 "use client";
 
-import {
-  CalendarDays,
-  CircleUser,
-  ConciergeBell,
-  FileText,
-  Inbox,
-  LayoutDashboard,
-  ListChecks,
-  Megaphone,
-  MonitorPlay,
-  NotebookPen,
-  Presentation,
-  Settings,
-  Users,
-  type LucideIcon,
-} from "lucide-react";
 import { motion } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { PulseMark } from "@/components/brand/PulseMark";
+import { RollingNumber } from "@/components/ui/RollingNumber";
 import { StillLogo } from "@/components/ui/StillLogo";
 import { useCalendar } from "@/lib/calendar/queries";
 import { todayCount } from "@/lib/calendar/agenda";
 import { pendingInvites } from "@/lib/calendar/invites";
+import { DeskIcon, type DeskIconName } from "@/components/desk/ui/icons";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { TONE_VAR, type Tone } from "@/components/desk/ui/tone";
 import { useDeskScope } from "@/components/desk/DeskScope";
@@ -103,26 +89,25 @@ export function useDeskBadges(role: DeskRole): DeskBadges {
   }, [calendar.data, director, disputes.data, errands.data, game, inbox.data, myId, now, orders.data, visits.data]);
 }
 
-/** Each section's sign (lucide, D-165): beside the name in the wide navigation, alone when folded. */
-const ICON: Record<string, LucideIcon> = {
-  "/desk/today": LayoutDashboard,
-  "/desk/tasks": ListChecks,
-  "/desk/inbox": Inbox,
-  "/desk/team": Users,
-  "/desk/errands": ConciergeBell,
-  "/desk/ether": Megaphone,
-  "/desk/reports": FileText,
-  "/desk/calendar": CalendarDays,
-  "/desk/notes": NotebookPen,
-  "/desk/boards": Presentation,
-  "/desk/screen": MonitorPlay,
-  "/desk/settings": Settings,
-  [DESK_PROFILE]: CircleUser,
+/** Each section's own sign (D-214): beside the name in the wide navigation, alone when folded. */
+const ICON: Record<string, DeskIconName> = {
+  "/desk/today": "today",
+  "/desk/tasks": "tasks",
+  "/desk/inbox": "inbox",
+  "/desk/team": "team",
+  "/desk/errands": "errands",
+  "/desk/ether": "ether",
+  "/desk/reports": "reports",
+  "/desk/calendar": "calendar",
+  "/desk/notes": "notes",
+  "/desk/boards": "boards",
+  "/desk/screen": "screen",
+  "/desk/settings": "settings",
+  [DESK_PROFILE]: "profile",
 };
 
 function NavIcon({ href }: { href: string }) {
-  const Glyph = ICON[href] ?? LayoutDashboard;
-  return <Glyph size={17} strokeWidth={1.9} aria-hidden />;
+  return <DeskIcon name={ICON[href] ?? "today"} size={18} />;
 }
 
 /**
@@ -167,7 +152,8 @@ function NavLink({
   chord?: string;
   folded: boolean;
 }) {
-  const shown = count ? (count > 99 ? "99+" : String(count)) : null;
+  // a count that grows rolls up to its new figure; past 99 it is said as «99+», standing still
+  const shown = count ? count > 99 ? "99+" : <RollingNumber value={count} /> : null;
   return (
     <Tooltip label={label} keys={chord ? ["G", chord] : undefined} side="right" className="flex w-full">
       <Link
@@ -183,7 +169,7 @@ function NavLink({
         <span className="desk-nav-icon relative z-[1] inline-flex shrink-0">
           <NavIcon href={href} />
           {folded && shown ? (
-            <span className="nums absolute -right-2.5 -top-2 min-w-[16px] text-center text-[10px] leading-[15px]" style={badgeColors(tone, quiet)} data-testid="nav-badge" data-tone={quiet ? "quiet" : tone}>
+            <span className="nums absolute -right-2.5 -top-2 min-w-[16px] text-center text-[11px] leading-[15px]" style={badgeColors(tone, quiet)} data-testid="nav-badge" data-tone={quiet ? "quiet" : tone}>
               {shown}
             </span>
           ) : null}
@@ -237,12 +223,12 @@ export function SideNav({ role, brand, folded = false, onToggle }: { role: DeskR
 
   return (
     <nav aria-label="Разделы" data-folded={folded ? "" : undefined} className="desk-nav flex min-h-0 flex-col">
-      <div className={`mb-6 flex h-9 items-center ${folded ? "justify-center" : "px-2"}`} title={brand.name}>
+      <div className={`mb-5 flex h-8 items-center ${folded ? "justify-center" : "px-2"}`} title={brand.name}>
         {logo ? (
           // a still frame of the client's logo: an animated one would keep the main thread awake (В-9, D-155)
-          <StillLogo src={logo} alt={brand.name} className={folded ? "h-6 max-w-[44px] object-contain" : "h-8 max-w-[176px] object-contain object-left"} />
+          <StillLogo src={logo} alt={brand.name} className={folded ? "h-5 max-w-[44px] object-contain" : "h-6 max-w-[160px] object-contain object-left"} />
         ) : named ? (
-          <span className="font-display text-[16px] font-bold leading-5 tracking-[-0.02em]">{folded ? brand.name.slice(0, 1) : brand.name}</span>
+          <span className="font-display text-[16px] font-semibold leading-5 tracking-[-0.02em]">{folded ? brand.name.slice(0, 1) : brand.name}</span>
         ) : folded ? (
           <PulseGlyphMark />
         ) : (
@@ -250,8 +236,9 @@ export function SideNav({ role, brand, folded = false, onToggle }: { role: DeskR
         )}
       </div>
       <ul className="no-bar flex min-h-0 flex-col overflow-y-auto">
-        {DESK_NAV[role].map((item) => (
-          <li key={item.href}>
+        {DESK_NAV[role].map((item, index, items) => (
+          // a new group starts with air above it (graphite.css)
+          <li key={item.href} data-group-start={index > 0 && items[index - 1].group !== item.group ? "" : undefined}>
             <NavLink
               href={item.href}
               label={item.label}
@@ -277,7 +264,7 @@ export function SideNav({ role, brand, folded = false, onToggle }: { role: DeskR
                 aria-label={foldLabel}
                 aria-pressed={folded}
                 data-testid="desk-nav-fold"
-                className="desk-focus flex h-8 w-8 items-center justify-center rounded-[8px] text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
+                className="desk-focus flex h-8 w-8 items-center justify-center rounded-[8px] text-muted transition-colors duration-[140ms] hover:bg-surface-2 hover:text-text"
               >
                 <FoldIcon folded={folded} />
               </button>

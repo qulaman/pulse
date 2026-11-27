@@ -120,7 +120,7 @@ function RecordPanel({ spec, row, names, field }: { spec: TableSpec; row: TableR
                   {column.label} <code className="nums text-muted/60">{column.key}</code>
                 </span>
                 {text ? (
-                  <button type="button" onClick={() => copy(text, column.label.toLowerCase())} className="text-[12px] text-muted opacity-0 transition-opacity duration-[120ms] hover:text-text focus-visible:opacity-100 group-hover:opacity-100">
+                  <button type="button" onClick={() => copy(text, column.label.toLowerCase())} className="text-[12px] text-muted opacity-0 transition-opacity duration-[140ms] hover:text-text focus-visible:opacity-100 group-hover:opacity-100">
                     Копировать
                   </button>
                 ) : null}
@@ -145,7 +145,7 @@ function RecordPanel({ spec, row, names, field }: { spec: TableSpec; row: TableR
           );
         })}
       </dl>
-      <Button size="sm" variant="secondary" className="self-start" onClick={() => copy(JSON.stringify(row, null, 2), "запись")} icon={<Copy size={14} strokeWidth={2} />}>
+      <Button size="sm" variant="secondary" className="self-start" onClick={() => copy(JSON.stringify(row, null, 2), "запись")} icon={<Copy size={14} />}>
         Скопировать запись как JSON
       </Button>
     </div>
@@ -391,7 +391,7 @@ export function DataDesk({ initialTable }: { initialTable: string | null }) {
               tabIndex={active ? 0 : -1}
               data-table={t.table}
               onClick={() => pick(t.table)}
-              className={`data-tab relative h-8 shrink-0 whitespace-nowrap text-[14px] leading-5 transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45 ${
+              className={`data-tab relative h-8 shrink-0 whitespace-nowrap text-[14px] leading-5 transition-colors duration-[140ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45 ${
                 active ? "font-semibold text-text shadow-[inset_0_-2px_0_var(--text)]" : "text-muted hover:text-text"
               }`}
             >
@@ -408,10 +408,10 @@ export function DataDesk({ initialTable }: { initialTable: string | null }) {
               {query.isPending ? "…" : `${formatNum(from)}–${formatNum(to)} из ${formatNum(total)}`}
             </span>
             <Button size="sm" variant="ghost" className="!px-2" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))} title="Предыдущая страница · <" aria-label="Предыдущая страница">
-              <ChevronLeft size={16} strokeWidth={2.25} aria-hidden />
+              <ChevronLeft size={16} aria-hidden />
             </Button>
             <Button size="sm" variant="ghost" className="!px-2" disabled={page >= pages - 1} onClick={() => setPage((p) => Math.min(pages - 1, p + 1))} title="Следующая страница · >" aria-label="Следующая страница">
-              <ChevronRight size={16} strokeWidth={2.25} aria-hidden />
+              <ChevronRight size={16} aria-hidden />
             </Button>
             <Select
               aria-label="Строк на странице"
@@ -428,7 +428,7 @@ export function DataDesk({ initialTable }: { initialTable: string | null }) {
                 </option>
               ))}
             </Select>
-            <Button size="sm" variant="secondary" loading={query.isFetching && !query.isPending} onClick={() => void query.refetch()} title="Прочитать заново · R" icon={<RefreshCw size={14} strokeWidth={2} />}>
+            <Button size="sm" variant="secondary" loading={query.isFetching && !query.isPending} onClick={() => void query.refetch()} title="Прочитать заново · R" icon={<RefreshCw size={14} />}>
               Обновить
             </Button>
           </>

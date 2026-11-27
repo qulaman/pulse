@@ -77,7 +77,7 @@ function RangePicker({ value, now, onPick }: { value: DayRange | null; now: Date
             <button
               type="button"
               onClick={() => onPick(choice ? { from: choice.from, to: choice.to } : null)}
-              className="flex h-8 w-full items-center gap-2.5 px-3 text-left text-[13px] leading-4 transition-colors duration-[120ms] hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none"
+              className="flex h-8 w-full items-center gap-2.5 px-3 text-left text-[13px] leading-4 transition-colors duration-[140ms] hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none"
               data-testid="desk-range-preset"
             >
               <span className="min-w-0 flex-1 truncate">{choice?.label ?? "Все даты"}</span>

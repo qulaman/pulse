@@ -84,7 +84,7 @@ export function DoorCard({
                       {fresh ? <LiveDot ink="warn" mode="now" /> : null}
                       {fresh ? "К вам посетитель" : "Ждёт в приёмной"}
                     </span>
-                    <span className="block text-[15px] font-semibold leading-5 [overflow-wrap:anywhere]">{name}</span>
+                    <span className="block text-[14px] font-semibold leading-5 [overflow-wrap:anywhere]">{name}</span>
                   </span>
                   <span className="day-when">ждёт {waitedSince(visit.created_at, now)}</span>
                 </div>
@@ -150,7 +150,7 @@ export function MeetingCard({ event, now, index }: { event: CalendarEvent; now: 
         )}
       </Head>
       <div className="flex flex-col gap-2 pb-1 pt-1" data-live={live ? "" : undefined}>
-        <span className="text-[15px] font-semibold leading-5 [overflow-wrap:anywhere]">{event.title}</span>
+        <span className="text-[14px] font-semibold leading-5 [overflow-wrap:anywhere]">{event.title}</span>
         <span className="flex items-center gap-3 text-[12px]">
           <span className="nums day-muted">{timeRange(event)}</span>
           <span className="day-stack-faces ml-auto" title={`Участников: ${peopleCount(event)}`}>

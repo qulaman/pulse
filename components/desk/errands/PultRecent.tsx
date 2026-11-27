@@ -29,7 +29,7 @@ function Thank({ errand, now, pointsOn }: { errand: Errand; now: Date; pointsOn:
   if (errand.thanked_at || sent) {
     return (
       <span className="pult-thanked" data-pop={sent ? "" : undefined} title="Спасибо отправлено">
-        <Heart size={13} strokeWidth={2.25} aria-hidden />
+        <Heart size={14} aria-hidden />
         спасибо
       </span>
     );
@@ -45,7 +45,7 @@ function Thank({ errand, now, pointsOn }: { errand: Errand; now: Date; pointsOn:
       }}
       data-testid="desk-errand-thank"
     >
-      <Heart size={13} strokeWidth={2.25} aria-hidden />
+      <Heart size={14} aria-hidden />
       Спасибо
     </button>
   );
@@ -172,7 +172,7 @@ export function DoneList({
         action={
           onHistory ? (
             <button type="button" className="pult-link desk-focus" onClick={onHistory}>
-              История <ArrowRight size={14} strokeWidth={2.25} aria-hidden />
+              История <ArrowRight size={14} aria-hidden />
             </button>
           ) : undefined
         }

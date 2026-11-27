@@ -37,11 +37,11 @@ function ErrandBody({ errand, now, catalogue }: { errand: Errand; now: Date; cat
           {shortName(errand.author?.full_name ?? "Директор")} · {isActive(errand) ? waitedFor(errand, now) : humanAqtobe(new Date(errand.created_at), now)}
           {errand.until_at ? ` · ${untilLine(errand.until_at)}` : ""}
         </p>
-        <p className="desk-figure mt-0.5 text-[22px] leading-7 [overflow-wrap:anywhere]" style={alarm ? { color: "var(--danger)" } : undefined}>
+        <p className="desk-figure mt-0.5 text-[20px] leading-7 [overflow-wrap:anywhere]" style={alarm ? { color: "var(--danger)" } : undefined}>
           {alarm && isActive(errand) ? "Вызови охрану!" : errand.label}
           {/* «к 18:00» (D-106 §8): the time it is needed by, beside the request itself */}
           {!alarm && errand.due_at ? (
-            <span className="text-[15px] font-medium" data-testid="errand-due">
+            <span className="text-[14px] font-medium" data-testid="errand-due">
               {" · "}
               <When overdue={late}>{atLine(errand.due_at, now)}</When>
             </span>
@@ -59,7 +59,7 @@ export function ThankButton({ errand }: { errand: Errand }) {
   const thank = useThankErrand();
   return (
     <button type="button" className="errands-thank desk-focus" disabled={thank.isPending} onClick={() => thank.mutate(errand.id)} data-testid="desk-errand-thank">
-      <Heart size={13} strokeWidth={2.25} aria-hidden />
+      <Heart size={14} aria-hidden />
       Спасибо
     </button>
   );
@@ -77,7 +77,7 @@ function Receipt({ errand, now }: { errand: Errand; now: Date }) {
   if (!line) return null;
   return (
     <p className="errands-receipt" data-tone={line.tone}>
-      <BellRing size={14} strokeWidth={2.25} aria-hidden />
+      <BellRing size={14} aria-hidden />
       <span>Секретарю: {line.text}</span>
     </p>
   );
@@ -167,7 +167,7 @@ export function ErrandDetails({
       {/* the director's side answers the question itself (DirectorLink); the secretary reads it here */}
       {viewer === "secretary" && errand.question ? (
         <p className="errands-qa">
-          <CircleHelp size={14} strokeWidth={2.25} aria-hidden />
+          <CircleHelp size={14} aria-hidden />
           <span className="min-w-0">
             <span className="text-muted">{errand.question} — </span>
             {errand.answer ? <span className="font-semibold">директор: {errand.answer}</span> : <span className="text-muted">ждём ответа</span>}
@@ -189,7 +189,7 @@ export function ErrandDetails({
         </div>
       ) : errand.thanked_at ? (
         <p className="errands-thanked">
-          <Heart size={13} strokeWidth={2.25} aria-hidden />
+          <Heart size={14} aria-hidden />
           Спасибо отправлено
         </p>
       ) : null}

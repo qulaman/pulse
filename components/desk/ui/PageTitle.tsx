@@ -23,7 +23,7 @@ export function PageTitle({
     <div className="desk-page-title flex flex-wrap items-end justify-between gap-3">
       {light !== undefined ? <DeskLight tone={light} /> : null}
       <div className="min-w-0">
-        <h1 className="truncate font-display text-[28px] font-bold leading-[34px] tracking-[-0.025em]">{title}</h1>
+        <h1 className="truncate font-display text-[24px] font-semibold leading-8 tracking-[-0.02em]">{title}</h1>
         {state ? (
           <p className="mt-1 flex items-center gap-1.5 text-[14px] font-medium leading-5" style={{ color: state.tone ? TONE_VAR[state.tone] : "var(--text-muted)" }}>
             {state.tone ? <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: TONE_VAR[state.tone] }} /> : null}
@@ -37,10 +37,15 @@ export function PageTitle({
 }
 
 /**
- * The desk screen's frame: the gutter and one of two widths, always from the same left edge as
- * the order line above it (D-154) — a screen never jumps sideways between sections.
+ * The desk screen's frame (D-214): one gutter and one of three measures, always from the same left
+ * edge as the order line above it (D-154) — a screen never jumps sideways between sections.
+ * `wide` — a screen that is read: 1200 px of content, however wide the monitor; `full` — a table, a
+ * grid of tiles, a calendar: the whole width; `narrow` — a form. The measures are in graphite.css.
  */
 export function DeskPage({ children, width = "wide" }: { children: ReactNode; width?: "wide" | "narrow" | "full" }) {
-  const max = width === "full" ? "" : width === "narrow" ? "max-w-[808px]" : "max-w-[1328px]";
-  return <div className={`desk-page flex w-full flex-col gap-5 px-6 pb-12 pt-6 ${width === "narrow" ? "desk-page-narrow" : ""} ${max}`}>{children}</div>;
+  return (
+    <div className={`desk-page flex w-full flex-col gap-5 px-6 pb-12 pt-6 ${width === "narrow" ? "desk-page-narrow max-w-[808px]" : ""}`} data-width={width}>
+      {children}
+    </div>
+  );
 }

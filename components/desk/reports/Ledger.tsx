@@ -167,7 +167,7 @@ export function CheckButton({
           onCheck(!checked);
         }}
       >
-        <Check size={14} strokeWidth={2.4} aria-hidden />
+        <Check size={14} aria-hidden />
         {checked ? (
           <>
             Проверено <span className="nums rep-feed-check-at">{timeOf(report.checked_at)}</span>
@@ -185,7 +185,7 @@ export function SeenLine({ report }: { report: Pick<DailyReport, "seen_at"> }) {
   if (!report.seen_at) return null;
   return (
     <span className="rep-feed-seen nums" title={`Просмотрено в ${timeOf(report.seen_at)}`} data-testid="desk-feed-seen">
-      <Eye size={13} strokeWidth={2} aria-hidden />
+      <Eye size={14} aria-hidden />
       просмотрено {timeOf(report.seen_at)}
     </span>
   );
@@ -263,7 +263,7 @@ export function LedgerEntry({ report, now, query, director, selected, opened, fo
           setUnfolded(true);
         }}
       >
-        <Check size={14} strokeWidth={2.4} className="rep-feed-folded-tick" aria-hidden />
+        <Check size={14} className="rep-feed-folded-tick" aria-hidden />
         <Face person={{ id: report.user_id, full_name: report.full_name, avatar_url: report.avatar_url }} size={20} />
         <span className="rep-feed-folded-name">{report.full_name}</span>
         {line ? <span className="rep-feed-folded-line">{line}</span> : null}

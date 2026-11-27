@@ -104,7 +104,7 @@ function Level({ subscribe }: { subscribe: Dictation["subscribeLevel"] }) {
   return (
     <span ref={box} aria-hidden className="inline-flex h-[14px] items-center gap-[2px]" data-testid="dictation-level">
       {Array.from({ length: BARS }, (_, i) => (
-        <span key={i} className="block h-full w-[3px] rounded-[1px] bg-current" style={{ transform: "scaleY(0.18)", transition: "transform 60ms linear" }} />
+        <span key={i} className="block h-full w-[3px] rounded-[2px] bg-current" style={{ transform: "scaleY(0.18)", transition: "transform 60ms linear" }} />
       ))}
     </span>
   );
@@ -128,7 +128,7 @@ function Clock({ startedAt }: { startedAt: number | null }) {
 }
 
 /** A small word-button of the failed state: «Повторить», «Удалить запись». */
-const WORD = "desk-focus inline-flex h-8 shrink-0 items-center rounded-[8px] px-2.5 text-[13px] font-medium leading-4 transition-colors duration-[120ms] hover:bg-surface-2";
+const WORD = "desk-focus inline-flex h-8 shrink-0 items-center rounded-[8px] px-2.5 text-[13px] font-medium leading-4 transition-colors duration-[140ms] hover:bg-surface-2";
 
 /**
  * A page's dictaphone button (D-177): the round microphone of the voice — the pen's colour, the
@@ -175,9 +175,9 @@ export function DictationMic({
             onClick={() => dictation.cancel()}
             aria-label="Отменить запись"
             data-testid={`${testId}-cancel`}
-            className="desk-focus flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
+            className="desk-focus flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-muted transition-colors duration-[140ms] hover:bg-surface-2 hover:text-text"
           >
-            <X aria-hidden size={16} strokeWidth={2} />
+            <X aria-hidden size={16} />
           </button>
         </Tooltip>
       </span>
@@ -225,7 +225,7 @@ export function DictationMic({
         data-testid={testId}
         data-recording="0"
         data-stage={stage}
-        className={`desk-focus flex ${box} shrink-0 items-center justify-center rounded-full bg-accent text-bg transition-[filter,scale] duration-[120ms] hover:brightness-110 active:scale-[.94] active:duration-[70ms]`}
+        className={`desk-focus flex ${box} shrink-0 items-center justify-center rounded-full bg-accent text-bg transition-[filter,scale] duration-[140ms] hover:brightness-110 active:scale-[.94] active:duration-[80ms]`}
         style={{ boxShadow: "0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent), 0 6px 18px -8px color-mix(in srgb, var(--accent) 80%, transparent)" }}
       >
         <MicGlyph size={size === 36 ? 18 : 16} />

@@ -31,13 +31,25 @@ export function DayColumn({
   head,
   quiet,
   band,
-  children,
+  work,
+  pult,
+  people,
+  yours,
+  figures,
+  feed,
 }: {
   /** the moment (or the launch, or the queue's failure): the column's first card */
   head: ReactNode;
   quiet: readonly QuietItem[];
   band: readonly { key: string; node: ReactNode }[];
-  children: ReactNode;
+  /** the director's own lists: just sent, decisions, attention, overdue */
+  work: ReactNode;
+  pult: ReactNode;
+  people: ReactNode;
+  /** the day's own words and hours: messages, meetings and deadlines */
+  yours: ReactNode;
+  figures: ReactNode;
+  feed: ReactNode;
 }) {
   const arrive = useFirstArrival();
   const asleep = useDeepRest();
@@ -54,7 +66,32 @@ export function DayColumn({
           ))}
         </AnimatePresence>
       </div>
-      {children}
+      {/* one column in the screen's order; on a wide monitor the day's words, figures and feed stand
+          beside the work as a second column, so a row never runs the width of the monitor (D-214) */}
+      <div className="day-cols">
+        <div className="day-main">
+          <div className="day-slot" data-slot="work">
+            {work}
+          </div>
+          <div className="day-slot" data-slot="pult">
+            {pult}
+          </div>
+          <div className="day-slot" data-slot="people">
+            {people}
+          </div>
+        </div>
+        <div className="day-aside">
+          <div className="day-slot" data-slot="yours">
+            {yours}
+          </div>
+          <div className="day-slot" data-slot="figures">
+            {figures}
+          </div>
+          <div className="day-slot" data-slot="feed">
+            {feed}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

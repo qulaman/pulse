@@ -15,7 +15,7 @@ html[data-surface="desk"][data-journal] {
   .dict-strip,
   .dict-addbar {
     padding: 14px 18px 16px;
-    border-radius: 14px;
+    border-radius: 12px;
     background: var(--raise);
     box-shadow: var(--shadow-card);
     animation: settings-rise 320ms var(--ease-snap) both;
@@ -45,7 +45,7 @@ html[data-surface="desk"][data-journal] {
     padding: 0 2px;
   }
   #desk-main .dict-table-head .dict-strip-title {
-    font-size: 15px;
+    font-size: 14px;
     letter-spacing: -0.01em;
   }
   .dict-strip .field,
@@ -109,14 +109,14 @@ html[data-surface="desk"][data-journal] {
   }
   .dict-misheard-item {
     padding: 6px 8px;
-    border-radius: 10px;
+    border-radius: 8px;
     background: color-mix(in srgb, var(--ink) 3%, transparent);
   }
   .dict-x {
     border-radius: 6px;
     transition:
-      background-color 100ms linear,
-      color 100ms linear;
+      background-color 80ms linear,
+      color 80ms linear;
   }
 
   /* the budget: the list's length is the recognition prompt's length */
@@ -143,7 +143,7 @@ html[data-surface="desk"][data-journal] {
   .dict-suggest-item {
     height: 34px;
     padding: 0 4px 0 12px;
-    border-radius: 10px;
+    border-radius: 8px;
     background: color-mix(in srgb, var(--ink) 3%, transparent);
     box-shadow: inset 0 0 0 1px var(--rule-soft);
     animation: settings-pop 240ms var(--ease-snap) both;
@@ -159,7 +159,7 @@ html[data-surface="desk"][data-journal] {
   .dict-pill {
     height: 26px;
     padding: 0 9px;
-    border-radius: 7px;
+    border-radius: 6px;
     background: var(--surface-2);
     box-shadow: inset 0 0 0 1px var(--rule-soft);
     font-size: 13px;
@@ -174,7 +174,7 @@ html[data-surface="desk"][data-journal] {
     &[data-fresh] {
       background: color-mix(in srgb, var(--pen) 12%, transparent);
       box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 40%, transparent);
-      animation: settings-pop 260ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+      animation: settings-pop 260ms var(--ease-spring) both;
     }
     &[data-waiting] {
       background: transparent;
@@ -186,10 +186,10 @@ html[data-surface="desk"][data-journal] {
     width: 18px;
     height: 18px;
     margin-left: 2px;
-    border-radius: 5px;
+    border-radius: 4px;
     transition:
-      opacity 120ms linear,
-      background-color 100ms linear;
+      opacity 140ms linear,
+      background-color 80ms linear;
 
     &:hover {
       background: color-mix(in srgb, var(--pencil) 16%, transparent);
@@ -198,13 +198,13 @@ html[data-surface="desk"][data-journal] {
   .dict-add {
     height: 26px;
     padding: 0 9px 0 7px;
-    border-radius: 7px;
+    border-radius: 6px;
     box-shadow: inset 0 0 0 1px var(--line);
     border: 0;
     transition:
-      opacity 120ms linear,
-      background-color 100ms linear,
-      color 100ms linear;
+      opacity 140ms linear,
+      background-color 80ms linear,
+      color 80ms linear;
 
     &:hover {
       background: var(--hover);
@@ -216,14 +216,14 @@ html[data-surface="desk"][data-journal] {
   .dict-offer {
     height: 26px;
     padding: 0 9px 0 7px;
-    border-radius: 7px;
+    border-radius: 6px;
     background: color-mix(in srgb, var(--pen) 9%, transparent);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 34%, transparent);
     font-size: 13px;
     font-weight: 500;
     color: var(--pen);
     transition:
-      background-color 120ms linear,
+      background-color 140ms linear,
       scale 200ms var(--ease-snap);
 
     &:hover:not(:disabled) {
@@ -232,7 +232,7 @@ html[data-surface="desk"][data-journal] {
     }
     &:active:not(:disabled) {
       scale: 0.95;
-      transition-duration: 70ms;
+      transition-duration: 80ms;
     }
   }
   .dict-shared {
@@ -248,7 +248,7 @@ html[data-surface="desk"][data-journal] {
   .dict-kind {
     height: 26px;
     padding: 0 7px 0 9px;
-    border-radius: 7px;
+    border-radius: 6px;
     background: color-mix(in srgb, var(--ink) 5%, transparent);
     box-shadow: inset 0 0 0 1px var(--rule-soft);
     color: var(--ink-2);
@@ -284,8 +284,8 @@ html[data-surface="desk"][data-journal] {
     padding: 0 10px;
     border-radius: 8px;
     transition:
-      color 120ms linear,
-      background-color 120ms linear;
+      color 140ms linear,
+      background-color 140ms linear;
 
     &:hover {
       background: var(--hover);
@@ -301,7 +301,7 @@ html[data-surface="desk"][data-journal] {
     background: var(--surface-2);
     box-shadow: inset 0 0 0 1px var(--rule);
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 20px;
   }
   .dict-foot {
@@ -316,7 +316,7 @@ html[data-surface="desk"][data-journal] {
   .lab-strip {
     padding: 12px 16px;
     border: 0;
-    border-radius: 14px;
+    border-radius: 12px;
     background: var(--raise);
     box-shadow: var(--shadow-card);
   }
@@ -324,8 +324,8 @@ html[data-surface="desk"][data-journal] {
     height: 30px;
     border-radius: 8px;
     transition:
-      color 120ms linear,
-      background-color 120ms linear;
+      color 140ms linear,
+      background-color 140ms linear;
 
     &:hover {
       background: var(--hover);
@@ -342,11 +342,11 @@ html[data-surface="desk"][data-journal] {
   .lab-tab.desk-bench [class*="rounded-[12px]"].bg-surface-2 {
     padding-inline: 12px;
     border-top: 0;
-    border-radius: 10px;
+    border-radius: 8px;
     background: var(--surface-2);
   }
   #desk-main .lab-head {
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
     letter-spacing: -0.01em;
     color: var(--ink);
@@ -369,14 +369,14 @@ html[data-surface="desk"][data-journal] {
     box-shadow: none !important;
     font-weight: 500;
     transition:
-      color 120ms linear,
-      background-color 120ms linear;
+      color 140ms linear,
+      background-color 140ms linear;
 
     &:hover {
       background: var(--hover);
     }
     &[aria-selected="true"] {
-      font-weight: 600;
+      font-weight: 500;
     }
   }
   .data-tab-line {
@@ -388,7 +388,7 @@ html[data-surface="desk"][data-journal] {
     height: 2px;
     border-radius: 2px 2px 0 0;
     background: var(--pen);
-    box-shadow: 0 0 10px color-mix(in srgb, var(--pen) 60%, transparent);
+    box-shadow: none;
   }
   .data-sheet {
     border: 0;

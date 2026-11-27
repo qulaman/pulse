@@ -177,8 +177,8 @@ export function Diary({ userId, focus, today, onDay, director, onAll }: DiaryPro
             {monthTitle(range.month, today)}
           </h3>
           <div className="rep-diary-stepper">
-            <IconButton label="Предыдущий месяц" icon={<ChevronLeft size={16} strokeWidth={2.2} />} disabled={monthStart <= joinedMonth} onClick={() => step(-1)} testId="desk-diary-prev" />
-            <IconButton label="Следующий месяц" icon={<ChevronRight size={16} strokeWidth={2.2} />} disabled={monthStart >= nowMonth} onClick={() => step(1)} testId="desk-diary-next" />
+            <IconButton label="Предыдущий месяц" icon={<ChevronLeft size={16} />} disabled={monthStart <= joinedMonth} onClick={() => step(-1)} testId="desk-diary-prev" />
+            <IconButton label="Следующий месяц" icon={<ChevronRight size={16} />} disabled={monthStart >= nowMonth} onClick={() => step(1)} testId="desk-diary-next" />
           </div>
         </div>
         <p className="rep-diary-tally nums" data-testid="desk-diary-tally">
@@ -453,11 +453,11 @@ function Dispute({ report, listKey }: { report: PersonDailyReport; listKey: read
     <div className="rep-diary-dispute" data-testid="desk-diary-dispute">
       <p className="rep-diary-dispute-who">Оспаривает минус:</p>
       <blockquote className="rep-diary-quote">
-        <Quote size={13} strokeWidth={2} aria-hidden />
+        <Quote size={14} aria-hidden />
         «{dispute.text}»
       </blockquote>
       <div className="rep-diary-row">
-        <Button size="sm" variant="secondary" icon={<Undo2 size={14} strokeWidth={2.2} aria-hidden />} disabled={resolve.isPending} onClick={() => answer(true)} data-testid="desk-diary-refund">
+        <Button size="sm" variant="secondary" icon={<Undo2 size={14} aria-hidden />} disabled={resolve.isPending} onClick={() => answer(true)} data-testid="desk-diary-refund">
           Вернуть очки
         </Button>
         <Button size="sm" variant="ghost" disabled={resolve.isPending} onClick={() => answer(false)} data-testid="desk-diary-keep">

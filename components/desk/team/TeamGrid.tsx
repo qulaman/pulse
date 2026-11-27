@@ -151,7 +151,7 @@ function PersonTile({
         <span className="team-tile-facts">
           {active > 0 ? (
             <span className="team-fact" data-tone={stateTone(state)} title={loadWords(facts.load)}>
-              <ListChecks size={13} strokeWidth={2.25} aria-hidden />
+              <ListChecks size={14} aria-hidden />
               <span className="nums">{active}</span>
             </span>
           ) : null}
@@ -161,26 +161,26 @@ function PersonTile({
               data-tone={report.state === "submitted" ? "ok" : report.state === "missed" ? "danger" : "muted"}
               title={report.state === "submitted" ? "Отчёт за сегодня сдан" : report.state === "missed" ? "Отчёт за сегодня не сдан" : "Отчёт за сегодня ещё не сдан"}
             >
-              {report.state === "missed" ? <ClipboardX size={13} strokeWidth={2.25} aria-hidden /> : <ClipboardCheck size={13} strokeWidth={2.25} aria-hidden />}
+              {report.state === "missed" ? <ClipboardX size={14} aria-hidden /> : <ClipboardCheck size={14} aria-hidden />}
               <span>{report.state === "submitted" ? "сдан" : report.state === "missed" ? "нет" : "ждём"}</span>
             </span>
           ) : null}
           {facts.balance !== null ? (
             <span className="team-fact" data-tone="gold" title="Очки">
-              <Sparkles size={13} strokeWidth={2.25} aria-hidden />
+              <Sparkles size={14} aria-hidden />
               <span className="nums">{formatNum(facts.balance)}</span>
             </span>
           ) : null}
           {deaf ? (
             <span className="team-fact" data-tone="muted" title={`Уведомления: ${facts.push?.text ?? "не включены"}`}>
-              <BellOff size={13} strokeWidth={2.25} aria-hidden />
+              <BellOff size={14} aria-hidden />
             </span>
           ) : null}
         </span>
       ) : !director && deaf ? (
         <span className="team-tile-facts">
           <span className="team-fact" data-tone="muted">
-            <BellOff size={13} strokeWidth={2.25} aria-hidden />
+            <BellOff size={14} aria-hidden />
             <span>без уведомлений</span>
           </span>
         </span>

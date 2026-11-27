@@ -142,7 +142,7 @@ export function LaunchChecklist({
           {left}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[17px] font-semibold leading-[22px]">Запуск компании</p>
+          <p className="truncate text-[16px] font-semibold leading-[22px]">Запуск компании</p>
           <p className="truncate text-[13px] leading-[18px] text-muted">
             {pluralRu(left, ["Остался", "Осталось", "Осталось"])} {left} {pluralRu(left, ["шаг", "шага", "шагов"])} · с первым поручением здесь появится ваш день
           </p>

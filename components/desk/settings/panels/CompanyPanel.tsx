@@ -58,7 +58,7 @@ function LogoWell({ url, letter }: { url: string | null; letter: string }) {
     >
       {/* dashed — the one place on the page a file can be dropped into (D-154) */}
       <span
-        className="set-logo-well flex h-9 w-[132px] items-center justify-center overflow-hidden border border-dashed px-2 transition-colors duration-[120ms]"
+        className="set-logo-well flex h-9 w-[132px] items-center justify-center overflow-hidden border border-dashed px-2 transition-colors duration-[140ms]"
         data-over={over ? "" : undefined}
         style={{ background: "var(--spine)", borderColor: over ? "var(--accent)" : "var(--text-muted)" }}
       >
@@ -84,7 +84,7 @@ function LogoWell({ url, letter }: { url: string | null; letter: string }) {
           event.target.value = "";
         }}
       />
-      <Button size="sm" variant="secondary" disabled={upload.isPending} onClick={() => input.current?.click()} icon={<ImageUp size={15} strokeWidth={2} />}>
+      <Button size="sm" variant="secondary" disabled={upload.isPending} onClick={() => input.current?.click()} icon={<ImageUp size={16} />}>
         {url ? "Заменить…" : "Загрузить…"}
       </Button>
       {url ? (
@@ -126,14 +126,14 @@ function BrandPreview({ logo, name, tagline, accent }: { logo: string | null; na
         ) : (
           <span className="set-brand-letter">{name.trim().slice(0, 1).toUpperCase() || "?"}</span>
         )}
-        <span className="min-w-0 flex-1 truncate text-[15px] font-semibold" style={{ color: accent ?? undefined }}>
+        <span className="min-w-0 flex-1 truncate text-[14px] font-semibold" style={{ color: accent ?? undefined }}>
           {name.trim() || "Название компании"}
         </span>
         <span aria-hidden className="set-brand-button">Принял</span>
       </div>
       <div className="set-brand-login">
         <span className="text-[11px] font-medium leading-4 text-white/45">Экран входа</span>
-        <span className="truncate text-[17px] font-semibold text-white">{name.trim() || "Название компании"}</span>
+        <span className="truncate text-[16px] font-semibold text-white">{name.trim() || "Название компании"}</span>
         <span className="truncate text-[13px] text-white/60">{tagline.trim() || "Голосовое управление компанией"}</span>
       </div>
     </div>
@@ -256,7 +256,7 @@ export function CompanyPanel() {
                 invalid={accent === undefined}
                 onChange={(value) => brand.set({ accent: value })}
               />
-              <Button size="sm" variant="ghost" disabled={!edit.accent} onClick={() => brand.set({ accent: "" })} icon={<RotateCcw size={14} strokeWidth={2} />} title="Вернуть акцент Pulse">
+              <Button size="sm" variant="ghost" disabled={!edit.accent} onClick={() => brand.set({ accent: "" })} icon={<RotateCcw size={14} />} title="Вернуть акцент Pulse">
                 Сброс
               </Button>
             </SettingRow>

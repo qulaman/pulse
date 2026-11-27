@@ -37,7 +37,7 @@ export function ReceptionCard({ visits, now, loading = false }: { visits: readon
   return (
     <section className="stoika-card" data-testid="stoika-reception" aria-label="Приёмная">
       <header className="stoika-card-head">
-        <DoorOpen size={15} strokeWidth={2.25} aria-hidden className="text-muted" />
+        <DoorOpen size={16} aria-hidden className="text-muted" />
         <h2>Приёмная</h2>
         {!loading && live.length > 0 ? <span className="nums text-muted">{live.length}</span> : null}
       </header>

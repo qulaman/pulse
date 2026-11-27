@@ -47,7 +47,7 @@ function Weekdays({ days, onChange }: { days: readonly number[]; onChange: (days
               if (on && days.length === 1) return;
               onChange(on ? days.filter((d) => d !== day) : [...days, day].sort((a, b) => a - b));
             }}
-            className={`set-day flex h-8 w-7 items-center justify-center text-[13px] font-semibold leading-4 transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45 ${
+            className={`set-day flex h-8 w-7 items-center justify-center text-[13px] font-semibold leading-4 transition-colors duration-[140ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45 ${
               on ? "seg-thumb text-text" : "text-muted/70 hover:text-text"
             }`}
           >
@@ -87,7 +87,7 @@ function Holidays({ days, onChange }: { days: readonly Ymd[]; onChange: (days: Y
                 onClick={() => onChange(days.filter((d) => d !== day))}
                 className="set-chip-x flex h-6 w-5 items-center justify-center text-muted hover:text-danger"
               >
-                <X size={13} strokeWidth={2.25} aria-hidden />
+                <X size={14} aria-hidden />
               </button>
             </span>
           );
@@ -96,13 +96,13 @@ function Holidays({ days, onChange }: { days: readonly Ymd[]; onChange: (days: Y
         {past ? <span className="text-[13px] leading-5 text-muted">· и ещё {past} {pluralRu(past, ["прошедший", "прошедших", "прошедших"])}</span> : null}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="secondary" onClick={(event) => setAnchor(anchor ? null : event.currentTarget)} aria-expanded={Boolean(anchor)} icon={<CalendarPlus size={15} strokeWidth={2} />}>
+        <Button size="sm" variant="secondary" onClick={(event) => setAnchor(anchor ? null : event.currentTarget)} aria-expanded={Boolean(anchor)} icon={<CalendarPlus size={16} />}>
           День…
         </Button>
         {years.map((y) => {
           const kz = kzFixedHolidays(y);
           return (
-            <Button key={y} size="sm" variant="ghost" disabled={kz.every((day) => days.includes(day))} onClick={() => add(kz)} icon={<Plus size={14} strokeWidth={2.25} />}>
+            <Button key={y} size="sm" variant="ghost" disabled={kz.every((day) => days.includes(day))} onClick={() => add(kz)} icon={<Plus size={14} />}>
               Праздники Казахстана {y}
             </Button>
           );

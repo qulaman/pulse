@@ -427,7 +427,7 @@ function NarrowHint({ role }: { role: DeskRole }) {
     }
   };
   return (
-    <div className="mx-2 mb-2 flex min-h-9 shrink-0 flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-[10px] border border-border bg-surface py-1.5 pl-4 pr-1.5 text-[13px] leading-4" data-testid="desk-narrow-hint">
+    <div className="mx-2 mb-2 flex min-h-9 shrink-0 flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-[8px] border border-border bg-surface py-1.5 pl-4 pr-1.5 text-[13px] leading-4" data-testid="desk-narrow-hint">
       <span className="text-muted">Этот экран удобнее на телефоне</span>
       <span aria-hidden className="text-muted">·</span>
       <button type="button" className="font-semibold text-accent" onClick={() => goPhoneView(homeForRole(role))}>

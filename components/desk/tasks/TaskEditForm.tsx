@@ -297,7 +297,7 @@ export function TaskEditForm({ desk, onDone }: { desk: DeskTask; onDone: (saved:
 
       {/* the foot rides at the panel's bottom while the fields scroll: who learns of it, and the two buttons */}
       <div className="tasks-edit-foot sticky bottom-0 z-[1] flex items-center gap-3">
-        <p className="min-w-0 flex-1 text-[12.5px] leading-[18px]" aria-live="polite" data-testid={armed ? "desk-edit-armed" : "desk-edit-notice"} data-armed={armed ? "" : undefined}>
+        <p className="min-w-0 flex-1 text-[12px] leading-[18px]" aria-live="polite" data-testid={armed ? "desk-edit-armed" : "desk-edit-notice"} data-armed={armed ? "" : undefined}>
           {armed ? (
             <>
               Не сохранено — <Kbd>Esc</Kbd> ещё раз, чтобы выйти без правки

@@ -61,7 +61,7 @@ export function WhenField({
   return (
     <div ref={setBox} className="tasks-when desk-input relative flex h-9 items-center gap-2" data-tone={open ? undefined : tone} aria-expanded={open}>
       <span aria-hidden className="tasks-ico tasks-when-icon shrink-0">
-        <CalendarClock size={15} strokeWidth={2} />
+        <CalendarClock size={16} />
       </span>
       <input
         value={text ?? shown}

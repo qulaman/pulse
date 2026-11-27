@@ -36,7 +36,7 @@ export function ThoughtsPicker({ open, onClose, notes, now, onAdd }: { open: boo
               <span className="block truncate text-[12px] leading-4 text-muted">{whenRu(note.created_at, now)}</span>
             </span>
             <button type="button" className="board-thought-add desk-focus" aria-label={`На доску: ${firstLine(note.text)}`} onClick={() => onAdd(note)} data-testid="board-thought-add">
-              <Plus aria-hidden size={16} strokeWidth={2.2} />
+              <Plus aria-hidden size={16} />
             </button>
           </li>
         ))}

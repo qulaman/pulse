@@ -538,7 +538,7 @@ export function Outline({ rows, phone, hearing, numbers, spot, onWall, taskOf, a
                 const last = branches[branches.length - 1]?.point ?? null;
                 startDraft({ id: crypto.randomUUID(), parent: null, after: last?.id ?? null, text: "" });
               }}
-              className={`flex h-9 min-w-0 flex-1 items-center gap-2.5 ${compact ? "pl-[8px]" : "pl-[32px]"} pr-2 text-left text-[14px] leading-5 text-muted transition-colors duration-[120ms] hover:bg-surface-2/50 hover:text-text`}
+              className={`flex h-9 min-w-0 flex-1 items-center gap-2.5 ${compact ? "pl-[8px]" : "pl-[32px]"} pr-2 text-left text-[14px] leading-5 text-muted transition-colors duration-[140ms] hover:bg-surface-2/50 hover:text-text`}
               data-testid="desk-outline-add"
             >
               <NoteIcon name="plus" size={14} />
@@ -606,7 +606,7 @@ function LineRow({
     <div
       data-line-box={row.id}
       onContextMenu={onMenu}
-      className={`group relative flex items-start gap-1.5 py-[3px] pr-1 transition-colors duration-[120ms] hover:bg-surface-2/40 focus-within:bg-surface ${level === 1 ? (compact ? "pl-[26px]" : "pl-[34px]") : "pl-0"} ${dragging ? "bg-surface-2/60" : ""}`}
+      className={`group relative flex items-start gap-1.5 py-[3px] pr-1 transition-colors duration-[140ms] hover:bg-surface-2/40 focus-within:bg-surface ${level === 1 ? (compact ? "pl-[26px]" : "pl-[34px]") : "pl-0"} ${dragging ? "bg-surface-2/60" : ""}`}
       style={lit ? { boxShadow: "inset 2px 0 0 var(--accent)", background: "color-mix(in srgb, var(--accent) 7%, transparent)" } : undefined}
       data-testid="desk-outline-line"
       data-level={level}
@@ -617,7 +617,7 @@ function LineRow({
         aria-label="Перетащить"
         tabIndex={-1}
         onPointerDown={onGrip}
-        className={`mt-[5px] h-6 shrink-0 cursor-grab items-center justify-center text-muted/60 opacity-0 transition-opacity duration-[120ms] hover:text-text active:cursor-grabbing group-hover:opacity-100 ${compact ? "hidden" : "flex w-5"}`}
+        className={`mt-[5px] h-6 shrink-0 cursor-grab items-center justify-center text-muted/60 opacity-0 transition-opacity duration-[140ms] hover:text-text active:cursor-grabbing group-hover:opacity-100 ${compact ? "hidden" : "flex w-5"}`}
       >
         <NoteIcon name="grip" size={13} />
       </button>
@@ -631,8 +631,8 @@ function LineRow({
           disabled={onPhone}
           onClick={onToggle}
           data-testid="desk-outline-check"
-          className={`mt-[5px] flex shrink-0 items-center justify-center border leading-none transition-colors duration-[120ms] disabled:opacity-50 ${
-            level === 0 ? "h-6 w-6 text-[12px]" : "mt-[7px] h-[18px] w-[18px] text-[10px]"
+          className={`mt-[5px] flex shrink-0 items-center justify-center border leading-none transition-colors duration-[140ms] disabled:opacity-50 ${
+            level === 0 ? "h-6 w-6 text-[12px]" : "mt-[7px] h-[18px] w-[18px] text-[11px]"
           } ${done ? "border-text bg-text text-bg" : lit ? "border-accent text-accent" : "border-border text-muted hover:border-muted hover:text-text"}`}
         >
           {done ? <NoteIcon name="check" size={level === 0 ? 13 : 11} /> : level === 0 && n !== null ? <span className="nums">{n}</span> : null}
@@ -644,7 +644,7 @@ function LineRow({
           text={row.text}
           readOnly={onPhone}
           placeholder={placeholder}
-          className={`${level === 0 ? "text-[15px] font-semibold leading-[22px]" : "text-[14px] leading-[22px] text-text/90"} ${done ? "text-muted line-through decoration-muted/40" : ""}`}
+          className={`${level === 0 ? "text-[14px] font-semibold leading-[22px]" : "text-[14px] leading-[22px] text-text/90"} ${done ? "text-muted line-through decoration-muted/40" : ""}`}
           onKey={onKey}
           onSave={onSave}
           onPaste={onPaste}
@@ -666,10 +666,10 @@ function LineRow({
         aria-label="Действия с пунктом"
         tabIndex={-1}
         onClick={onMenu}
-        className="mt-[3px] flex h-7 w-7 shrink-0 items-center justify-center text-muted opacity-0 transition-opacity duration-[120ms] hover:bg-surface-2 hover:text-text focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
+        className="mt-[3px] flex h-7 w-7 shrink-0 items-center justify-center text-muted opacity-0 transition-opacity duration-[140ms] hover:bg-surface-2 hover:text-text focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
         data-testid="desk-outline-menu"
       >
-        <Ellipsis aria-hidden size={16} strokeWidth={2.2} />
+        <Ellipsis aria-hidden size={16} />
       </button>
     </div>
   );
@@ -728,7 +728,7 @@ function DraftLine({
         onBlur={(event) => onLeave(event.currentTarget.value)}
         placeholder={sub ? "Подпункт — Enter, Shift+Tab — в пункты" : "Пункт — Enter, Tab — подпункт"}
         aria-label={sub ? "Новый подпункт" : "Новый пункт"}
-        className={`no-bar min-w-0 flex-1 resize-none bg-transparent px-1 py-[3px] outline-none placeholder:text-muted/70 ${sub ? "text-[14px] leading-[22px]" : "text-[15px] font-semibold leading-[22px] placeholder:font-normal"}`}
+        className={`no-bar min-w-0 flex-1 resize-none bg-transparent px-1 py-[3px] outline-none placeholder:text-muted/70 ${sub ? "text-[14px] leading-[22px]" : "text-[14px] font-semibold leading-[22px] placeholder:font-normal"}`}
       />
       <span aria-hidden className="w-7 shrink-0" />
     </div>

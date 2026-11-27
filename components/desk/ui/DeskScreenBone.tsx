@@ -6,12 +6,12 @@ import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
  * one growing placeholder — what is under the title is decided by the data. Screens with a frame
  * of their own while the lists land (`TasksSkeleton`, `InboxSkeleton`) use theirs instead.
  */
-export function DeskScreenBone({ title, width }: { title: string; width?: "wide" | "narrow" }) {
+export function DeskScreenBone({ title, width }: { title: string; width?: "wide" | "narrow" | "full" }) {
   return (
     <DeskPage width={width}>
       <PageTitle title={title} />
       <SkeletonGroup grow>
-        <Bone h={36} w={320} className="rounded-[11px]" />
+        <Bone h={36} w={320} className="rounded-[12px]" />
         <Bone h={420} className="mt-4 rounded-[12px]" />
       </SkeletonGroup>
     </DeskPage>

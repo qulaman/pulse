@@ -64,7 +64,7 @@ function PresencePill({ meId, people, now }: { meId: string; people: readonly Se
       >
         <span aria-hidden className="stoika-presence-dot" />
         <span className="nums">{away && me?.away_until ? `Нет ${untilLine(me.away_until)}` : "На месте"}</span>
-        <ChevronDown size={14} strokeWidth={2.25} aria-hidden className="text-muted" />
+        <ChevronDown size={14} aria-hidden className="text-muted" />
       </button>
       <Menu
         open={Boolean(anchor)}
@@ -99,7 +99,7 @@ export function StoikaHead({ meId, view, count, now, settled }: { meId: string; 
   const secretaries = useSecretaries();
   return (
     <div className="stoika-head desk-page-title" data-testid="stoika-head">
-      <h1 className="font-display text-[28px] font-bold leading-[34px] tracking-[-0.025em]">Секретарь</h1>
+      <h1 className="font-display text-[28px] font-semibold leading-[34px] tracking-[-0.025em]">Секретарь</h1>
       <SecretaryTabs view={view} count={count} />
       <span className="flex-1" />
       <RingState />

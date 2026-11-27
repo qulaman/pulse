@@ -31,7 +31,7 @@ function Fact({ fact }: { fact: HeroFact }) {
   const body = (
     <>
       <span
-        className={`nums desk-figure text-[22px] leading-[26px] ${quiet ? "text-muted/50" : ""}`}
+        className={`nums desk-figure text-[20px] leading-[26px] ${quiet ? "text-muted/50" : ""}`}
         style={!quiet && fact.tone ? { color: TONE_VAR[fact.tone] } : undefined}
       >
         {fact.text ?? formatNum(fact.value)}
@@ -117,7 +117,7 @@ export function DeskHero({
             </span>
           ) : null}
           <div className="min-w-0">
-            <p className="text-[17px] font-semibold leading-[22px]" data-testid="hero-title">
+            <p className="text-[16px] font-semibold leading-[22px]" data-testid="hero-title">
               {title}
             </p>
             {sub ? <p className="text-[13px] leading-[18px] text-muted">{sub}</p> : null}

@@ -67,7 +67,7 @@ import { rowsOnScreen, useTaskSelection } from "./useTaskSelection";
 /** The screen's frame while the lists land: the head, the moment (the archive has none), the tool bar, the rows. */
 export function TasksSkeleton({ moment = true }: { moment?: boolean }) {
   return (
-    <DeskPage>
+    <DeskPage width="full">
       <PageTitle title="Задачи" />
       <SkeletonGroup className="tasks-skel flex flex-col gap-3.5" grow>
         {/* the moment's own box, so nothing moves when it lands */}
@@ -602,7 +602,7 @@ function TasksView({
   const calm = screen.value === null && screen.closedToday === 0;
 
   return (
-    <DeskPage>
+    <DeskPage width="full">
       <PageTitle
         title="Задачи"
         actions={load.kind === "stale" ? <LoadNote state={load} failed="" now={now} onRetry={onRetry} /> : undefined}

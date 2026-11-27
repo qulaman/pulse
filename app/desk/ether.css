@@ -10,7 +10,7 @@ html[data-surface="desk"][data-journal] {
     gap: 7px;
     color: var(--text);
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 18px;
 
     .nums {
@@ -41,7 +41,7 @@ html[data-surface="desk"][data-journal] {
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
     color: var(--text);
-    font-size: 15px;
+    font-size: 14px;
     line-height: 22px;
     overflow-wrap: anywhere;
   }
@@ -72,7 +72,7 @@ html[data-surface="desk"][data-journal] {
     width: 112px;
     height: 6px;
     overflow: hidden;
-    border-radius: 3px;
+    border-radius: 2px;
     background: color-mix(in srgb, var(--pen, var(--accent)) 15%, transparent);
 
     > i {
@@ -140,7 +140,7 @@ html[data-surface="desk"][data-journal] {
     right: 10px;
     bottom: 10px;
     opacity: 0;
-    transition: opacity 120ms linear;
+    transition: opacity 140ms linear;
 
     .ether-news-card:hover > &,
     .ether-news-card:focus-within > & {
@@ -270,13 +270,13 @@ html[data-surface="desk"][data-journal] {
   .ether-news-card {
     padding: 14px 16px;
     border-top: 0;
-    border-radius: 14px;
+    border-radius: 12px;
     background: var(--raise);
     box-shadow: var(--shadow-card);
     transition:
-      transform 220ms var(--ease-snap),
-      box-shadow 180ms linear,
-      background-color 160ms linear;
+      transform 200ms var(--ease-snap),
+      box-shadow 200ms linear,
+      background-color 140ms linear;
   }
   .ether-card {
     &:hover {
@@ -288,28 +288,24 @@ html[data-surface="desk"][data-journal] {
     }
     &:active:not(:has(button:active)) {
       transform: scale(0.995);
-      transition-duration: 70ms;
+      transition-duration: 80ms;
     }
     /* the chosen card: the pen's ring drawn round it */
     &[aria-selected="true"] {
       background: color-mix(in srgb, var(--pen) 5%, var(--raise));
       box-shadow:
-        0 0 0 1.5px color-mix(in srgb, var(--pen) 75%, transparent),
-        0 14px 34px -18px color-mix(in srgb, var(--pen) 60%, transparent);
+        0 0 0 1.5px color-mix(in srgb, var(--pen) 75%, transparent);
     }
     /* held for the window: the sky's ring and a light from its corner — waiting, not wrong */
     &[data-held] {
-      background:
-        radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--sky) 10%, transparent), transparent 55%),
-        var(--raise);
+      background: color-mix(in srgb, var(--sky) 4%, var(--raise));
       box-shadow:
         0 0 0 1px color-mix(in srgb, var(--sky) 38%, transparent),
         var(--lift);
     }
     &[data-held][aria-selected="true"] {
       box-shadow:
-        0 0 0 1.5px color-mix(in srgb, var(--pen) 75%, transparent),
-        0 14px 34px -18px color-mix(in srgb, var(--pen) 60%, transparent);
+        0 0 0 1.5px color-mix(in srgb, var(--pen) 75%, transparent);
     }
   }
   &[data-desk-theme="light"] .ether-card:hover {
@@ -318,9 +314,7 @@ html[data-surface="desk"][data-journal] {
       0 10px 24px -14px rgb(15 17 22 / 0.22);
   }
   .ether-news-card {
-    background:
-      radial-gradient(110% 130% at 100% 0%, color-mix(in srgb, var(--gold-ink) 9%, transparent), transparent 55%),
-      var(--raise);
+    background: color-mix(in srgb, var(--gold-ink) 4%, var(--raise));
   }
   .ether-panel-reach {
     background: var(--surface-2);

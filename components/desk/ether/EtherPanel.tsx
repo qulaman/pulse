@@ -74,7 +74,7 @@ export function EtherPanel({
 
       {until ? (
         <div className="ether-panel-held" data-testid="ether-held">
-          <Clock3 size={16} strokeWidth={2.25} aria-hidden />
+          <Clock3 size={16} aria-hidden />
           <span className="min-w-0 flex-1 text-[14px] leading-5">
             Команда получит <When>{whenHeld(until, now)}</When>
             <span className="block text-[12px] leading-4 text-muted">ждёт окна доставки — ночью телефоны не будим</span>
@@ -87,7 +87,7 @@ export function EtherPanel({
 
       {director ? null : heard ? (
         <p className="ether-heard text-[14px] leading-5">
-          <CheckCheck size={15} strokeWidth={2.25} aria-hidden />
+          <CheckCheck size={16} aria-hidden />
           Вы ознакомились
         </p>
       ) : (
@@ -102,7 +102,7 @@ export function EtherPanel({
         <div className="ether-panel-reach">
           <ReachRing seen={reach.seen} of={reach.of} />
           <div className="min-w-0">
-            <p className="text-[15px] font-semibold leading-5">{reach.of > 0 && reach.seen >= reach.of ? "Ознакомились все" : `Ознакомились ${reach.seen} из ${reach.of}`}</p>
+            <p className="text-[14px] font-semibold leading-5">{reach.of > 0 && reach.seen >= reach.of ? "Ознакомились все" : `Ознакомились ${reach.seen} из ${reach.of}`}</p>
             <p className="text-[12px] leading-4 text-muted">{reach.missing.length > 0 ? `ещё нет — ${reach.missing.length}` : "из тех, кто сейчас в команде"}</p>
           </div>
         </div>
@@ -152,7 +152,7 @@ export function EtherPanel({
       {director ? (
         <div className="border-t border-border/60 pt-4">
           <Button size="sm" variant="danger" onClick={onDelete} data-testid="ether-panel-delete">
-            <Trash2 size={14} strokeWidth={2.25} aria-hidden className="mr-1.5" />
+            <Trash2 size={14} aria-hidden className="mr-1.5" />
             Удалить…
           </Button>
         </div>

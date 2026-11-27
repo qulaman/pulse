@@ -52,7 +52,7 @@ export function Avatar({ name, ring, size = 28 }: { name: string; ring?: Tone | 
     <span
       aria-hidden
       data-list={size < 40 ? "" : undefined}
-      className="desk-avatar flex shrink-0 items-center justify-center rounded-full bg-surface-2 font-display font-bold text-text/85"
+      className="desk-avatar flex shrink-0 items-center justify-center rounded-full bg-surface-2 font-display font-semibold text-text/85"
       style={{
         width: size,
         height: size,

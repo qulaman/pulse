@@ -83,7 +83,7 @@ export function RecurrenceFields({ value, onChange }: { value: RepeatValue; onCh
                 type="button"
                 aria-pressed={on}
                 onClick={() => set({ weekdays: on ? value.weekdays.filter((d) => d !== day) : [...value.weekdays, day] })}
-                className={`desk-focus h-8 w-9 rounded-[2px] border text-[13px] font-medium leading-none transition-colors duration-[120ms] ${
+                className={`desk-focus h-8 w-9 rounded-[2px] border text-[13px] font-medium leading-none transition-colors duration-[140ms] ${
                   on ? "border-accent text-accent" : "border-border text-muted hover:text-text"
                 }`}
               >

@@ -225,7 +225,7 @@ export function DeskThread({
                   ) : null}
                   {line && lastMine?.id === message.id && state === "sent" ? (
                     <p className="tasks-receipt mt-0.5 flex flex-wrap items-center gap-x-1 text-[12px] leading-4 text-muted" data-testid="thread-receipt">
-                      <CheckCheck aria-hidden size={13} strokeWidth={2.2} className="tasks-ico shrink-0" />
+                      <CheckCheck aria-hidden size={14} className="tasks-ico shrink-0" />
                       {line.text}
                       {/* at night the words wait for the morning — unless the director says «now» (D-129) */}
                       {line.held ? (
@@ -377,7 +377,7 @@ function Composer({ taskId, me, actions, placeholder = "Ответить…", on
       onDragLeave={() => setOver(false)}
       onDrop={onDrop}
       data-over={over ? "" : undefined}
-      className={`tasks-composer rounded-[2px] border transition-colors duration-[120ms] focus-within:border-accent ${over ? "border-dashed border-accent" : "border-border"}`}
+      className={`tasks-composer rounded-[2px] border transition-colors duration-[140ms] focus-within:border-accent ${over ? "border-dashed border-accent" : "border-border"}`}
     >
       <input ref={file} type="file" accept="image/*" className="hidden" aria-label="Приложить фото" onChange={(event) => void sendPhoto(event.target.files?.[0])} />
       <textarea
@@ -403,12 +403,12 @@ function Composer({ taskId, me, actions, placeholder = "Ответить…", on
           disabled={uploading}
           title="Приложить фото — или вставьте его (Ctrl+V), или перетащите сюда"
           aria-label="Приложить фото"
-          className="flex h-7 w-7 items-center justify-center rounded-[2px] text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text disabled:opacity-50"
+          className="flex h-7 w-7 items-center justify-center rounded-[2px] text-muted transition-colors duration-[140ms] hover:bg-surface-2 hover:text-text disabled:opacity-50"
         >
           {uploading ? (
             <MiniMark state="busy" size={16} />
           ) : (
-            <Paperclip size={16} strokeWidth={1.9} aria-hidden />
+            <Paperclip size={16} aria-hidden />
           )}
         </button>
         <span className="min-w-0 flex-1 truncate text-[12px] leading-4 text-muted">{uploading ? "Отправляю фото…" : draft.trim() ? "Enter — отправить" : ""}</span>
@@ -416,11 +416,11 @@ function Composer({ taskId, me, actions, placeholder = "Ответить…", on
           type="button"
           onClick={sendText}
           disabled={!draft.trim()}
-          className="tasks-send desk-move inline-flex h-7 items-center gap-1.5 rounded-[2px] border px-2 text-[13px] leading-4 transition-opacity duration-[120ms] disabled:opacity-30"
+          className="tasks-send desk-move inline-flex h-7 items-center gap-1.5 rounded-[2px] border px-2 text-[13px] leading-4 transition-opacity duration-[140ms] disabled:opacity-30"
           data-testid="desk-composer-send"
         >
           Отправить
-          <ArrowUp aria-hidden size={14} strokeWidth={2.4} className="tasks-ico" />
+          <ArrowUp aria-hidden size={14} className="tasks-ico" />
         </button>
       </div>
     </div>

@@ -5,8 +5,8 @@
   a.day-pinned {
     color: inherit;
     transition:
-      background-color 120ms linear,
-      box-shadow 120ms linear;
+      background-color 140ms linear,
+      box-shadow 140ms linear;
 
     &:hover {
       background: color-mix(in srgb, var(--pen) 10%, transparent);

@@ -155,7 +155,7 @@ function EtherCard({
           </span>
           {item.audio_path ? (
             <span className="ether-voice" title="Сказано голосом — запись в панели">
-              <AudioLines size={13} strokeWidth={2.25} aria-hidden />
+              <AudioLines size={14} aria-hidden />
             </span>
           ) : null}
         </p>
@@ -164,7 +164,7 @@ function EtherCard({
         </p>
         {until ? (
           <p className="ether-held-line" data-testid="ether-held-line">
-            <Clock3 size={14} strokeWidth={2.25} aria-hidden />
+            <Clock3 size={14} aria-hidden />
             <span>
               Команда получит <When>{whenHeld(until, now)}</When>
             </span>
@@ -175,7 +175,7 @@ function EtherCard({
           {!director ? (
             heard ? (
               <span className="ether-heard">
-                <CheckCheck size={14} strokeWidth={2.25} aria-hidden />
+                <CheckCheck size={14} aria-hidden />
                 Вы ознакомились
               </span>
             ) : (
@@ -213,11 +213,11 @@ function NewsCards({ news, now, director, onRemove }: { news: readonly EtherEven
               </div>
               {item.kind === "praise" && item.amount ? (
                 <span className="ether-points nums">
-                  <Sparkles size={13} strokeWidth={2.25} aria-hidden />+{formatNum(item.amount)}
+                  <Sparkles size={14} aria-hidden />+{formatNum(item.amount)}
                 </span>
               ) : merch ? (
                 <span className="ether-points" data-merch>
-                  <Gift size={13} strokeWidth={2.25} aria-hidden />
+                  <Gift size={14} aria-hidden />
                   награда
                 </span>
               ) : null}
@@ -371,7 +371,7 @@ export function EtherDesk() {
             {load.kind === "stale" ? <LoadNote state={load} failed="" now={now} onRetry={() => void feed.refetch()} /> : null}
             {director ? (
               <Button size="sm" onClick={newAnnouncement} data-testid="ether-new" title="Строкой поручения: «Всем: …» · N">
-                <Megaphone size={15} strokeWidth={2.25} aria-hidden className="mr-1.5" />
+                <Megaphone size={16} aria-hidden className="mr-1.5" />
                 Новое объявление
               </Button>
             ) : null}
@@ -419,7 +419,7 @@ export function EtherDesk() {
             {sections.map((section) => (
               <section key={section.key} role="rowgroup" className="flex flex-col gap-2" data-testid={section.held ? "ether-held-group" : undefined}>
                 <h2 className="ether-day" data-held={section.held ? "" : undefined}>
-                  {section.held ? <MoonStar size={14} strokeWidth={2.25} aria-hidden /> : null}
+                  {section.held ? <MoonStar size={14} aria-hidden /> : null}
                   {section.title}
                   <span className="nums">{section.rows.length}</span>
                 </h2>

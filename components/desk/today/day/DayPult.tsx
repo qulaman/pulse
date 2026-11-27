@@ -113,7 +113,7 @@ export function DayPult({ me, index }: { me: Me; index: number }) {
     <Card ink="ok" index={index} testId="home-secretary" className="day-pult">
       {/* the head's name is the way into «Заявки» */}
       <div data-testid="home-secretary-errands">
-        <Head icon={ConciergeBell} title="Заявки" href="/desk/errands" corner={waiting ? "state" : null}>
+        <Head icon={ConciergeBell} sign="errands" title="Заявки" href="/desk/errands" corner={waiting ? "state" : null}>
           {there ? <Presence people={people} now={now} /> : null}
         </Head>
       </div>
@@ -154,7 +154,7 @@ function Presence({ people, now }: { people: readonly SecretaryPerson[]; now: Da
       <p className="day-pult-who" title={`${absence} — просьба дождётся`} data-testid="home-secretary-away">
         <Seat person={back} away />
         <span className="day-pult-who-text inline-flex items-center gap-1" style={{ color: INK.warn }}>
-          <Clock size={12} strokeWidth={2.25} aria-hidden className="shrink-0" />
+          <Clock size={12} aria-hidden className="shrink-0" />
           <span className="truncate">
             {people.length === 1 ? `вернётся в ${at}` : `никого нет до ${at}`} · просьба дождётся
           </span>
@@ -355,7 +355,7 @@ function Desk({ mine, now }: { mine: readonly Errand[]; now: Date }) {
                     style={{ "--tone": state === "sent" ? INK.ok : sceneInk(scene) } as CSSProperties}
                   >
                     <span className="day-key-icon">
-                      {state === "sent" ? <Check size={24} strokeWidth={2.5} aria-hidden /> : <Sign scene={scene} icon={action.icon} size={24} />}
+                      {state === "sent" ? <Check size={24} aria-hidden /> : <Sign scene={scene} icon={action.icon} size={24} />}
                     </span>
                     {/* the five seconds running out round the key */}
                     {state === "held" ? <Ring className="day-key-window" style={{ "--window": `${GRACE_MS}ms` } as CSSProperties} /> : null}
@@ -426,7 +426,7 @@ function AlarmKey({ action, place, live, hint, onSend }: { action: SecretaryActi
     >
       <span className="day-key-disc day-sos-disc">
         <span className="day-sos-siren">
-          <Siren size={30} strokeWidth={2.25} aria-hidden />
+          <Siren size={30} aria-hidden />
         </span>
         <Ring className="day-sos-fuse" />
       </span>
@@ -465,7 +465,7 @@ function AskField({ onSend, boxRef }: { onSend: (words: string) => void; boxRef:
         data-testid="home-secretary-words"
       />
       <button type="button" className="day-ask-send desk-focus" disabled={!ready} onClick={send} aria-label="Попросить" title="Попросить" data-testid="home-secretary-words-send">
-        <ArrowUp size={15} strokeWidth={2.5} aria-hidden />
+        <ArrowUp size={16} aria-hidden />
       </button>
     </div>
   );
@@ -512,14 +512,14 @@ function PultLine({ line, actions, now, iconRef }: { line: Line; actions: readon
     stateKey = row.waiting ? "waiting" : "going";
     state = row.waiting ? (
       <>
-        <CloudOff size={12} strokeWidth={2.5} aria-hidden className="shrink-0" style={{ color: INK.warn }} />
+        <CloudOff size={12} aria-hidden className="shrink-0" style={{ color: INK.warn }} />
         <span className="truncate" style={{ color: INK.warn }}>
           ждёт связи — уйдёт сама
         </span>
       </>
     ) : (
       <>
-        <LoaderCircle size={12} strokeWidth={2.5} aria-hidden className="desk-spin day-muted shrink-0" />
+        <LoaderCircle size={12} aria-hidden className="desk-spin day-muted shrink-0" />
         <span className="day-muted">отправляю…</span>
       </>
     );
@@ -527,7 +527,7 @@ function PultLine({ line, actions, now, iconRef }: { line: Line; actions: readon
     stateKey = "ask";
     state = (
       <>
-        <CircleHelp size={12} strokeWidth={2.5} aria-hidden className="shrink-0" style={{ color: INK.violet }} />
+        <CircleHelp size={12} aria-hidden className="shrink-0" style={{ color: INK.violet }} />
         <span className="truncate" style={{ color: INK.violet }} title={`${who} спрашивает: ${errand.question}`}>
           вопрос: {errand.question}
         </span>
@@ -590,7 +590,7 @@ function PultLine({ line, actions, now, iconRef }: { line: Line; actions: readon
     );
   } else if (errand) {
     end = (
-      <span className={errand.urgent ? "" : "opacity-0 transition-opacity duration-[120ms] focus-within:opacity-100 group-hover/err:opacity-100"}>
+      <span className={errand.urgent ? "" : "opacity-0 transition-opacity duration-[140ms] focus-within:opacity-100 group-hover/err:opacity-100"}>
         <button type="button" className="day-ghost desk-focus" style={errand.urgent ? { color: INK.pencil } : undefined} onClick={() => cancel(errand)} data-testid="home-secretary-cancel">
           {cancelWord(errand)}
         </button>
@@ -620,7 +620,7 @@ function PultLine({ line, actions, now, iconRef }: { line: Line; actions: readon
             <Sign scene={scene} icon={icon} size={15} />
           </span>
           <span className="relative flex min-w-0 flex-1 flex-col">
-            <span className="truncate text-[13.5px] leading-5">
+            <span className="truncate text-[13px] leading-5">
               {errand?.urgent ? <span style={{ color: INK.pencil }}>{head}</span> : head}
               {tail ? <span className="day-muted"> · {tail}</span> : null}
               {dueAt ? <span className="font-medium"> · {atLine(dueAt, now)}</span> : null}

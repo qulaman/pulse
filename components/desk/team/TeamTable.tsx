@@ -587,7 +587,7 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
   const visibleColumns = columns.filter((column) => width === 0 || width >= (ROOM[column.key] ?? 0));
 
   return (
-    <DeskPage>
+    <DeskPage width="full">
       <PageTitle
         title="Команда"
         actions={
@@ -635,7 +635,7 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
               value: "grid",
               label: (
                 <span className="inline-flex items-center gap-1.5" data-testid="desk-team-view-grid">
-                  <LayoutGrid size={14} strokeWidth={2.25} aria-hidden />
+                  <LayoutGrid size={14} aria-hidden />
                   Сетка
                 </span>
               ),
@@ -644,7 +644,7 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
               value: "list",
               label: (
                 <span className="inline-flex items-center gap-1.5" data-testid="desk-team-view-list">
-                  <List size={14} strokeWidth={2.25} aria-hidden />
+                  <List size={14} aria-hidden />
                   Список
                 </span>
               ),
@@ -845,7 +845,7 @@ function TeamTableView({ director, companyId, me, people, loading, failed, retry
 function ScreensLine({ screens, director }: { screens: readonly Person[]; director: boolean }) {
   return (
     <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] leading-5 text-muted" data-testid="desk-team-screens">
-      <Monitor size={15} strokeWidth={2} aria-hidden className="shrink-0" />
+      <Monitor size={16} aria-hidden className="shrink-0" />
       {screens.map((screen, index) => (
         <span key={screen.id} className="inline-flex min-w-0 items-center gap-1">
           {index === 0 ? <span>{screens.length > 1 ? "Экраны на стене:" : "Экран на стене:"}</span> : null}

@@ -143,7 +143,7 @@ export function PersonPeek({
           <Face person={person} size={48} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="desk-figure truncate text-[22px] leading-7" title={person.full_name}>
+          <p className="desk-figure truncate text-[20px] leading-7" title={person.full_name}>
             {person.full_name}
           </p>
           <p className="truncate text-[13px] leading-[18px] text-muted">
@@ -161,7 +161,7 @@ export function PersonPeek({
             const quiet = fact.value === 0;
             const body = (
               <>
-                <dd className={`nums desk-figure whitespace-nowrap text-[22px] leading-[26px] ${quiet ? "text-muted/50" : ""}`} style={!quiet && fact.tone ? { color: TONE_VAR[fact.tone] } : undefined}>
+                <dd className={`nums desk-figure whitespace-nowrap text-[20px] leading-[26px] ${quiet ? "text-muted/50" : ""}`} style={!quiet && fact.tone ? { color: TONE_VAR[fact.tone] } : undefined}>
                   {formatNum(fact.value)}
                 </dd>
                 <dt className="truncate text-[12px] leading-4 text-muted">{fact.label}</dt>

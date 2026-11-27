@@ -436,7 +436,7 @@ export function NotesDesk({ children }: { children: ReactNode }) {
       <div className="nb desk-page absolute inset-0 !max-w-none !pb-5" data-testid="desk-notes">
         <header className="nb-head">
           <div className="desk-page-title nb-title">
-            <h1 className="font-display text-[28px] font-bold leading-[34px] tracking-[-0.025em]">Заметки</h1>
+            <h1 className="font-display text-[28px] font-semibold leading-[34px] tracking-[-0.025em]">Заметки</h1>
             <span className="nb-private" title="Заметки видите только вы">
               <NoteIcon name="lock" size={12} />
               только вам

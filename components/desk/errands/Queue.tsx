@@ -175,7 +175,7 @@ export type PillTone = "sky" | "warn" | "pencil" | "quiet" | "ok";
 export function WaitPill({ text, tone, title = "Сколько ждёт директор" }: { text: string; tone: PillTone; title?: string }) {
   return (
     <span className="stoika-wait nums" data-tone={tone} title={title}>
-      <Timer size={12} strokeWidth={2.5} aria-hidden />
+      <Timer size={12} aria-hidden />
       {/* «только что» is the list's word; the pill wants the short one */}
       {text === "только что" ? "сейчас" : text}
     </span>
@@ -186,7 +186,7 @@ export function WaitPill({ text, tone, title = "Сколько ждёт дире
 function AlarmTile({ size }: { size: number }) {
   return (
     <span aria-hidden className="errands-tile stoika-alarm-tile" style={{ width: size, height: size }}>
-      <Siren size={Math.round(size * 0.5)} strokeWidth={2.25} />
+      <Siren size={Math.round(size * 0.5)} />
     </span>
   );
 }
@@ -425,14 +425,14 @@ function HandRow({
             data-eta-for={errand.id}
             title="Сказать директору, когда будет (1–4)"
           >
-            <Clock3 size={15} strokeWidth={2.25} aria-hidden />
+            <Clock3 size={16} aria-hidden />
             <span className="stoika-move-word">Будет через…</span>
             <Cap>1–4</Cap>
           </button>
         ) : null}
         {!asking && !alarm ? (
           <button type="button" className="stoika-second stoika-ghost desk-focus" onClick={(event) => moves.ask(event.currentTarget)} data-testid="desk-errand-ask-open" data-ask-for={errand.id} title="Уточнить у директора (Q)">
-            <MessageCircleQuestion size={15} strokeWidth={2.25} aria-hidden />
+            <MessageCircleQuestion size={16} aria-hidden />
             <span className="stoika-move-word">Уточнить</span>
             <Cap>Q</Cap>
           </button>
@@ -467,7 +467,7 @@ function ResultRow({ errand, catalogue, chosen, busy, onSend, onDismiss, onOpen 
       data-errand-id={errand.id}
     >
       <span className="stoika-wait" data-tone="ok">
-        <Check size={12} strokeWidth={2.75} aria-hidden />
+        <Check size={12} aria-hidden />
         готово
       </span>
       <span className="stoika-row-tile">
@@ -501,7 +501,7 @@ function ResultRow({ errand, catalogue, chosen, busy, onSend, onDismiss, onOpen 
                 </button>
               ))}
               <button type="button" onClick={() => setTyping(true)} className="stoika-ghost desk-focus">
-                <PenLine size={13} strokeWidth={2.25} aria-hidden />
+                <PenLine size={14} aria-hidden />
                 Своими словами
               </button>
             </>
@@ -522,7 +522,7 @@ function ResultRow({ errand, catalogue, chosen, busy, onSend, onDismiss, onOpen 
 function LandingSlot() {
   return (
     <div className="stoika-slot" data-testid="stoika-slot">
-      <CheckCheck size={16} strokeWidth={2.25} aria-hidden />
+      <CheckCheck size={16} aria-hidden />
       <span className="min-w-0 flex-1 truncate">Новых просьб нет — придёт, встанет сюда и прозвенит</span>
       <span className="stoika-slot-keys" aria-label="Клавиши: Enter — принять, N — не могу, Q — уточнить">
         <Kbd>Enter</Kbd>

@@ -81,7 +81,7 @@ export function UrgentSwitch({ on, onChange, size = "line" }: { on: boolean; onC
         data-size={size}
         className="tasks-urgent desk-focus flex shrink-0 items-center gap-1.5 text-[13px] font-medium leading-none"
       >
-        <Flame aria-hidden size={14} strokeWidth={2.2} />
+        <Flame aria-hidden size={14} />
         Срочно
       </button>
     </Tooltip>
@@ -183,14 +183,14 @@ export function EntityEditor({
           onFocus={() => setRemoving(true)}
           onBlur={() => setRemoving(false)}
           data-testid="desk-entity-remove"
-          className="tasks-remove desk-focus -mr-1.5 flex h-6 items-center gap-1 rounded-[2px] px-1.5 text-[13px] leading-none text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-danger"
+          className="tasks-remove desk-focus -mr-1.5 flex h-6 items-center gap-1 rounded-[2px] px-1.5 text-[13px] leading-none text-muted transition-colors duration-[140ms] hover:bg-surface-2 hover:text-danger"
         >
-          <X aria-hidden size={13} strokeWidth={2.4} className="tasks-ico" />
+          <X aria-hidden size={14} className="tasks-ico" />
           Убрать
         </button>
       </header>
 
-      <div className="tasks-entity-body flex flex-col gap-1 transition-opacity duration-[120ms]" style={{ opacity: removing ? 0.35 : 1 }}>
+      <div className="tasks-entity-body flex flex-col gap-1 transition-opacity duration-[140ms]" style={{ opacity: removing ? 0.35 : 1 }}>
         {hasAssignee(entity) ? (
           <Field label="Кому" align={ambiguous && candidates.length > 0 ? "start" : "center"}>
             <PersonField
@@ -211,7 +211,7 @@ export function EntityEditor({
                     key={candidate.user_id}
                     type="button"
                     onClick={() => ctx.onPickAssignee(index, { id: candidate.user_id, full_name: candidate.full_name })}
-                    className="desk-focus flex h-7 items-center gap-1.5 rounded-[2px] border border-border px-2 text-[13px] font-medium leading-4 transition-colors duration-[120ms] hover:bg-surface-2"
+                    className="desk-focus flex h-7 items-center gap-1.5 rounded-[2px] border border-border px-2 text-[13px] font-medium leading-4 transition-colors duration-[140ms] hover:bg-surface-2"
                   >
                     {ctx.digitsFor === index ? <Kbd>{at + 1}</Kbd> : null}
                     <span aria-hidden className="tasks-ico tasks-candidate-face">

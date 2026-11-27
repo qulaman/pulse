@@ -63,7 +63,7 @@ function NameCheckBlock({ people, matching, lockedIds, onAdded }: { people: Rost
     <Strip title="Проверить имя" about="как говорите вслух, в любом падеже — что поймёт ИИ">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
       <label className="dict-check-field relative flex items-center">
-        <Search size={15} strokeWidth={2} aria-hidden className="dict-check-icon pointer-events-none absolute left-3 hidden text-muted" />
+        <Search size={16} aria-hidden className="dict-check-icon pointer-events-none absolute left-3 hidden text-muted" />
         <input
           type="search"
           value={spoken}
@@ -79,7 +79,7 @@ function NameCheckBlock({ people, matching, lockedIds, onAdded }: { people: Rost
       {result ? (
         <div role="status" className="dict-verdict flex min-w-0 flex-1 items-center gap-2" data-kind={result.kind}>
           <span aria-hidden className="dict-verdict-icon hidden">
-            {result.kind === "sure" ? <CircleCheck size={16} strokeWidth={2.25} /> : result.kind === "none" ? <CircleSlash size={16} strokeWidth={2.25} /> : <CircleHelp size={16} strokeWidth={2.25} />}
+            {result.kind === "sure" ? <CircleCheck size={16} /> : result.kind === "none" ? <CircleSlash size={16} /> : <CircleHelp size={16} />}
           </span>
           <p className="min-w-0 flex-1 text-[13px] leading-[18px]">
             {result.kind === "sure" ? (
@@ -164,7 +164,7 @@ function MisheardBlock({ items, lockedIds, onAdded }: { items: Misheard[]; locke
               onClick={() => dismiss.mutate([item.key])}
               className="dict-x flex h-6 w-6 shrink-0 items-center justify-center text-muted hover:bg-surface-2 hover:text-text"
             >
-              <X size={14} strokeWidth={2.25} aria-hidden />
+              <X size={14} aria-hidden />
             </button>
           </li>
         ))}

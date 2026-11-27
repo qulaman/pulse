@@ -89,7 +89,7 @@ html[data-surface="desk"] {
     color: var(--rd-ink-2);
 
     [data-tone="danger"] {
-      font-weight: 600;
+      font-weight: 500;
       color: var(--rd-miss-deep);
     }
     [data-tone="muted"] {
@@ -103,8 +103,8 @@ html[data-surface="desk"] {
     margin-right: -6px;
   }
   .rep-diary-month-name {
-    font-size: 15px;
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 500;
     line-height: 20px;
     color: var(--rd-ink);
   }
@@ -127,16 +127,16 @@ html[data-surface="desk"] {
     width: 100%;
     height: 40px;
     place-items: center;
-    border-radius: 7px;
+    border-radius: 6px;
     background: transparent;
     box-shadow: inset 0 0 0 1px var(--rd-rule);
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 16px;
     color: var(--rd-ink);
     transition:
-      background-color 120ms linear,
-      box-shadow 120ms linear;
+      background-color 140ms linear,
+      box-shadow 140ms linear;
 
     &[data-state="out"] {
       visibility: hidden;
@@ -193,7 +193,7 @@ html[data-surface="desk"] {
     position: absolute;
     top: 4px;
     left: 5px;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 500;
     line-height: 10px;
     color: var(--rd-ink-3);
@@ -263,7 +263,7 @@ html[data-surface="desk"] {
   .rep-diary-date {
     border-radius: 4px;
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 18px;
     color: var(--rd-ink);
     white-space: nowrap;
@@ -287,12 +287,12 @@ html[data-surface="desk"] {
     }
   }
   .rep-diary-fresh {
-    font-weight: 600;
+    font-weight: 500;
     color: var(--rd-pen-deep);
   }
   .rep-diary-missed {
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 18px;
     color: var(--rd-miss-deep);
     white-space: nowrap;
@@ -333,7 +333,7 @@ html[data-surface="desk"] {
     font-size: 13px;
     line-height: 18px;
     color: var(--rd-ink);
-    transition: background-color 100ms linear;
+    transition: background-color 80ms linear;
 
     &:hover {
       background: var(--rd-hover);

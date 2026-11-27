@@ -148,9 +148,9 @@ function ActionsTable({ actions, onChange }: { actions: Action[]; onChange: (act
                   title="Выше · Alt ↑"
                   disabled={index === 0}
                   onClick={() => move(index, index - 1, "label")}
-                  className="set-icon-button flex h-7 w-7 items-center justify-center opacity-0 transition-opacity duration-[120ms] hover:bg-surface-2 hover:text-text focus-visible:opacity-100 disabled:!opacity-0 group-hover:opacity-100"
+                  className="set-icon-button flex h-7 w-7 items-center justify-center opacity-0 transition-opacity duration-[140ms] hover:bg-surface-2 hover:text-text focus-visible:opacity-100 disabled:!opacity-0 group-hover:opacity-100"
                 >
-                  <ChevronUp size={15} strokeWidth={2.25} aria-hidden />
+                  <ChevronUp size={16} aria-hidden />
                 </button>
                 <button
                   type="button"
@@ -158,9 +158,9 @@ function ActionsTable({ actions, onChange }: { actions: Action[]; onChange: (act
                   title="Ниже · Alt ↓"
                   disabled={index === actions.length - 1}
                   onClick={() => move(index, index + 1, "label")}
-                  className="set-icon-button flex h-7 w-7 items-center justify-center opacity-0 transition-opacity duration-[120ms] hover:bg-surface-2 hover:text-text focus-visible:opacity-100 disabled:!opacity-0 group-hover:opacity-100"
+                  className="set-icon-button flex h-7 w-7 items-center justify-center opacity-0 transition-opacity duration-[140ms] hover:bg-surface-2 hover:text-text focus-visible:opacity-100 disabled:!opacity-0 group-hover:opacity-100"
                 >
-                  <ChevronDown size={15} strokeWidth={2.25} aria-hidden />
+                  <ChevronDown size={16} aria-hidden />
                 </button>
                 <button
                   type="button"
@@ -169,7 +169,7 @@ function ActionsTable({ actions, onChange }: { actions: Action[]; onChange: (act
                   onClick={() => onChange(actions.filter((_, i) => i !== index))}
                   className="set-icon-button flex h-7 w-7 items-center justify-center hover:bg-surface-2 hover:text-danger"
                 >
-                  <X size={15} strokeWidth={2.25} aria-hidden />
+                  <X size={16} aria-hidden />
                 </button>
               </span>
             </div>
@@ -177,7 +177,7 @@ function ActionsTable({ actions, onChange }: { actions: Action[]; onChange: (act
         })}
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <Button size="sm" variant="secondary" disabled={actions.length >= ACTIONS_MAX} onClick={add} icon={<Plus size={15} strokeWidth={2.25} />}>
+        <Button size="sm" variant="secondary" disabled={actions.length >= ACTIONS_MAX} onClick={add} icon={<Plus size={16} />}>
           Кнопка
         </Button>
         <span className="flex items-center gap-1 text-[12px] leading-4 text-muted">
@@ -218,7 +218,7 @@ function KeypadPicture({ actions }: { actions: readonly Action[] }) {
                 </span>
                 <span className="pult-key-word">
                   <span className="truncate">{action.label}</span>
-                  {isDndAction(action) ? <ChevronDown size={14} strokeWidth={2.5} className="shrink-0" /> : null}
+                  {isDndAction(action) ? <ChevronDown size={14} className="shrink-0" /> : null}
                 </span>
                 <span className="pult-key-note">{isDndAction(action) ? "на сколько?" : " "}</span>
               </div>
@@ -353,8 +353,8 @@ function OptionsTab() {
 function SettingsBone({ view }: { view: "buttons" | "settings" }) {
   return (
     <SkeletonGroup className={view === "buttons" ? "sec-buttons" : "sec-options"} aria-hidden>
-      <Bone h={view === "buttons" ? 360 : 132} className="!rounded-[14px]" />
-      <Bone h={view === "buttons" ? 240 : 156} className="!rounded-[14px]" />
+      <Bone h={view === "buttons" ? 360 : 132} className="!rounded-[12px]" />
+      <Bone h={view === "buttons" ? 240 : 156} className="!rounded-[12px]" />
     </SkeletonGroup>
   );
 }

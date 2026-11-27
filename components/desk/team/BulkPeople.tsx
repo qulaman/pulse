@@ -254,7 +254,7 @@ export function BulkPeople({ editor, people, onBusy }: { editor: Role; people: r
     <div className="bulk flex flex-col gap-5" onKeyDown={onKeyDown} data-testid="bulk-people">
       <section className="bulk-paste flex flex-col gap-2">
         <label htmlFor="bulk-text" className="bulk-paste-label">
-          <ClipboardPaste size={15} strokeWidth={2} aria-hidden />
+          <ClipboardPaste size={16} aria-hidden />
           Строки из Excel или текста
         </label>
         <textarea

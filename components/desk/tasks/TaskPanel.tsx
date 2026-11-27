@@ -167,12 +167,12 @@ export function TaskPanel({
     <div ref={root} tabIndex={-1} className="flex flex-col outline-none" data-testid="desk-task-panel" data-task-id={taskId} data-desk-task={taskId} data-editing={desk.editing ? "" : undefined}>
       {next ? (
         <div className="tasks-next mb-3 mr-9 flex items-baseline gap-2 border-b border-border pb-2 text-[13px] leading-5" data-testid="desk-panel-next">
-          <CircleCheck aria-hidden size={15} strokeWidth={2.2} className="tasks-ico tasks-next-icon shrink-0 self-center" />
+          <CircleCheck aria-hidden size={16} className="tasks-ico tasks-next-icon shrink-0 self-center" />
           <span className="font-semibold">Готово</span>
           {next.id ? (
             <button type="button" onClick={next.onGo} className="ml-auto inline-flex items-center gap-1 font-medium text-accent hover:underline" data-testid="desk-panel-next-go">
               следующая
-              <ArrowRight aria-hidden size={14} strokeWidth={2.2} className="tasks-ico" />
+              <ArrowRight aria-hidden size={14} className="tasks-ico" />
             </button>
           ) : (
             <span className="ml-auto text-muted">в списке пусто</span>
@@ -197,7 +197,7 @@ export function TaskPanel({
           <TaskAbout desk={desk} />
 
           <h3 className="tasks-thread-head desk-label flex items-center gap-2 uppercase">
-            <MessagesSquare aria-hidden size={14} strokeWidth={2} className="tasks-ico" />
+            <MessagesSquare aria-hidden size={14} className="tasks-ico" />
             Переписка
             {said > 0 ? <span className="tasks-count nums">{said}</span> : null}
           </h3>

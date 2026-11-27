@@ -194,7 +194,7 @@ function PushSetting({ director }: { director: boolean }) {
       <div className="flex flex-col gap-2">
         <div className="profile-device">
           <span className="profile-device-icon" aria-hidden>
-            <Bell size={18} strokeWidth={2} />
+            <Bell size={20} />
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-[14px] font-medium leading-5">Этот компьютер</p>
@@ -219,7 +219,7 @@ function ActionSoundSetting() {
   return (
     <div className="profile-device" data-testid="desk-profile-action-sound">
       <span className="profile-device-icon" aria-hidden>
-        <MousePointerClick size={18} strokeWidth={2} />
+        <MousePointerClick size={20} />
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-[14px] font-medium leading-5">Звуки действий</p>
@@ -253,7 +253,7 @@ function SoundSetting({ director }: { director: boolean }) {
   return (
     <div className="profile-device" data-testid="desk-profile-sound">
       <span className="profile-device-icon" aria-hidden>
-        {sound ? <Volume2 size={18} strokeWidth={2} /> : <VolumeX size={18} strokeWidth={2} />}
+        {sound ? <Volume2 size={20} /> : <VolumeX size={20} />}
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-[14px] font-medium leading-5">Звук, пока открыт Pulse</p>
@@ -284,7 +284,7 @@ function OthersSetting({ userId }: { userId: string }) {
   const { open, error, pending, ask, close, submit } = useSignOutOthers(userId);
   return (
     <ProfileRow label="Другие устройства" hint="Телефон забыт дома, планшет отдан — вход закроется везде, кроме этого компьютера" testId="desk-profile-others">
-      <Button size="sm" variant="secondary" icon={<MonitorSmartphone size={15} strokeWidth={2} aria-hidden />} onClick={ask}>
+      <Button size="sm" variant="secondary" icon={<MonitorSmartphone size={16} aria-hidden />} onClick={ask}>
         Выйти на других устройствах
       </Button>
       <Dialog open={open} onClose={close} title="Выйти на других устройствах?" width="sm">
@@ -352,7 +352,7 @@ function SignOutSetting({ action, userId }: { action: () => Promise<void>; userI
 
   return (
     <ProfileRow label="Выйти из аккаунта" hint="Задачи, сообщения и очки останутся на месте" testId="desk-profile-signout">
-      <Button size="sm" variant="secondary" icon={<LogOut size={15} strokeWidth={2} aria-hidden />} onClick={show}>
+      <Button size="sm" variant="secondary" icon={<LogOut size={16} aria-hidden />} onClick={show}>
         Выйти
       </Button>
       <Dialog open={open} onClose={() => !pending && setOpen(false)} title="Выйти из аккаунта?" width="sm">
@@ -393,7 +393,7 @@ function ViewSettings({ role }: { role: Role }) {
         <ProfileRow
           label={
             <span className="inline-flex items-center gap-2">
-              <PanelLeft size={15} strokeWidth={2} className="text-muted" aria-hidden />
+              <PanelLeft size={16} className="text-muted" aria-hidden />
               Боковая навигация
             </span>
           }
@@ -425,7 +425,7 @@ function ViewSettings({ role }: { role: Role }) {
         <ProfileRow
           label={
             <span className="inline-flex items-center gap-2">
-              <Smartphone size={15} strokeWidth={2} className="text-muted" aria-hidden />
+              <Smartphone size={16} className="text-muted" aria-hidden />
               Телефонная версия
             </span>
           }
@@ -493,7 +493,7 @@ export function ProfileDesk({
               director ? (
                 <Link href={`/desk/team/${userId}`} className="profile-link">
                   Открыть карточку
-                  <ArrowRight size={14} strokeWidth={2.25} aria-hidden />
+                  <ArrowRight size={14} aria-hidden />
                 </Link>
               ) : null
             }

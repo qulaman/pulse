@@ -1,6 +1,5 @@
 "use client";
 
-import { AppWindow, BookText, BrainCircuit, Building2, Database, FlaskConical, Sparkles, Users, type LucideIcon } from "lucide-react";
 import { motion } from "motion/react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -11,6 +10,7 @@ import { useDeskScope } from "@/components/desk/DeskScope";
 import { BrandDraftProvider, useBrandDraft } from "@/components/desk/settings/brand";
 import { entryHref, searchSettings, type SettingEntry } from "@/components/desk/settings/search";
 import { DeskLinks, goDesk } from "@/components/desk/ui/DeskLinks";
+import { DeskIcon, type DeskIconName } from "@/components/desk/ui/icons";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SearchField } from "@/components/desk/ui/Toolbar";
@@ -54,16 +54,16 @@ function walkNav(event: KeyboardEvent<HTMLElement>) {
   items[(at + (event.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
 }
 
-/** The icon beside each section's name (D-174). */
-const NAV_ICON: Record<string, LucideIcon> = {
-  company: Building2,
-  app: AppWindow,
-  team: Users,
-  ai: BrainCircuit,
-  dictionary: BookText,
-  lab: FlaskConical,
-  data: Database,
-  points: Sparkles,
+/** The page's own sign beside its name (D-214): the desk's set, as in the side navigation. */
+const NAV_ICON: Record<string, DeskIconName> = {
+  company: "company",
+  app: "program",
+  team: "team",
+  ai: "model",
+  dictionary: "dictionary",
+  lab: "lab",
+  data: "data",
+  points: "shop",
 };
 
 /** The chosen item's plate glides from the last one: the toolbar's spring, no overshoot (D-171). */
@@ -99,7 +99,7 @@ function NavItem({
       data-dirty={dirty ? "" : undefined}
       title={keyHint ? `${label} · ${keyHint}` : label}
       // an icon, and a plate with the accent's rail gliding to the chosen one (settings.css)
-      className={`set-nav-item group relative flex h-8 items-center gap-2.5 text-[14px] leading-5 outline-none transition-colors duration-[120ms] focus-visible:ring-2 focus-visible:ring-accent/45 ${
+      className={`set-nav-item group relative flex h-8 items-center gap-2.5 text-[14px] leading-5 outline-none transition-colors duration-[140ms] focus-visible:ring-2 focus-visible:ring-accent/45 ${
         active ? "font-semibold text-text" : "text-muted hover:text-text"
       }`}
     >
@@ -108,7 +108,7 @@ function NavItem({
           <span className="set-nav-rail absolute inset-y-1 -left-3 w-[2px] bg-accent" />
         </motion.span>
       ) : null}
-      {Icon ? <Icon size={16} strokeWidth={2} aria-hidden className="set-nav-icon relative shrink-0" /> : null}
+      {Icon ? <DeskIcon name={Icon} size={18} className="set-nav-icon relative shrink-0" /> : null}
       <span className="relative min-w-0 flex-1 truncate">{label}</span>
       {dirty ? (
         <span className="relative">
@@ -135,7 +135,7 @@ function Results({ results, at, onPick, onHover }: { results: SettingEntry[]; at
             tabIndex={-1}
             onMouseEnter={() => onHover(index)}
             onClick={() => onPick(entry)}
-            className={`flex w-full flex-col py-1 text-left transition-colors duration-[120ms] ${index === at ? "bg-surface-2 text-text" : "hover:bg-surface-2/60"}`}
+            className={`flex w-full flex-col py-1 text-left transition-colors duration-[140ms] ${index === at ? "bg-surface-2 text-text" : "hover:bg-surface-2/60"}`}
           >
             <span className="text-[13px] font-medium leading-[18px]">{entry.title}</span>
             <span className="text-[12px] leading-4 text-muted">{entry.place}</span>

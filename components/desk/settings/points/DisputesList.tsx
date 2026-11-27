@@ -43,7 +43,7 @@ function DisputeCard({ item, avatar, index }: { item: OpenDispute; avatar: strin
       </div>
       <p className="pts-dispute-reason text-[13px] leading-[18px] text-muted">за что: {item.tx?.reason ?? "—"}</p>
       <blockquote className="pts-dispute-quote text-[14px] leading-5">
-        <Quote size={14} strokeWidth={2} aria-hidden className="pts-dispute-mark" />
+        <Quote size={14} aria-hidden className="pts-dispute-mark" />
         «{item.text}»
       </blockquote>
       <div className="pts-dispute-moves flex items-center gap-2">
@@ -62,7 +62,7 @@ function DisputeCard({ item, avatar, index }: { item: OpenDispute; avatar: strin
           disabled={busy}
           onClick={() => resolve.mutate({ id: item.id, refund: true, answer: answer.trim() })}
           data-testid="dispute-refund"
-          icon={<Undo2 size={14} strokeWidth={2.25} />}
+          icon={<Undo2 size={14} />}
         >
           Вернуть {formatNum(Math.abs(amount))}
         </Button>
