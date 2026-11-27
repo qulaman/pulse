@@ -37,8 +37,11 @@ export async function deskDevTools(): Promise<boolean> {
  * The tab bar a layout draws, decided on the server so the first paint already has every tab
  * (D-113 §7): the role's bar and, while the company tests, «Лаб» on the team's bar (D-150).
  * `lab` only adds a tab to the team's bar — the director's and the secretary's carry it anyway.
+ * `reports` — «Отчёты» on the bar of whoever hands the daily report in, while the company has the
+ * reports on (D-219); from the same cached company row.
  */
-export async function tabScope(profile: SessionProfile): Promise<{ role: TabBarRole; lab: boolean }> {
+export async function tabScope(profile: SessionProfile): Promise<{ role: TabBarRole; lab: boolean; reports: boolean }> {
   const role = tabBarRole(profile.role);
-  return { role, lab: role === "employee" && (await labOpen(profile)) };
+  const reports = isTeamRole(profile.role) && (await loadBrand(profile.companyId)).reportsEnabled;
+  return { role, lab: role === "employee" && (await labOpen(profile)), reports };
 }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { MyReportView } from "@/components/daily-report/MyReportView";
+import { MyTabel } from "@/components/daily-report/MyTabel";
 import type { Pop } from "@/components/daily-report/PointsPop";
 import { ReportSkeleton } from "@/components/daily-report/Skeletons";
 import { LoadFailed } from "@/components/daily-report/TeamDayPanel";
@@ -12,9 +13,10 @@ import { isNetworkError } from "@/lib/net";
 import { useNow } from "@/lib/useNow";
 
 /**
- * «Отчёт за день» (D-152): the data and the submit; the screen itself is `MyReportView`, which
- * takes everything as props. The day and the past days are live: a director's «Просмотрено» /
- * «Проверено» lands without a reload (D-198).
+ * «Отчёт за день» (D-152) — the tab «Отчёты» of the team's bar (D-219): the data and the submit;
+ * the screen itself is `MyReportView`, which takes everything as props, the month's «Табель» —
+ * `MyTabel`. The day and the past days are live: a director's «Просмотрено» / «Проверено» lands
+ * without a reload (D-198).
  */
 export default function ReportPage() {
   const day = useMyDailyReport();
@@ -49,6 +51,7 @@ export default function ReportPage() {
       now={now}
       waiting={waiting}
       pop={pop}
+      tabel={<MyTabel day={day.data} />}
       onSubmit={(input) =>
         submit.mutate(input, {
           // game feel after the write, over the screen (принцип 1a)

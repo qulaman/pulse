@@ -15,6 +15,18 @@ describe("backTarget (D-113): «Назад» on every screen that is not a tab's
     }
     // the team's «Лаб» while the company tests stays a tab (D-150)
     expect(backTarget("employee", "/lab", true)).toBeNull();
+    // «Отчёты» is a tab of the team's bar while the company has the reports on (D-219)
+    expect(backTarget("employee", "/report", false, true)).toBeNull();
+    expect(backTarget("employee", "/report", true, true)).toBeNull();
+    expect(backTarget("secretary", "/report", false, true)).toBeNull();
+    // and the other tabs stay tabs beside it
+    for (const path of ["/feed", "/tasks", "/calendar", "/rating", "/profile"]) {
+      expect(backTarget("employee", path, false, true)).toBeNull();
+    }
+  });
+
+  it("gives the director's bar no «Отчёты» — the director hands no report in", () => {
+    expect(backTarget("director", "/report", false, true)).toBe("/pulse");
   });
 
   it("leads the director's nested screens to the tab they open from", () => {
@@ -35,7 +47,9 @@ describe("backTarget (D-113): «Назад» on every screen that is not a tab's
     expect(backTarget("secretary", "/people/new")).toBe("/profile");
     // her requests live on Лента's ball «Заявки» (D-87): their list leads back there
     expect(backTarget("secretary", "/secretary")).toBe("/feed");
-    expect(backTarget("secretary", "/report")).toBe("/tasks");
+    // with the reports off the bar has no «Отчёты»: the past reports open from «Профиль → Мои отчёты»
+    expect(backTarget("secretary", "/report")).toBe("/profile");
+    expect(backTarget("employee", "/report")).toBe("/profile");
     expect(backTarget("employee", "/shop")).toBe("/rating");
     expect(backTarget("employee", "/ether")).toBe("/feed");
     expect(backTarget("employee", "/somewhere")).toBe("/feed");

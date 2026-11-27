@@ -220,6 +220,12 @@
   font-weight: 700;
   color: var(--accent);
 }
+/* seven tabs — the team's bar with «Отчёты» (D-219) and «Лаб» (D-150): a column is ~47–51 px, so
+   the words are set a size smaller and «Календарь» still stays clear of its neighbours */
+.capsule[data-dense] .label {
+  font-size: 9.5px;
+  letter-spacing: -0.03em;
+}
 /* folded while reading: the icons alone, the words step down and back when it opens */
 .capsule[data-folded] .label {
   opacity: 0;

@@ -81,6 +81,14 @@ const ICONS = {
       <line x1="7.5" y1="15" x2="16.5" y2="15" />
     </svg>
   ),
+  // the clipboard of «Отчёт за день» (components/daily-report/icons.tsx), ticked
+  report: (
+    <svg width="24" height="24" viewBox="0 0 24 24" {...stroke} aria-hidden>
+      <rect x="5" y="4.5" width="14" height="16.5" rx="2.6" />
+      <path d="M9 4.5V3.4h6v1.1" />
+      <polyline points="8.8,13 11.2,15.4 15.4,10.6" />
+    </svg>
+  ),
 };
 
 /**
@@ -92,6 +100,13 @@ const LAB_TAB: Tab = { href: "/lab", label: "Лаб", icon: ICONS.lab };
 
 /** «Календарь» (D-78): one screen for every role, so both bars carry the same tab. */
 const CALENDAR_TAB: Tab = { href: "/calendar", label: "Календарь", icon: ICONS.calendar };
+
+/**
+ * «Отчёты» (D-219): the person's own daily reports — today's form, the month's табель, the past
+ * days. On the bar of whoever hands the report in, while the company has the reports on (`tabsOf`).
+ * It stands after «Календарь»: the longest word keeps a short neighbour on its other side.
+ */
+const REPORT_TAB: Tab = { href: "/report", label: "Отчёты", icon: ICONS.report };
 
 /**
  * Пульс is the mascot's home, for every role: its icon is the mark's small self (D-209) — not a chat
@@ -151,8 +166,9 @@ const SECTIONS: Record<TabRole, Record<string, string>> = {
     "/ether": "/pulse",
     "/confirm": "/pulse",
   },
-  // the daily report (D-152) lives in «Дела»
-  employee: { "/ether": "/feed", "/shop": "/rating", "/report": "/tasks" },
+  // the daily report (D-152) is a tab of its own (D-219); with the reports off the bar has none,
+  // and the past reports open from «Профиль → Мои отчёты»
+  employee: { "/ether": "/feed", "/shop": "/rating", "/report": "/profile" },
   // the secretary's requests are her Лента's ball «Заявки» (D-79, D-87): their list — where a push
   // about a request lands — lights Лента and «Назад» leads there, not to the admin screens of «Профиль»
   secretary: {
@@ -162,18 +178,35 @@ const SECTIONS: Record<TabRole, Record<string, string>> = {
     "/secretary": "/feed",
     "/settings": "/profile",
     "/lab": "/profile",
-    "/report": "/tasks",
+    "/report": "/profile",
   },
 };
 
-/** The role's tabs; `lab` — the company is testing, so the team's bar carries «Лаб» too (D-150). */
-function tabsOf(role: TabRole, lab: boolean): Tab[] {
-  return lab && role === "employee" ? [...TABS.employee, LAB_TAB] : TABS[role];
+/** The bars as drawn, one array per variant: the effects that read `tabs` see the same one every render. */
+const BARS = new Map<string, Tab[]>();
+
+/**
+ * The role's tabs. `lab` — the company is testing, so the team's bar carries «Лаб» too (D-150);
+ * `reports` — the company has the daily reports on, so the bar of whoever hands one in carries
+ * «Отчёты» after «Календарь» (D-219). The director's bar takes neither.
+ */
+function tabsOf(role: TabRole, lab: boolean, reports: boolean): Tab[] {
+  if (role === "director") return TABS.director;
+  const withLab = lab && role === "employee";
+  if (!withLab && !reports) return TABS[role];
+  const key = `${role}|${withLab}|${reports}`;
+  let tabs = BARS.get(key);
+  if (!tabs) {
+    tabs = TABS[role].flatMap((tab) => (reports && tab === CALENDAR_TAB ? [tab, REPORT_TAB] : [tab]));
+    if (withLab) tabs.push(LAB_TAB);
+    BARS.set(key, tabs);
+  }
+  return tabs;
 }
 
 /** The lit tab and whether the screen is that tab's own (`page`) or lives inside it. */
-function activeTab(role: TabRole, pathname: string, lab: boolean): { index: number; own: boolean } {
-  const tabs = tabsOf(role, lab);
+function activeTab(role: TabRole, pathname: string, lab: boolean, reports: boolean): { index: number; own: boolean } {
+  const tabs = tabsOf(role, lab, reports);
   const within = (base: string) => pathname === base || pathname.startsWith(`${base}/`);
   const own = tabs.findIndex((tab) => within(tab.href));
   if (own >= 0) return { index: own, own: true };
@@ -186,10 +219,10 @@ function activeTab(role: TabRole, pathname: string, lab: boolean): { index: numb
  * way back; anywhere else — the tab the screen lives in (the one the bar lights), or the
  * first tab, the home screen, when it lives in none.
  */
-export function backTarget(role: TabRole, pathname: string, lab = false): string | null {
-  const tabs = tabsOf(role, lab);
+export function backTarget(role: TabRole, pathname: string, lab = false, reports = false): string | null {
+  const tabs = tabsOf(role, lab, reports);
   if (tabs.some((tab) => tab.href === pathname)) return null;
-  const { index } = activeTab(role, pathname, lab);
+  const { index } = activeTab(role, pathname, lab, reports);
   return tabs[index >= 0 ? index : 0].href;
 }
 
@@ -480,14 +513,14 @@ function useWarmTabData(role: TabRole) {
  * assistive tech — six tabs never truncate to «Кале…». Scrolling down folds the capsule.
  * Everything that docks above the bar sits at `--tabbar-space` and wears `.above-tabbar`.
  */
-export function TabBar({ role, lab = false }: { role: TabRole; lab?: boolean }) {
+export function TabBar({ role, lab = false, reports = false }: { role: TabRole; lab?: boolean; reports?: boolean }) {
   const pathname = usePathname();
   const badges = useTabBadges(role);
   const nav = useRef<HTMLElement>(null);
   const scrim = useRef<HTMLDivElement>(null);
   useFold(nav, pathname);
   useKeyboardAway(nav, scrim);
-  const tabs = tabsOf(role, lab);
+  const tabs = tabsOf(role, lab, reports);
 
   // the thumb answers the tap, not the network: it leaves before the next screen arrives.
   // The tap is forgotten once the route moves — back from «Дела» to «Лента» in the same
@@ -498,7 +531,7 @@ export function TabBar({ role, lab = false }: { role: TabRole; lab?: boolean }) 
     setTappedOn(pathname);
     setTapped(null);
   }
-  const route = activeTab(role, pathname, lab);
+  const route = activeTab(role, pathname, lab, reports);
   const index = tapped ?? route.index;
   // the column the markup draws the thumb on: the server's HTML is seen before any script
   // runs. From then on only useThumb moves it — React never writes `--i` again
@@ -525,6 +558,8 @@ export function TabBar({ role, lab = false }: { role: TabRole; lab?: boolean }) 
         ref={nav}
         aria-label="Основная навигация"
         className={styles.capsule}
+        // seven tabs (the team's bar with «Отчёты» and «Лаб»): the words are set a size smaller
+        data-dense={tabs.length > 6 ? "" : undefined}
         style={{ "--n": tabs.length } as CSSProperties}
       >
         <span

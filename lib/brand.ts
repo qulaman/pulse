@@ -20,6 +20,8 @@ export type Brand = {
   labForAll: boolean;
   /** `settings.dev_tools`: «Лаборатория» and «Данные», closed to a client. */
   devTools: boolean;
+  /** `settings.daily_report.enabled` (D-152): the team's bar carries «Отчёты» (D-219) — for the first paint. */
+  reportsEnabled: boolean;
 };
 
 /**
@@ -38,6 +40,7 @@ export const PRODUCT_BRAND: Brand = {
   pointsEnabled: false,
   labForAll: false,
   devTools: false,
+  reportsEnabled: false,
 };
 
 type CompanyRow = { id: string; name: string; settings: unknown };
@@ -104,5 +107,6 @@ function brandOf(data: CompanyRow): Brand {
     pointsEnabled: settings.points_enabled,
     labForAll: settings.lab_for_all,
     devTools: settings.dev_tools,
+    reportsEnabled: settings.daily_report.enabled,
   };
 }

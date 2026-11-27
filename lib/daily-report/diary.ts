@@ -156,7 +156,7 @@ export type MonthTally = {
  * fines started, which the табель's totals leave out — the line must agree with the squares under
  * it), one on a weekend stands apart, a missed day the director excused is not a miss.
  */
-export function monthTally(cells: readonly (DiaryCell | null)[][], rules: Pick<ReportRules, "workdays" | "holidays">): MonthTally {
+export function monthTally(cells: readonly (Pick<DiaryCell, "day" | "state"> | null)[][], rules: Pick<ReportRules, "workdays" | "holidays">): MonthTally {
   const tally: MonthTally = { submitted: 0, missed: 0, excused: 0, offDay: 0 };
   for (const cell of cells.flat()) {
     if (!cell) continue;

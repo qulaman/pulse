@@ -13,10 +13,11 @@ import {
 import { useCallback, useEffect, useMemo } from "react";
 
 import { toast } from "@/components/ui/Toast";
-import type { Ymd } from "@/lib/datetime/calendar";
+import { addDays, type Ymd } from "@/lib/datetime/calendar";
 import { ApiError, postJson } from "@/lib/api/client";
 import { isNetworkError } from "@/lib/net";
 import { outboxSize, subscribeOutbox } from "@/lib/outbox";
+import type { ReportPerson, ReportRules } from "@/lib/people/stats";
 import { useRealtimeListener, useRealtimeQuery, type RealtimeEvent } from "@/lib/realtime/useRealtimeQuery";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import { rpcJson } from "@/lib/supabase/rpc";
@@ -27,6 +28,7 @@ import { askFromOf, ASK_FROM_DEFAULT, reportDue, type ReportDue } from "./due";
 // a cycle (review.ts takes DailyReportFailure from here): both are used inside functions only
 import { patchIfReviewOnly } from "./review";
 import { DAILY_REPORT_ERROR_TEXT, errorCodeOf } from "./format";
+import { reportRulesOf } from "./rules";
 import {
   DAILY_REPORT_RPC,
   type DailyReport,
@@ -52,6 +54,11 @@ export const dailyReportKeys = {
   history: () => ["daily-report", "history"] as const,
   /** «Прошлые отчёты» a page at a time (D-198 «Показать ещё»), under `history()`. */
   historyPages: () => ["daily-report", "history", "pages"] as const,
+  /** The person's rows of one calendar month — the «Табель» of /report (D-219), under `history()`. */
+  historyMonths: () => ["daily-report", "history", "month"] as const,
+  historyMonth: (from: Ymd) => ["daily-report", "history", "month", from] as const,
+  /** The company's report rules and the person's own profile — what a day's state is read with (D-219). */
+  tabelContext: () => ["daily-report", "tabel-context"] as const,
   team: ["daily-report", "team"] as const,
   teamDay: (date: Ymd) => ["daily-report", "team", "day", date] as const,
   teamPeriod: (from: Ymd, to: Ymd) => ["daily-report", "team", "period", from, to] as const,
@@ -128,6 +135,8 @@ function patchMine(client: QueryClient, payload: RealtimeEvent<ReportRow>): void
   client.setQueryData<HistoryPages>(dailyReportKeys.historyPages(), (data) =>
     data ? { ...data, pages: data.pages.map((page) => page.map(patch)) } : data,
   );
+  // the months of the «Табель» hold the same reports (D-219)
+  client.setQueriesData<DailyReportHistoryItem[]>({ queryKey: dailyReportKeys.historyMonths() }, (rows) => rows?.map(patch));
   if (!known || content) refreshMine(client, false);
 }
 
@@ -150,6 +159,8 @@ function refreshMine(client: QueryClient, join: boolean): void {
     if (client.isMutating({ mutationKey: SUBMIT_KEY }) > 0) return;
     void client.invalidateQueries({ queryKey: dailyReportKeys.myDay() }, options);
     void client.invalidateQueries({ queryKey: dailyReportKeys.history() }, options);
+    // the morning's missed row comes with a new `checked_on`: the «Табель» reads its rules again (D-219)
+    void client.invalidateQueries({ queryKey: dailyReportKeys.tabelContext() }, options);
   });
 }
 
@@ -227,6 +238,58 @@ export function useMyDailyReportHistory(enabled = true): MyReportHistory {
     loadingMore: query.isFetchingNextPage,
     moreFailed: query.isFetchNextPageError,
   };
+}
+
+/** A calendar month holds at most this many days — one row a day. */
+const MONTH_ROWS = 31;
+
+/**
+ * The person's reports of one calendar month, for the «Табель» of /report (D-219): the same RPC as
+ * «Прошлые отчёты» — the rows strictly before the day after `to`, cut to the month — so a day says
+ * the same in both. Under `history()`: a submit, the morning's missed row and a director's mark
+ * reach it as they reach the past days. No last month kept on screen while the next one comes —
+ * its rows under another month's dates would read as a month of misses.
+ */
+export function useMyReportMonth(from: Ymd, to: Ymd, enabled = true) {
+  return useQuery({
+    queryKey: dailyReportKeys.historyMonth(from),
+    enabled: enabled && Boolean(from && to) && from <= to,
+    queryFn: async () => {
+      const rows = await read<DailyReportHistoryItem[] | null>(
+        createBrowserSupabase().rpc(DAILY_REPORT_RPC.history, { p_limit: MONTH_ROWS, p_before: addDays(to, 1) }),
+      );
+      return (rows ?? []).filter((row) => row.report_date >= from);
+    },
+  });
+}
+
+export type TabelContext = { rules: ReportRules; person: ReportPerson };
+
+/**
+ * What a day's state is read with (lib/daily-report/tabel.ts): the company's report rules —
+ * weekdays, holidays, when the reports started, the last day the morning tick closed — and the
+ * person's own joining day, role and availability. Straight under RLS, as `readFeedContext`:
+ * /api/settings is the director's and the secretary's only.
+ */
+async function readTabelContext(): Promise<TabelContext> {
+  const supabase = createBrowserSupabase();
+  const [company, session] = await Promise.all([
+    supabase.from("companies").select("daily_report:settings->daily_report").limit(1).maybeSingle(),
+    supabase.auth.getSession(),
+  ]);
+  if (company.error) throw new Error(company.error.message);
+  const userId = session.data.session?.user.id;
+  if (!userId) throw new Error("no session");
+  const profile = await supabase.from("profiles").select("is_active, role, availability, created_at").eq("id", userId).maybeSingle();
+  if (profile.error) throw new Error(profile.error.message);
+  if (!profile.data) throw new Error("no profile");
+  const rules = reportRulesOf((company.data as { daily_report?: unknown } | null)?.daily_report);
+  return { rules, person: profile.data as ReportPerson };
+}
+
+/** The rules and the person for the «Табель» (D-219); a settings save reads them again (the module's key). */
+export function useTabelContext(enabled = true) {
+  return useQuery({ queryKey: dailyReportKeys.tabelContext(), enabled, staleTime: 60_000, queryFn: readTabelContext });
 }
 
 /**

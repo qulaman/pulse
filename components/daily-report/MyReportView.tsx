@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
 
@@ -25,8 +25,8 @@ const MAX_FIELD_PX = 360;
 /**
  * «Отчёт за день» (D-152, D-198): the day and its state in the head, the tasks the day closed
  * (written in by themselves), «Что сделали», one button — «Сдать отчёт», later «Сохранить» while
- * the day lasts — and the past days below. No «Пришёл / Ушёл»: the report is the words, the tasks
- * and the moment it went (D-198). After the hand-in the director's marks stand under it, only those
+ * the day lasts — then the month's «Табель» (D-219) and the past days. No «Пришёл / Ушёл»: the report
+ * is the words, the tasks and the moment it went (D-198). After the hand-in the director's marks stand under it, only those
  * that happened. The data is the page's (`useMyDailyReport`).
  */
 export function MyReportView({
@@ -37,8 +37,11 @@ export function MyReportView({
   onSubmit,
   waiting = false,
   pop = null,
+  tabel,
 }: {
   day: MyDailyReportDay;
+  /** «Табель» — the person's month, between the form and the past days (D-219); the page's `MyTabel`. */
+  tabel?: ReactNode;
   /** Past days, newest first; undefined while they load. */
   history: readonly DailyReport[] | undefined;
   /** «Показать ещё» under the past days; absent — everything is here. */
@@ -73,6 +76,13 @@ export function MyReportView({
           <p className="mt-1 text-[14px] leading-[19px] text-muted">Директор включает их в настройках — тогда здесь появится форма</p>
         </div>
       )}
+
+      {tabel ? (
+        <>
+          <h2 className="eyebrow mt-8 px-1">Табель</h2>
+          {tabel}
+        </>
+      ) : null}
 
       <h2 className="eyebrow mt-8 px-1">Прошлые отчёты</h2>
       <div className="mt-2">{past ? <ReportHistory items={past} now={now} more={more} /> : <HistoryBone />}</div>

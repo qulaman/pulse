@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { RoleScope } from "@/components/RoleScope";
 import { TabBar } from "@/components/TabBar";
 import { profileOrLogin } from "@/lib/auth-layout";
-import { homeForRole, tabBarRole } from "@/lib/routes";
+import { tabScope } from "@/lib/lab/access";
+import { homeForRole } from "@/lib/routes";
 
 /**
  * The director's errands for the secretary (D-79). One route for both roles, like the shop
@@ -14,10 +15,12 @@ export default async function SecretaryLayout({ children }: { children: React.Re
   const profile = await profileOrLogin();
   if (profile.role !== "director" && profile.role !== "secretary") redirect(homeForRole(profile.role));
 
+  // the role's bar as every other layout draws it — the secretary's carries «Отчёты» (D-219)
+  const scope = await tabScope(profile);
   return (
     <div className="flex min-h-dvh flex-col">
-      <RoleScope role={tabBarRole(profile.role)} me={profile}>{children}</RoleScope>
-      <TabBar role={tabBarRole(profile.role)} />
+      <RoleScope {...scope} me={profile}>{children}</RoleScope>
+      <TabBar {...scope} />
     </div>
   );
 }

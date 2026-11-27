@@ -6,6 +6,7 @@ import { RoleScope } from "@/components/RoleScope";
 import { TabBar } from "@/components/TabBar";
 import { homeForRole } from "@/lib/auth";
 import { profileOrLogin } from "@/lib/auth-layout";
+import { tabScope } from "@/lib/lab/access";
 import { canManageTeam } from "@/lib/routes";
 
 /**
@@ -25,10 +26,12 @@ export async function AdminShell({ children }: { children: ReactNode }) {
     );
   }
 
+  // the secretary's own bar, with «Отчёты» while the company has the reports on (D-219)
+  const scope = await tabScope(profile);
   return (
     <div className="app-shell flex min-h-dvh flex-col">
-      <RoleScope role="secretary" me={profile}>{children}</RoleScope>
-      <TabBar role="secretary" />
+      <RoleScope {...scope} me={profile}>{children}</RoleScope>
+      <TabBar {...scope} />
     </div>
   );
 }
