@@ -61,7 +61,7 @@ async function main() {
     const cardBox = await card.boundingBox();
     const faceBox = await page.locator('[data-testid="mascot-lever"]').boundingBox();
     record("карточка — прямо над лицом", Boolean(cardBox && faceBox && cardBox.y + cardBox.height <= faceBox.y + 20));
-    const looks = (await page.locator('[data-gaze="on"]').count()) === 1 && (await page.locator('[data-testid="look-line"]').count()) === 1;
+    const looks = (await page.locator('[data-testid="mascot-lever"] .bk[data-gaze]').count()) === 1 && (await page.locator('[data-testid="look-line"]').count()) === 1;
     record("маскот смотрит на человека", looks);
     // the face, not the small secretary at the desk (D-85), who is a mascot too
     record("маскот проснулся", (await page.locator('[data-testid="mascot-lever"] .mascot').first().getAttribute("data-state")) !== "sleeping");
@@ -100,7 +100,7 @@ async function main() {
     } else {
       await page.locator('[data-testid="pick-close"]').click();
       await page.waitForTimeout(600);
-      const released = (await page.locator('[data-testid="pick-card"]').count()) === 0 && (await page.locator('[data-gaze="on"]').count()) === 0;
+      const released = (await page.locator('[data-testid="pick-card"]').count()) === 0 && (await page.locator('[data-testid="mascot-lever"] .bk[data-gaze]').count()) === 0;
       record("× снимает выбор, взгляд отпущен", released);
 
       // somebody at work (D-118): his card, his tasks as links, the face on him, a touch away closes
@@ -114,10 +114,21 @@ async function main() {
         record("тап по занятому — карточка с его задачами", (await page.locator('[data-testid="crew-card"]').isVisible()) && (await rows.count()) > 0);
         record("строка ведёт на экран задачи", /^\/tasks\/[0-9a-f-]{36}$/.test(href), href);
         record("«Все дела» — на карточку человека", /^\/people\//.test((await page.locator('[data-testid="crew-all"]').getAttribute("href")) ?? ""));
-        record("маскот смотрит на занятого", (await page.locator('[data-gaze="on"]').count()) === 1);
+        record("маскот смотрит на занятого", (await page.locator('[data-testid="mascot-lever"] .bk[data-gaze]').count()) === 1);
+        // «+» in the card's corner: one more task for him — the card goes, the pick card comes (D-216)
+        const busyPerson = await lit.first().getAttribute("data-person");
+        await page.locator('[data-testid="crew-add"]').click();
+        await page.waitForTimeout(700);
+        await page.screenshot({ path: join(SHOTS, "p6-add.png") });
+        const picking = page.locator('[data-testid="pick-card"]');
+        record("«+» в карточке — ещё задача этому человеку", (await picking.isVisible()) && (await picking.getAttribute("data-person")) === busyPerson && (await page.locator('[data-testid="crew-card"]').count()) === 0);
+        await page.locator('[data-testid="pick-close"]').click();
+        await page.waitForTimeout(500);
+        await lit.first().click();
+        await page.waitForTimeout(600);
         await page.mouse.click(12, 200);
         await page.waitForTimeout(500);
-        const cardGone = (await page.locator('[data-testid="crew-card"]').count()) === 0 && (await page.locator('[data-gaze="on"]').count()) === 0;
+        const cardGone = (await page.locator('[data-testid="crew-card"]').count()) === 0 && (await page.locator('[data-testid="mascot-lever"] .bk[data-gaze]').count()) === 0;
         record("касание мимо убирает карточку", cardGone);
       } else {
         console.log("—     занятых на доске нет: карточка не проверена");

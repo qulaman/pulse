@@ -217,6 +217,17 @@ export function PeopleField({
     setOpened(null);
     onLook?.(null);
   };
+  // «+» on his card: one more task for somebody who already has some — the card goes and the face
+  // turns to him, as it does for a pick among those with nothing to do (D-84, D-216)
+  const addFor = (id: string) => {
+    const entry = crew.find((c) => c.member.id === id);
+    const seat = layout.seats.get(id);
+    if (!entry || !seat) return;
+    haptic([12, 24, 12]);
+    setOpened(null);
+    onLook?.(null);
+    onPick?.({ id, name: shortName(entry.member.fullName), address: addressOf(entry.member), x: seat.x, y: seat.y });
+  };
   // The handlers read the latest screen through a ref, so they never change and a move of one
   // person re-renders that one person, not the whole team.
   const latest = useRef({ crew, layout, opened, picked, onPick, onLook });
@@ -364,6 +375,7 @@ export function PeopleField({
             reach={layout.size / 2 + RING_OUT + 6}
             allHref={allHref?.(openedCrew.member.id)}
             onMore={onTaskMore}
+            onAdd={onPick ? () => addFor(openedCrew.member.id) : undefined}
             onClose={closeCard}
           />
         ) : null}

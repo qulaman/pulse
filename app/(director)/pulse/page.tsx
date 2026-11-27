@@ -67,7 +67,8 @@ import { usePeople } from "@/lib/people/queries";
 import { useOpenDisputes } from "@/lib/points/game";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { countsOf, emptyLanes, hasMessage, hasUnread, HELD_STATUS, isOnBoard, lanesOf, type BoardTask, type Lanes } from "@/lib/pulse/board";
-import { alarmOf } from "@/lib/pulse/mood";
+import { markHeard, useHeard } from "@/lib/pulse/heard";
+import { alarmOf, unreachableOrders } from "@/lib/pulse/mood";
 import { useLastVisit } from "@/lib/pulse/queries";
 import { directorMascot } from "@/lib/pulse/scene-face";
 import { sound } from "@/lib/sound";
@@ -360,6 +361,12 @@ export default function PulsePage() {
   const alarm = useMemo(() => alarmOf(rows ?? [], now, meId, noPush), [rows, now, meId, noPush]);
   // a meeting within the quarter of an hour is worth the same watchful face as a deadline
   const mood: MascotState | null = alarm || eventSoon ? "alert" : null;
+  // At rest the face is watchful only about what it has not said yet (D-216): an order lying with
+  // somebody whose pushes do not reach them is told once — the director wakes the face, the line
+  // names the person — and is no news after that. Awake, the face keeps the whole truth (`mood`).
+  const told = useHeard(meId);
+  const restAlarm = useMemo(() => alarmOf(rows ?? [], now, meId, noPush, told), [rows, now, meId, noPush, told]);
+  const restMood: MascotState | null = restAlarm || eventSoon ? "alert" : null;
   const awake: MascotState = loading
     ? "thinking"
     : speech.speaking
@@ -380,7 +387,7 @@ export default function PulsePage() {
   // a change on the board is data the assistant has just read: it reports the new status (D-65)
   // The face sleeps only when the board is quiet: a mood outranks sleep, so the barometer
   // is readable without a tap (the owner, 2026-09-17 — «маскот должен меняться и в покое»).
-  const restFace: MascotState = mood ?? "sleeping";
+  const restFace: MascotState = restMood ?? "sleeping";
   // a picked person wakes the face: it cannot look at anybody with its eyes shut
   const attending = picked !== null && (stage === "idle" || stage === "recording");
   // the same for the person whose card is open — only while the waiting screen is up
@@ -554,13 +561,17 @@ export default function PulsePage() {
       speech.replay();
       go({ mode: "ring", panel, held: phraseInHand });
       acts.play("wave");
+      // With nothing louder on the board the summary names whoever cannot be reached (`openingLine`):
+      // said once, their orders no longer keep the face up (D-216). Under a louder line they wait
+      // for a wake that does say them
+      if (rows && counts.attention === 0 && alarm === "unaccepted") markHeard(meId, unreachableOrders(rows, noPush), rows.map((task) => task.id));
     } else if (mode === "panel") {
       // one step back: the panel folds, the balls orbit again
       go({ mode: "ring", panel: null, held: phraseInHand });
     } else {
       go({ mode: "idle", panel: null, held: phraseInHand });
       // dozing off again with a yawn — unless something waits, then the face stays watchful
-      if (!mood) acts.play("yawn");
+      if (!restMood) acts.play("yawn");
     }
   });
   // the mark pulled to the right (D-212): the secretary comes out and the errand buttons with it —

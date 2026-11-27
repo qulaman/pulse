@@ -5,7 +5,7 @@ import type { TaskStatus } from "@/lib/tasks/status-text";
 import type { BoardTask } from "./board";
 import { attentionOf } from "@/lib/tasks/attention";
 
-import { alarmOf } from "./mood";
+import { alarmOf, unreachableOrders } from "./mood";
 
 /** 2026-09-11 09:30 Aqtobe (UTC+5) — тот же час, что и в board.test.ts */
 const NOW = new Date("2026-09-11T04:30:00Z");
@@ -108,6 +108,23 @@ describe("alarmOf", () => {
     expect(alarmOf([fresh], NOW, ME, new Set(["u-1"]))).toBe("unaccepted");
     // у принятой задачи канал уже не тревога: человек о ней знает
     expect(alarmOf([row("accepted")], NOW, ME, new Set(["u-1"]))).toBeNull();
+  });
+
+  it("D-216: о чём маскот уже сказал, то больше не тревога — ни «не доходят», ни «не принята» следом", () => {
+    const cut = new Set(["u-1"]);
+    const fresh = row("sent");
+    const stale = row("sent", { created_at: "2026-09-11T03:50:00Z" });
+    expect(unreachableOrders([fresh, stale, row("accepted")], cut)).toEqual([fresh.id, stale.id]);
+    expect(alarmOf([fresh, stale], NOW, ME, cut, new Set([fresh.id, stale.id]))).toBeNull();
+    // новое поручение тому же человеку — снова новость
+    expect(alarmOf([fresh, stale], NOW, ME, cut, new Set([stale.id]))).toBe("unaccepted");
+    // срок услышанным не снимается
+    const late = row("sent", { deadline: "2026-09-11T02:00:00Z" });
+    expect(alarmOf([late], NOW, ME, cut, new Set([late.id]))).toBe("deadline");
+    // до человека снова можно достучаться — задача обычная: полчаса без «Принял» тревожат
+    expect(alarmOf([stale], NOW, ME, new Set(), new Set([stale.id]))).toBe("unaccepted");
+    // услышанное о другом не снимает непрочитанное
+    expect(alarmOf([fresh, row("accepted", unread())], NOW, ME, cut, new Set([fresh.id]))).toBe("unread");
   });
 
   it("D-194: тревога Пульса и вердикт «Задач» — одно правило", () => {

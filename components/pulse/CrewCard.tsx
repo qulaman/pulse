@@ -18,7 +18,8 @@ const EASE_OUT = [0.2, 0, 0, 1] as const;
  * task has on «Задачи», so the circle, the card and the screen speak one language. A refusal
  * says why, a question is quoted, an unread word is flagged. «Все дела» opens his card. «⋯» on
  * a row is everything the task allows, right here — revoke, delete, another deadline — without
- * the trip to its screen (D-139).
+ * the trip to its screen (D-139). «+» in the corner gives him one more task: the card goes, the
+ * face turns to him and asks, as it does for somebody with nothing to do (D-84, D-216).
  *
  * It stands next to him — under him when he is high up, above him when not — and never runs
  * off the screen. `reach` — how far out of his seat the card starts (his ring and a gap).
@@ -33,6 +34,7 @@ export function CrewCard({
   reach,
   allHref,
   onMore,
+  onAdd,
   onClose,
 }: {
   ref?: Ref<HTMLDivElement>;
@@ -45,6 +47,8 @@ export function CrewCard({
   allHref?: string;
   /** «⋯» on a row: the task's «Действия» (D-139); without it the row only leads to the task */
   onMore?: (taskId: string) => void;
+  /** «+»: one more task for him; without it the card only shows what he has */
+  onAdd?: () => void;
   onClose: () => void;
 }) {
   const width = Math.min(box.w - 24, 304);
@@ -71,11 +75,25 @@ export function CrewCard({
       >
         <div className="flex items-center gap-2 pl-1">
           <p className="min-w-0 truncate font-display text-[17px] font-semibold leading-6">{member.fullName}</p>
+          {onAdd ? (
+            <button
+              type="button"
+              aria-label={`Ещё задача: ${member.fullName}`}
+              onClick={onAdd}
+              className="-my-1 ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-accent transition-colors duration-[120ms] active:bg-surface-2"
+              style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)" }}
+              data-testid="crew-add"
+            >
+              <svg aria-hidden width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <path d="M8 3v10M3 8h10" />
+              </svg>
+            </button>
+          ) : null}
           <button
             type="button"
             aria-label="Закрыть"
             onClick={onClose}
-            className="-my-1 -mr-1 ml-auto flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[18px] text-muted"
+            className={`-my-1 -mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[18px] text-muted${onAdd ? "" : " ml-auto"}`}
           >
             ×
           </button>

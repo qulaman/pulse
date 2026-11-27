@@ -20,14 +20,25 @@ export { ACCEPT_GRACE_MS, DEADLINE_SOON_MS };
 
 export type BoardAlarm = "deadline" | "unaccepted" | "unread";
 
-/** `noPush` — whose pushes do not reach them (`noPushIds`); absent — nobody is known to be cut off. */
-export function alarmOf(tasks: readonly BoardTask[], now: Date, meId: string, noPush?: ReadonlySet<string>): BoardAlarm | null {
+/** The orders lying with somebody who cannot be told about them — what the mark says once it is woken (D-216). */
+export function unreachableOrders(tasks: readonly BoardTask[], noPush: ReadonlySet<string>): string[] {
+  return tasks.filter((task) => task.status === "sent" && noPush.has(task.assignee_id)).map((task) => task.id);
+}
+
+/**
+ * `noPush` — whose pushes do not reach them (`noPushIds`); absent — nobody is known to be cut off.
+ * `heard` — the orders the director has already been told about (lib/pulse/heard.ts, D-216): one
+ * lying with somebody who cannot be reached is no longer news once it was said — neither «не
+ * доходят» nor the «не принята» that follows by itself. A deadline is never heard away, and the
+ * moment the person can be reached again the order is an ordinary one.
+ */
+export function alarmOf(tasks: readonly BoardTask[], now: Date, meId: string, noPush?: ReadonlySet<string>, heard?: ReadonlySet<string>): BoardAlarm | null {
   let unaccepted = false;
   let unread = false;
   for (const task of tasks) {
     // the deadline outranks everything: it is the only thing that cannot be moved by talking
     if (isOverdue(task, now) || isDeadlineSoon(task, now)) return "deadline";
-    if (task.status === "sent") {
+    if (task.status === "sent" && !(heard?.has(task.id) && noPush?.has(task.assignee_id))) {
       const reason = taskAttention(task, { now, noPush, reasons: new Map() });
       if (reason === "unaccepted" || reason === "no_push") unaccepted = true;
     }
