@@ -198,22 +198,25 @@ function FoldIcon({ folded }: { folded: boolean }) {
   );
 }
 
-/** The product's mark without its name — the folded navigation's head and foot. */
+/** The product's mark without its name — the folded navigation's head and foot: the dot in a ring, as in the wordmark. */
 function PulseGlyphMark() {
   return (
-    <svg width="26" height="18" viewBox="0 0 26 18" aria-label="Pulse" role="img">
-      <polyline points="0,10 6,10 9,3 13,15 16,8 19,10 26,10" fill="none" stroke="var(--accent)" strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round" />
+    <svg width="20" height="20" viewBox="0 0 24 24" aria-label="Pulse" role="img">
+      <circle cx="12" cy="12" r="8" fill="none" stroke="var(--accent)" strokeWidth="2.6" />
+      <circle cx="12" cy="12" r="3.1" fill="var(--accent)" />
     </svg>
   );
 }
 
 /**
- * The desk's side navigation (D-153 §3): the client's logo on top as on the phone's home header
- * (D-113) — the logo alone, the company's name in its title, never cut to «West Arlan …»; the
- * role's sections with their counts in the tone of the move; the product's own mark at the foot
- * above «Профиль» (D-44: the product's identity comes first). Every section answers to «G» and
- * its letter and says so under the mouse; `folded` — icons only, 64 px, the counts on their
- * corners and the names in the hints (D-154 wave 3; «[» or the button at the foot).
+ * The desk's side navigation (D-153 §3): the client on top, in the middle of the binding — the logo
+ * and the company's name under it, whole: a long one takes a second line, never cut to
+ * «West Arlan …» (D-220); with no logo the name alone; the role's sections with their counts in
+ * the tone of the move; the product's own mark — the dot in a ring and the word — at the foot
+ * under «Профиль» (D-44: the product's identity comes first). Every section answers to «G» and
+ * its letter and says so under the mouse; `folded` — icons only, 64 px: the logo small and alone,
+ * the counts on their corners and the names in the hints (D-154 wave 3; «[» or the button at the
+ * foot).
  */
 export function SideNav({ role, brand, folded = false, onToggle }: { role: DeskRole; brand: DeskBrand; folded?: boolean; onToggle?: () => void }) {
   const pathname = usePathname();
@@ -229,16 +232,26 @@ export function SideNav({ role, brand, folded = false, onToggle }: { role: DeskR
 
   return (
     <nav aria-label="Разделы" data-folded={folded ? "" : undefined} className="desk-nav flex min-h-0 flex-col">
-      <div className={`mb-5 flex h-8 items-center ${folded ? "justify-center" : "px-2"}`} title={brand.name}>
+      <div
+        data-testid="desk-nav-brand"
+        className={`flex shrink-0 flex-col items-center ${folded ? "mb-5 h-8 justify-center" : "mb-4 min-h-8 justify-center gap-2 px-2 pt-1 text-center"}`}
+        title={brand.name}
+      >
         {logo ? (
-          // a still frame of the client's logo: an animated one would keep the main thread awake (В-9, D-155)
-          <StillLogo src={logo} alt={brand.name} className={folded ? "h-5 max-w-[44px] object-contain" : "h-6 max-w-[160px] object-contain object-left"} />
+          <>
+            {/* a still frame of the client's logo: an animated one would keep the main thread awake (В-9, D-155);
+                `block` — the empty frame holds the logo's height until the picture comes */}
+            <StillLogo src={logo} alt={brand.name} className={folded ? "block h-5 max-w-[44px] object-contain" : "block h-9 max-w-[176px] object-contain"} />
+            {folded ? null : <span className="line-clamp-2 max-w-full text-balance break-words text-[13px] font-medium leading-4 text-muted">{brand.name}</span>}
+          </>
         ) : named ? (
-          <span className="font-display text-[16px] font-semibold leading-5 tracking-[-0.02em]">{folded ? brand.name.slice(0, 1) : brand.name}</span>
+          <span className={`font-display text-[16px] font-semibold leading-5 tracking-[-0.02em] ${folded ? "" : "line-clamp-2 max-w-full text-balance break-words"}`}>
+            {folded ? brand.name.slice(0, 1) : brand.name}
+          </span>
         ) : folded ? (
           <PulseGlyphMark />
         ) : (
-          <PulseMark />
+          <PulseMark sign="ring" />
         )}
       </div>
       <ul className="no-bar flex min-h-0 flex-col overflow-y-auto">
@@ -261,7 +274,7 @@ export function SideNav({ role, brand, folded = false, onToggle }: { role: DeskR
       <div className="desk-nav-foot mt-auto flex flex-col gap-2 border-t pt-3">
         <NavLink href={DESK_PROFILE} label="Профиль" active={active === DESK_PROFILE} chord={DESK_PROFILE_KEY} folded={folded} />
         <div className={`flex items-center ${folded ? "flex-col gap-2" : "justify-between pl-3"}`}>
-          {logo || named ? <span className="opacity-50">{folded ? <PulseGlyphMark /> : <PulseMark />}</span> : <span aria-hidden />}
+          {logo || named ? <span className="opacity-50">{folded ? <PulseGlyphMark /> : <PulseMark sign="ring" />}</span> : <span aria-hidden />}
           {onToggle ? (
             <Tooltip label={foldLabel} keys={["["]} side={folded ? "right" : "top"}>
               <button
