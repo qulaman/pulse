@@ -112,7 +112,7 @@ function lookOf({
   // The director dictates to the secretary: it listens exactly as the big mark does (STATE_LOOK.listening)
   // — the ring opens into its arcs, the dot is the three bars of the voice, the light takes the voice
   // (`--mascot-level` from an ancestor). Over whatever the ring held: the words are for it now
-  if (listening) return { color: TONE, ring: "open", spin: "drift", core: "bars", glow: "voice" };
+  if (listening) return { color: TONE, ring: "open", spin: "drift", core: "bars", glow: "voice", ringAnim: "bk-calm 2.8s var(--ease-in-out) infinite" };
   const party = cheer ? ({ extra: "confetti" } as const) : null;
   // the face is talking while the balls are out: no request in it
   if (talking) return { color: TONE, glow: "talk", blink: true, coreAnim: "bk-talk 0.9s var(--ease-in-out) infinite", ringAnim: CALM, ...party };
@@ -157,15 +157,15 @@ function Headset({ tieOnly = false }: { tieOnly?: boolean }) {
     <svg viewBox="-80 -80 160 160" aria-hidden data-prop={tieOnly ? "tie" : "headset"}>
       {tieOnly ? null : (
         <>
-          <path d="M -58 -12 A 59.5 59.5 0 0 1 58 -12" fill="none" stroke={light} strokeWidth="4.5" strokeLinecap="round" />
-          <rect x="-68" y="-16" width="15" height="32" rx="7" fill={light} />
-          <rect x="53" y="-16" width="15" height="32" rx="7" fill={light} />
-          <path d="M 61 15 Q 64 47 38 54" fill="none" stroke={light} strokeWidth="3.4" strokeLinecap="round" />
-          <circle cx="34" cy="55" r="6" fill="currentColor" stroke="var(--bg)" strokeWidth="2" />
+          <path d="M -58 -12 A 59.5 59.5 0 0 1 58 -12" fill="none" stroke={light} strokeWidth="3" strokeLinecap="round" />
+          <rect x="-66" y="-14" width="11" height="28" rx="5.5" fill={light} />
+          <rect x="55" y="-14" width="11" height="28" rx="5.5" fill={light} />
+          <path d="M 61 13 Q 64 47 38 54" fill="none" stroke={light} strokeWidth="2.4" strokeLinecap="round" />
+          <circle cx="34" cy="55" r="4.8" fill="currentColor" stroke="var(--bg)" strokeWidth="1.6" />
         </>
       )}
-      <path d="M 0 63 L -14 54 V 72 Z M 0 63 L 14 54 V 72 Z" fill={light} stroke={light} strokeWidth="3" strokeLinejoin="round" />
-      <circle cx="0" cy="63" r="4" fill="currentColor" stroke="var(--bg)" strokeWidth="1.6" />
+      <path d="M 0 63 L -12.5 55 V 71 Z M 0 63 L 12.5 55 V 71 Z" fill={light} stroke={light} strokeWidth="2.4" strokeLinejoin="round" />
+      <circle cx="0" cy="63" r="3.4" fill="currentColor" stroke="var(--bg)" strokeWidth="1.4" />
     </svg>
   );
 }

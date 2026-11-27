@@ -10,16 +10,20 @@ import { FULL_PX, LITE_PX, type ActLook, type StateLook } from "./look";
 
 /**
  * The mark is drawn once, in a 240-box, and scaled to the size asked for: one transform, not a new
- * drawing. The ring's outer width in that drawing, and the share of the screen's box it takes — what
- * the blob of «Капля» took.
+ * drawing. `RING` is the width the ring is given in that drawing, and `FILL` the share of the
+ * screen's box it takes. The line of the ring is thin and is set by the size (`--bk-line` in
+ * mark.css): the smaller the mark, the heavier the line is drawn, so it never falls under a pixel.
  */
 const RING = 107;
 const FILL = 0.84;
 
 /** A third of the ring, at the top; the other two are this one turned. Round ends, radius 50. */
 const ARC = "M -43.301 -25 A 50 50 0 0 1 43.301 -25";
-/** A rim light on the ring's upper left, along its outer edge — the side the dot's glint is on. */
-const SHINE = "M -46.49 -21.68 A 51.3 51.3 0 0 1 -19.22 -47.56";
+/** A gleam on the ring's upper left, along its outer edge — the side the dot's glint is on. */
+const SHINE = "M -46.13 -21.51 A 50.9 50.9 0 0 1 -19.07 -47.19";
+/** The fibres of the iris: sixty fine marks inside the ring, every fifth a little longer. */
+const IRIS_R = 41.5;
+const fibres = (count: number, width: number) => `${width} ${((2 * Math.PI * IRIS_R) / count - width).toFixed(3)}`;
 
 /** A ring that waves: two of them turning against each other read as a trembling wave. */
 const WAVY = (() => {
@@ -28,7 +32,7 @@ const WAVY = (() => {
   let d = "";
   for (let i = 0; i < points; i++) {
     const angle = (i / points) * Math.PI * 2;
-    const r = 86 + 2.6 * Math.sin(angle * lobes);
+    const r = 86 + 2.4 * Math.sin(angle * lobes);
     d += `${i === 0 ? "M" : "L"}${(Math.cos(angle) * r).toFixed(2)} ${(Math.sin(angle) * r).toFixed(2)}`;
   }
   return `${d}Z`;
@@ -40,20 +44,21 @@ const WAVY = (() => {
  * voice it takes and how late — the side bars follow the middle one.
  */
 const PILLS = [
-  { i: -1, rest: 14, len: 150, lx: "0px", voice: 0.68, lag: "160ms" },
-  { i: 0, rest: 26, len: 150, lx: "0px", voice: 1, lag: "90ms" },
-  { i: 1, rest: 14, len: 86, lx: "-7px", voice: 0.68, lag: "160ms" },
+  { i: -1, rest: 25, len: 207, lx: "0px", voice: 0.66, lag: "170ms" },
+  { i: 0, rest: 47, len: 207, lx: "0px", voice: 1, lag: "90ms" },
+  { i: 1, rest: 25, len: 127, lx: "-7px", voice: 0.74, lag: "230ms" },
 ];
 
 /** The looks of the pupil a state names. */
 const LOOKS = {
-  wander: "bk-wander 13s var(--ease-out) infinite",
-  sweep: "bk-sweep 4.6s var(--ease-in-out) infinite",
+  wander: "bk-wander 14.6s linear infinite",
+  sweep: "bk-sweep 4.6s linear infinite",
   follow: "bk-follow 1.15s linear infinite",
-  desk: "bk-desk-look 7s var(--ease-in-out) infinite",
-  ponder: "bk-ponder 5.6s var(--ease-in-out) infinite",
+  desk: "bk-desk-look 7s linear infinite",
+  ponder: "bk-ponder 5.6s linear infinite",
 };
-const BLINK = "bk-blink 7.3s linear infinite";
+/** Never a metronome: five blinks at uneven gaps, on a clock that shares no beat with the looks. */
+const BLINK = "bk-blink 16.9s linear infinite";
 
 /** Sparks of a happy face: where each stands round the ring and when it lights. */
 const SPARKS = [
@@ -185,7 +190,8 @@ export function Mark({
                     <span className="bk-p bk-glow" />
                     <span className="bk-p bk-iris">
                       <svg viewBox="-60 -60 120 120" aria-hidden>
-                        <circle r="38.5" fill="none" stroke="currentColor" strokeWidth="1.1" strokeDasharray="1.6 6.463" strokeLinecap="round" />
+                        <circle r={IRIS_R} fill="none" stroke="currentColor" strokeWidth="2.6" strokeDasharray={fibres(60, 0.5)} />
+                        <circle r={IRIS_R} fill="none" stroke="currentColor" strokeWidth="4.4" strokeDasharray={fibres(12, 0.7)} />
                       </svg>
                     </span>
                     <span className="bk-p bk-arcs">
@@ -197,7 +203,7 @@ export function Mark({
                                 <span className="bk-p bk-arc-split">
                                   <span className="bk-p bk-arc-level">
                                     <svg viewBox="-60 -60 120 120" aria-hidden>
-                                      <path d={ARC} fill="none" stroke="currentColor" strokeWidth="7" strokeLinecap="round" />
+                                      <path d={ARC} fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
                                     </svg>
                                   </span>
                                 </span>
@@ -208,8 +214,9 @@ export function Mark({
                       </span>
                     </span>
                     <span className="bk-p bk-shine">
+                      <i className="bk-p bk-sheen" />
                       <svg viewBox="-60 -60 120 120" aria-hidden>
-                        <path d={SHINE} fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2" strokeLinecap="round" />
+                        <path d={SHINE} fill="none" stroke="rgba(255,255,255,0.62)" strokeWidth="1.2" strokeLinecap="round" />
                       </svg>
                     </span>
                     <span className="bk-p bk-comet" />
@@ -354,7 +361,7 @@ function Part({ className, anim, children }: { className: string; anim?: string;
 function Wavy() {
   return (
     <svg viewBox="-100 -100 200 200" width="200" height="200" aria-hidden>
-      <path d={WAVY} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d={WAVY} fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
     </svg>
   );
 }

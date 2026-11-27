@@ -101,7 +101,7 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
       <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-6">
         <PageHead title="Пока нечего подтверждать" />
         <p className="mt-3 text-[16px] leading-[22px] text-muted">
-          Удержите лицо на Пульсе и скажите, что нужно сделать.
+          Потяните маскота на Пульсе вниз и скажите, что нужно сделать.
         </p>
         <div className="mt-6">
           <Button onClick={() => router.replace("/pulse")}>К Пульсу</Button>

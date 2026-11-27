@@ -34,6 +34,7 @@
     "smoke:feed": "tsx scripts/smoke-feed.ts",
     "smoke:desk": "tsx scripts/smoke-desk.ts",
     "smoke:pick": "tsx scripts/smoke-pick.ts",
+    "smoke:lever": "tsx scripts/smoke-lever.ts",
     "smoke:team": "tsx scripts/smoke-team.ts",
     "smoke:mascot": "tsx scripts/smoke-mascot.ts",
     "smoke:stages": "tsx scripts/smoke-stages.ts",

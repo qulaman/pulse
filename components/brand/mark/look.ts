@@ -59,8 +59,8 @@ const CALM = "bk-calm 4.6s var(--ease-in-out) infinite";
 export const STATE_LOOK: Record<MascotState, StateLook> = {
   // awake, nothing asked: the pulse, a look about, a blink
   calm: { color: "var(--accent)", glow: "pulse", look: "wander", blink: true, coreAnim: "bk-beat 3.4s var(--ease-in-out) infinite", ringAnim: BREATH, halo: "bk-halo-beat 3.4s var(--ease-in-out) infinite" },
-  // the ring opens, the dot is the voice
-  listening: { color: "var(--accent)", ring: "open", spin: "drift", core: "bars", glow: "voice" },
+  // the ring opens and leans in, the dot is the voice, a wave comes in with it
+  listening: { color: "var(--accent)", ring: "open", spin: "drift", core: "bars", glow: "voice", ringAnim: "bk-calm 2.8s var(--ease-in-out) infinite" },
   // the recording is put away: a note sinks into the ring
   saving: { color: "var(--accent)", glyph: "note", glow: "in", ringAnim: "bk-gulp 1.3s var(--ease-in-out) infinite" },
   // the voice becomes text: three lines written one after another under a running comet

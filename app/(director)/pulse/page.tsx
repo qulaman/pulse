@@ -10,6 +10,7 @@ import { entitiesSummary } from "@/components/confirm/format";
 import { EtherSection } from "@/components/ether/EtherSection";
 import type { AssistantLine } from "@/components/pulse/Assistant";
 import { CardDeck } from "@/components/pulse/CardDeck";
+import { EdgeBackGuard } from "@/components/pulse/EdgeBackGuard";
 import { HomeStage } from "@/components/pulse/home/HomeStage";
 import { ExchangeButtons, ServiceLines, UnparsedButtons } from "@/components/pulse/home/PulseLines";
 import {
@@ -56,7 +57,7 @@ import { useCalendar, type CalendarEvent } from "@/lib/calendar/queries";
 import { nextEventLine } from "@/lib/calendar/say";
 import { isCountable, isSendable, whyNothingToSend } from "@/lib/confirm/entities";
 import { springs } from "@/lib/design/tokens";
-import { askSecretary } from "@/lib/errands/pending";
+import { askSecretary, usePendingErrands } from "@/lib/errands/pending";
 import { activeCount, isActive } from "@/lib/errands/queries";
 import { etaLeftMin, sceneOfAction, untilLine, urgencyOf } from "@/lib/errands/scene";
 import { useEther } from "@/lib/ether/queries";
@@ -109,8 +110,8 @@ const AT_REST: Scene = { mode: "idle", panel: null, view: "idle", cameFrom: "idl
 /** The cards band against the words' band while a phrase of several things waits (D-146). */
 const CROWDED_GROW = 8;
 
-/** A hold too short to say anything: the mark pinches and says this under itself, then rests (2026-11-26). */
-const TOO_SHORT_NOTE = "Держите, пока говорите";
+/** A recording ended too soon to say anything: the mark pinches and says this under itself, then rests (2026-11-26). */
+const TOO_SHORT_NOTE = "Скажите фразу, потом нажмите";
 const TOO_SHORT_NOTE_MS = 2_200;
 
 /**
@@ -119,12 +120,14 @@ const TOO_SHORT_NOTE_MS = 2_200;
  * middle of the face to the top-left corner of the secretary's box.
  */
 const DESK_AT = { x: 82, y: -10 };
+/** The secretary comes out from the right edge and leaves the same way (D-212): this far, px. */
+const DESK_SLIDE = 48;
 
 /**
- * Пульс — the director's home (D-57, D-60): the mascot asleep in the middle of
- * the screen. Hold it to speak, pull it down to type, tap it and it wakes: three balls
- * orbit it — tasks, messages, Эфир — each with its count; a tap on a ball opens its panel
- * (the card deck with the gestures, or the announcements).
+ * Пульс — the director's home (D-57, D-60, D-212): the mascot asleep in the middle of
+ * the screen. Pull it down to speak, up to type, to the right for the secretary; tap it and it
+ * wakes: the balls orbit it — tasks, messages, Эфир — each with its count; a tap on a ball opens
+ * its panel (the card deck with the gestures, or the announcements).
  * The gesture hint lives at the bottom; service lines (push, draft) appear only after
  * the tap, under the assistant's line. One screen at every width — a wide window only
  * centres it (owner, 2026-09-17: the board of D-57 stays a reserve for /tv).
@@ -174,8 +177,8 @@ export default function PulsePage() {
   const [picked, setPicked] = useState<Picked | null>(null);
   // the secretary at the desk has turned to the face, and the errand buttons are out (D-85)
   const [deskOpen, setDeskOpen] = useState(false);
-  // the face is held for the picked person right now: the card drops its buttons (D-84)
-  const [held, setHeld] = useState(false);
+  // the mark is being pulled to the right and not let go yet: the secretary looks out (D-212)
+  const [deskPeek, setDeskPeek] = useState(false);
   // the card of somebody at work is open on the waiting screen: the face looks at him (D-118)
   const [looking, setLooking] = useState<Pick | null>(null);
   useEffect(
@@ -293,13 +296,15 @@ export default function PulsePage() {
     ],
     [taskCount, counts.overdue, counts.declined, counts.review, messageTasks.length, ether.data, events, now, eventSoon, pointsEnabled, disputes],
   );
-  // The hint's lines (2026-11-26): the hold and the pull on the first, what a tap brings out on the
-  // second — each way only until it has been done (useLeverHint)
+  // The hint's lines (2026-11-26, D-212): where the mark is pulled on the first, what a tap brings out
+  // on the second — each way only until it has been done (useLeverHint)
   const hintWays = useMemo(() => {
-    const gestures = [hint.hold ? "удержите — говорите" : null, hint.pull ? "потяните вниз — текст" : null].filter(Boolean).join(", ");
+    const pulls = [hint.voice ? "вниз — голос" : null, hint.text ? "вверх — текст" : null, hint.secretary && hasSecretary ? "вправо — секретарь" : null]
+      .filter(Boolean)
+      .join(", ");
     const tap = hint.tap ? `нажмите — ${balls.map((ball) => ball.label.toLowerCase()).join(", ")}` : "";
-    return [gestures, tap].filter((line) => line !== "");
-  }, [hint, balls]);
+    return [pulls, tap].filter((line) => line !== "");
+  }, [hint, balls, hasSecretary]);
   // the deck behind each ball: tasks without the message lane, or every task with a message (whatever its lane)
   const taskLanes = useMemo<Lanes>(() => ({ ...lanes, question: [] }), [lanes]);
   // the thought talks about the newest word on the board — a tap on it opens that thread
@@ -380,8 +385,14 @@ export default function PulsePage() {
   const attending = picked !== null && (stage === "idle" || stage === "recording");
   // the same for the person whose card is open — only while the waiting screen is up
   const reading = looking !== null && mode === "idle" && stage === "idle" && !phraseInHand;
-  // the desk is part of the waiting screen: shown there, and only when there is somebody at it
-  const showDesk = hasSecretary && mode === "idle" && !phraseInHand && (stage === "idle" || stage === "recording");
+  // The secretary keeps out of the waiting screen (D-212): it comes out from the right when the mark
+  // is pulled there, and stays only while it has something of the director's — a request in the air,
+  // on its way or kept on the phone, one just done, a dictation, or «не беспокоить» to offer
+  const errandsOnTheWay = usePendingErrands((state) => state.pending.length);
+  const dndOffer = Boolean(desk.offerDnd && meetingNow && meetingEndsAt && desk.dndAction);
+  const deskBusy = activeCount(errandRows) + errandsOnTheWay > 0 || deskStage.phase !== "rest" || dictating || dndOffer;
+  const showDesk =
+    hasSecretary && mode === "idle" && !phraseInHand && (stage === "idle" || stage === "recording") && (deskOpen || deskPeek || deskBusy);
   const asking = deskOpen && showDesk && stage === "idle";
   // the small secretary has just finished a request and leans over with the tick: the face looks at it
   const handoff = showDesk && !asking && stage === "idle" && deskStage.phase === "done";
@@ -522,9 +533,9 @@ export default function PulsePage() {
       setDeskOpen(false);
       return;
     }
-    // somebody is picked: the face is their microphone — a tap starts, a tap stops (D-84);
-    // holding it works as always and never gets here — but a hold let go at once is a tap, and its
-    // recording was dropped a moment ago: the store's stage, not this render's, says which it is
+    // somebody is picked: the face is their microphone — a tap starts it (D-84); the tap that ends a
+    // recording never gets here, the lever stops it itself. The store's stage, not this render's,
+    // says where the pipeline is
     if (picked && !phraseInHand) {
       const now = useIngestStore.getState().stage;
       if (now === "recording") void stopVoice();
@@ -551,6 +562,15 @@ export default function PulsePage() {
       // dozing off again with a yawn — unless something waits, then the face stays watchful
       if (!mood) acts.play("yawn");
     }
+  });
+  // the mark pulled to the right (D-212): the secretary comes out and the errand buttons with it —
+  // from the ring or an open card the screen goes back to rest first, the secretary lives there
+  const onPullRight = useStableCallback(() => {
+    closeExchange();
+    if (mode !== "idle") go({ mode: "idle", panel: null, held: phraseInHand });
+    if (restFace === "sleeping" && !picked) setWakeKey((key) => key + 1);
+    setPicked(null);
+    setDeskOpen(true);
   });
   const team = useMemo(() => (peopleRows ?? []).filter((p) => p.is_active && p.role !== "director" && p.role !== "tv"), [peopleRows]);
   // the secretaries sit at the desk, not among the circles (D-85)
@@ -684,7 +704,7 @@ export default function PulsePage() {
       panel === "tasks" ? (
         // what waits for the morning still has its closing card (D-139)
         taskCount === 0 && heldTasks.length === 0 ? (
-          <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Задач нет. Удержите меня и скажите, что нужно сделать.</p>
+          <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Задач нет. Потяните меня вниз и скажите, что нужно сделать.</p>
         ) : (
           <CardDeck lanes={taskLanes} now={now} since={since} actions={actions} companyId={companyId} meId={meId} onReply={openThread} focus={null} held={heldTasks} onMore={moreTask} />
         )
@@ -831,12 +851,14 @@ export default function PulsePage() {
                     ? "Маскот: нажмите — отправить"
                     : "Маскот: нажмите — указать, кому"
                   : picked
-                    ? `Маскот: задача для ${picked.name} — удержите и говорите или нажмите`
+                    ? `Маскот: задача для ${picked.name} — потяните вниз и говорите или нажмите`
                     : undefined
               }
               pin={pin}
               gaze={faceGaze}
-              onHold={setHeld}
+              // the secretary is called only from a quiet pipeline, and only when there is one
+              onPullRight={hasSecretary && stage === "idle" ? onPullRight : undefined}
+              onPeek={setDeskPeek}
               around={orbit}
               play={playAct}
               // what the failure is about stays in the ring while its words are up (2026-11-26)
@@ -847,22 +869,24 @@ export default function PulsePage() {
             <LocalPresence>
               {picked && mode === "idle" && (stage === "idle" || stage === "recording") ? (
                 <div key={picked.id} className="absolute bottom-full left-1/2 z-30 mb-3 -translate-x-1/2">
-                  <PickCard picked={picked} held={held} onClose={() => setPicked(null)} />
+                  <PickCard picked={picked} onClose={() => setPicked(null)} />
                 </div>
               ) : null}
             </LocalPresence>
-            {/* the secretary, right of the face (D-85, D-210): a small mark of its own; a tap turns
-                it to the face, the face's eye to it, and the errand buttons come out */}
+            {/* the secretary, right of the face (D-85, D-210): a small mark of its own, out from the
+                right only when called or busy (D-212); a tap turns it to the face, the face's eye to
+                it, and the errand buttons come out */}
             <LocalPresence>
               {showDesk ? (
                 <motion.div
                   key="desk"
                   className="absolute left-1/2 top-1/2 z-20"
                   style={{ marginLeft: DESK_AT.x, marginTop: DESK_AT.y, width: DESK_W, height: DESK_H }}
-                  initial={{ opacity: 0, x: 12 }}
+                  initial={{ opacity: 0, x: DESK_SLIDE }}
                   animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 12, transition: { duration: 0.18 } }}
+                  exit={{ opacity: 0, x: DESK_SLIDE, transition: { duration: 0.2, ease: "easeIn" } }}
                   transition={springs.object}
+                  data-testid="desk-slot"
                 >
                   {/* a narrow phone keeps the desk a little smaller, so it never touches the edge;
                       words for the face, not for the desk, send it a step back (D-166) */}
@@ -902,7 +926,7 @@ export default function PulsePage() {
                     }}
                   />
                   </div>
-                  {desk.offerDnd && meetingNow && meetingEndsAt && dndAction && !asking ? (
+                  {dndOffer && meetingNow && meetingEndsAt && dndAction && !asking ? (
                     // a meeting is on: one tap guards the door until it ends (D-99)
                     // right-aligned under the secretary: it stands right of the face, a centred pill ran off the screen
                     <div className="absolute top-full mt-8 flex items-center gap-1 whitespace-nowrap" style={{ right: -42 }} data-testid="dnd-offer">
@@ -976,6 +1000,9 @@ export default function PulsePage() {
       gliding={phraseInHand}
       crowded={crowded}
     >
+      {/* an iPhone's «Назад» swipe from the left edge is off on this screen (D-212) */}
+      <EdgeBackGuard />
+
       {/* the bottom: the gesture hint — never under the face */}
       {/* the hint is for an idle face: while the phrase is in flight the face says what it does */}
       {hintWays.length > 0 && mode === "idle" && stage === "idle" && !picked && !asking && !visitorsWaiting && !messagesWaiting && !keptPill ? (
@@ -984,8 +1011,8 @@ export default function PulsePage() {
           style={{ bottom: "calc(var(--tabbar-space) + 2px)" }}
           data-testid="lever-hint"
         >
-          {/* nothing stands under the mark (D-208): the line teaches the mark's own ways — the hold,
-              the pull, and what its tap brings out — the balls, by their own labels (D-60). Each way
+          {/* nothing stands under the mark (D-208): the line teaches the mark's own ways — where it is
+              pulled, and what its tap brings out — the balls, by their own labels (D-60). Each way
               leaves the line once it has been done (2026-11-26) */}
           {hintWays.map((way, i) => (
             <span key={way} className="block">

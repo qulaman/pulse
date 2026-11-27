@@ -25,33 +25,26 @@ import { useComposeStore } from "@/lib/store/compose";
 import { subscribeIngestLevel, useIngestStore, type Pin } from "@/lib/store/ingest";
 import { STAGE_FACE, STAGE_LINE, elapsedSince } from "@/lib/voice/stages";
 
-/** Hold longer than this and it is speech, not a tap (docs/DESIGN.md «Жесты»). */
-const HOLD_MS = 250;
-/**
- * A finger that travels farther than this before the hold fires is making a gesture (the pull down),
- * not holding: the microphone does not open under a moving finger.
- */
+/** The four ways the mark is pulled (D-212): down — the voice, up — the typed input, right — the secretary, left — kept in reserve. */
+export type Pull = "down" | "up" | "right" | "left";
+
+/** A finger that has travelled this far is pulling, not tapping (docs/DESIGN.md «Жесты»). */
 const SLOP_PX = 10;
-/**
- * A recording let go sooner than this after it began was a tap that lingered: it is dropped without a
- * word and the tap is done (2026-11-26). Between this and `MIN_RECORDING_MS` it was a hold too short
- * to say anything — the mark pinches and its caption says to hold.
- */
-const TAP_LINGER_MS = 600;
-/** Swipe up this far while holding — the messenger gesture for "forget it". */
+/** Pulled this far, a way is armed: letting go does it, coming back under it lets it go. */
+const PULL_PX = 44;
+/** While it records, pulled up this far — the messenger gesture for "forget it". */
 const CANCEL_DISTANCE_PX = 60;
-/** Pull the face down this far before the hold fires — the keyboard instead of the microphone. */
-const TEXT_DISTANCE_PX = 44;
 /**
- * The hint at the bottom teaches the mark's three ways, each until it has been done (2026-11-26): the
- * hold part until a held phrase has reached the parser this many times, the tap part until the mark
- * has been tapped as often, the pull part after `PULL_USES` real pulls.
+ * The hint at the bottom teaches the mark's ways, each until it has been done (2026-11-26): the voice
+ * until a pulled phrase has reached the parser this many times, the tap until the mark has been tapped
+ * as often, the pulls up and right after `PULL_USES` real ones.
  */
 const HINT_USES = 5;
 const PULL_USES = 2;
-/** The hold count — the key the single count had, so a director who has spoken keeps his line short. */
-const SPEAK_KEY = "pulse.lever.uses";
-const PULL_KEY = "pulse.lever.pulls";
+/** The counts of the pulls are new keys: the gestures changed, so everybody is taught them once more. */
+const VOICE_KEY = "pulse.lever.down";
+const TEXT_KEY = "pulse.lever.up";
+const SECRETARY_KEY = "pulse.lever.right";
 const TAP_KEY = "pulse.lever.taps";
 /**
  * The face is always drawn at this size and only scaled to the size the screen asks for:
@@ -62,26 +55,30 @@ const BASE = 128;
 /** The face travels with the box around it — one spring for both, or they arrive apart. */
 const SPRING = springs.object;
 /**
- * The face gives a little under a pulling finger — down towards the typed input, up towards «отмена»
- * while it records — so the gesture is seen working before the finger lets go. A third of the pull
- * (a quarter for the cancel), never more than this; a tight spring follows the finger, and lets
- * the face back when the finger is gone.
+ * The mark goes with the pulling finger — a part of the way, never farther than this — so the pull is
+ * seen working before the finger lets go; a tight spring follows the finger and lets the mark back
+ * when the finger is gone. A way that leads nowhere (left, or right without a secretary) barely gives.
  */
-const GIVE_PX = 16;
+const GIVE_PX = 24;
+const GIVE_SHARE = 0.4;
+const DEAD_GIVE_PX = 7;
+const DEAD_GIVE_SHARE = 0.12;
 const GIVE_SPRING = { stiffness: 700, damping: 40 };
 
-function readCount(key: string): number | null {
+/** Where the pupil looks while the mark is pulled: the way it is going. */
+const PULL_GAZE: Record<Pull, { x: number; y: number }> = {
+  down: { x: 0, y: 1 },
+  up: { x: 0, y: -0.6 },
+  right: { x: 1, y: 0 },
+  left: { x: -1, y: 0 },
+};
+
+function readCount(key: string): number {
   try {
-    const raw = window.localStorage.getItem(key);
-    return raw === null ? null : Number(raw) || 0;
+    return Number(window.localStorage.getItem(key)) || 0;
   } catch {
     return 0;
   }
-}
-
-/** Each gesture's own count; the taps of a director from before the split are his holds — he has tapped as much. */
-function countOf(key: string): number {
-  return readCount(key) ?? (key === TAP_KEY ? (readCount(SPEAK_KEY) ?? 0) : 0);
 }
 
 // the counts as an external store: the server (and the first client paint) sees the hint
@@ -89,7 +86,7 @@ function countOf(key: string): number {
 const usesListeners = new Set<() => void>();
 function bump(key: string): void {
   try {
-    window.localStorage.setItem(key, String(countOf(key) + 1));
+    window.localStorage.setItem(key, String(readCount(key) + 1));
   } catch {
     // a hint that never goes away is still a hint
   }
@@ -97,19 +94,21 @@ function bump(key: string): void {
 }
 
 /** Which parts of the hint are still shown, as bits — a number, so the snapshot compares by value. */
-const HOLD_BIT = 1;
-const PULL_BIT = 2;
+const VOICE_BIT = 1;
+const TEXT_BIT = 2;
 const TAP_BIT = 4;
+const SECRETARY_BIT = 8;
 function readHint(): number {
   return (
-    (countOf(SPEAK_KEY) < HINT_USES ? HOLD_BIT : 0) |
-    (countOf(PULL_KEY) < PULL_USES ? PULL_BIT : 0) |
-    (countOf(TAP_KEY) < HINT_USES ? TAP_BIT : 0)
+    (readCount(VOICE_KEY) < HINT_USES ? VOICE_BIT : 0) |
+    (readCount(TEXT_KEY) < PULL_USES ? TEXT_BIT : 0) |
+    (readCount(SECRETARY_KEY) < PULL_USES ? SECRETARY_BIT : 0) |
+    (readCount(TAP_KEY) < HINT_USES ? TAP_BIT : 0)
   );
 }
 
-/** Which parts of the gesture hint are still to be shown — the screen puts it at the bottom. */
-export type LeverHint = { hold: boolean; pull: boolean; tap: boolean };
+/** Which of the mark's ways are still to be taught — the screen puts the line at the bottom. */
+export type LeverHint = { voice: boolean; text: boolean; secretary: boolean; tap: boolean };
 
 export function useLeverHint(): LeverHint {
   const bits = useSyncExternalStore(
@@ -120,7 +119,18 @@ export function useLeverHint(): LeverHint {
     readHint,
     () => 0,
   );
-  return useMemo(() => ({ hold: (bits & HOLD_BIT) !== 0, pull: (bits & PULL_BIT) !== 0, tap: (bits & TAP_BIT) !== 0 }), [bits]);
+  return useMemo(
+    () => ({ voice: (bits & VOICE_BIT) !== 0, text: (bits & TEXT_BIT) !== 0, secretary: (bits & SECRETARY_BIT) !== 0, tap: (bits & TAP_BIT) !== 0 }),
+    [bits],
+  );
+}
+
+/** What the pulling finger is doing: which way it goes (null — a way that leads nowhere), far enough or not. */
+type Drag = { dir: Pull | null; armed: boolean };
+
+/** The way of a finger `dx`, `dy` away from where it came down: the longer side wins. */
+function pullOf(dx: number, dy: number): Pull {
+  return Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up";
 }
 
 /**
@@ -132,13 +142,15 @@ const Face = memo(Mascot);
 const QuietTextSheet = memo(TextSheet);
 
 /**
- * The mascot as the one lever of the screen (D-60): hold — it shivers and listens (the
- * same pipeline as the voice button had), release — the phrase goes to the parser; tap —
- * the summary again and the cards thrown anew; pull down — the typed input. Pointer
- * capture and a dead touch-action keep the page still under the finger.
+ * The mascot as the one lever of the screen (D-60, D-212). It is pulled, never held: down — it
+ * listens (the recording goes on with the finger off the mark; a tap sends it, a pull up drops it),
+ * up — the typed input, right — the secretary comes out, left — nothing yet. A tap — the summary and
+ * the balls. Nothing is written round the mark: it answers the pull itself — it goes a little with
+ * the finger, its pupil looks where it is pulled, and a way pulled far enough shows on it what letting
+ * go will do. Pointer capture and a dead touch-action keep the page still under the finger.
  *
  * Memoised (D-178): a tap on Пульс or Лента renders the page again, and the lever only when its own
- * props changed — the screen keeps `onTap`, `onHold`, `pin`, `gaze`, `carry` and `around` stable.
+ * props changed — the screen keeps `onTap`, `onPullRight`, `onPeek`, `pin`, `gaze`, `carry` and `around` stable.
  */
 export const MascotLever = memo(function MascotLever({
   state,
@@ -152,7 +164,8 @@ export const MascotLever = memo(function MascotLever({
   pin = null,
   gaze = null,
   carry = null,
-  onHold,
+  onPullRight,
+  onPeek,
   around = null,
   play,
   thing = null,
@@ -170,27 +183,29 @@ export const MascotLever = memo(function MascotLever({
   play?: (act: MascotAct) => void;
   /** what the dot is for as long as it is set — the thing a failed phrase is about (a muted microphone, no signal) */
   thing?: GlyphId | null;
-  /** a short word of the mark's own under it, when no stage is said there — «Держите, пока говорите» */
+  /** a short word of the mark's own under it, when no stage is said there — «Скажите фразу, потом нажмите» */
   note?: string | null;
   onTap: () => void;
   size?: number;
   /** bumped when the face wakes up: a one-shot stretch */
   wakeKey?: number;
-  /** false — the employee's face: a tap only, no hold-to-speak and no pull-down */
+  /** false — the employee's face: a tap only, no pulls */
   voice?: boolean;
   /** what a tap does right now, for the screen reader (the confirmation says «отправлю») */
   label?: string;
   /** false when the screen says the stage itself — two «Отправляю…» would collide */
   caption?: boolean;
   /**
-   * Somebody picked on the waiting screen (D-84): holding the face records a task for them —
-   * their name in front of the phrase, their id to the parser.
+   * Somebody picked on the waiting screen (D-84): the pull down records a task for them —
+   * their name in front of the phrase, their id to the parser — and the pull up types one.
    */
   pin?: (Pin & { address: string }) | null;
-  /** where the resting face looks (the picked circle); the pipeline takes the eyes back */
+  /** where the resting face looks (the picked circle); the pipeline and a pull take the eyes back */
   gaze?: { x: number; y: number } | null;
-  /** the finger is on the face and the microphone is open — the pick card says so (D-84) */
-  onHold?: (held: boolean) => void;
+  /** the pull to the right: the secretary. Not given — the company has nobody to ask, the way is dead */
+  onPullRight?: () => void;
+  /** the mark is being pulled to the right, not let go yet: the secretary may look out already */
+  onPeek?: (peeking: boolean) => void;
   /**
    * What lives round the face and travels with it: the balls (D-178). Drawn in the face's own box,
    * under the face, so the face's glide carries them and nothing ever covers the face.
@@ -200,9 +215,8 @@ export const MascotLever = memo(function MascotLever({
   const stage = useIngestStore((s) => s.stage);
   // the holiday the face dresses for (D-119)
   const season = useMascotSeason();
-  // a recording started from somebody's orb on the waiting screen has its own card, with its
-  // own timer and its own «Готово»: the face only plays the pose, or the screen says it twice
-  // — and the card's recording answers no gesture, so «ведите вверх» would be a lie as well
+  // a recording started for somebody picked has the pick card as its caption, with its own timer,
+  // «Готово» and «Отмена»: the face only plays the pose, or the screen says it twice
   const fromOrb = useIngestStore((s) => s.address !== null);
   // a request said into the small secretary (D-99): the secretary listens, this mark stays itself
   const toSecretary = useIngestStore((s) => s.toSecretary);
@@ -222,39 +236,35 @@ export const MascotLever = memo(function MascotLever({
     [],
   );
 
-  const [shaking, setShaking] = useState(false);
   // The stretch of waking up plays once per wake, on the same face. It used to remount the face
-  // (`key={wakeKey}`), which restarted every animation of it from the first frame — and after a
-  // hold's shiver the stretch played again, in the middle of listening.
+  // (`key={wakeKey}`), which restarted every animation of it from the first frame.
   const [waking, setWaking] = useState(false);
   const [wakeSeen, setWakeSeen] = useState(wakeKey);
   if (wakeSeen !== wakeKey) {
     setWakeSeen(wakeKey);
     setWaking(true);
   }
-  // this face is being held with the microphone open — the screen may want to know
-  const setHeld = useCallback((value: boolean) => onHold?.(value), [onHold]);
-  const [cancelArmed, setCancelArmed] = useState(false);
-  // the finger is on this face with the microphone open: only then does «ведите вверх» mean anything
-  const [holding, setHolding] = useState(false);
-  // the voice swells the blob; painted into a CSS variable of the face's wrapper (below)
-  const faceRef = useRef<HTMLSpanElement>(null);
-  // the face's button: the voice level lives on it, so the face and the rings round it both read it
+  // the face's button: the voice level lives on it, so the face and the waves round it both read it
   const leverRef = useRef<HTMLButtonElement>(null);
   const timerRef = useRef<HTMLSpanElement>(null);
 
-  // the give under the finger: a motion value, not state — a pointer move must not re-render the face
-  const pull = useMotionValue(0);
-  const give = useSpring(pull, GIVE_SPRING);
+  // the give under the finger: motion values, not state — a pointer move must not re-render the face
+  const pullX = useMotionValue(0);
+  const pullY = useMotionValue(0);
+  const giveX = useSpring(pullX, GIVE_SPRING);
+  const giveY = useSpring(pullY, GIVE_SPRING);
+  // what the finger is doing, for the drawing: changes only when the way or its arming does
+  const [drag, setDrag] = useState<Drag | null>(null);
+  const dragRef = useRef<Drag | null>(null);
+  const moveDrag = useCallback((next: Drag | null) => {
+    const now = dragRef.current;
+    if (now === next || (now && next && now.dir === next.dir && now.armed === next.armed)) return;
+    dragRef.current = next;
+    setDrag(next);
+  }, []);
   // a finger (or a button) is down on the face — a hovering mouse moves nothing
   const pressed = useRef(false);
-
-  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const holdFired = useRef(false);
-  // when the hold fired and the microphone was asked for: a release soon after is a tap that lingered
-  const heldAt = useRef(0);
-  const pulledDown = useRef(false);
-  // the finger travelled before the hold fired: a gesture, not a hold — and not a tap either
+  // the finger has travelled: a pull, not a tap
   const moved = useRef(false);
   const start = useRef({ x: 0, y: 0 });
 
@@ -264,11 +274,11 @@ export const MascotLever = memo(function MascotLever({
   // waiting for the throw is NOT busy — there the face is the send button (D-60, sixth)
   const busy = stage === "uploading" || stage === "transcribing" || stage === "parsing" || stage === "sending";
 
-  // a held phrase that has reached the parser is the hold learned — a slip of the finger is not
+  // a pulled phrase that has reached the parser is the pull learned — a slip of the finger is not
   useEffect(() => {
     if (!voice) return;
     return useIngestStore.subscribe((current, previous) => {
-      if (current.stage === "parsing" && previous.stage !== "parsing" && current.source === "voice") bump(SPEAK_KEY);
+      if (current.stage === "parsing" && previous.stage !== "parsing" && current.source === "voice") bump(VOICE_KEY);
     });
   }, [voice]);
 
@@ -302,128 +312,153 @@ export const MascotLever = memo(function MascotLever({
     return () => clearInterval(id);
   }, [recording, recordingStartedAt]);
 
-  const clearHold = useCallback(() => {
-    if (holdTimer.current !== null) clearTimeout(holdTimer.current);
-    holdTimer.current = null;
-  }, []);
+  /**
+   * Which ways lead somewhere right now. While this mark records the only pull is up — «отмена»;
+   * the voice starts only from a stage the pipeline can start from; the secretary only when the
+   * screen has one to call.
+   */
+  const open = useCallback(
+    (dir: Pull): boolean => {
+      const now = useIngestStore.getState();
+      if (now.stage === "recording") return dir === "up" && !now.toSecretary;
+      if (dir === "down") return now.stage === "idle" || now.stage === "error" || now.stage === "question" || now.stage === "kept";
+      if (dir === "up") return true;
+      if (dir === "right") return onPullRight !== undefined;
+      return false;
+    },
+    [onPullRight],
+  );
+
+  const letGo = useCallback(() => {
+    pressed.current = false;
+    moved.current = false;
+    pullX.set(0);
+    pullY.set(0);
+    if (dragRef.current?.dir === "right") onPeek?.(false);
+    moveDrag(null);
+  }, [pullX, pullY, moveDrag, onPeek]);
+
+  // The phrase went on its way while a finger was still on the mark («Готово» on the pick card, a
+  // parse that came back): the button is disabled from that moment and no release will reach it —
+  // the pull is forgotten here, or the mark would stay where the finger left it
+  useEffect(
+    () =>
+      useIngestStore.subscribe((current, previous) => {
+        if (current.stage === previous.stage || !pressed.current) return;
+        if (current.stage !== "idle" && current.stage !== "recording" && current.stage !== "error" && current.stage !== "question" && current.stage !== "kept") letGo();
+      }),
+    [letGo],
+  );
 
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
       if (busy || !voice) return;
       pressed.current = true;
+      moved.current = false;
       event.currentTarget.setPointerCapture(event.pointerId);
       start.current = { x: event.clientX, y: event.clientY };
-      holdFired.current = false;
-      pulledDown.current = false;
-      moved.current = false;
-      setCancelArmed(false);
-      clearHold();
-      holdTimer.current = setTimeout(() => {
-        holdTimer.current = null;
-        holdFired.current = true;
-        heldAt.current = performance.now();
-        // the shiver: a short one-shot before the listening pose takes over — and it ends the stretch
-        // of a wake tapped a moment ago, or the stretch would start over once the shiver is done
-        setWaking(false);
-        setShaking(true);
-        setTimeout(() => setShaking(false), 220);
-        haptic([15, 30, 15]);
-        setHolding(true);
-        setHeld(true);
-        // not awaited: stop and cancel settle with an opening microphone in the store itself
-        void (pin ? startVoice(pin.address, { id: pin.id, name: pin.name }) : startVoice());
-      }, HOLD_MS);
     },
-    [busy, clearHold, startVoice, voice, pin, setHeld],
+    [busy, voice],
   );
 
   const onPointerMove = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
+      if (!pressed.current) return;
       const dx = event.clientX - start.current.x;
       const dy = event.clientY - start.current.y;
-      if (holdFired.current) {
-        setCancelArmed(-dy >= CANCEL_DISTANCE_PX);
-        if (pressed.current) pull.set(dy < 0 ? -Math.min(GIVE_PX, -dy / 4) : 0);
-        return;
-      }
-      if (!pressed.current) return;
-      pull.set(dy > 0 ? Math.min(GIVE_PX, dy / 3) : 0);
-      if (!moved.current && Math.hypot(dx, dy) > SLOP_PX) {
-        // a finger on its way somewhere: a gesture, not a hold — the microphone never opens under it
+      const far = Math.hypot(dx, dy);
+      if (!moved.current) {
+        if (far <= SLOP_PX) return;
         moved.current = true;
-        clearHold();
       }
-      if (dy >= TEXT_DISTANCE_PX && !pulledDown.current) {
-        // a pull, not a hold: the microphone never starts
-        pulledDown.current = true;
-        clearHold();
-      }
+      const dir = pullOf(dx, dy);
+      const live = open(dir);
+      // the mark goes with the finger along the way pulled; a dead way barely gives
+      const along = dir === "down" || dir === "up" ? dy : dx;
+      const give = Math.sign(along) * Math.min(live ? GIVE_PX : DEAD_GIVE_PX, Math.abs(along) * (live ? GIVE_SHARE : DEAD_GIVE_SHARE));
+      pullX.set(dir === "left" || dir === "right" ? give : 0);
+      pullY.set(dir === "down" || dir === "up" ? give : 0);
+      const recordingNow = useIngestStore.getState().stage === "recording";
+      const armed = live && Math.abs(along) >= (recordingNow ? CANCEL_DISTANCE_PX : PULL_PX);
+      const before = dragRef.current;
+      // the way has just armed: a tick in the hand — letting go now does it
+      if (armed && !(before?.armed && before.dir === dir)) haptic(12);
+      if ((before?.dir === "right") !== (dir === "right" && live)) onPeek?.(dir === "right" && live);
+      moveDrag({ dir: live ? dir : null, armed });
     },
-    [clearHold, pull],
+    [open, pullX, pullY, moveDrag, onPeek],
   );
 
-  const onPointerUp = useCallback((event?: ReactPointerEvent<HTMLButtonElement>) => {
-    clearHold();
-    pressed.current = false;
-    pull.set(0);
-    // a finger's tap ticks here: its touchend is cancelled (below), so the app's click listener that
-    // ticks every other tap never hears one (D-147, D-173); a mouse still clicks and ticks there.
-    // After the tap's own work, as that listener does: a pattern of the tap's own wins
-    const tick = () => {
-      if (event?.pointerType !== "touch") return;
-      const at = Date.now();
-      setTimeout(() => tapHaptic(at), 0);
-    };
-    if (!voice) {
-      tick();
-      onTap();
-      return;
-    }
-    if (pulledDown.current) {
-      pulledDown.current = false;
-      moved.current = false;
-      setTextOpen(true);
-      bump(PULL_KEY);
-      return;
-    }
-    if (!holdFired.current) {
-      // a finger that went somewhere and came off short of the pull: the gesture was let go
-      if (moved.current) {
-        moved.current = false;
+  const onPointerUp = useCallback(
+    (event?: ReactPointerEvent<HTMLButtonElement>) => {
+      // a finger's tap ticks here: its touchend is cancelled (below), so the app's click listener that
+      // ticks every other tap never hears one (D-147, D-173); a mouse still clicks and ticks there.
+      // After the tap's own work, as that listener does: a pattern of the tap's own wins
+      const tick = () => {
+        if (event?.pointerType !== "touch") return;
+        const at = Date.now();
+        setTimeout(() => tapHaptic(at), 0);
+      };
+      if (!voice) {
+        tick();
+        onTap();
         return;
       }
-      tick();
-      bump(TAP_KEY);
-      onTap();
-      return;
-    }
-    holdFired.current = false;
-    setHolding(false);
-    setHeld(false);
-    if (cancelArmed) {
-      // swiped away: the recording goes up in dust, with the sound of a step back
-      setCancelArmed(false);
-      cancelVoice();
-      play?.("poof");
-      sound("back");
-      return;
-    }
-    if (performance.now() - heldAt.current < TAP_LINGER_MS) {
-      // a tap that lingered past the hold: the microphone had barely opened — nothing said, the
-      // recording is dropped and the tap is done. With somebody picked the tap is their microphone,
-      // and its own «слушаю» follows at once — no step back before it
-      cancelVoice();
-      if (!pin) sound("back");
-      tick();
-      bump(TAP_KEY);
-      onTap();
-      return;
-    }
-    // shorter than a phrase can be, the store answers «record_too_short» and the screen pinches
-    void stopVoice();
-  }, [cancelArmed, cancelVoice, clearHold, onTap, stopVoice, voice, setHeld, pull, play, pin]);
+      // a release with no press of this lever's own (the press came while the phrase was in flight)
+      if (!pressed.current) return;
+      const done = dragRef.current;
+      const wasMoved = moved.current;
+      letGo();
+      const now = useIngestStore.getState();
+      const mine = now.stage === "recording" && !now.toSecretary;
 
-  // Every gesture of the face — tap, hold, pull — is done by the pointer events above, so the click a
+      if (done?.armed && done.dir) {
+        if (mine) {
+          // pulled away: the recording goes up in dust, with the sound of a step back
+          cancelVoice();
+          play?.("poof");
+          sound("back");
+          return;
+        }
+        if (done.dir === "down") {
+          haptic([15, 30, 15]);
+          // not awaited: stop and cancel settle with an opening microphone in the store itself
+          void (pin ? startVoice(pin.address, { id: pin.id, name: pin.name }) : startVoice());
+          return;
+        }
+        if (done.dir === "up") {
+          tick();
+          bump(TEXT_KEY);
+          // for somebody picked the typed order is theirs too (the sheet opens on the request)
+          if (pin) useComposeStore.getState().request("", pin);
+          else setTextOpen(true);
+          return;
+        }
+        if (done.dir === "right") {
+          tick();
+          bump(SECRETARY_KEY);
+          onPullRight?.();
+        }
+        return;
+      }
+      // a finger that went somewhere and came off short of the way: the pull was let go
+      if (wasMoved) return;
+      if (mine) {
+        // the tap that ends the phrase; shorter than a phrase can be, the store answers
+        // «record_too_short» and the screen pinches
+        tick();
+        void stopVoice();
+        return;
+      }
+      // a tap, however long the finger stayed: nothing is held on the mark any more
+      tick();
+      bump(TAP_KEY);
+      onTap();
+    },
+    [cancelVoice, letGo, onTap, onPullRight, stopVoice, startVoice, voice, play, pin],
+  );
+
+  // Every gesture of the face — tap and pull — is done by the pointer events above, so the click a
   // browser makes from a finger's touch afterwards is never needed. It was harmful: by the time it
   // comes the tap has already changed the screen, and the browser aims it anew at the same point —
   // at the ball that slid under the finger (the «Дела» ball shut the card the tap had just opened)
@@ -432,34 +467,27 @@ export const MascotLever = memo(function MascotLever({
     if (event.cancelable) event.preventDefault();
   }, []);
 
-  const onPointerCancel = useCallback(() => {
-    clearHold();
-    pressed.current = false;
-    pull.set(0);
-    pulledDown.current = false;
-    moved.current = false;
-    if (holdFired.current) {
-      holdFired.current = false;
-      // the store drops a microphone still opening too: its stream is closed the moment it comes
-      cancelVoice();
-    }
-    setHolding(false);
-    setHeld(false);
-    setCancelArmed(false);
-  }, [cancelVoice, clearHold, setHeld, pull]);
+  // the browser took the touch away: the pull is forgotten; a recording goes on — no finger holds it
+  const onPointerCancel = letGo;
 
   // The pipeline plays on this face, where the director is already looking: no second
   // mascot over the screen, the same one listens, saves, reads, sorts and throws (D-60).
   // the pipeline owns the face whatever the gestures are: while the batch flies the face
-  // throws it, even though holding is off at that moment (the phrase is already in hand)
+  // throws it, even though the pulls are off at that moment (the phrase is already in hand)
   // — all but the secretary's dictation: the small secretary listens to that, this mark stays itself
   const pipeline = stage === "recording" && toSecretary ? undefined : STAGE_FACE[stage];
-  const face: MascotState = pipeline ?? state;
+  // a way armed shows what letting go will do, on the mark itself — where the finger does not cover
+  // it: pulled down far enough the ring is already open to listen, pulled up the dot is lines of text
+  const armed = drag?.armed && !recording ? drag.dir : null;
+  const cancelArmed = recording && drag?.armed === true;
+  const face: MascotState = pipeline ?? (armed === "down" ? "listening" : state);
+  const faceThing = armed === "up" ? "lines" : thing;
+  const faceGaze = drag?.dir && !recording ? PULL_GAZE[drag.dir] : gaze;
   // a recording for a picked person has the pick card as its caption (timer, «Готово»); the
-  // face keeps only the red «Отпустите, чтобы отменить» of its own gesture
+  // face keeps only the red «Отпустите — отменю» of its own gesture
   const stageLine =
     caption && (cancelArmed || !(fromOrb && recording)) && !(stage === "recording" && toSecretary) ? STAGE_LINE[stage] : undefined;
-  // the mark's own short word when no stage is said — «Держите, пока говорите» after a hold too short
+  // the mark's own short word when no stage is said
   const line = stageLine ?? (caption ? (note ?? undefined) : undefined);
 
   return (
@@ -471,11 +499,18 @@ export const MascotLever = memo(function MascotLever({
         {/* the size the screen asked for is a scale, not a new face: growing and shrinking
             rides the same spring as the box and never re-draws the SVG mid-flight; it stands
             above whatever is round it */}
-        <motion.div initial={false} animate={{ scale: size / BASE }} transition={SPRING} style={{ y: give }} className="relative z-[1] flex items-center justify-center">
+        <motion.div initial={false} animate={{ scale: size / BASE }} transition={SPRING} style={{ x: giveX, y: giveY }} className="relative z-[1] flex items-center justify-center">
           <button
             ref={leverRef}
             type="button"
-            aria-label={recording ? "Идёт запись, отпустите, чтобы отправить" : (label ?? (voice ? "Маскот: удержите — говорите, нажмите — задачи, сообщения, эфир, календарь, потяните вниз — текст" : "Маскот: нажмите — дела"))}
+            aria-label={
+              recording
+                ? "Идёт запись: нажмите — отправить, потяните вверх — отменить"
+                : (label ??
+                  (voice
+                    ? `Маскот: потяните вниз — говорите, вверх — текст${onPullRight ? ", вправо — секретарь" : ""}, нажмите — задачи, сообщения, эфир, календарь`
+                    : "Маскот: нажмите — дела"))
+            }
             disabled={busy}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
@@ -485,6 +520,8 @@ export const MascotLever = memo(function MascotLever({
             onContextMenu={(event) => event.preventDefault()}
             data-testid="mascot-lever"
             data-recording={recording ? "1" : "0"}
+            data-pull={drag?.dir ?? undefined}
+            data-armed={drag?.armed ? "1" : undefined}
             // press answers in the same frame as the finger (DESIGN §2: press = scale only)
             className="relative flex items-center justify-center rounded-full transition-transform duration-[120ms] ease-out active:scale-[0.97] disabled:active:scale-100"
             style={{
@@ -504,14 +541,13 @@ export const MascotLever = memo(function MascotLever({
               className="absolute inset-0 rounded-full"
               style={{
                 background: "var(--danger)",
-                opacity: recording && cancelArmed ? 0.22 : 0,
+                opacity: cancelArmed ? 0.22 : 0,
                 transition: "opacity var(--t-instant) var(--ease-out)",
               }}
             />
             <span
-              ref={faceRef}
               className="flex items-center justify-center [@media(max-height:760px)]:scale-[0.82]"
-              style={{ animation: shaking ? "mascot-shake 220ms ease-in-out both" : waking ? "mascot-wake 520ms cubic-bezier(0.34, 1.4, 0.64, 1) both" : "none" }}
+              style={{ animation: waking ? "mascot-wake 520ms cubic-bezier(0.34, 1.4, 0.64, 1) both" : "none" }}
               onAnimationEnd={(event) => {
                 // the face's own animations end in here too: only the stretch of this wrapper counts
                 if (event.target === event.currentTarget && event.animationName === "mascot-wake") setWaking(false);
@@ -519,7 +555,15 @@ export const MascotLever = memo(function MascotLever({
             >
               {/* an act plays over a gaze as well: the screen gives one while the face looks at somebody
                   only when it was called on purpose — a failure, a pinch (idle acts are off then) */}
-              <Face state={face} size={BASE} act={pipeline ? null : act} gaze={pipeline ? null : gaze} carry={pipeline ? null : carry} season={season} thing={pipeline ? null : thing} />
+              <Face
+                state={face}
+                size={BASE}
+                act={pipeline || armed ? null : act}
+                gaze={pipeline ? null : faceGaze}
+                carry={pipeline ? null : carry}
+                season={season}
+                thing={pipeline ? null : faceThing}
+              />
             </span>
           </button>
         </motion.div>
@@ -532,14 +576,19 @@ export const MascotLever = memo(function MascotLever({
               style={{ background: "color-mix(in srgb, var(--surface) 88%, transparent)", color: cancelArmed ? "var(--danger)" : "var(--text)" }}
               data-testid={stageLine ? undefined : "lever-note"}
             >
-              {cancelArmed ? "Отпустите, чтобы отменить" : line}
+              {cancelArmed ? "Отпустите — отменю" : line}
               {recording && !cancelArmed ? (
                 <span ref={timerRef} className="nums ml-1.5 text-muted">
                   0:00
                 </span>
               ) : null}
             </span>
-            {recording && holding && !cancelArmed ? <span className="mt-0.5 text-[12px] leading-4 text-muted">ведите вверх, чтобы отменить</span> : null}
+            {/* the recording goes on by itself: how it ends is said for as long as it runs */}
+            {recording && !fromOrb && !cancelArmed ? (
+              <span className="mt-0.5 text-[12px] leading-4 text-muted" data-testid="lever-recording-ways">
+                нажмите — отправлю · вверх — отмена
+              </span>
+            ) : null}
           </span>
         ) : null}
       </motion.div>

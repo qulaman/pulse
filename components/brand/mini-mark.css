@@ -30,7 +30,7 @@
   fill: currentColor;
 }
 .mm-bars path {
-  stroke-width: 2.5;
+  stroke-width: 2;
   stroke-linecap: round;
 }
 .mm-ring,
@@ -62,8 +62,9 @@
 .mini-mark[data-state="listening"] .mm-arcs {
   opacity: 1;
 }
+/* each third starts back a little and steps past its place, as the arcs of the big mark do */
 .mini-mark[data-state="busy"] .mm-arcs {
-  animation: mm-step 1.5s var(--ease-in-out) infinite;
+  animation: mm-step 1.5s cubic-bezier(0.55, -0.2, 0.3, 1.2) infinite;
 }
 .mini-mark[data-state="busy"] .mm-dot {
   animation: mm-tick 0.5s var(--ease-in-out) infinite alternate both;
@@ -106,9 +107,11 @@
 }
 
 @keyframes mm-beat {
-  0%, 32%, 100% { transform: scale(1); }
-  11% { transform: scale(1.3); }
-  21% { transform: scale(0.94); }
+  0%, 40%, 100% { transform: scale(1); }
+  6% { transform: scale(1.3); }
+  13% { transform: scale(0.96); }
+  20% { transform: scale(1.16); }
+  29% { transform: scale(0.97); }
 }
 @keyframes mm-wave {
   0%, 6% { opacity: 0; transform: scale(1); }

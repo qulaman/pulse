@@ -352,7 +352,7 @@ function EmptyState({
       <div className="flex flex-col items-center rounded-[20px] border border-border/70 px-6 py-10 text-center">
         <Mascot state="calm" size={64} />
         <p className="mt-4 font-display text-[17px] font-semibold">Пока ничего не отправлено</p>
-        <p className="mt-1 text-[14px] leading-[19px] text-muted">Задача — голосом: удержите маскота на Пульсе и скажите, что сделать</p>
+        <p className="mt-1 text-[14px] leading-[19px] text-muted">Задача — голосом: потяните маскота на Пульсе вниз и скажите, что сделать</p>
       </div>
     );
   }

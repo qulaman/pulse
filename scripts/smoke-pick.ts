@@ -1,10 +1,10 @@
 /**
  * Pulse, the waiting screen (D-84): a tap on an idle person's circle wakes the face, the face
  * looks at them (gaze + a dashed line), and the ways to give them a task come out over its
- * head — «Записать», «Текстом», or holding the face. A tap on a lit circle — somebody at work
+ * head — «Записать», «Текстом», or pulling the face down (D-212). A tap on a lit circle — somebody at work
  * (D-118) — opens his card with his tasks, each a link to its screen, the face looks at him, and a
  * touch elsewhere puts the card away. Read-only by default: it picks, opens the text sheet and
- * the card, closes. With FAKE_MIC_WAV it also holds the face with a person picked and
+ * the card, closes. With FAKE_MIC_WAV it also pulls the face down with a person picked, taps it to end the phrase and
  * checks that the parsed task is for that person — that writes an ai_logs row and an audio
  * file (no task is sent).
  *   pnpm smoke:pick                                  (against http://localhost:3000)
@@ -78,14 +78,18 @@ async function main() {
       const name = ((await card.locator(".truncate").first().textContent()) ?? "").trim();
       const lever = page.locator('[data-testid="mascot-lever"]');
       const box = await lever.boundingBox();
-      if (!box) throw new Error("no face to hold");
-      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      if (!box) throw new Error("no face to pull");
+      const middle = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      await page.mouse.move(middle.x, middle.y);
       await page.mouse.down();
-      await page.waitForTimeout(700);
-      record("удержание маскота пишет", (await lever.getAttribute("data-recording")) === "1");
-      await page.screenshot({ path: join(SHOTS, "p3-holding.png") });
-      await page.waitForTimeout(3200);
+      await page.mouse.move(middle.x, middle.y + 64, { steps: 6 });
       await page.mouse.up();
+      await page.waitForTimeout(700);
+      record("тяга маскота вниз пишет", (await lever.getAttribute("data-recording")) === "1");
+      await page.screenshot({ path: join(SHOTS, "p3-recording.png") });
+      await page.waitForTimeout(3200);
+      // the recording goes on by itself: a tap on the mark ends the phrase
+      await page.mouse.click(middle.x, middle.y);
       await page.getByText(/Понял так/).waitFor({ timeout: 45_000 });
       await page.waitForTimeout(600);
       await page.screenshot({ path: join(SHOTS, "p4-parsed.png") });

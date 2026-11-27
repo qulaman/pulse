@@ -70,8 +70,8 @@ function Card({ children }: { children?: ReactNode }) {
 function Slash() {
   return (
     <>
-      <path d="M-17 17 L17 -17" {...cut} strokeWidth="9" />
-      <path d="M-17 17 L17 -17" {...line} strokeWidth="4" />
+      <path d="M-17 17 L17 -17" {...cut} strokeWidth="7.4" />
+      <path d="M-17 17 L17 -17" {...line} strokeWidth="3.2" />
     </>
   );
 }
@@ -79,7 +79,7 @@ function Slash() {
 /** The rays of the beaming dot: eight, long and short in turn, from just off the dot outwards. */
 const RAYS = Array.from({ length: 8 }, (_, n) => {
   const angle = (n * Math.PI) / 4;
-  const [from, to] = [19.5, n % 2 ? 22.5 : 25.5];
+  const [from, to] = [18, n % 2 ? 21.5 : 25.5];
   const at = (r: number) => `${(Math.sin(angle) * r).toFixed(2)} ${(-Math.cos(angle) * r).toFixed(2)}`;
   return `M${at(from)} L${at(to)}`;
 });
@@ -91,52 +91,52 @@ function draw(id: GlyphId, count: number, hot: boolean): ReactNode {
     case "card":
       return (
         <Card>
-          <path d="M-11 -4 H6 M-11 4 H-1" {...cut} strokeWidth="3.4" />
+          <path d="M-11 -4 H6 M-11 4 H-1" {...cut} strokeWidth="2.8" />
         </Card>
       );
     case "card-bang":
       return (
         <Card>
-          <path d="M0 -7 V1.5" {...cut} strokeWidth="4.2" />
-          <circle cx="0" cy="8" r="2.4" fill={INK} />
+          <path d="M0 -7 V1.5" {...cut} strokeWidth="3.6" />
+          <circle cx="0" cy="8" r="2.1" fill={INK} />
         </Card>
       );
     case "card-bang2":
       return (
         <Card>
-          <path d="M-5.5 -7 V1.5 M5.5 -7 V1.5" {...cut} strokeWidth="4.2" />
-          <circle cx="-5.5" cy="8" r="2.4" fill={INK} />
-          <circle cx="5.5" cy="8" r="2.4" fill={INK} />
+          <path d="M-5.5 -7 V1.5 M5.5 -7 V1.5" {...cut} strokeWidth="3.6" />
+          <circle cx="-5.5" cy="8" r="2.1" fill={INK} />
+          <circle cx="5.5" cy="8" r="2.1" fill={INK} />
         </Card>
       );
     case "card-x":
       return (
         <Card>
-          <path d="M-6 -6 L6 6 M6 -6 L-6 6" {...cut} strokeWidth="4" />
+          <path d="M-6 -6 L6 6 M6 -6 L-6 6" {...cut} strokeWidth="3.2" />
         </Card>
       );
     case "check":
-      return <path d="M-16 1 L-5.5 11.5 L16 -11" {...line} strokeWidth="8.5" />;
+      return <path d="M-16 1 L-5.5 11.5 L16 -11" {...line} strokeWidth="5.4" />;
     case "question":
       return (
         <>
-          <path d="M-9.5 -9.5 A9.8 9.8 0 1 1 4 -0.5 Q0 2 0 7" {...line} strokeWidth="7.5" />
-          <circle cx="0" cy="17" r="4.4" fill="currentColor" />
+          <path d="M-9.5 -9.5 A9.8 9.8 0 1 1 4 -0.5 Q0 2 0 7" {...line} strokeWidth="5" />
+          <circle cx="0" cy="17" r="3.3" fill="currentColor" />
         </>
       );
     case "envelope":
       return (
         <>
           <rect x="-20" y="-14" width="40" height="28" rx="7" fill="currentColor" />
-          <path d="M-14 -8 L0 3.5 L14 -8" {...cut} strokeWidth="3.4" />
+          <path d="M-14 -8 L0 3.5 L14 -8" {...cut} strokeWidth="2.8" />
         </>
       );
     case "lines":
       return (
         <g className="bk-g-lines">
-          <path d="M-17 -12 H17" {...line} strokeWidth="7" />
-          <path d="M-17 0 H17" {...line} strokeWidth="7" />
-          <path d="M-17 12 H3" {...line} strokeWidth="7" />
+          <path d="M-17 -12 H17" {...line} strokeWidth="4.8" />
+          <path d="M-17 0 H17" {...line} strokeWidth="4.8" />
+          <path d="M-17 12 H3" {...line} strokeWidth="4.8" />
         </g>
       );
     case "stack": {
@@ -147,7 +147,7 @@ function draw(id: GlyphId, count: number, hot: boolean): ReactNode {
           {layers > 1 ? <rect x="-17" y="-14.5" width="35" height="25" rx="6.5" fill="currentColor" opacity="0.66" /> : null}
           <g className="bk-g-top">
             <rect x="-21" y="-9" width="36" height="26" rx="6.5" fill="currentColor" />
-            <path d="M-14 0.5 H3 M-14 8 H-5" {...cut} strokeWidth="3.2" />
+            <path d="M-14 0.5 H3 M-14 8 H-5" {...cut} strokeWidth="2.7" />
           </g>
           {/* a card of the stack is due within the hour */}
           {hot ? <circle cx="16" cy="-12" r="5.2" fill="var(--danger)" stroke={INK} strokeWidth="2" className="bk-g-hot" /> : null}
@@ -171,16 +171,16 @@ function draw(id: GlyphId, count: number, hot: boolean): ReactNode {
       return (
         <>
           <circle r="20" fill="currentColor" />
-          <path d="M0 0 V-11" {...cut} strokeWidth="3.6" className="bk-g-hand-min" />
-          <path d="M0 0 H7.5" {...cut} strokeWidth="3.6" className="bk-g-hand-hour" />
+          <path d="M0 0 V-12" {...cut} strokeWidth="2.8" className="bk-g-hand-min" />
+          <path d="M0 0 H7.5" {...cut} strokeWidth="2.8" className="bk-g-hand-hour" />
         </>
       );
     case "calendar":
       return (
         <>
           <rect x="-18" y="-15" width="36" height="33" rx="7.5" fill="currentColor" />
-          <path d="M-9 -20 V-13 M9 -20 V-13" {...line} strokeWidth="4.4" />
-          <path d="M-12 -5 H12" {...cut} strokeWidth="3" />
+          <path d="M-9 -20 V-13 M9 -20 V-13" {...line} strokeWidth="3.4" />
+          <path d="M-12 -5 H12" {...cut} strokeWidth="2.6" />
           <rect x="-11" y="1.5" width="8.6" height="8.6" rx="2.4" fill={INK} />
           {/* the day torn off: it falls and is gone */}
           <rect x="-7" y="-2" width="15" height="13" rx="3.4" fill="currentColor" stroke={INK} strokeWidth="1.6" className="bk-g-page" />
@@ -189,36 +189,36 @@ function draw(id: GlyphId, count: number, hot: boolean): ReactNode {
     case "cup":
       return (
         <>
-          <path d="M-8 -17 q-4 -4 0 -8 M3 -17 q-4 -4 0 -8" {...line} strokeWidth="2.8" className="bk-g-steam" />
-          <path d="M9 -5 h3.5 a6.5 6.5 0 0 1 0 13 h-4" {...line} strokeWidth="4.2" />
+          <path d="M-8 -17 q-4 -4 0 -8 M3 -17 q-4 -4 0 -8" {...line} strokeWidth="2.2" className="bk-g-steam" />
+          <path d="M9 -5 h3.5 a6.5 6.5 0 0 1 0 13 h-4" {...line} strokeWidth="3.4" />
           <path d="M-17 -9 H10 V3 A12 12 0 0 1 -2 15 H-5 A12 12 0 0 1 -17 3 Z" fill="currentColor" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" />
-          <path d="M-19 20 H12" {...line} strokeWidth="3.4" />
+          <path d="M-19 20 H12" {...line} strokeWidth="2.8" />
         </>
       );
     case "megaphone":
       return (
         <>
           <path d="M-19 -5 L1 -15 V15 L-19 5 Z" fill="currentColor" stroke="currentColor" strokeWidth="5" strokeLinejoin="round" />
-          <path d="M-13 8 V15" {...line} strokeWidth="6" />
-          <path d="M8 -7 A9 9 0 0 1 8 7" {...line} strokeWidth="3.6" className="bk-g-arc bk-g-arc-1" />
-          <path d="M14 -13 A17 17 0 0 1 14 13" {...line} strokeWidth="3.6" className="bk-g-arc bk-g-arc-2" />
+          <path d="M-13 8 V15" {...line} strokeWidth="5" />
+          <path d="M8 -7 A9 9 0 0 1 8 7" {...line} strokeWidth="2.8" className="bk-g-arc bk-g-arc-1" />
+          <path d="M14 -13 A17 17 0 0 1 14 13" {...line} strokeWidth="2.8" className="bk-g-arc bk-g-arc-2" />
         </>
       );
     case "bubble":
       return (
         <>
           <path d="M-12 -16 H12 A8 8 0 0 1 20 -8 V4 A8 8 0 0 1 12 12 H-4 L-13 19 V12 A8 8 0 0 1 -20 4 V-8 A8 8 0 0 1 -12 -16 Z" fill="currentColor" />
-          <circle cx="-9" cy="-2" r="2.9" fill={INK} className="bk-g-dot bk-g-dot-1" />
-          <circle cx="0" cy="-2" r="2.9" fill={INK} className="bk-g-dot bk-g-dot-2" />
-          <circle cx="9" cy="-2" r="2.9" fill={INK} className="bk-g-dot bk-g-dot-3" />
+          <circle cx="-9" cy="-2" r="2.4" fill={INK} className="bk-g-dot bk-g-dot-1" />
+          <circle cx="0" cy="-2" r="2.4" fill={INK} className="bk-g-dot bk-g-dot-2" />
+          <circle cx="9" cy="-2" r="2.4" fill={INK} className="bk-g-dot bk-g-dot-3" />
         </>
       );
     case "bubble-lines":
       return (
         <>
           <path d="M-12 -16 H12 A8 8 0 0 1 20 -8 V4 A8 8 0 0 1 12 12 H-4 L-13 19 V12 A8 8 0 0 1 -20 4 V-8 A8 8 0 0 1 -12 -16 Z" fill="currentColor" />
-          <path d="M-11 -6 H11" {...cut} strokeWidth="3.2" className="bk-g-write bk-g-write-1" />
-          <path d="M-11 2 H3" {...cut} strokeWidth="3.2" className="bk-g-write bk-g-write-2" />
+          <path d="M-11 -6 H11" {...cut} strokeWidth="2.7" className="bk-g-write bk-g-write-1" />
+          <path d="M-11 2 H3" {...cut} strokeWidth="2.7" className="bk-g-write bk-g-write-2" />
         </>
       );
     case "list":
@@ -226,8 +226,8 @@ function draw(id: GlyphId, count: number, hot: boolean): ReactNode {
         <>
           {[-13, 0, 13].map((y, row) => (
             <g key={y}>
-              <path d={`M-19 ${y} l3.6 3.6 l6.6 -7.4`} {...line} strokeWidth="3.6" className={`bk-g-tick bk-g-tick-${row + 1}`} />
-              <path d={`M-2 ${y} H${row === 2 ? 10 : 19}`} {...line} strokeWidth="5.6" opacity={0.9} />
+              <path d={`M-19 ${y} l3.6 3.6 l6.6 -7.4`} {...line} strokeWidth="3" className={`bk-g-tick bk-g-tick-${row + 1}`} />
+              <path d={`M-2 ${y} H${row === 2 ? 10 : 19}`} {...line} strokeWidth="4.2" opacity={0.9} />
             </g>
           ))}
         </>
@@ -236,7 +236,7 @@ function draw(id: GlyphId, count: number, hot: boolean): ReactNode {
       return (
         <g className="bk-g-sink">
           <rect x="-15" y="-18" width="30" height="36" rx="7" fill="currentColor" />
-          <path d="M-8 -4 V4 M-3 -9 V9 M2 -5 V5 M7 -2 V2" {...cut} strokeWidth="3" />
+          <path d="M-8 -4 V4 M-3 -9 V9 M2 -5 V5 M7 -2 V2" {...cut} strokeWidth="2.6" />
         </g>
       );
     case "send":
@@ -260,7 +260,7 @@ function draw(id: GlyphId, count: number, hot: boolean): ReactNode {
       return (
         <>
           <circle r="19.5" fill="currentColor" />
-          <circle r="13" {...cut} strokeWidth="2.6" />
+          <circle r="13.4" {...cut} strokeWidth="2" />
           <path d={STAR} transform="scale(0.36)" fill={INK} stroke={INK} strokeWidth="3" strokeLinejoin="round" />
         </>
       );
@@ -277,15 +277,15 @@ function draw(id: GlyphId, count: number, hot: boolean): ReactNode {
       return (
         <>
           <rect x="-7.5" y="-20" width="15" height="24" rx="7.5" fill="currentColor" />
-          <path d="M-13 -3 A13 13 0 0 0 13 -3 M0 10 V18 M-7 18.5 H7" {...line} strokeWidth="4" />
+          <path d="M-13 -3 A13 13 0 0 0 13 -3 M0 10 V18 M-7 18.5 H7" {...line} strokeWidth="3.2" />
           <Slash />
         </>
       );
     case "signal-off":
       return (
         <>
-          <circle cx="0" cy="13" r="4.4" fill="currentColor" />
-          <path d="M-9 3 A12.5 12.5 0 0 1 9 3 M-17 -5.5 A24 24 0 0 1 17 -5.5" {...line} strokeWidth="4.6" />
+          <circle cx="0" cy="13" r="3.6" fill="currentColor" />
+          <path d="M-9 3 A12.5 12.5 0 0 1 9 3 M-17 -5.5 A24 24 0 0 1 17 -5.5" {...line} strokeWidth="3.6" />
           <Slash />
         </>
       );
@@ -297,44 +297,44 @@ function draw(id: GlyphId, count: number, hot: boolean): ReactNode {
           <g className="bk-g-rays-turn">
             <g className="bk-g-rays">
               {RAYS.map((ray) => (
-                <path key={ray} d={ray} {...line} strokeWidth="4" />
+                <path key={ray} d={ray} {...line} strokeWidth="2.6" />
               ))}
             </g>
           </g>
-          <circle r="12.5" fill="currentColor" className="bk-g-sun" />
+          <circle r="11" fill="currentColor" className="bk-g-sun" />
         </>
       );
     // an eye shut: a level line — not an arc, an arc would smile
     case "shut":
-      return <path d="M-14 0 H14" {...line} strokeWidth="8" className="bk-g-doze" />;
+      return <path d="M-14 0 H14" {...line} strokeWidth="5" className="bk-g-doze" />;
     case "sound":
       return (
         <>
           {[-14, -7, 0, 7, 14].map((x, i) => (
-            <path key={x} d={`M${x} -13 V13`} {...line} strokeWidth="5" className={`bk-g-bar bk-g-bar-${i + 1}`} />
+            <path key={x} d={`M${x} -13 V13`} {...line} strokeWidth="3.8" className={`bk-g-bar bk-g-bar-${i + 1}`} />
           ))}
         </>
       );
     // nothing came through: a level that lies flat
     case "quiet":
-      return <path d="M-17 0 H-10 M-3.5 0 H3.5 M10 0 H17" {...line} strokeWidth="6.5" className="bk-g-flat" />;
+      return <path d="M-17 0 H-10 M-3.5 0 H3.5 M10 0 H17" {...line} strokeWidth="4.8" className="bk-g-flat" />;
     // a cup with the tag of a tea bag over its rim
     case "tea":
       return (
         <>
-          <path d="M-8 -17 q-4 -4 0 -8 M3 -17 q-4 -4 0 -8" {...line} strokeWidth="2.8" className="bk-g-steam" />
-          <path d="M9 -5 h3.5 a6.5 6.5 0 0 1 0 13 h-4" {...line} strokeWidth="4.2" />
+          <path d="M-8 -17 q-4 -4 0 -8 M3 -17 q-4 -4 0 -8" {...line} strokeWidth="2.2" className="bk-g-steam" />
+          <path d="M9 -5 h3.5 a6.5 6.5 0 0 1 0 13 h-4" {...line} strokeWidth="3.4" />
           <path d="M-17 -9 H10 V3 A12 12 0 0 1 -2 15 H-5 A12 12 0 0 1 -17 3 Z" fill="currentColor" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" />
           <path d="M-9 -9 V-1" {...cut} strokeWidth="1.8" />
           <rect x="-13" y="-1" width="8" height="8" rx="2" fill={INK} />
-          <path d="M-19 20 H12" {...line} strokeWidth="3.4" />
+          <path d="M-19 20 H12" {...line} strokeWidth="2.8" />
         </>
       );
     case "glass":
       return (
         <>
           <path d="M-12 -18 H12 L8.5 17 H-8.5 Z" fill="currentColor" stroke="currentColor" strokeWidth="4" strokeLinejoin="round" />
-          <path d="M-9 -6 q4.5 -3.4 9 0 t9 0" {...cut} strokeWidth="2.8" className="bk-g-swell" />
+          <path d="M-9 -6 q4.5 -3.4 9 0 t9 0" {...cut} strokeWidth="2.4" className="bk-g-swell" />
         </>
       );
     // «не беспокоить»
@@ -349,8 +349,8 @@ function draw(id: GlyphId, count: number, hot: boolean): ReactNode {
       return (
         <>
           <path d="M0 -20 L16.5 -13.5 V0 C16.5 10 9.5 17 0 21 C-9.5 17 -16.5 10 -16.5 0 V-13.5 Z" fill="currentColor" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" />
-          <path d="M0 -9 V2" {...cut} strokeWidth="4.2" />
-          <circle cx="0" cy="9.5" r="2.5" fill={INK} />
+          <path d="M0 -9 V2" {...cut} strokeWidth="3.6" />
+          <circle cx="0" cy="9.5" r="2.2" fill={INK} />
         </>
       );
     case "guest":
@@ -406,7 +406,7 @@ function draw(id: GlyphId, count: number, hot: boolean): ReactNode {
         <>
           <circle cx="0" cy="-14" r="3.6" fill="currentColor" />
           <path d="M-18 8 A18 18 0 0 1 18 8 Z" fill="currentColor" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" />
-          <path d="M-22 14.5 H22" {...line} strokeWidth="4.4" />
+          <path d="M-22 14.5 H22" {...line} strokeWidth="3.4" />
           <path d="M-9 -1 q3 -5 8 -6" {...cut} strokeWidth="2.4" />
         </>
       );
@@ -414,8 +414,8 @@ function draw(id: GlyphId, count: number, hot: boolean): ReactNode {
       return (
         <>
           <rect x="-18" y="-15" width="36" height="31" rx="6.5" fill="currentColor" />
-          <path d="M-18 -4 H18 M0 -15 V-4" {...cut} strokeWidth="3" />
-          <path d="M-5 5 H5" {...cut} strokeWidth="3" />
+          <path d="M-18 -4 H18 M0 -15 V-4" {...cut} strokeWidth="2.6" />
+          <path d="M-5 5 H5" {...cut} strokeWidth="2.6" />
         </>
       );
     case "plant":
@@ -442,14 +442,14 @@ export function Bit({ id }: { id: "z" | "spark" | "tune" | "drop" }) {
   if (id === "z") {
     return (
       <svg viewBox="-8 -8 16 16" width="16" height="16" aria-hidden>
-        <path d="M-4.5 -5 H4.5 L-4.5 5 H4.5" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M-4.5 -5 H4.5 L-4.5 5 H4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     );
   }
   if (id === "spark") {
     return (
       <svg viewBox="-8 -8 16 16" width="16" height="16" aria-hidden>
-        <path d="M0 -7.5 Q1 -1 7.5 0 Q1 1 0 7.5 Q-1 1 -7.5 0 Q-1 -1 0 -7.5 Z" fill="currentColor" />
+        <path d="M0 -8 Q0.8 -0.8 8 0 Q0.8 0.8 0 8 Q-0.8 0.8 -8 0 Q-0.8 -0.8 0 -8 Z" fill="currentColor" />
       </svg>
     );
   }
@@ -457,7 +457,7 @@ export function Bit({ id }: { id: "z" | "spark" | "tune" | "drop" }) {
     return (
       <svg viewBox="-8 -8 16 16" width="16" height="16" aria-hidden>
         <ellipse cx="-2.6" cy="4.4" rx="3.3" ry="2.6" fill="currentColor" />
-        <path d="M0.4 4.4 V-6 L5.6 -4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M0.4 4.4 V-6 L5.6 -4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     );
   }

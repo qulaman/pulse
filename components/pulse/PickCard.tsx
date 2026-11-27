@@ -40,13 +40,14 @@ const KEYS = (
 /**
  * The card over the face when a circle of the waiting screen is picked (D-84): the face has
  * turned to that person, and the ways to give them a task come out right over its head —
- * «Записать» (a tap starts, «Готово» stops), «Текстом», or simply hold the face as always.
- * Whichever way, the person rides along by id: the parser never has to guess who it is for.
+ * «Записать» (a tap starts, «Готово» stops), «Текстом», or the mark's own pulls — down to speak,
+ * up to type (D-212). Whichever way, the person rides along by id: the parser never has to guess
+ * who it is for.
  *
- * The card follows the pipeline: it shows its own timer while it records, steps aside for the
- * face's caption while the face is held, and leaves when the phrase goes to the parser.
+ * The card follows the pipeline: it shows its own timer, «Готово» and «Отмена» while it records,
+ * and leaves when the phrase goes to the parser.
  */
-export function PickCard({ picked, held = false, onClose }: { picked: Picked; held?: boolean; onClose: () => void }) {
+export function PickCard({ picked, onClose }: { picked: Picked; onClose: () => void }) {
   const stage = useIngestStore((s) => s.stage);
   const startedAt = useIngestStore((s) => s.recordingStartedAt);
   const pinnedHere = useIngestStore((s) => s.pinned?.id === picked.id);
@@ -127,12 +128,7 @@ export function PickCard({ picked, held = false, onClose }: { picked: Picked; he
           ) : null}
         </div>
 
-        {recording && held ? (
-          // the finger is on the face: the gesture itself ends it
-          <p className="mt-3 text-center text-[13px] leading-[18px] text-muted">
-            Отпустите — отправлю · <span className="text-text/80">вверх — отмена</span>
-          </p>
-        ) : stage === "recording" && !recording ? null : (
+        {stage === "recording" && !recording ? null : (
           <div className="mt-3 grid grid-cols-2 gap-2">
             {recording ? (
               <>
@@ -168,7 +164,7 @@ export function PickCard({ picked, held = false, onClose }: { picked: Picked; he
           </div>
         )}
         {!recording && stage !== "recording" ? (
-          <p className="mt-2.5 text-center text-[12px] leading-4 text-muted">или удержите маскота и говорите</p>
+          <p className="mt-2.5 text-center text-[12px] leading-4 text-muted">или потяните маскота вниз и говорите</p>
         ) : null}
       </div>
       {/* the tail: the card is the face's own speech, and it points at the face */}

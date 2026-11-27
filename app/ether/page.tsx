@@ -26,7 +26,7 @@ export default function EtherPage() {
           <Mascot state="calm" size={72} />
           <p className="mt-4 text-[16px] leading-[22px]">Объявлений пока нет</p>
           <p className="mt-1 text-[13px] leading-4 text-muted">
-            {isDirector ? "Удержите лицо на Пульсе и начните со слова «всем»" : "Здесь появятся объявления директора и «Ознакомился» под каждым"}
+            {isDirector ? "Потяните маскота на Пульсе вниз и начните со слова «всем»" : "Здесь появятся объявления директора и «Ознакомился» под каждым"}
           </p>
         </div>
       ) : (

@@ -98,7 +98,7 @@
 }
 /* a small mark: a dot in a ring, as one drawing */
 .idle-rider[data-kind="mark"] .idle-ink {
-  background: radial-gradient(closest-side, currentColor 30%, transparent 36% 66%, currentColor 72% 94%, transparent 100%);
+  background: radial-gradient(closest-side, currentColor 25%, transparent 32% 74%, currentColor 80% 95%, transparent 100%);
 }
 /* …and it lets go of a wave of its own when the big one passes */
 .idle-echo {

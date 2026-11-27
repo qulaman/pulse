@@ -68,6 +68,13 @@ function allMarkup(): string[] {
 }
 
 describe("mascot keyframes", () => {
+  // a var() as a keyframe's timing function is dropped by the browser: the segment silently takes
+  // the animation's own curve, and a spring written that way never plays
+  it("spell their timing functions out", () => {
+    const mark = readFileSync(join(process.cwd(), "components/brand/mark/mark.css"), "utf8");
+    expect(mark.match(/animation-timing-function:\s*var\([^)]*\)/g) ?? []).toEqual([]);
+  });
+
   it("declares every keyframes block once", () => {
     const seen = new Set<string>();
     const twice = DECLARED.filter((name) => (seen.has(name) ? true : (seen.add(name), false)));

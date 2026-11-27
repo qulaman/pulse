@@ -85,8 +85,8 @@ export function addressOf(person: Person): string {
 
 /**
  * How far under the middle of the face the assistant's own words reach. While the microphone
- * is open a pill with the stage and the timer hangs right under the head, and «ведите вверх,
- * чтобы отменить» under that (components/pulse/MascotLever.tsx): the box of the face is 76 px
+ * is open a pill with the stage and the timer hangs right under the head, and «нажмите —
+ * отправлю · вверх — отмена» under that (components/pulse/MascotLever.tsx): the box of the face is 76 px
  * of it and the two lines another 50. The floor starts below all of that — the first row used
  * to stand on those words exactly while the director was talking (владелец, 2026-09-18).
  */

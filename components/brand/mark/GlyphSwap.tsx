@@ -15,7 +15,8 @@ type Shown = Thing & { leaves: boolean };
  * The thing that leaves is drawn as it last stood — a stack goes with the count it had. A thing an
  * act has thrown or crushed (`leaves`) is gone already: nothing of it is drawn again to go out. And
  * between one thing and the next the dot itself shows for a moment (`bk-bead`) — a thing is what the
- * dot turns into, so the dot is what lies between two things.
+ * dot turns into, so the dot is what lies between two things. With every new thing a thin ring leaves
+ * the middle and is gone inside the big one (`bk-swap`): the turn is seen, not only its result.
  *
  * The only client part of the mark: the rest of `Mascot` is drawn by the server.
  */
@@ -61,6 +62,7 @@ export function GlyphSwap({
         </span>
       ) : null}
       {after > 0 && id !== null ? <span key={`bead-${after}`} className="bk-p bk-bead" /> : null}
+      {changed && id !== null ? <span key={`pop-${id}`} className="bk-p bk-swap" data-after={after > 0 ? "" : undefined} /> : null}
       {id !== null ? (
         <span key={id} className="bk-p bk-glyph" data-swap={changed ? "in" : undefined} data-after={after > 0 ? "" : undefined}>
           <span className="bk-p bk-glyph-act" style={anim ? { animation: anim } : undefined}>

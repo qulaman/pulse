@@ -285,14 +285,6 @@ const GESTURES: GestureEntry[] = [
     loop: false,
   },
   {
-    key: "shake",
-    title: "Дрожь удержания",
-    note: "Короткая дрожь в момент срабатывания удержания, перед позой «слушает» (D-60)",
-    animation: "mascot-shake 220ms ease-in-out both",
-    where: "MascotLever, удержание",
-    loop: false,
-  },
-  {
     key: "breathe",
     title: "Простое дыхание",
     note: "Ровный цикл без пауз — им пульсирует активный шаг конвейера",

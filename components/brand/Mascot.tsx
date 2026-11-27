@@ -10,14 +10,15 @@ import type { MascotSeason } from "@/lib/mascot/season";
  * into three arcs, turns; the light pulses, takes the voice, throws a wave. A thing of the product
  * is never held beside the mark: the dot turns into it — a card, an envelope, a cup, a medal — and
  * back. Each state is its own choreography, read at a glance without a caption:
- *   calm         the pulse: two beats and two waves, a look about, a blink
+ *   calm         the pulse: two beats — the dot, then the ring, then the light — and two waves, a look about, a blink
  *   listening    the ring opens into three arcs, the dot is three bars of the voice, a wave trembles round
+ *                and another comes in from the edge, as bright as the voice is loud
  *   saving       the recording is put away: a note sinks into the ring
- *   transcribing the voice becomes text: three lines written one by one, a comet runs the ring
+ *   transcribing the voice becomes text: three lines written one by one and running off, a comet runs the ring
  *   parsing      the text is sorted: the arcs step round by thirds, three dots take turns
  *   sending      the dot is thrown up, the ring kicks back, one strong wave; a new dot grows
  *   offering     parsed and waiting for the tap: an arrow up, the mark presses itself like a button
- *   thinking     pondering, loading, «не разобрал»: the arcs drift, three dots
+ *   thinking     pondering, loading, «не разобрал»: the arcs drift, the pupil looks up and aside
  *   speaking     the dot beats with the words, a small wave goes with each (D-49)
  *   happy        gold, the dot beams (rays with the beat), sparks
  *   sleeping     the eye is shut, the slowest breath, z-s drift up — the screen before the first tap

@@ -49,12 +49,12 @@ export function MiniMark({
       style={{ width: size, height: size, color: tone, ...style }}
     >
       <svg viewBox="-12 -12 24 24" width={size} height={size}>
-        <circle className="mm-wave" r="8.6" strokeWidth="1.3" />
-        <circle className="mm-ring" r="8.6" strokeWidth="2.4" />
+        <circle className="mm-wave" r="8.6" strokeWidth="1" />
+        <circle className="mm-ring" r="8.6" strokeWidth="1.8" />
         <g className="mm-arcs">
-          <circle r="8.6" strokeWidth="2.4" strokeDasharray="13.2 4.812" strokeLinecap="round" />
+          <circle r="8.6" strokeWidth="1.8" strokeDasharray="13.2 4.812" strokeLinecap="round" />
         </g>
-        <circle className="mm-dot" r="3.3" />
+        <circle className="mm-dot" r="2.9" />
         <g className="mm-bars">
           <path d="M-4.3 -2.4 V2.4" />
           <path d="M0 -4.2 V4.2" />

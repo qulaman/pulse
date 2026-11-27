@@ -447,15 +447,6 @@ h1 { letter-spacing: -0.025em; }
   to { transform: rotate(-20turn); }
 }
 
-/* the lever: a short shiver when the hold fires, before listening takes over (D-60) */
-@keyframes mascot-shake {
-  0%, 100% { transform: translateX(0) rotate(0); }
-  20% { transform: translateX(-3px) rotate(-2deg); }
-  40% { transform: translateX(3px) rotate(2deg); }
-  60% { transform: translateX(-2px) rotate(-1.5deg); }
-  80% { transform: translateX(2px) rotate(1deg); }
-}
-
 /* speaking: the body nods a little with the words */
 @keyframes mascot-talk {
   0% { transform: scale(1) rotate(0deg); animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1); }
