@@ -50,7 +50,7 @@ export type StateLook = {
   /** a loop of what the ring wears (the secretary's headset ringing) */
   wearAnim?: string;
   /** what stands round the ring */
-  extra?: "zzz" | "sparks" | "light" | "confetti";
+  extra?: "sparks" | "light" | "confetti";
 };
 
 const BREATH = "bk-breath 3.4s var(--ease-in-out) infinite";
@@ -79,7 +79,7 @@ export const STATE_LOOK: Record<MascotState, StateLook> = {
   // gold, the dot beams: rays go out of it with the beat, sparks
   happy: { color: "var(--gold)", glyph: "beam", glow: "pulse", extra: "sparks", ringAnim: BREATH, halo: "bk-halo-beat 3.4s var(--ease-in-out) infinite" },
   // the eye is shut, the slowest breath
-  sleeping: { color: SLEEP_COLOR, glyph: "shut", glow: "sleep", extra: "zzz", all: "bk-sleep 5.8s var(--ease-in-out) infinite", halo: "bk-sleep-halo 5.8s var(--ease-in-out) infinite" },
+  sleeping: { color: SLEEP_COLOR, glyph: "shut", glow: "sleep", all: "bk-sleep 5.8s var(--ease-in-out) infinite", halo: "bk-sleep-halo 5.8s var(--ease-in-out) infinite" },
   // news from the base: a comet runs the ring, the pupil follows it
   processing: { color: "var(--accent)", ring: "dim", comet: true, look: "follow", glow: "in", coreAnim: "bk-sync-dot 1.15s var(--ease-in-out) infinite" },
   // «обрати внимание»: a card with «!», two hops
@@ -126,7 +126,7 @@ export type ActLook = {
   comet?: boolean;
   /** the thing flies off or is crushed: the act ends as it goes, nothing of it comes back to go out again */
   leaves?: boolean;
-  extra?: "tunes" | "bubble" | "moon" | "spark" | "drop" | "dust";
+  extra?: "moon" | "spark" | "dust";
 };
 
 const POP = "bk-a-g-pop";
@@ -166,15 +166,13 @@ export const ACT_LOOK: Record<MascotAct, ActLook> = {
   listen: { glyph: "sound", glyphAnim: POP },
   thumb: { glyph: "thumb", glyphAnim: POP },
   watch: { glyph: "clock", glyphAnim: BOB },
-  wipe: { lidAnim: "bk-a-rest", extra: "drop" },
   shuffle: { glyph: "stack", glyphAnim: "bk-a-g-shuffle" },
   coin: { glyph: "coin", color: "var(--gold)", glyphAnim: "bk-a-g-flip", extra: "spark" },
   // ── the small things of a face at rest ──
-  yawn: { ringAnim: "bk-a-inhale", coreAnim: "bk-a-yawn", glyphAnim: "bk-a-yawn" },
-  snore: { ringAnim: "bk-a-inhale", extra: "bubble" },
+  // dozing off: a long breath of the ring, the lid rests — the mark has no mouth to open
+  yawn: { ringAnim: "bk-a-inhale", lidAnim: "bk-a-rest" },
   turn: { ring: "apart", ringAnim: "bk-a-roll", glyphAnim: "bk-a-g-tilt" },
   doze: { all: "bk-a-nodoff" },
-  mumble: { glyphAnim: "bk-a-mumble", coreAnim: "bk-a-mumble" },
   // a good dream: the sleeper warms to gold for a moment, the line of the shut eye lifts, a spark, two waves
   smile: { color: "var(--gold)", glyphAnim: "bk-a-g-lift", extra: "spark", glow: "waves" },
   kick: { all: "bk-a-jerk" },
@@ -184,7 +182,6 @@ export const ACT_LOOK: Record<MascotAct, ActLook> = {
   wink: { lidAnim: "bk-a-wink", ringAnim: "bk-a-cock", extra: "spark" },
   hop: { all: "bk-a-hop" },
   spin: { ring: "apart", ringAnim: "bk-a-spin" },
-  whistle: { coreAnim: "bk-a-purse", lookAnim: "bk-a-lookup", extra: "tunes" },
   heart: { glyph: "heart", glyphAnim: "bk-a-g-beat" },
   orbit: { lookAnim: "bk-a-follow", extra: "moon" },
   peek: { lookAnim: "bk-a-peek", ringAnim: "bk-a-lean" },

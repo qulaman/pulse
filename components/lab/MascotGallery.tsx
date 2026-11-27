@@ -190,10 +190,8 @@ type ActEntry = { act: MascotAct; on: MascotState; title: string; note: string; 
 /** The acts of a face at rest (D-82), each on the state whose pool it belongs to. */
 const ACTS: ActEntry[] = [
   { act: "yawn", on: "sleeping", title: "Зевок", note: "Долгий вдох кольца; точка (или черта закрытого глаза) вытягивается вверх и возвращается" },
-  { act: "snore", on: "sleeping", title: "Храп", note: "Вдох кольца; у кольца растёт тонкий пузырь и лопается" },
   { act: "turn", on: "sleeping", title: "Переворачивается", note: "Ворочается: дуги расходятся и поворачиваются на треть, черта глаза наклоняется" },
   { act: "doze", on: "sleeping", title: "Клюёт носом", note: "Клюёт носом: знак медленно оседает и клонится, рывок вверх — и снова спит" },
-  { act: "mumble", on: "sleeping", title: "Бормочет", note: "Бормочет: черта глаза подрагивает, то шире, то уже" },
   { act: "smile", on: "sleeping", title: "Хороший сон", note: "Хороший сон: спящий знак на миг теплеет до золота, черта закрытого глаза приподнимается, рядом вспыхивает искра, уходят две волны" },
   { act: "kick", on: "sleeping", title: "Бежит во сне", note: "Бежит во сне: два коротких рывка знака в сторону" },
   { act: "scan", on: "calm", title: "Осматривается", note: "Осматривается: кольцо тускнеет, по нему дважды пробегает комета, зрачок идёт за ней" },
@@ -204,7 +202,6 @@ const ACTS: ActEntry[] = [
   { act: "wink", on: "calm", title: "Подмигивает", note: "Подмигивает: точка сплющивается в наклонную черту, кольцо приподнимается с того же бока, рядом вспыхивает искра" },
   { act: "hop", on: "calm", title: "Подпрыгивает", note: "Подпрыгивает: весь знак приседает, взлетает и приземляется" },
   { act: "spin", on: "calm", title: "Кружится", note: "Дуги расходятся и делают полный оборот с разгоном и доводкой" },
-  { act: "whistle", on: "calm", title: "Насвистывает", note: "Насвистывает: точка сжимается и смотрит вверх, от кольца уплывают две ноты" },
   { act: "heart", on: "calm", title: "Сердечко", note: "Точка превращается в сердце, оно бьётся дважды" },
   { act: "orbit", on: "calm", title: "Следит за шариками", note: "Вокруг кольца один раз обходит малая точка, зрачок следит за ней" },
   { act: "peek", on: "alert", title: "Выглядывает", note: "Выглядывает: зрачок уходит до упора влево, потом вправо; кольцо подаётся следом" },
@@ -225,7 +222,6 @@ const ACTS: ActEntry[] = [
   { act: "listen", on: "happy", title: "Объявление", note: "Слушает голосовое: точка — пять полосок звука, бьются вразнобой" },
   { act: "thumb", on: "tuned", title: "Ознакомился", note: "Точка — большой палец вверх" },
   { act: "watch", on: "working", title: "Смотрит на часы", note: "Смотрит на время: точка — часы, покачиваются", carry: { count: 2 } },
-  { act: "wipe", on: "working", title: "Вытирает лоб", note: "Вытер лоб: глаз прикрыт, от кольца отлетает капля", carry: { count: 2 } },
   { act: "shuffle", on: "working", title: "Перебирает карточки", note: "Перебирает стопку: карточки покачиваются из стороны в сторону", carry: { count: 3 } },
   { act: "coin", on: "happy", title: "Пришли очки", note: "Золото. Очки: монета подлетает и переворачивается в воздухе, искра" },
   // the director's face answers the board — the employee's steps and its own decisions (tasks/020)
@@ -593,7 +589,7 @@ export function MascotGallery() {
       <section className="mt-6">
         <h2 className="text-[19px] font-semibold leading-6">Сцены конвейера</h2>
         <p className="mt-1 text-[13px] leading-4 text-muted">
-          MascotScene: лицо плюс то, что живёт вне капли — эквалайзер, полоска этапов, улетающая карточка. Размер лица здесь свой, 112.
+          MascotScene: лицо плюс то, что живёт вне знака — эквалайзер, полоска этапов, улетающая карточка. Размер лица здесь свой, 112.
         </p>
         <div className="mt-3 flex flex-col gap-4">
           {SCENES.map((entry) => (

@@ -42,7 +42,6 @@ const EVENTS: Cell[] = [
 /** The acts of a busy face at rest, and the job of each open ball. */
 const IDLE: Cell[] = [
   { caption: "С делами: часы", state: "working", act: "watch", carry: { count: 2 } },
-  { caption: "С делами: вытирает лоб", state: "working", act: "wipe", carry: { count: 2 } },
   { caption: "С делами: перебирает", state: "working", act: "shuffle", carry: { count: 3 } },
   { caption: "Ждёт: выглядывает", state: "awaiting", act: "peek" },
   { caption: "Шарик «Дела»", state: "checking" },

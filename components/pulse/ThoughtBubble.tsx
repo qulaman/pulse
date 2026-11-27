@@ -10,7 +10,7 @@ import { HazeWords } from "./HazeWords";
 
 /** The full face; a smaller one (a panel open) lets the thought down by the difference. */
 const FACE = 128;
-/** From the face's middle to the thought's bottom over a full face: the trail reaches the head. */
+/** From the face's middle to the thought's bottom over a full face: clear of the mark's own light. */
 const OVER_FACE = FACE / 2 + 26;
 /** The face's own spring when it grows or shrinks: the thought follows it on the same one. */
 const FACE_SPRING = springs.object;
@@ -24,7 +24,7 @@ const TONE_COLOR: Record<SpeechTone, string> = {
 
 /**
  * A thought above the face (D-60): a change on the board — «Марат: задача «…» сдана» —
- * as a cloud with a trail of small circles down to the head. It pops in, hangs for a
+ * as a card over the mark, nothing between them: the mark has no head to think it out of. It pops in, hangs for a
  * while and fades; a tap sends it away sooner. Rendered inside the face's box, so it
  * follows the face wherever the layout puts it. Over the ring it floats above the orbit
  * (`rise`), clear of the top balls and of their taps (D-178). Memoised: the screen keeps its
@@ -82,9 +82,6 @@ export const ThoughtBubble = memo(function ThoughtBubble({
           <HazeWords text={text} delay={0.12} />
         </span>
       </span>
-      {/* the trail: two circles down to the head, the thought's tail */}
-      <span aria-hidden className="absolute left-[58%] top-full mt-1 h-3 w-3 rounded-full border border-border bg-surface" />
-      <span aria-hidden className="absolute left-[54%] top-full mt-[18px] h-2 w-2 rounded-full border border-border bg-surface" />
     </motion.button>
   );
 });

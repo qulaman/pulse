@@ -76,7 +76,7 @@ function Stat({ value, label }: { value: ReactNode; label: ReactNode }) {
 /* -------------------------------------------------------------------------- */
 
 // the waiting screen's little shows, one after another (D-82 §2)
-const HERO_ACTS: MascotAct[] = ["wave", "wink", "heart", "hop", "whistle", "spin"];
+const HERO_ACTS: MascotAct[] = ["wave", "wink", "heart", "hop", "spin"];
 
 function HeroFace() {
   const [turn, setTurn] = useState(0);

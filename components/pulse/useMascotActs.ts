@@ -9,22 +9,23 @@ import { actSurvives } from "@/components/brand/mark/look";
  * What a face may do on its own in each resting state (D-82). A state that is not here is
  * busy — listening, reading, throwing, holding a ball's job — and is left alone.
  *
- * The sleeper's acts stay asleep: a snore, a roll, a nod that jerks it half awake for a
- * moment, a mumble, a smile at a dream, a kick at the thing chasing it in the dream. The
+ * The sleeper's acts stay asleep: a roll, a nod that jerks it half awake for a moment, a
+ * warm moment of a good dream, a start, a long breath. Nothing of a mouth or a body: the mark
+ * is a dot in a ring — no snore, no mumble, no whistle, no sweat (D-218). The
  * awake face, waiting for the director to pick a ball, fidgets the way someone waiting does.
  * The watchful face only looks around harder — D-70: it has no other feelings to show.
  */
-const AWAKE: readonly MascotAct[] = ["wave", "wink", "hop", "spin", "whistle", "heart", "orbit", "yawn", "scan", "limber", "eyeroll", "thump"];
+const AWAKE: readonly MascotAct[] = ["wave", "wink", "hop", "spin", "heart", "orbit", "yawn", "scan", "limber", "eyeroll", "thump"];
 const POOLS: Partial<Record<MascotState, readonly MascotAct[]>> = {
-  sleeping: ["snore", "turn", "doze", "mumble", "smile", "kick", "yawn"],
+  sleeping: ["turn", "doze", "smile", "kick", "yawn"],
   calm: AWAKE,
   happy: AWAKE,
   alert: ["peek", "tiptoe"],
   // the employee's face with work in its hands (D-110): a look at the watch, the brow wiped,
   // a card gone through, a tune, a wink — somebody busy, not somebody waiting
-  working: ["watch", "wipe", "shuffle", "whistle", "wink"],
+  working: ["watch", "shuffle", "wink"],
   // everything is with the director: it looks around, stretches to see, checks the time
-  awaiting: ["peek", "tiptoe", "watch", "whistle", "eyeroll", "scan"],
+  awaiting: ["peek", "tiptoe", "watch", "eyeroll", "scan"],
 };
 
 /** The first act comes a few seconds after the face settles into its state. */
@@ -43,7 +44,7 @@ const GAP_MAX_MS = 25_000;
  * of a pool is small (a glance, a wink, a look round) and comes three times as often: a face that
  * jumps every other time is restless, not resting.
  */
-const BIG: ReadonlySet<MascotAct> = new Set(["hop", "spin", "heart", "whistle", "thump"]);
+const BIG: ReadonlySet<MascotAct> = new Set(["hop", "spin", "heart", "thump"]);
 const SMALL_WEIGHT = 3;
 
 const between = ([min, max]: [number, number]) => min + Math.random() * (max - min);

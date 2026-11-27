@@ -91,7 +91,6 @@ export type WorkAct =
   | "listen"
   | "thumb"
   | "watch"
-  | "wipe"
   | "shuffle"
   | "coin";
 
@@ -109,17 +108,14 @@ export type ErrorAct = "ear" | "scratch" | "pinch" | "nomic" | "signal";
  */
 export type MascotAct =
   | "yawn"
-  | "snore"
   | "turn"
   | "doze"
-  | "mumble"
   | "smile"
   | "kick"
   | "wave"
   | "wink"
   | "hop"
   | "spin"
-  | "whistle"
   | "heart"
   | "orbit"
   | "peek"
@@ -166,21 +162,17 @@ export const ACT_MS: Record<MascotAct, number> = {
   listen: 2000,
   thumb: 1300,
   watch: 1800,
-  wipe: 1800,
   shuffle: 1400,
   coin: 1600,
   yawn: 2200,
-  snore: 2800,
   turn: 2600,
   doze: 2400,
-  mumble: 2600,
   smile: 3200,
   kick: 1600,
   wave: 1800,
   wink: 1300,
   hop: 1000,
   spin: 1300,
-  whistle: 2800,
   heart: 2400,
   orbit: 3600,
   peek: 2800,

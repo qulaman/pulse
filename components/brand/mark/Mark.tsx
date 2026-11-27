@@ -285,20 +285,10 @@ export function Mark({
 
             {tier === "lite" ? null : (
               <>
-                {look.extra === "zzz" ? (
-                  <>
-                    <span className="bk-bit bk-z">
-                      <Bit id="z" />
-                    </span>
-                    <span className="bk-bit bk-z bk-z-2">
-                      <Bit id="z" />
-                    </span>
-                  </>
-                ) : null}
                 {look.extra === "sparks"
                   ? SPARKS.map((spark) => (
                       <span key={spark.delay} className="bk-bit bk-spark" style={{ ...at(spark.x, spark.y), animationDelay: spark.delay }}>
-                        <Bit id="spark" />
+                        <Bit />
                       </span>
                     ))
                   : null}
@@ -315,25 +305,9 @@ export function Mark({
 
                 {part?.extra === "spark" ? (
                   <span className="bk-bit" style={{ ...at(44, -50), animation: once("bk-a-spark") }}>
-                    <Bit id="spark" />
+                    <Bit />
                   </span>
                 ) : null}
-                {part?.extra === "tunes" ? (
-                  <>
-                    <span className="bk-bit" style={{ animation: once("bk-a-tune") }}>
-                      <Bit id="tune" />
-                    </span>
-                    <span className="bk-bit" style={{ animation: once("bk-a-tune2") }}>
-                      <Bit id="tune" />
-                    </span>
-                  </>
-                ) : null}
-                {part?.extra === "drop" ? (
-                  <span className="bk-bit" style={{ animation: once("bk-a-drop") }}>
-                    <Bit id="drop" />
-                  </span>
-                ) : null}
-                {part?.extra === "bubble" ? <span className="bk-bubble" style={{ animation: once("bk-a-bubble") }} /> : null}
                 {part?.extra === "moon" ? (
                   <span className="bk-p bk-moon-path" style={{ animation: once("bk-a-moon", "linear") }}>
                     <i className="bk-moon" />

@@ -74,7 +74,7 @@ const ACTS: Record<SecretaryAct, ActLook> = {
   stretchSide: { ringAnim: "bk-a-lean", lidAnim: "bk-a-rest" },
   clock: { glyph: "clock", glyphAnim: "bk-a-g-bob" },
   papers: { glyph: "stack", glyphAnim: "bk-a-g-shuffle" },
-  plant: { glyph: "plant", glyphAnim: "bk-a-g-pop", extra: "drop" },
+  plant: { glyph: "plant", glyphAnim: "bk-a-g-pop" },
   arrive: { all: "bk-a-hop2", glow: "waves" },
   thanks: { glyph: "heart", glyphAnim: "bk-a-g-beat", extra: "spark" },
 };
@@ -140,7 +140,7 @@ function lookOf({
     return { color: TONE, glyph: "check", glow: "pulse", ringAnim: BREATH, halo: "bk-halo-beat 3.4s var(--ease-in-out) infinite", ...party };
   }
   // at rest: at night it dozes; on a screen nobody has touched it sits still; else it is at its desk
-  if (asleep) return { color: TONE, glyph: "shut", glow: "sleep", extra: "zzz", all: "bk-sleep 5.8s var(--ease-in-out) infinite", halo: "bk-sleep-halo 5.8s var(--ease-in-out) infinite" };
+  if (asleep) return { color: TONE, glyph: "shut", glow: "sleep", all: "bk-sleep 5.8s var(--ease-in-out) infinite", halo: "bk-sleep-halo 5.8s var(--ease-in-out) infinite" };
   if (still) return { color: TONE, glow: "quiet", ...party };
   return { color: TONE, glow: "pulse", look: mini ? "wander" : "desk", blink: true, ringAnim: BREATH, ...party };
 }

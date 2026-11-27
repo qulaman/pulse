@@ -437,33 +437,11 @@ export function Glyph({ id, count = 1, hot = false }: { id: GlyphId; count?: num
   );
 }
 
-/** A sleeper's «z», a spark, a note of a tune, a drop off the brow: the small things round the ring. */
-export function Bit({ id }: { id: "z" | "spark" | "tune" | "drop" }) {
-  if (id === "z") {
-    return (
-      <svg viewBox="-8 -8 16 16" width="16" height="16" aria-hidden>
-        <path d="M-4.5 -5 H4.5 L-4.5 5 H4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
-  }
-  if (id === "spark") {
-    return (
-      <svg viewBox="-8 -8 16 16" width="16" height="16" aria-hidden>
-        <path d="M0 -8 Q0.8 -0.8 8 0 Q0.8 0.8 0 8 Q-0.8 0.8 -8 0 Q-0.8 -0.8 0 -8 Z" fill="currentColor" />
-      </svg>
-    );
-  }
-  if (id === "tune") {
-    return (
-      <svg viewBox="-8 -8 16 16" width="16" height="16" aria-hidden>
-        <ellipse cx="-2.6" cy="4.4" rx="3.3" ry="2.6" fill="currentColor" />
-        <path d="M0.4 4.4 V-6 L5.6 -4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
-  }
+/** A spark: the one small thing that stands round the ring. */
+export function Bit() {
   return (
     <svg viewBox="-8 -8 16 16" width="16" height="16" aria-hidden>
-      <path d="M0 -6.5 C4 -1 5 1.6 5 3 A5 5 0 0 1 -5 3 C-5 1.6 -4 -1 0 -6.5 Z" fill="currentColor" />
+      <path d="M0 -8 Q0.8 -0.8 8 0 Q0.8 0.8 0 8 Q-0.8 0.8 -8 0 Q-0.8 -0.8 0 -8 Z" fill="currentColor" />
     </svg>
   );
 }
