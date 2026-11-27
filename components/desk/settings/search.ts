@@ -15,6 +15,8 @@ export type SettingEntry = {
   href?: string;
   words?: string;
   director?: boolean;
+  /** Only for who is not the director: a row the director has in a section of his own (D-215). */
+  secretary?: boolean;
   /** Lives in «Лаборатория» or «Данные», or leads there: only for who has the developers' tools. */
   devTools?: boolean;
 };
@@ -34,21 +36,30 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   // «Программа»
   { id: "mascot-seasons", tab: "app", place: "Программа", title: "Праздничные наряды маскота", words: "новый год наурыз колпак лицо" },
   { id: "mascot-telegraph", tab: "app", place: "Программа", title: "Лицо сотрудника переживает за дела", words: "маскот волнуется зовёт" },
-  // «Очки и отчёты»
-  { id: "points-enabled", tab: "team", place: "Очки и отчёты", title: "Очки включены", words: "баллы рейтинг магазин" },
-  { id: "rating-mode", tab: "team", place: "Очки и отчёты", title: "Кто видит рейтинг целиком", words: "топ-5 топ рейтинг" },
-  { id: "points-quick", tab: "team", place: "Очки и отчёты", title: "Очки за быстрое «Принял»", words: "быстро минут принял" },
-  { id: "points-on-time", tab: "team", place: "Очки и отчёты", title: "Очки за сдачу в срок", words: "срок досрочно" },
-  { id: "points-late", tab: "team", place: "Очки и отчёты", title: "Штраф за просрочку", words: "минус просрочка опоздание" },
-  { id: "points-report", tab: "team", place: "Очки и отчёты", title: "Очки за отчёт за день", words: "отчёт штраф несданный" },
-  { id: "points-reactions", tab: "team", place: "Очки и отчёты", title: "Цена реакций директора", words: "лайк огонь сердце реакция" },
-  { id: "points-ether", tab: "team", place: "Очки и отчёты", title: "Что попадает в Эфир", words: "похвала награды эфир" },
-  { id: "report-enabled", tab: "team", place: "Очки и отчёты", title: "Ежедневный отчёт", words: "отчёт конец дня", director: true },
-  { id: "report-days", tab: "team", place: "Очки и отчёты", title: "Рабочие дни", words: "пн пт суббота выходные неделя", director: true },
-  { id: "report-holidays", tab: "team", place: "Очки и отчёты", title: "Праздники компании", words: "выходной наурыз курбан", director: true },
-  { id: "report-times", tab: "team", place: "Очки и отчёты", title: "Начало дня и напоминание об отчёте", words: "пришёл время напомнить", director: true },
-  { id: "report-ask", tab: "team", place: "Очки и отчёты", title: "Пульс просит отчёт с", words: "пульс лента отчёт вечер просит не сдан", director: true },
-  { id: "morning-brief", tab: "team", place: "Очки и отчёты", title: "Утренняя сводка сотрудникам", words: "утро пуш дела на сегодня встречи доброе утро", director: true },
+  // the points game: the director's rows live in «Рейтинг» and «Магазин» (D-215); the secretary, who has neither section, keeps them on her tab
+  { id: "points-enabled", tab: "team", place: "Очки и отчёты", title: "Очки включены", words: "баллы рейтинг магазин", secretary: true },
+  { id: "rating-mode", tab: "team", place: "Очки и отчёты", title: "Кто видит рейтинг целиком", words: "топ-5 топ рейтинг", secretary: true },
+  { id: "points-quick", tab: "team", place: "Очки и отчёты", title: "Очки за быстрое «Принял»", words: "быстро минут принял", secretary: true },
+  { id: "points-on-time", tab: "team", place: "Очки и отчёты", title: "Очки за сдачу в срок", words: "срок досрочно", secretary: true },
+  { id: "points-late", tab: "team", place: "Очки и отчёты", title: "Штраф за просрочку", words: "минус просрочка опоздание", secretary: true },
+  { id: "points-report", tab: "team", place: "Очки и отчёты", title: "Очки за отчёт за день", words: "отчёт штраф несданный", secretary: true },
+  { id: "points-reactions", tab: "team", place: "Очки и отчёты", title: "Цена реакций директора", words: "лайк огонь сердце реакция", secretary: true },
+  { id: "points-ether", tab: "team", place: "Очки и отчёты", title: "Что попадает в Эфир", words: "похвала награды эфир", secretary: true },
+  { id: "game-points-enabled", href: "/desk/rating?view=rules&focus=points-enabled", place: "Рейтинг · Правила", title: "Очки включены", words: "баллы рейтинг магазин", director: true },
+  { id: "game-rating-mode", href: "/desk/rating?view=rules&focus=rating-mode", place: "Рейтинг · Правила", title: "Кто видит рейтинг целиком", words: "топ-5 топ рейтинг", director: true },
+  { id: "game-points-quick", href: "/desk/rating?view=rules&focus=points-quick", place: "Рейтинг · Правила", title: "Очки за быстрое «Принял»", words: "быстро минут принял", director: true },
+  { id: "game-points-on-time", href: "/desk/rating?view=rules&focus=points-on-time", place: "Рейтинг · Правила", title: "Очки за сдачу в срок", words: "срок досрочно", director: true },
+  { id: "game-points-late", href: "/desk/rating?view=rules&focus=points-late", place: "Рейтинг · Правила", title: "Штраф за просрочку", words: "минус просрочка опоздание", director: true },
+  { id: "game-points-report", href: "/desk/rating?view=rules&focus=points-report-plus", place: "Рейтинг · Правила", title: "Очки за отчёт за день", words: "отчёт штраф несданный", director: true },
+  { id: "game-points-reactions", href: "/desk/rating?view=rules&focus=points-reactions-prices", place: "Рейтинг · Правила", title: "Цена реакций директора", words: "лайк огонь сердце реакция", director: true },
+  { id: "game-ether-praise", href: "/desk/rating?view=rules&focus=ether-praise", place: "Рейтинг · Правила", title: "Похвала директора — в Эфир", words: "похвала эфир начислить", director: true },
+  { id: "game-ether-merch", href: "/desk/shop?focus=ether-merch", place: "Магазин", title: "Выдача наград — в Эфир", words: "награды эфир выдал магазин настройки", director: true },
+  { id: "report-enabled", tab: "team", place: "Отчёты", title: "Ежедневный отчёт", words: "отчёт конец дня", director: true },
+  { id: "report-days", tab: "team", place: "Отчёты", title: "Рабочие дни", words: "пн пт суббота выходные неделя", director: true },
+  { id: "report-holidays", tab: "team", place: "Отчёты", title: "Праздники компании", words: "выходной наурыз курбан", director: true },
+  { id: "report-times", tab: "team", place: "Отчёты", title: "Начало дня и напоминание об отчёте", words: "пришёл время напомнить", director: true },
+  { id: "report-ask", tab: "team", place: "Отчёты", title: "Пульс просит отчёт с", words: "пульс лента отчёт вечер просит не сдан", director: true },
+  { id: "morning-brief", tab: "team", place: "Отчёты", title: "Утренняя сводка сотрудникам", words: "утро пуш дела на сегодня встречи доброе утро", director: true },
   // ИИ-модель
   { id: "stt-provider", tab: "ai", place: "ИИ-модель", title: "Распознавание речи — провайдер", words: "stt openai whisper deepgram elevenlabs голос" },
   { id: "stt-language", tab: "ai", place: "ИИ-модель", title: "Язык речи", words: "казахский русский смешанная" },
@@ -75,7 +86,7 @@ const fold = (text: string) => foldRu(text).replace(/[«»"]/g, "");
 export function searchSettings(query: string, options: { director: boolean; devTools: boolean }): SettingEntry[] {
   const words = fold(query).split(/\s+/).filter(Boolean);
   if (words.length === 0) return [];
-  const allowed = SETTINGS_INDEX.filter((entry) => (!entry.director || options.director) && (!entry.devTools || options.devTools));
+  const allowed = SETTINGS_INDEX.filter((entry) => (!entry.director || options.director) && (!entry.secretary || !options.director) && (!entry.devTools || options.devTools));
   const scored = allowed
     .map((entry) => {
       const title = fold(entry.title);

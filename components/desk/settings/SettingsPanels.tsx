@@ -7,7 +7,7 @@ import { useDeskParams, writeDeskAddress } from "@/components/desk/DeskAddress";
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { useBrandDraft } from "@/components/desk/settings/brand";
 import { landOn, SaveBar } from "@/components/desk/settings/form";
-import { patchOf, resetOf, SECTION_NAME } from "@/components/desk/settings/sections";
+import { DIRECTOR_TEAM_TAB, patchOf, resetOf, SECTION_NAME } from "@/components/desk/settings/sections";
 import { AiPanel } from "@/components/desk/settings/panels/AiPanel";
 import { AppPanel } from "@/components/desk/settings/panels/AppPanel";
 import { CompanyPanel } from "@/components/desk/settings/panels/CompanyPanel";
@@ -75,7 +75,8 @@ function PanelBone() {
 function Panels({ tab, visited, director }: { tab: SettingsTab; visited: ReadonlySet<SettingsTab>; director: boolean }) {
   const { draft, server, update, conventions, dirty, save, saving } = useDraft();
   const brand = useBrandDraft();
-  const sections = TAB_SECTIONS[tab].filter((key) => dirty[key]);
+  // the director's «Отчёты» holds no points: they are saved where they live, in «Рейтинг» and «Магазин» (D-215)
+  const sections = TAB_SECTIONS[tab].filter((key) => dirty[key] && !(director && key === "points"));
   const brandHere = tab === "company" && brand.dirty;
   const changes = [...(brandHere ? ["Компания"] : []), ...sections.map((key) => SECTION_NAME[key])];
   const busy = sections.some((key) => saving(Object.keys(patchOf(key, draft, conventions))[0] as keyof SettingsPatch)) || (brandHere && brand.saving);
@@ -156,7 +157,7 @@ export function SettingsPanels({ tab }: { tab: SettingsTab }) {
   if (!visited.has(tab)) setVisited(new Set(visited).add(tab));
 
   useShortcuts("Настройки · вкладки", [
-    { keys: ["1", "2", "3", "4"], label: "Компания, Программа, Очки и отчёты, ИИ-модель" },
+    { keys: ["1", "2", "3", "4"], label: `Компания, Программа, ${director ? DIRECTOR_TEAM_TAB.title : "Очки и отчёты"}, ИИ-модель` },
     { keys: ["Ctrl S"], label: "Сохранить вкладку" },
     { keys: ["↑ ↓"], label: "Число или время в поле: шаг (Shift — крупнее)" },
     { keys: ["← →"], label: "Выбор из нескольких: соседний вариант" },
@@ -199,7 +200,10 @@ export function SettingsPanels({ tab }: { tab: SettingsTab }) {
     // another tab changes the page in place (D-184): the title and the tab's settings cross-fade
     <ViewTransition update={SWITCH_SWAP} default="none">
       <div className="flex w-full max-w-[880px] flex-col gap-5">
-        <PageTitle title={meta.title} state={{ text: DESK_ABOUT[tab] ?? meta.about }} />
+        <PageTitle
+          title={director && tab === "team" ? DIRECTOR_TEAM_TAB.title : meta.title}
+          state={{ text: director && tab === "team" ? DIRECTOR_TEAM_TAB.about : (DESK_ABOUT[tab] ?? meta.about) }}
+        />
         <Ready>
           <Panels tab={tab} visited={visited} director={director} />
         </Ready>

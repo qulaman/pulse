@@ -21,6 +21,13 @@ export const SECTION_NAME: Record<SectionKey, string> = {
   voice_retention: "Хранение записей",
 };
 
+/**
+ * The «team» tab on the desk by role (D-215): the director's holds the reports only — the points
+ * live in «Рейтинг» and «Магазин» — so it is called «Отчёты» and saves no points; the secretary's
+ * keeps the phone's «Очки и отчёты».
+ */
+export const DIRECTOR_TEAM_TAB = { title: "Отчёты", about: "отчёт за день, утренняя сводка" } as const;
+
 /** What a section sends — the same shape the phone's own «Сохранить» of that section sends. */
 export function patchOf(key: SectionKey, draft: CompanySettings, conventions: CompanySettings["conventions"]): SettingsPatch {
   switch (key) {

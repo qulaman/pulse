@@ -13,7 +13,8 @@ const TABS = [
   // the tab, the groups it has at least (director)
   ["company", 2],
   ["app", 2],
-  ["team", 5],
+  // the director's «Отчёты»: the daily report and the morning brief — the points live in «Рейтинг» and «Магазин» (D-215)
+  ["team", 2],
   ["ai", 5],
 ] as const;
 
@@ -342,6 +343,7 @@ async function points(ctx: Ctx) {
   const views = [
     ["Digit2", "disputes", main.locator('[data-testid="dispute-card"], [data-testid="desk-empty"]')],
     ["Digit3", "history", main.getByRole("grid", { name: "История очков" }).or(main.getByTestId("desk-empty"))],
+    ["Digit4", "rules", main.getByTestId("rating-rules").locator("[data-settings-group]")],
   ] as const;
   const seen: string[] = [];
   for (const [key, view, mark] of views) {
@@ -368,7 +370,15 @@ async function points(ctx: Ctx) {
       record("очки: история — минусы приглушённые с «−»", sums.length === 0 || bad.length === 0, `сумм ${sums.length}, не так ${bad.length}`);
     }
   }
-  record("рейтинг: клавиши 2–3 — «Споры», «История»", seen.length === views.length, `${seen.join(", ")} · ${APP_URL}`);
+  record("рейтинг: клавиши 2–4 — «Споры», «История», «Правила»", seen.length === views.length, `${seen.join(", ")} · ${APP_URL}`);
+  // the rules of the game live here, not in «Настройки» (D-215): the switch, the prices — looked at, nothing changed
+  const rules = main.getByTestId("rating-rules");
+  const ruleGroups = await rules.locator("[data-settings-group]").count();
+  record(
+    "рейтинг: «Правила» — «Очки включены», цены задач, отчёта и реакций; полосы «Не сохранено» нет",
+    ruleGroups >= 5 && (await rules.locator("#set-points-enabled").count()) === 1 && (await page.getByTestId("settings-savebar").count()) === 0,
+    `групп ${ruleGroups}`,
+  );
 
   // «Магазин»: what waits to be handed out on top, the points on hands beside it, the rewards under
   await open(page, "/desk/shop");
@@ -379,7 +389,22 @@ async function points(ctx: Ctx) {
   record("магазин: шапка — «Ждут выдачи» и «На руках у команды», под ней награды", /ждут выдачи/i.test(shopText) && /на руках у команды/i.test(shopText) && shelf, shopText.split("\n").slice(0, 3).join(" · "));
   const rawShop = shopText.match(/\d{4,}|(?:^|[\s(])-\d/gm) ?? [];
   record("магазин: числа с разрядами и настоящим «−»", rawShop.length === 0, rawShop.slice(0, 4).join(" "));
+  const shopSettings = main.getByTestId("shop-settings");
+  record("магазин: своя настройка — «Выдача наград — в Эфир» под наградами", (await shopSettings.locator("#set-ether-merch").count()) === 1);
   await ctx.shot("shop");
+
+  // and they are gone from the director's «Настройки»: the tab holds the reports and leads here
+  await open(page, "/desk/settings?tab=team");
+  const teamPanel = page.getByTestId("desk-settings-panel-team");
+  await teamPanel.locator("[data-settings-group]").first().waitFor({ timeout: 15_000 }).catch(() => {});
+  const leftovers = (await teamPanel.locator("#set-points-enabled").count()) + (await teamPanel.locator("#set-ether-merch").count()) + (await teamPanel.locator("#set-points-quick").count());
+  record(
+    "настройки: очков и магазина у директора больше нет — вкладка «Отчёты» со ссылкой в «Рейтинг»",
+    leftovers === 0 && (await page.getByTestId("settings-to-rating-rules").count()) === 1 && /Отчёты/.test(await page.locator("#desk-main h1").first().innerText()),
+    `строк очков ${leftovers}`,
+  );
+  await open(page, "/desk/shop");
+  await page.getByTestId("shop-hero").waitFor({ timeout: 20_000 }).catch(() => {});
 
   // «+ Награда» — the desk's form with the card's preview, closed with Esc; nothing saved
   const addItem = page.getByTestId("shop-add-item");

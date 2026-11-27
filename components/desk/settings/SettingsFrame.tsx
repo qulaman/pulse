@@ -9,6 +9,7 @@ import { useDeskParams } from "@/components/desk/DeskAddress";
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { BrandDraftProvider, useBrandDraft } from "@/components/desk/settings/brand";
 import { entryHref, searchSettings, type SettingEntry } from "@/components/desk/settings/search";
+import { DIRECTOR_TEAM_TAB } from "@/components/desk/settings/sections";
 import { DeskLinks, goDesk } from "@/components/desk/ui/DeskLinks";
 import { DeskIcon, type DeskIconName } from "@/components/desk/ui/icons";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
@@ -59,6 +60,7 @@ const NAV_ICON: Record<string, DeskIconName> = {
   company: "company",
   app: "program",
   team: "team",
+  reports: "reports",
   ai: "model",
   dictionary: "dictionary",
   lab: "lab",
@@ -166,7 +168,8 @@ function SettingsNav({ searchRef }: { searchRef: RefObject<HTMLInputElement | nu
   const dirty: Record<SettingsTab, boolean> = {
     company: brand.dirty || !!sections.window,
     app: !!sections.mascot,
-    team: !!(sections.points || sections.daily_report || sections.morning_brief),
+    // the director's tab holds no points (D-215)
+    team: !!((!director && sections.points) || sections.daily_report || sections.morning_brief),
     ai: !!(sections.stt || sections.parser || sections.conventions || sections.voice_retention),
   };
   const onTabs = pathname === "/desk/settings";
@@ -217,8 +220,8 @@ function SettingsNav({ searchRef }: { searchRef: RefObject<HTMLInputElement | nu
               <NavItem
                 key={key}
                 href={`/desk/settings?tab=${key}`}
-                label={SETTINGS_TAB_META[key].title}
-                icon={key}
+                label={director && key === "team" ? DIRECTOR_TEAM_TAB.title : SETTINGS_TAB_META[key].title}
+                icon={director && key === "team" ? "reports" : key}
                 active={current === key}
                 dirty={dirty[key]}
                 testId={`settings-nav-${key}`}

@@ -1,7 +1,6 @@
 "use client";
 
-import { Plus, SlidersHorizontal } from "lucide-react";
-import Link from "next/link";
+import { Plus } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -10,19 +9,21 @@ import { BalancesTable, PERIOD_LABEL } from "@/components/desk/points/BalancesTa
 import { DisputesList } from "@/components/desk/points/DisputesList";
 import { RatingHero } from "@/components/desk/points/Heroes";
 import { LedgerTable } from "@/components/desk/points/LedgerTable";
+import { PointsDraftKeeper, RatingRules, RulesBlock } from "@/components/desk/points/Rules";
 import { useScreenKeys } from "@/components/desk/team/keys";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SearchField, SegmentTabs, Select, Toolbar } from "@/components/desk/ui/Toolbar";
+import { SettingsDraftProvider } from "@/components/settings/draft";
 import { Button } from "@/components/ui/Button";
 import { isTeamMember, usePeople } from "@/lib/people/queries";
 import { useOpenDisputes } from "@/lib/points/game";
 import { usePointsEnabled, type RatingPeriod } from "@/lib/points/queries";
 import { useShopSummary } from "@/lib/shop/queries";
 
-type View = "people" | "disputes" | "history";
+type View = "people" | "disputes" | "history" | "rules";
 
-const VIEWS: readonly View[] = ["people", "disputes", "history"];
+const VIEWS: readonly View[] = ["people", "disputes", "history", "rules"];
 
 /** `?view=` of the address; a push about a dispute comes as `/rating#disputes` (D-133) and lands here with its hash. */
 function viewOf(param: string | null, hash: string): View {
@@ -35,11 +36,21 @@ const PERIODS: RatingPeriod[] = ["week", "month", "all"];
 /**
  * «Рейтинг» (D-215) — a section of the director's desk: who leads. On top the period's podium beside
  * what the company gave by day; under it the whole team by place with «Начислить», the minuses people
- * dispute, and the company's ledger. The period chosen in the head is the podium's and the table's
- * alike. The rating's mode and the rules are a settings section («Очки и отчёты») — linked, not
- * repeated; the rewards and their queue are «Магазин». Balances are sums of the ledger (principle 4).
+ * dispute, the company's ledger, and «Правила» — the settings of the game, which live here and not
+ * in «Настройки»: on or off, who sees the rating, what a task, a report and a reaction pay. The
+ * period chosen in the head is the podium's and the table's alike. The rewards and their queue are
+ * «Магазин». Balances are sums of the ledger (principle 4).
  */
 export function RatingScreen() {
+  return (
+    // the rules are edited as a draft of the company settings, kept for the whole section
+    <SettingsDraftProvider>
+      <RatingBody />
+    </SettingsDraftProvider>
+  );
+}
+
+function RatingBody() {
   const enabled = usePointsEnabled();
   const summary = useShopSummary(true);
   const disputes = useOpenDisputes(true);
@@ -82,10 +93,10 @@ export function RatingScreen() {
     [people.data],
   );
 
-  // N — «Начислить» (to the chosen person of the table), 1–3 — the sections, F — the ledger's search; outside a field
+  // N — «Начислить» (to the chosen person of the table), 1–4 — the sections, F — the ledger's search; outside a field
   useScreenKeys((event) => {
     if (event.shiftKey) return false;
-    const index = ["Digit1", "Digit2", "Digit3"].indexOf(event.code);
+    const index = ["Digit1", "Digit2", "Digit3", "Digit4"].indexOf(event.code);
     if (index >= 0) {
       setView(VIEWS[index]);
       return true;
@@ -101,10 +112,11 @@ export function RatingScreen() {
     return false;
   });
   useShortcuts("Рейтинг", [
-    { keys: ["1", "2", "3"], label: "Места, Споры, История" },
+    { keys: ["1", "2", "3", "4"], label: "Места, Споры, История, Правила" },
     { keys: ["N"], label: "Начислить (выбранному в таблице)" },
     { keys: ["↑ ↓", "Enter"], label: "Выбрать строку · открыть" },
     { keys: ["F"], label: "Поиск по истории" },
+    { keys: ["Ctrl S"], label: "Сохранить правила" },
   ]);
 
   const tools =
@@ -120,7 +132,7 @@ export function RatingScreen() {
         </Select>
         <SearchField ref={search} value={query} onChange={setQuery} placeholder="Причина или имя…" />
       </>
-    ) : (
+    ) : view === "rules" ? null : (
       // the period is the podium's and the table's alike: it stays while the disputes are read
       <SegmentTabs aria-label="Период" value={period} onChange={setPeriod} items={PERIODS.map((value) => ({ value, label: PERIOD_LABEL[value] }))} />
     );
@@ -130,25 +142,15 @@ export function RatingScreen() {
       <div className="pts-screen flex w-full min-w-0 flex-col gap-4">
         <PageTitle
           title="Рейтинг"
-          state={enabled.isPending || on ? null : { text: "Очки выключены — начислять нельзя" }}
+          state={enabled.isPending || on ? null : { text: "Очки выключены — включить можно во вкладке «Правила»" }}
           actions={
-            <>
-              <Link
-                href="/desk/settings?tab=team&focus=points-enabled"
-                className="pts-rules-link inline-flex h-8 items-center gap-1.5 px-2.5 text-[13px] font-medium text-muted hover:text-text"
-                data-testid="points-rules-link"
-                title="Режим рейтинга и правила — в «Настройках», вкладка «Очки и отчёты»"
-              >
-                <SlidersHorizontal size={16} aria-hidden />
-                Правила очков
-              </Link>
-              {/* the button always starts at «Кому»: a name typed after it must never land in the sum */}
-              <Button size="sm" disabled={!on} onClick={() => setAward({})} data-testid="points-award" title="Начислить · N — выбранному в таблице" icon={<Plus size={16} />}>
-                Начислить
-              </Button>
-            </>
+            // the button always starts at «Кому»: a name typed after it must never land in the sum
+            <Button size="sm" disabled={!on} onClick={() => setAward({})} data-testid="points-award" title="Начислить · N — выбранному в таблице" icon={<Plus size={16} />}>
+              Начислить
+            </Button>
           }
         />
+        <PointsDraftKeeper name="Правила очков" open={view === "rules"} />
 
         <RatingHero period={period} summary={summary.data} disputes={disputeCount} onDisputes={() => setView("disputes")} />
 
@@ -161,6 +163,7 @@ export function RatingScreen() {
               { value: "people", label: "Места" },
               { value: "disputes", label: "Споры", count: disputeCount || undefined },
               { value: "history", label: "История" },
+              { value: "rules", label: "Правила" },
             ]}
           />
         </Toolbar>
@@ -180,8 +183,12 @@ export function RatingScreen() {
             />
           ) : view === "disputes" ? (
             <DisputesList />
-          ) : (
+          ) : view === "history" ? (
             <LedgerTable who={who} search={query} />
+          ) : (
+            <RulesBlock name="Правила очков" cards={3} testId="rating-rules">
+              <RatingRules />
+            </RulesBlock>
           )}
         </div>
 

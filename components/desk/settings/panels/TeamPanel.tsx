@@ -4,7 +4,8 @@ import { CalendarPlus, Plus, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
-import { GroupLink, GroupNote, NumberInput, Segmented, SettingRow, SettingsGroup, TimeInput } from "@/components/desk/settings/form";
+import { RatingRules, ShopRules } from "@/components/desk/points/Rules";
+import { GroupLink, GroupNote, SettingRow, SettingsGroup, TimeInput } from "@/components/desk/settings/form";
 import { Popover } from "@/components/desk/ui/Popover";
 import { Switch } from "@/components/desk/ui/Switch";
 import { useDraft } from "@/components/settings/draft";
@@ -12,11 +13,9 @@ import { Button } from "@/components/ui/Button";
 import { Calendar } from "@/components/ui/datetime/Calendar";
 import { kzFixedHolidays } from "@/lib/daily-report/holidays";
 import { parseYmd, todayYmd, WEEKDAYS_SHORT_RU, type Ymd } from "@/lib/datetime/calendar";
-import { REACTION_CODES, REACTION_LABEL } from "@/lib/points/reactions";
 import type { CompanySettings } from "@/lib/settings";
 import { pluralRu } from "@/lib/tasks/status-text";
 
-type Rules = CompanySettings["points_rules"];
 type Report = CompanySettings["daily_report"];
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -124,109 +123,25 @@ function Holidays({ days, onChange }: { days: readonly Ymd[]; onChange: (days: Y
   );
 }
 
-/** A reaction's price: its name, the points it pays. */
-function ReactionPrice({ code, value, onChange }: { code: (typeof REACTION_CODES)[number]; value: number; onChange: (value: number) => void }) {
-  return (
-    <label className="set-price flex items-center gap-2.5 border-b border-border/60 py-0.5">
-      <span className="min-w-0 flex-1 text-[14px] leading-5">{REACTION_LABEL[code]}</span>
-      <NumberInput label={`Очков за ${REACTION_LABEL[code]}`} value={value} max={100000} unit="очк." width={110} onChange={onChange} />
-    </label>
-  );
-}
-
 /**
- * «Очки и отчёты» on the desk: the points' rules (D-133, D-152) — on/off and who sees the rating, what
- * a task, the daily report and the director's reactions pay, what goes to Эфир — and the daily
- * report's days and times (D-152, D-155 §7, the director's). The people themselves are «Команда».
+ * The «team» tab of the desk's settings. The director's is «Отчёты»: the daily report's days and
+ * times (D-152, D-155 §7) and the morning brief — the points' rules and the shop's setting live in
+ * «Рейтинг» and «Магазин» (D-215), a note leads there. The secretary has neither section, so her
+ * tab keeps those rows (D-104). The people themselves are «Команда».
  */
 export function TeamPanel({ director }: { director: boolean }) {
   const { draft, server, update } = useDraft();
-  const rules = draft.points_rules;
-  const saved = server.points_rules;
-  const setRules = (patch: Partial<Rules>) => update({ points_rules: { ...rules, ...patch } });
   const report = draft.daily_report;
   const setReport = (patch: Partial<Report>) => update({ daily_report: { ...report, ...patch } });
-  const off = !draft.points_enabled;
 
   return (
     <div className="flex flex-col gap-6">
-      <SettingsGroup
-        id="points"
-        title="Очки и рейтинг"
-        about="Очки начисляются сами за задачи, отчёты и реакции; директор добавляет свои. Тратятся в магазине."
-        action={director ? <GroupLink href="/desk/rating">Рейтинг и балансы</GroupLink> : null}
-      >
-        <SettingRow id="points-enabled" label="Очки включены" hint="Без них нет рейтинга, начислений и штрафов; магазин работает" htmlFor="ctl-points-enabled" changed={draft.points_enabled !== server.points_enabled}>
-          <Switch id="ctl-points-enabled" label="Очки включены" checked={draft.points_enabled} onChange={(points_enabled) => update({ points_enabled })} />
-        </SettingRow>
-        <SettingRow id="rating-mode" label="Кто видит рейтинг целиком" hint="Директор всегда видит полный список" muted={off} changed={draft.rating_mode !== server.rating_mode}>
-          <Segmented
-            label="Кто видит рейтинг целиком"
-            value={draft.rating_mode}
-            onChange={(rating_mode) => update({ rating_mode })}
-            items={[
-              { value: "top5", label: "Топ-5 всем" },
-              { value: "full", label: "Весь список всем" },
-            ]}
-          />
-        </SettingRow>
-      </SettingsGroup>
-
-      <SettingsGroup id="points-task" title="Сами за задачу" about={off ? "Очки выключены — правила хранятся и заработают, когда их включат." : "Приходят без участия директора, на шагах задачи."}>
-        <SettingRow id="points-quick" label="Принял быстро" hint={`Нажал «Принял» в первые ${rules.quick_accept_min} мин после пуша`} muted={off} changed={rules.quick_accept !== saved.quick_accept}>
-          <NumberInput label="Очков за быстрое «Принял»" value={rules.quick_accept} unit="очк." onChange={(quick_accept) => setRules({ quick_accept })} />
-        </SettingRow>
-        <SettingRow id="points-quick-min" label="Быстро — это" hint="Сколько минут после пуша считаются быстрым ответом" muted={off} changed={rules.quick_accept_min !== saved.quick_accept_min}>
-          <NumberInput label="Минут на «Принял»" value={rules.quick_accept_min} min={1} max={240} unit="мин" onChange={(quick_accept_min) => setRules({ quick_accept_min })} />
-        </SettingRow>
-        <SettingRow id="points-on-time" label="Сдал в срок" hint="Очки приходят, когда директор принял работу" muted={off} changed={rules.on_time !== saved.on_time}>
-          <NumberInput label="Очков за сдачу в срок" value={rules.on_time} unit="очк." onChange={(on_time) => setRules({ on_time })} />
-        </SettingRow>
-        <SettingRow id="points-early" label="Сдал досрочно" hint="В первой половине срока — вместо «в срок»" muted={off} changed={rules.early !== saved.early}>
-          <NumberInput label="Очков за досрочную сдачу" value={rules.early} unit="очк." onChange={(early) => setRules({ early })} />
-        </SettingRow>
-        <SettingRow
-          id="points-late"
-          label="Штраф за просрочку"
-          hint="Не снимается с тех, кто в отпуске или на больничном. Сотрудник может оспорить"
-          htmlFor="ctl-points-late"
-          muted={off}
-          changed={rules.late_on !== saved.late_on || rules.late !== saved.late}
-        >
-          <span className={rules.late_on ? "" : "pointer-events-none opacity-40"}>
-            <NumberInput label="Очков штрафа за просрочку" value={rules.late} unit="очк." onChange={(late) => setRules({ late })} />
-          </span>
-          <Switch id="ctl-points-late" label="Штраф за просрочку" checked={rules.late_on} onChange={(late_on) => setRules({ late_on })} />
-        </SettingRow>
-      </SettingsGroup>
-
-      <SettingsGroup id="points-report" title="За отчёт за день" about="Только в рабочие дни. Штрафуем только тех, кто уже сдал хотя бы один отчёт; в отпуске и на больничном — нет.">
-        <SettingRow id="points-report-plus" label="+ за сданный" hint="Первая сдача за рабочий день" muted={off} changed={rules.daily_report !== saved.daily_report}>
-          <NumberInput label="Очков за сданный отчёт" value={rules.daily_report} unit="очк." onChange={(daily_report) => setRules({ daily_report })} />
-        </SettingRow>
-        <SettingRow id="points-report-minus" label="− за несданный" hint="Утром за прошедший день; можно оспорить" muted={off} changed={rules.daily_report_missed !== saved.daily_report_missed}>
-          <NumberInput label="Очков штрафа за несданный отчёт" value={rules.daily_report_missed} unit="очк." onChange={(daily_report_missed) => setRules({ daily_report_missed })} />
-        </SettingRow>
-      </SettingsGroup>
-
-      <SettingsGroup id="points-reactions" title="Реакция директора на задачу" about="Реакция платит свою цену; 0 — реакция без очков. Сменил реакцию — разница доплачивается или списывается.">
-        <SettingRow id="points-reactions-prices" label="Цена реакций" stack muted={off} changed={!same(rules.reactions, saved.reactions)}>
-          <div className="desk-cells grid grid-cols-2 gap-x-8">
-            {REACTION_CODES.map((code) => (
-              <ReactionPrice key={code} code={code} value={rules.reactions[code]} onChange={(value) => setRules({ reactions: { ...rules.reactions, [code]: value } })} />
-            ))}
-          </div>
-        </SettingRow>
-      </SettingsGroup>
-
-      <SettingsGroup id="points-ether" title="В Эфир — всей команде" about="Хорошие новости, которые видит вся команда. Минусы в Эфир не попадают никогда.">
-        <SettingRow id="ether-merch" label="Выдача наград" hint="«Айгуль — Брендовая куртка» после «Выдал»" htmlFor="ctl-ether-merch" muted={off} changed={draft.ether_events.merch !== server.ether_events.merch}>
-          <Switch id="ctl-ether-merch" label="Выдача наград в Эфир" checked={draft.ether_events.merch} onChange={(merch) => update({ ether_events: { ...draft.ether_events, merch } })} />
-        </SettingRow>
-        <SettingRow id="ether-praise" label="Похвала директора" hint="При «Начислить» можно снять галочку «Сказать в Эфире»" htmlFor="ctl-ether-praise" muted={off} changed={draft.ether_events.praise !== server.ether_events.praise}>
-          <Switch id="ctl-ether-praise" label="Похвала директора в Эфир" checked={draft.ether_events.praise} onChange={(praise) => update({ ether_events: { ...draft.ether_events, praise } })} />
-        </SettingRow>
-      </SettingsGroup>
+      {director ? null : (
+        <>
+          <RatingRules />
+          <ShopRules />
+        </>
+      )}
 
       {director ? (
         <SettingsGroup
@@ -285,6 +200,19 @@ export function TeamPanel({ director }: { director: boolean }) {
       ) : null}
 
       <GroupNote>
+        {director ? (
+          <>
+            Правила очков и рейтинга — в разделе{" "}
+            <Link href="/desk/rating?view=rules" className="font-medium text-text underline underline-offset-2" data-testid="settings-to-rating-rules">
+              «Рейтинг»
+            </Link>
+            , настройки магазина — в{" "}
+            <Link href="/desk/shop?focus=ether-merch" className="font-medium text-text underline underline-offset-2">
+              «Магазине»
+            </Link>
+            .{" "}
+          </>
+        ) : null}
         Люди, роли и пароли — в разделе{" "}
         <Link href="/desk/team" className="font-medium text-text underline underline-offset-2">
           «Команда»
