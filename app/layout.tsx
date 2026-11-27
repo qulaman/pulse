@@ -112,7 +112,15 @@ export const metadata: Metadata = {
   description: "Голосовое управление компанией",
   applicationName: "Pulse",
   manifest: "/manifest.webmanifest",
-  icons: { icon: "/icons/icon-192.png", apple: "/icons/apple-touch-icon.png" },
+  // the mascot's mark (scripts/make-icons.ts); `?v=` — see ICON_V in app/manifest.ts. The tab takes
+  // the heavier drawing (app/favicon.ico, favicon-32), the rest the app icon
+  icons: {
+    icon: [
+      { url: "/icons/favicon-32.png?v=2", sizes: "32x32", type: "image/png" },
+      { url: "/icons/icon-192.png?v=2", sizes: "192x192", type: "image/png" },
+    ],
+    apple: "/icons/apple-touch-icon.png?v=2",
+  },
   // iOS home-screen install: own window, dark status bar
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Pulse" },
   formatDetection: { telephone: false },

@@ -139,11 +139,12 @@ self.addEventListener("push", (event) => {
   const options = {
     body: data.body || "",
     lang: "ru",
-    icon: "/icons/icon-192.png",
+    // the mascot's mark; `?v=` — a new drawing gets a new address (ICON_V in app/manifest.ts)
+    icon: "/icons/icon-192.png?v=2",
     // the status bar and the shade header draw only the alpha of the badge (Android): the
     // colour app icon came out as a blank white square there, so the badge is the bare
-    // pulse line on transparency (D-125)
-    badge: "/icons/badge-96.png",
+    // mark — the ring and the dot — on transparency (D-125)
+    badge: "/icons/badge-96.png?v=2",
     // when it happened, not when the worker got to it (a word held for the morning window)
     timestamp: Number.isNaN(at) ? undefined : at,
     // one bubble per task: a newer word replaces the older one instead of stacking

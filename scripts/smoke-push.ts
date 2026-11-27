@@ -78,7 +78,7 @@ async function main() {
 
     // how the shade shows it (D-125)
     const test = (await page.evaluate(shownScript("push-test"))) as Shown;
-    record("the shade gets the monochrome badge", Boolean(test?.badge.endsWith("/icons/badge-96.png")), test?.badge ?? "no notification");
+    record("the shade gets the monochrome badge", Boolean(test?.badge.includes("/icons/badge-96.png")), test?.badge ?? "no notification");
     record("the notification speaks Russian", test?.lang === "ru", test?.lang ?? "");
     record("it carries the moment of the event", Boolean(test && Math.abs(Date.now() - test.timestamp) < 120_000), String(test?.timestamp ?? ""));
 

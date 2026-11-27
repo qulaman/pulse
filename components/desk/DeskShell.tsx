@@ -214,7 +214,7 @@ function useDeskKeys(role: DeskRole, panel: { isOpen: boolean; close: () => void
 }
 
 /** The icon the tab wears (app/layout.tsx metadata): drawn again with a dot while something waits. */
-const ICON_SRC = "/icons/icon-192.png";
+const ICON_SRC = "/icons/favicon-64.png?v=2";
 const DOT_INK: Record<Exclude<SignalDot, "none">, string> = { wait: "#f5b931", alarm: "#ff453a" };
 const dotted = new Map<SignalDot, Promise<string | null>>();
 
@@ -231,7 +231,7 @@ function dottedIcon(dot: Exclude<SignalDot, "none">): Promise<string | null> {
         const ctx = canvas.getContext("2d");
         if (!ctx) return resolve(null);
         ctx.drawImage(image, 0, 0, 64, 64);
-        // a ring of the icon's own dark ground keeps the dot apart from the pulse line
+        // a ring of the icon's own dark ground keeps the dot apart from the mark
         ctx.fillStyle = "#0b0f14";
         ctx.beginPath();
         ctx.arc(49, 15, 15, 0, Math.PI * 2);

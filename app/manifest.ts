@@ -1,6 +1,13 @@
 import type { MetadataRoute } from "next";
 
-/** Home-screen install: standalone window, brand colours, icons in public/icons. */
+/**
+ * The version of the icons' drawing: the worker keeps /icons/ cache-first and a phone keeps the icon
+ * it installed, so a new drawing gets a new address (`scripts/make-icons.ts`). The same number
+ * stands in app/layout.tsx, public/sw.js and DeskShell.
+ */
+const ICON_V = "?v=2";
+
+/** Home-screen install: standalone window, brand colours, icons in public/icons — the mascot's mark. */
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Pulse",
@@ -17,9 +24,9 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: "#0B0F14",
     theme_color: "#0B0F14",
     icons: [
-      { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-      { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
-      { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: `/icons/icon-192.png${ICON_V}`, sizes: "192x192", type: "image/png" },
+      { src: `/icons/icon-512.png${ICON_V}`, sizes: "512x512", type: "image/png" },
+      { src: `/icons/maskable-512.png${ICON_V}`, sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   };
 }
